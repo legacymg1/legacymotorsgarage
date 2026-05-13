@@ -551,6 +551,10 @@ window.saveClient=async function(){
   const id=editingId||('c_'+Date.now());
   const existing=editingId?clients.find(x=>x.id===editingId):{};
 
+  const freq=document.getElementById('f-freq')?document.getElementById('f-freq').value:'weekly';
+  const lang=document.getElementById('f-lang')?document.getElementById('f-lang').value:'es';
+  const contractDate=document.getElementById('f-contractdate')?document.getElementById('f-contractdate').value:'';
+
   const data={
     name,
     phone:document.getElementById('f-phone').value.trim(),
@@ -561,6 +565,9 @@ window.saveClient=async function(){
     total:Number(document.getElementById('f-total').value)||0,
     down:Number(document.getElementById('f-down').value)||0,
     weekly:Number(document.getElementById('f-weekly').value)||0,
+    freq,
+    lang,
+    contractDate,
     startDate,
     schedule:generateSchedule(startDate,numPay,freq),
     notes:document.getElementById('f-notes').value.trim(),
