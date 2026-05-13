@@ -163,9 +163,9 @@
   }
 
 .client-list{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
-.client-list-header{display:grid;grid-template-columns:180px 1fr 120px 130px 100px 110px;gap:0;background:var(--dark2);padding:8px 16px;border-bottom:1px solid var(--border);}
+.client-list-header{display:grid;grid-template-columns:180px 1fr 120px 130px 90px 120px 110px;gap:0;background:var(--dark2);padding:8px 16px;border-bottom:1px solid var(--border);}
 .cli-header-cell{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);font-weight:600;}
-.client-list-item{display:grid;grid-template-columns:180px 1fr 120px 130px 100px 110px;gap:0;align-items:center;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);border-left:3px solid transparent;transition:background 0.15s;}
+.client-list-item{display:grid;grid-template-columns:180px 1fr 120px 130px 90px 120px 110px;gap:0;align-items:center;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);border-left:3px solid transparent;transition:background 0.15s;}
 .client-list-item:last-child{border-bottom:none;}
 .client-list-item:hover{background:var(--navy2);}
 .client-list-item.overdue{border-left-color:var(--red);background:rgba(255,59,59,0.03);}
@@ -527,6 +527,7 @@ window.renderAll = function() {
       <div class="cli-header-cell">Vehículo</div>
       <div class="cli-header-cell">Teléfono</div>
       <div class="cli-header-cell">Próximo Pago</div>
+      <div class="cli-header-cell">Pago</div>
       <div class="cli-header-cell">Saldo</div>
       <div class="cli-header-cell">Acciones</div>
     </div>`;
@@ -542,6 +543,7 @@ window.renderAll = function() {
         <div class="cli-car">${c.year} ${c.make} ${c.model}</div>
         <div class="cli-phone">${c.phone}</div>
         <div class="cli-next" style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</div>
+        <div style="font-size:13px;color:var(--cream2);font-weight:500;">${formatMoney(c.weekly)}</div>
         <div class="cli-balance">${formatMoney(balance)}</div>
         <div class="cli-actions">
           <button class="cli-btn" style="background:var(--green);color:#000;" onclick="openPayModal('${c.id}')">💵</button>
@@ -662,6 +664,40 @@ window.renderAll = function() {
     });
   }
   html+='</div>';
+
+  // Financial summary - always show in both views
+  if(clients.length > 0) {
+    const now2 = new Date();
+    const endOfMonth2 = new Date(now2.getFullYear(), now2.getMonth()+1, 0);
+    const todayStr2 = today();
+    const endOfMonthStr2 = endOfMonth2.toISOString().split('T')[0];
+    let restanteMes2 = 0;
+    let pagosRestantes2 = 0;
+    clients.forEach(c => {
+      const paidDates2 = getPaidDates(c);
+      (c.schedule||[]).forEach(d => {
+        if(d >= todayStr2 && d <= endOfMonthStr2 && !paidDates2.has(d)) {
+          restanteMes2 += Number(c.weekly||0);
+          pagosRestantes2++;
+        }
+      });
+    });
+    const totalBalance2 = clients.reduce((s,c)=>s+calcBalance(c),0);
+    const totalMonthly2 = clients.reduce((s,c)=>{
+      const freq=c.freq||'weekly'; const w=Number(c.weekly||0);
+      return s+(freq==='monthly'?w:freq==='biweekly'?w*26/12:w*52/12);
+    },0);
+    const totalWeekly2 = clients.reduce((s,c)=>s+Number(c.weekly||0),0);
+    const activeClients2 = clients.filter(c=>calcBalance(c)>0).length;
+    html += `<div class="fin-summary">
+      <div class="fs-item"><div class="fs-label">Restante Este Mes</div><div class="fs-value" style="color:var(--green);">${formatMoney(restanteMes2)}</div><div class="fs-sub">${pagosRestantes2} pagos pendientes</div></div>
+      <div class="fs-item"><div class="fs-label">Ingresos / Mes</div><div class="fs-value">${formatMoney(Math.round(totalMonthly2))}</div><div class="fs-sub">Estimado mensual</div></div>
+      <div class="fs-item"><div class="fs-label">Total Por Cobrar</div><div class="fs-value">${formatMoney(totalBalance2)}</div><div class="fs-sub">${activeClients2} clientes activos</div></div>
+      <div class="fs-item"><div class="fs-label">Pago Promedio</div><div class="fs-value">${formatMoney(Math.round(totalWeekly2/Math.max(clients.length,1)))}</div><div class="fs-sub">Por cliente</div></div>
+      <div class="fs-item"><div class="fs-label">Cartera Total</div><div class="fs-value">${clients.length}</div><div class="fs-sub">Clientes totales</div></div>
+    </div>`;
+  }
+
   main.innerHTML=html;
 };
 
