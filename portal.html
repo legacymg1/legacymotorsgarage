@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legacy Motors Garage - Mi Cuenta</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#1a2035;--navy2:#141828;--navy3:#0f1320;
+    --gold:#c9a84c;--gold2:#e8c97a;--gold3:#8a6520;
+    --red:#ff3b3b;--green:#00c853;--yellow:#ffd600;
+    --text:#f0ede6;--muted:#8a8fa8;--border:#2a3050;--card:#1e2540;
+    --font-display:'Playfair Display',serif;--font-body:'DM Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--navy3);color:var(--text);font-family:var(--font-body);min-height:100vh;}
+
+  #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:radial-gradient(ellipse at 50% 0%,#1e2a4a 0%,#0f1320 60%);}
+  .login-box{background:var(--navy);border:1px solid var(--gold3);border-radius:24px;padding:48px 36px;width:100%;max-width:390px;text-align:center;box-shadow:0 32px 80px rgba(0,0,0,0.6);}
+  .login-logo{width:180px;margin:0 auto 6px;display:block;}
+  .login-tagline{font-size:11px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:32px;}
+  .login-title{font-family:var(--font-display);font-size:20px;color:var(--text);margin-bottom:24px;}
+  .fl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:6px;text-align:left;}
+  .fi{width:100%;background:var(--navy2);border:1px solid var(--border);border-radius:10px;padding:13px 16px;color:var(--text);font-family:var(--font-body);font-size:15px;outline:none;margin-bottom:14px;transition:border-color 0.2s;}
+  .fi:focus{border-color:var(--gold);}
+  .login-btn{width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold2));color:var(--navy3);border:none;border-radius:12px;padding:15px;font-family:var(--font-display);font-size:20px;cursor:pointer;letter-spacing:1px;margin-top:6px;}
+  .login-error{color:var(--red);font-size:13px;margin-top:12px;min-height:18px;}
+  .login-footer{margin-top:24px;font-size:12px;color:var(--muted);}
+
+  #app{display:none;}
+  header{background:var(--navy);border-bottom:1px solid var(--gold3);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100;}
+  .hlogo{display:flex;align-items:center;gap:10px;}
+  .hlogo img{height:36px;}
+  .hlogo-text{font-family:var(--font-display);font-size:16px;color:var(--gold);}
+  .logout-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;}
+
+  .page{max-width:600px;margin:0 auto;padding:24px 20px 60px;}
+
+  /* WELCOME CARD */
+  .welcome-card{background:linear-gradient(135deg,var(--navy),#1e2a4a);border:1px solid var(--gold3);border-radius:20px;padding:28px;margin-bottom:24px;position:relative;overflow:hidden;}
+  .welcome-card::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;background:radial-gradient(circle,rgba(201,168,76,0.15),transparent);border-radius:50%;}
+  .welcome-name{font-family:var(--font-display);font-size:26px;color:var(--gold2);margin-bottom:4px;}
+  .welcome-car{font-size:14px;color:var(--muted);margin-bottom:20px;}
+  .balance-amount{font-family:var(--font-display);font-size:42px;color:var(--text);margin-bottom:4px;}
+  .balance-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;}
+
+  /* PROGRESS */
+  .progress-section{margin-top:20px;}
+  .progress-bar-wrap{background:rgba(255,255,255,0.08);border-radius:6px;height:8px;overflow:hidden;margin:8px 0;}
+  .progress-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--gold3),var(--gold2));transition:width 0.8s ease;}
+  .progress-info{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);}
+
+  /* NEXT PAYMENT CARD */
+  .next-pay-card{border-radius:16px;padding:20px 24px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+  .next-pay-card.ok{background:rgba(0,200,83,0.08);border:1px solid rgba(0,200,83,0.3);}
+  .next-pay-card.soon{background:rgba(255,214,0,0.08);border:1px solid rgba(255,214,0,0.3);}
+  .next-pay-card.overdue{background:rgba(255,59,59,0.08);border:1px solid rgba(255,59,59,0.3);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{border-color:rgba(255,59,59,0.3);}50%{border-color:rgba(255,59,59,0.7);}}
+  .npc-label{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
+  .npc-label.ok{color:var(--green);}
+  .npc-label.soon{color:var(--yellow);}
+  .npc-label.overdue{color:var(--red);}
+  .npc-date{font-family:var(--font-display);font-size:22px;}
+  .npc-days{font-size:13px;margin-top:2px;}
+  .npc-days.ok{color:var(--green);}
+  .npc-days.soon{color:var(--yellow);}
+  .npc-days.overdue{color:var(--red);}
+  .npc-amount{text-align:right;}
+  .npc-amount-value{font-family:var(--font-display);font-size:28px;color:var(--gold2);}
+  .npc-amount-label{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  /* CONTACT BTN */
+  .contact-btn{width:100%;background:linear-gradient(135deg,#128C7E,#25d366);color:#000;border:none;border-radius:14px;padding:16px;font-family:var(--font-display);font-size:20px;cursor:pointer;margin-bottom:16px;letter-spacing:1px;display:flex;align-items:center;justify-content:center;gap:10px;}
+
+  /* SECTION */
+  .section-title{font-family:var(--font-display);font-size:18px;color:var(--muted);margin:24px 0 12px;}
+
+  /* PAYMENT LIST */
+  .pay-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+  .pay-item-left{}
+  .pay-num{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;}
+  .pay-date-text{font-size:15px;font-weight:500;}
+  .pay-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+  .pb-paid{background:rgba(0,200,83,0.15);color:var(--green);border:1px solid var(--green);}
+  .pb-overdue{background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);}
+  .pb-next{background:rgba(255,214,0,0.12);color:var(--yellow);border:1px solid var(--yellow);}
+  .pb-pending{background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid var(--border);}
+
+  /* INFO ROWS */
+  .info-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;}
+  .info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+  .info-row:last-child{border-bottom:none;}
+  .ir-label{font-size:13px;color:var(--muted);}
+  .ir-value{font-size:14px;font-weight:600;}
+
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-track{background:var(--navy3);}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+  @media(max-width:480px){.login-box{padding:36px 24px;}.welcome-name{font-size:22px;}.balance-amount{font-size:34px;}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <img src="logo.png" class="login-logo" onerror="this.style.display='none'">
+    <div class="login-tagline">Drive Your Legacy</div>
+    <div class="login-title">Consulta tu cuenta</div>
+    <label class="fl">Número de Teléfono</label>
+    <input class="fi" type="tel" id="l-phone" placeholder="(559) 123-4567" onkeydown="if(event.key==='Enter')doLogin()">
+    <label class="fl">Contraseña</label>
+    <input class="fi" type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">VER MI CUENTA</button>
+    <div class="login-error" id="l-error"></div>
+    <div class="login-footer">¿Necesitas ayuda? <a href="https://wa.me/15592345678">Contáctanos</a></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="hlogo">
+      <img src="logo.png" onerror="this.style.display='none'">
+      <div class="hlogo-text">Legacy Motors Garage</div>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">Salir</button>
+  </header>
+
+  <div class="page" id="portal-content"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
+  authDomain: "legacy-motors-garage.firebaseapp.com",
+  projectId: "legacy-motors-garage",
+  storageBucket: "legacy-motors-garage.firebasestorage.app",
+  messagingSenderId: "783567672493",
+  appId: "1:783567672493:web:3a825f2f59ec1c25e9a224",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let currentClient = null;
+
+function normalizePhone(p) { return p.replace(/\D/g,''); }
+function today() { return new Date().toISOString().split('T')[0]; }
+function addDays(dateStr,n) { const d=new Date(dateStr+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
+function formatDate(d) { if(!d) return '—'; const [y,m,day]=d.split('-'); return `${m}/${day}/${y}`; }
+function formatMoney(n) { return '$'+Number(n).toLocaleString('en-US'); }
+function daysUntil(dateStr) { if(!dateStr) return 999; const now=new Date(); now.setHours(0,0,0,0); const d=new Date(dateStr+'T00:00:00'); return Math.round((d-now)/86400000); }
+function getPaidDates(c) { return new Set((c.payments||[]).map(p=>p.schedDate).filter(Boolean)); }
+function getNextPayDate(c) { const s=c.schedule||[]; const pd=getPaidDates(c); for(const d of s){if(!pd.has(d))return d;} return s[s.length-1]||null; }
+function getPaidCount(c) { return (c.payments||[]).filter(p=>p.schedDate).length; }
+function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0); }
+function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
+function calcProgress(c) { const t=Number(c.total); if(!t) return 0; return Math.min(100,Math.round(calcPaid(c)/t*100)); }
+function getStatus(c) { const n=getNextPayDate(c); if(!n) return 'ok'; const d=daysUntil(n); if(d<0) return 'overdue'; if(d<=3) return 'soon'; return 'ok'; }
+
+window.doLogin = async function() {
+  const phone = normalizePhone(document.getElementById('l-phone').value);
+  const pass = document.getElementById('l-pass').value.trim();
+  const errEl = document.getElementById('l-error');
+  errEl.textContent = 'Verificando...';
+
+  if(!phone||!pass){errEl.textContent='Ingresa tu teléfono y contraseña';return;}
+
+  try {
+    const snap = await getDocs(collection(db,'clients'));
+    const match = snap.docs.map(d=>({id:d.id,...d.data()})).find(c =>
+      normalizePhone(c.phone||'') === phone && (c.portalPass||'') === pass
+    );
+    if(match){
+      currentClient = match;
+      errEl.textContent = '';
+      document.getElementById('login-screen').style.display='none';
+      document.getElementById('app').style.display='block';
+      renderPortal();
+    } else {
+      errEl.textContent = 'Teléfono o contraseña incorrectos';
+    }
+  } catch(e) {
+    errEl.textContent = 'Error de conexión. Intenta de nuevo.';
+  }
+};
+
+window.doLogout = function() {
+  currentClient = null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('l-phone').value='';
+  document.getElementById('l-pass').value='';
+};
+
+function renderPortal() {
+  const c = currentClient;
+  const balance = calcBalance(c);
+  const paid = calcPaid(c);
+  const progress = calcProgress(c);
+  const paidCount = getPaidCount(c);
+  const totalPay = (c.schedule||[]).length;
+  const nextPay = getNextPayDate(c);
+  const status = getStatus(c);
+  const days = daysUntil(nextPay);
+  const paidDates = getPaidDates(c);
+  const todayStr = today();
+
+  // Next pay card content
+  let npcLabel, npcDays;
+  if(status==='overdue'){
+    npcLabel='⚠️ Pago Vencido';
+    npcDays=`Venció hace ${Math.abs(days)} día${Math.abs(days)!==1?'s':''}`;
+  } else if(status==='soon'){
+    npcLabel='⏰ Pago Próximo';
+    npcDays=days===0?'Vence HOY':`Vence en ${days} día${days!==1?'s':''}`;
+  } else {
+    npcLabel='✅ Al Corriente';
+    npcDays=`Próximo pago en ${days} días`;
+  }
+
+  // WhatsApp number (use dealership number)
+  const waNum = '15592345678'; // ← Cambia al número de tu negocio
+
+  // Build schedule list
+  let schedHTML = '';
+  if(c.schedule&&c.schedule.length){
+    schedHTML = `<div class="section-title">Calendario de Pagos</div>`;
+    c.schedule.forEach((d,i)=>{
+      let badgeCls='pb-pending', badgeLabel='Pendiente';
+      if(paidDates.has(d)){badgeCls='pb-paid';badgeLabel='✓ Pagado';}
+      else if(d===nextPay&&d<todayStr){badgeCls='pb-overdue';badgeLabel='Vencido';}
+      else if(d===nextPay){badgeCls='pb-next';badgeLabel='Próximo';}
+      schedHTML+=`<div class="pay-item">
+        <div class="pay-item-left">
+          <div class="pay-num">Pago #${i+1}</div>
+          <div class="pay-date-text">${formatDate(d)}</div>
+        </div>
+        <span class="pay-badge ${badgeCls}">${badgeLabel}</span>
+      </div>`;
+    });
+  }
+
+  document.getElementById('portal-content').innerHTML = `
+    <!-- WELCOME -->
+    <div class="welcome-card">
+      <div class="welcome-name">Hola, ${c.name.split(' ')[0]} 👋</div>
+      <div class="welcome-car">${c.year} ${c.make} ${c.model}</div>
+      <div class="balance-amount">${formatMoney(balance)}</div>
+      <div class="balance-label">Saldo pendiente</div>
+      <div class="progress-section">
+        <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
+        <div class="progress-info">
+          <span>${formatMoney(paid)} pagado</span>
+          <span>${paidCount} de ${totalPay} pagos · ${progress}%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEXT PAYMENT -->
+    <div class="next-pay-card ${status}">
+      <div>
+        <div class="npc-label ${status}">${npcLabel}</div>
+        <div class="npc-date">${formatDate(nextPay)}</div>
+        <div class="npc-days ${status}">${npcDays}</div>
+      </div>
+      <div class="npc-amount">
+        <div class="npc-amount-value">${formatMoney(c.weekly)}</div>
+        <div class="npc-amount-label">pago semanal</div>
+      </div>
+    </div>
+
+    <!-- CONTACT -->
+    <button class="contact-btn" onclick="window.open('https://wa.me/${waNum}?text=${encodeURIComponent(`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`)}')" >
+      📱 Contactar a Legacy Motors Garage
+    </button>
+
+    <!-- CAR INFO -->
+    <div class="section-title">Mi Vehículo</div>
+    <div class="info-card">
+      <div class="info-row"><span class="ir-label">Vehículo</span><span class="ir-value">${c.year} ${c.make} ${c.model}</span></div>
+      <div class="info-row"><span class="ir-label">Precio total</span><span class="ir-value">${formatMoney(c.total)}</span></div>
+      <div class="info-row"><span class="ir-label">Down payment</span><span class="ir-value">${formatMoney(c.down)}</span></div>
+      <div class="info-row"><span class="ir-label">Pago semanal</span><span class="ir-value">${formatMoney(c.weekly)}</span></div>
+      <div class="info-row"><span class="ir-label">Total pagado</span><span class="ir-value" style="color:var(--green)">${formatMoney(paid)}</span></div>
+      <div class="info-row"><span class="ir-label">Saldo restante</span><span class="ir-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
+    </div>
+
+    ${schedHTML}
+  `;
+}
+</script>
+</body>
+</html>

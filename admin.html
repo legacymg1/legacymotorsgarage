@@ -1,0 +1,927 @@
+<!DOCTYPE html><!-- LMG CRM v3.1 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legacy Motors Garage - CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1a2035; --navy2: #141828; --navy3: #0f1320;
+    --gold: #c9a84c; --gold2: #e8c97a; --gold3: #8a6520;
+    --red: #ff3b3b; --green: #00c853; --yellow: #ffd600;
+    --text: #f0ede6; --muted: #8a8fa8; --border: #2a3050; --card: #1e2540;
+    --font-display: 'Playfair Display', serif; --font-body: 'DM Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--navy3); color: var(--text); font-family: var(--font-body); min-height: 100vh; }
+
+  /* LOGIN */
+  #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; background: radial-gradient(ellipse at center, #1a2035 0%, #0f1320 100%); }
+  .login-box { background: var(--navy); border: 1px solid var(--gold3); border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 380px; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.5); }
+  .login-logo-img { width: 180px; margin-bottom: 24px; }
+  .login-title { font-family: var(--font-display); font-size: 16px; color: var(--gold2); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 32px; }
+  .login-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 6px; text-align: left; }
+  .login-input { width: 100%; background: var(--navy2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; color: var(--text); font-family: var(--font-body); font-size: 15px; outline: none; margin-bottom: 16px; transition: border-color 0.2s; }
+  .login-input:focus { border-color: var(--gold); }
+  .login-btn { width: 100%; background: linear-gradient(135deg, var(--gold3), var(--gold)); color: var(--navy3); border: none; border-radius: 10px; padding: 14px; font-family: var(--font-display); font-size: 20px; cursor: pointer; letter-spacing: 1px; margin-top: 4px; transition: opacity 0.2s; }
+  .login-btn:hover { opacity: 0.9; }
+  .login-error { color: var(--red); font-size: 13px; margin-top: 10px; }
+
+  /* APP */
+  #app { display: none; }
+  header { background: var(--navy); border-bottom: 2px solid var(--gold3); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 64px; position: sticky; top: 0; z-index: 100; }
+  .header-logo { display: flex; align-items: center; gap: 12px; }
+  .header-logo img { height: 40px; }
+  .header-logo-text { font-family: var(--font-display); font-size: 18px; color: var(--gold); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .sync-status { font-size: 12px; color: var(--green); }
+  .sync-status.offline { color: var(--red); }
+  .logout-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  .logout-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  .stats-bar { display: flex; gap: 12px; padding: 20px 24px; overflow-x: auto; }
+  .stat-card { background: var(--navy); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; min-width: 150px; flex: 1; }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 6px; }
+  .stat-value { font-family: var(--font-display); font-size: 32px; }
+  .sv-gold { color: var(--gold); } .sv-red { color: var(--red); } .sv-yellow { color: var(--yellow); } .sv-green { color: var(--green); }
+
+  main { padding: 0 24px 80px; }
+  .section-title { font-family: var(--font-display); font-size: 20px; color: var(--muted); margin: 24px 0 12px; }
+
+  .alert-banner { background: linear-gradient(135deg,#3d1a1a,#2a0f0f); border: 1px solid var(--red); border-left: 4px solid var(--red); border-radius: 10px; padding: 14px 18px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { border-left-color: var(--red); } 50% { border-left-color: #ff8080; } }
+  .alert-info { flex: 1; }
+  .alert-name { font-weight: 600; font-size: 15px; }
+  .alert-detail { font-size: 13px; color: #ff8080; margin-top: 2px; }
+  .btn-msg { background: var(--red); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+
+  .clients-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .client-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: transform 0.2s; }
+  .client-card:hover { transform: translateY(-2px); }
+  .client-card.overdue { border-color: var(--red); }
+  .client-card.soon { border-color: var(--yellow); }
+  .client-card.ok { border-color: var(--green); }
+
+  .card-header { padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .client-name { font-weight: 600; font-size: 16px; }
+  .client-phone { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .badge-overdue { background: rgba(255,59,59,0.15); color: var(--red); border: 1px solid var(--red); }
+  .badge-soon { background: rgba(255,214,0,0.12); color: var(--yellow); border: 1px solid var(--yellow); }
+  .badge-ok { background: rgba(0,200,83,0.12); color: var(--green); border: 1px solid var(--green); }
+
+  .card-body { padding: 14px 16px; }
+  .car-info { font-family: var(--font-display); font-size: 18px; color: var(--gold); margin-bottom: 12px; }
+  .payment-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .pay-label { font-size: 12px; color: var(--muted); }
+  .pay-value { font-size: 14px; font-weight: 600; }
+  .progress-bar-wrap { background: var(--border); border-radius: 4px; height: 6px; margin: 12px 0 8px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--gold3), var(--gold)); }
+  .progress-label { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+
+  .schedule-toggle { width: 100%; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 8px 12px; font-family: var(--font-body); font-size: 12px; cursor: pointer; margin-top: 12px; text-align: left; }
+  .schedule-toggle:hover { border-color: var(--gold); color: var(--gold); }
+  .schedule-list { margin-top: 8px; max-height: 180px; overflow-y: auto; }
+  .schedule-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .schedule-item:last-child { border-bottom: none; }
+  .sched-num { color: var(--muted); min-width: 28px; }
+  .sched-date { flex: 1; }
+  .sched-paid { color: var(--green); font-weight: 700; }
+  .sched-overdue { color: var(--red); font-weight: 700; }
+  .sched-next { color: var(--yellow); font-weight: 700; }
+  .sched-upcoming { color: var(--muted); }
+
+  .card-actions { padding: 10px 16px 14px; display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 9px 12px; border-radius: 8px; font-family: var(--font-body); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.2s; }
+  .btn-pay { background: var(--green); color: #000; }
+  .btn-whatsapp { background: #25d366; color: #000; }
+  .btn-edit { background: var(--border); color: var(--text); }
+  .btn-delete { background: rgba(255,59,59,0.15); color: var(--red); border: 1px solid var(--red); flex: 0; padding: 9px 14px; }
+
+  .fab { position: fixed; bottom: 28px; right: 24px; background: linear-gradient(135deg,var(--gold3),var(--gold)); color: var(--navy3); border: none; border-radius: 50px; padding: 14px 22px; font-family: var(--font-display); font-size: 18px; cursor: pointer; box-shadow: 0 6px 24px rgba(201,168,76,0.4); z-index: 200; transition: transform 0.2s; }
+  .fab:hover { transform: translateY(-3px); }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 18px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 28px; }
+  .modal-title { font-family: var(--font-display); font-size: 26px; color: var(--gold); margin-bottom: 24px; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+  .form-input { width: 100%; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: var(--font-body); font-size: 14px; outline: none; transition: border-color 0.2s; }
+  .form-input:focus { border-color: var(--gold); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-hint { font-size: 11px; color: var(--gold); margin-top: 4px; min-height: 16px; }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+  .btn-save { flex: 1; background: linear-gradient(135deg,var(--gold3),var(--gold)); color: var(--navy3); border: none; border-radius: 10px; padding: 12px; font-family: var(--font-display); font-size: 20px; cursor: pointer; }
+  .btn-cancel { background: var(--border); color: var(--text); border: none; border-radius: 10px; padding: 12px 20px; font-size: 14px; cursor: pointer; }
+
+  .payment-history { max-height: 200px; overflow-y: auto; margin: 12px 0; }
+  .payment-entry { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .payment-entry:last-child { border-bottom: none; }
+
+  .msg-preview { background: var(--navy2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; font-size: 14px; line-height: 1.6; margin: 12px 0; white-space: pre-wrap; }
+
+  .startup-modal-inner { background: linear-gradient(135deg,#1e0a0a,#2a1010); border: 2px solid var(--red); }
+  .startup-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #3d1a1a; gap: 12px; }
+  .startup-item:last-child { border-bottom: none; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-icon { font-size: 64px; margin-bottom: 16px; }
+  .empty-text { font-family: var(--font-display); font-size: 22px; margin-bottom: 8px; }
+
+  .search-wrap { padding: 0 24px 16px; }
+  .search-input { width: 100%; background: var(--navy); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; color: var(--text); font-size: 14px; outline: none; }
+  .search-input:focus { border-color: var(--gold); }
+  .search-input::placeholder { color: var(--muted); }
+
+  .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--navy3); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 600px) {
+    .stats-bar { gap: 8px; padding: 16px; }
+    main { padding: 0 16px 80px; }
+    .search-wrap { padding: 0 16px 12px; }
+    header { padding: 0 16px; }
+    .clients-grid { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    .login-box { padding: 32px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <img src="logo.png" class="login-logo-img" onerror="this.style.display='none'">
+    <div class="login-title">Panel Administrativo</div>
+    <label class="login-label">Contraseña</label>
+    <input class="login-input" type="password" id="admin-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')adminLogin()">
+    <button class="login-btn" onclick="adminLogin()">ENTRAR</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="header-logo">
+      <img src="logo.png" onerror="this.style.display='none'">
+      <div class="header-logo-text">Legacy Motors Garage</div>
+    </div>
+    <div class="header-right">
+      <span class="sync-status" id="sync-status">● En línea</span>
+      <button class="logout-btn" onclick="adminLogout()">Salir</button>
+    </div>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-card"><div class="stat-label">Clientes</div><div class="stat-value sv-gold" id="stat-total">0</div></div>
+    <div class="stat-card"><div class="stat-label">Vencidos</div><div class="stat-value sv-red" id="stat-overdue">0</div></div>
+    <div class="stat-card"><div class="stat-label">Esta semana</div><div class="stat-value sv-yellow" id="stat-soon">0</div></div>
+    <div class="stat-card"><div class="stat-label">Al corriente</div><div class="stat-value sv-green" id="stat-ok">0</div></div>
+  </div>
+
+  <!-- TODAY BOX -->
+<div id="today-box" style="display:none;margin:0 24px 16px;background:var(--card);border:1px solid var(--gold);border-radius:14px;overflow:hidden;">
+  <div style="background:linear-gradient(135deg,var(--gold3),var(--gold));padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-family:var(--font-display);font-size:20px;color:var(--navy3);letter-spacing:1px;">📅 PAGOS DE HOY</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="sendDayMessages()" style="background:var(--navy3);color:var(--gold);border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">💬 ENVIAR SMS A TODOS</button>
+      <button onclick="exportCalendar()" style="background:var(--navy3);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">📆 EXPORTAR CALENDARIO</button>
+    </div>
+  </div>
+  <div id="today-list" style="padding:16px 20px;"></div>
+</div>
+
+<div class="search-wrap">
+    <input class="search-input" placeholder="🔍 Buscar cliente o carro..." id="search-box" oninput="renderAll()">
+  </div>
+
+  <main id="main-content"><div class="loading">Cargando clientes...</div></main>
+  <button class="fab" onclick="openAddModal()">+ AGREGAR CLIENTE</button>
+</div>
+
+<!-- STARTUP OVERDUE -->
+<div class="modal-overlay" id="startup-modal">
+  <div class="modal startup-modal-inner">
+    <div class="modal-title" style="color:var(--red)">⚠️ PAGOS VENCIDOS</div>
+    <div style="font-size:13px;color:#ff8080;margin-bottom:16px;">Clientes con pagos atrasados:</div>
+    <div id="startup-list"></div>
+    <div class="modal-actions"><button class="btn-save" onclick="closeModal('startup-modal')" style="background:var(--red)">ENTENDIDO</button></div>
+  </div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">NUEVO CLIENTE</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="f-name" placeholder="Juan García"></div>
+      <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="f-phone" placeholder="(559) 123-4567" type="tel"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Idioma de Comunicación</label>
+      <select class="form-input" id="f-lang">
+        <option value="es">🇲🇽 Español</option>
+        <option value="en">🇺🇸 English</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Contraseña Portal</label><input class="form-input" id="f-pass" placeholder="Crea una contraseña"></div>
+      <div class="form-group"><label class="form-label">Año del Carro</label><input class="form-input" id="f-year" placeholder="2019" type="number"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Marca</label><input class="form-input" id="f-make" placeholder="Toyota"></div>
+      <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="f-model" placeholder="Camry"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Precio Total ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcHint()"></div>
+      <div class="form-group"><label class="form-label">Down Payment ($)</label><input class="form-input" id="f-down" placeholder="1000" type="number" oninput="calcHint()"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Monto de Pago ($)</label><input class="form-input" id="f-weekly" placeholder="150" type="number" oninput="calcHint()"><div class="form-hint" id="f-weekly-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Ingresa el monto según la frecuencia seleccionada</div></div>
+      <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="calcHint()"><div class="form-hint" id="f-hint"></div></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Frecuencia de Pago</label>
+      <select class="form-input" id="f-freq" oninput="calcHint()">
+        <option value="weekly">Semanal (cada 7 días)</option>
+        <option value="biweekly">Quincenal (cada 14 días)</option>
+        <option value="monthly">Mensual (mismo día cada mes)</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Fecha Primer Pago</label><input class="form-input" id="f-startdate" type="date" oninput="calcHint()"></div>
+    <div class="form-group"><label class="form-label">Notas</label><input class="form-input" id="f-notes" placeholder="Información adicional..."></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('add-modal')">Cancelar</button>
+      <button class="btn-save" id="save-btn" onclick="saveClient()">GUARDAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div class="modal-overlay" id="pay-modal">
+  <div class="modal">
+    <div class="modal-title">REGISTRAR PAGO</div>
+    <div id="pay-client-info" style="margin-bottom:16px;font-size:14px;line-height:1.8;"></div>
+    <div class="form-group"><label class="form-label">Monto ($)</label><input class="form-input" id="pay-amount" type="number"></div>
+    <div class="form-group"><label class="form-label">Fecha de Pago</label><input class="form-input" id="pay-date" type="date"></div>
+    <div style="font-family:var(--font-display);font-size:16px;color:var(--muted);margin-top:16px;">HISTORIAL</div>
+    <div class="payment-history" id="pay-history"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('pay-modal')">Cancelar</button>
+      <button class="btn-save" onclick="confirmPayment()">CONFIRMAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- WHATSAPP MODAL -->
+<div class="modal-overlay" id="wa-modal">
+  <div class="modal">
+    <div class="modal-title">💬 MENSAJE SMS</div>
+    <div class="msg-preview" id="wa-preview"></div>
+    <div class="form-group"><label class="form-label">Editar mensaje</label><textarea class="form-input" id="wa-text" rows="6" style="resize:vertical;"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('wa-modal')">Cancelar</button>
+      <button class="btn-save" onclick="sendWhatsApp()" style="background:linear-gradient(135deg,#2196F3,#1565C0)">ENVIAR SMS</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
+  authDomain: "legacy-motors-garage.firebaseapp.com",
+  projectId: "legacy-motors-garage",
+  storageBucket: "legacy-motors-garage.firebasestorage.app",
+  messagingSenderId: "783567672493",
+  appId: "1:783567672493:web:3a825f2f59ec1c25e9a224",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ---- ADMIN AUTH (simple password) ----
+const ADMIN_PASS = "lmg2025admin"; // ← Cambia esta contraseña
+
+window.adminLogin = function() {
+  const pass = document.getElementById('admin-pass').value;
+  if (pass === ADMIN_PASS) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    startListening();
+  } else {
+    document.getElementById('login-error').textContent = 'Contraseña incorrecta';
+  }
+};
+
+window.adminLogout = function() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('admin-pass').value = '';
+};
+
+// ---- HELPERS ----
+let clients = [];
+let editingId = null, payingId = null, waPhone = null;
+
+function today() { return new Date().toISOString().split('T')[0]; }
+function addDays(dateStr, n) { const d = new Date(dateStr+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
+function formatDate(d) { if(!d) return '—'; const [y,m,day]=d.split('-'); return `${m}/${day}/${y}`; }
+function formatMoney(n) { return '$'+Number(n).toLocaleString('en-US'); }
+function daysUntil(dateStr) { if(!dateStr) return 999; const now=new Date(); now.setHours(0,0,0,0); const d=new Date(dateStr+'T00:00:00'); return Math.round((d-now)/86400000); }
+function generateSchedule(startDate, num) { const s=[]; for(let i=0;i<num;i++) s.push(addDays(startDate,i*7)); return s; }
+function getPaidDates(c) { return new Set((c.payments||[]).map(p=>p.schedDate).filter(Boolean)); }
+function getNextPayDate(c) { const s=c.schedule||[]; const pd=getPaidDates(c); for(const d of s){if(!pd.has(d))return d;} return s[s.length-1]||null; }
+function getPaidCount(c) { return (c.payments||[]).filter(p=>p.schedDate).length; }
+function getStatus(c) {
+  const n=getNextPayDate(c);
+  if(!n) return 'ok';
+  const d=daysUntil(n);
+  if(d<0) return 'overdue';
+  // "soon" threshold depends on frequency
+  const freq = c.freq || 'weekly';
+  const soonDays = freq==='monthly' ? 5 : freq==='biweekly' ? 4 : 3;
+  if(d<=soonDays) return 'soon';
+  return 'ok';
+}
+function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0); }
+function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
+function calcProgress(c) { const t=Number(c.total); if(!t) return 0; return Math.min(100,Math.round(calcPaid(c)/t*100)); }
+
+window.calcHint = function() {
+  const total=parseFloat(document.getElementById('f-total').value)||0;
+  const down=parseFloat(document.getElementById('f-down').value)||0;
+  const weekly=parseFloat(document.getElementById('f-weekly').value)||0;
+  const numPay=parseInt(document.getElementById('f-numpay').value)||0;
+  const startDate=document.getElementById('f-startdate').value;
+  const hint=document.getElementById('f-hint');
+  if(numPay&&startDate){hint.textContent=`Último pago: ${formatDate(addDays(startDate,(numPay-1)*7))}`;}
+  else if(total&&weekly){hint.textContent=`Sugerido: ~${Math.ceil((total-down)/weekly)} pagos`;}
+  else{hint.textContent='';}
+};
+
+// ---- FIRESTORE LISTENER ----
+function startListening() {
+  const q = query(collection(db, 'clients'));
+  onSnapshot(q, (snap) => {
+    clients = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    document.getElementById('sync-status').textContent = '● En línea';
+    document.getElementById('sync-status').className = 'sync-status';
+    renderAll();
+    renderTodayBox();
+    checkStartupOverdue();
+  }, () => {
+    document.getElementById('sync-status').textContent = '● Sin conexión';
+    document.getElementById('sync-status').className = 'sync-status offline';
+  });
+}
+
+// ---- RENDER ----
+window.renderAll = function() {
+  const search = document.getElementById('search-box').value.toLowerCase();
+  let total=0,overdue=0,soon=0,ok=0;
+  clients.forEach(c=>{total++;const s=getStatus(c);if(s==='overdue')overdue++;else if(s==='soon')soon++;else ok++;});
+  document.getElementById('stat-total').textContent=total;
+  document.getElementById('stat-overdue').textContent=overdue;
+  document.getElementById('stat-soon').textContent=soon;
+  document.getElementById('stat-ok').textContent=ok;
+
+  const filtered=clients.filter(c=>(c.name+c.phone+c.make+c.model+c.year).toLowerCase().includes(search));
+  const main=document.getElementById('main-content');
+  const todayStr=today();
+
+  const overdueC=filtered.filter(c=>getStatus(c)==='overdue');
+  let html='';
+  if(overdueC.length){
+    html+=`<div class="section-title">⚠️ Pagos Vencidos</div>`;
+    overdueC.forEach(c=>{
+      const days=Math.abs(daysUntil(getNextPayDate(c)));
+      html+=`<div class="alert-banner"><div class="alert-info"><div class="alert-name">${c.name}</div><div class="alert-detail">Vencido hace ${days} día${days!==1?'s':''} · ${c.make} ${c.model} · Adeuda ${formatMoney(calcBalance(c))}</div></div><button class="btn-msg" onclick="openWhatsApp('${c.id}','overdue')">📱 Avisar</button></div>`;
+    });
+  }
+
+  html+=`<div class="section-title">Todos los Clientes</div><div class="clients-grid">`;
+  if(!filtered.length){
+    html+=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚗</div><div class="empty-text">Sin clientes aún</div><div style="font-size:14px">Agrega tu primer cliente</div></div>`;
+  } else {
+    filtered.forEach(c=>{
+      const status=getStatus(c);
+      const nextPay=getNextPayDate(c);
+      const days=daysUntil(nextPay);
+      const paidCount=getPaidCount(c);
+      const totalPay=(c.schedule||[]).length;
+      const paidDates=getPaidDates(c);
+      const progress=calcProgress(c);
+      const balance=calcBalance(c);
+
+      const badge=status==='overdue'?`<span class="status-badge badge-overdue">VENCIDO</span>`:status==='soon'?`<span class="status-badge badge-soon">${c.freq==='monthly'?'PRÓXIMO PAGO':c.freq==='biweekly'?'PRÓXIMO PAGO':'ESTA SEMANA'}</span>`:`<span class="status-badge badge-ok">AL CORRIENTE</span>`;
+      const dayLabel=days<0?` (${Math.abs(days)}d vencido)`:days===0?' (HOY)':days<=7?` (${days}d)`:'';
+      const payColor=status==='overdue'?'var(--red)':status==='soon'?'var(--yellow)':'var(--green)';
+
+      let schedHTML='';
+      if(c.schedule&&c.schedule.length){
+        let items='';
+        c.schedule.forEach((d,i)=>{
+          let cls='sched-upcoming',label='Pendiente';
+          if(paidDates.has(d)){cls='sched-paid';label='✓ Pagado';}
+          else if(d===nextPay&&d<todayStr){cls='sched-overdue';label=`${Math.abs(daysUntil(d))}d vencido`;}
+          else if(d===nextPay){cls='sched-next';label='⟶ Próximo';}
+          else if(d<todayStr){cls='sched-overdue';label=`${Math.abs(daysUntil(d))}d vencido`;}
+          items+=`<div class="schedule-item"><span class="sched-num">#${i+1}</span><span class="sched-date">${formatDate(d)}</span><span class="${cls}">${label}</span></div>`;
+        });
+        schedHTML=`<button class="schedule-toggle" onclick="toggleSchedule('${c.id}')">📅 Calendario (${paidCount}/${totalPay} pagados)</button><div class="schedule-list" id="sched-${c.id}" style="display:none;">${items}</div>`;
+      }
+
+      html+=`<div class="client-card ${status}">
+        <div class="card-header"><div><div class="client-name">${c.name}</div><div class="client-phone">${c.phone} &nbsp;${c.lang==='en'?'🇺🇸':'🇲🇽'}</div></div>${badge}</div>
+        <div class="card-body">
+          <div class="car-info">${c.year} ${c.make} ${c.model}</div>
+          <div class="payment-row"><span class="pay-label">${c.freq==='monthly'?'Pago mensual':c.freq==='biweekly'?'Pago quincenal':'Pago semanal'}</span><span class="pay-value">${formatMoney(c.weekly)}</span></div>
+          <div class="payment-row"><span class="pay-label">Próximo pago</span><span class="pay-value" style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</span></div>
+          <div class="payment-row"><span class="pay-label">Pagos</span><span class="pay-value">${paidCount} de ${totalPay}</span></div>
+          <div class="payment-row"><span class="pay-label">Saldo</span><span class="pay-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
+          <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
+          <div class="progress-label"><span>${formatMoney(calcPaid(c))} pagado</span><span>${progress}%</span></div>
+          ${schedHTML}
+          ${c.notes?`<div style="margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;">${c.notes}</div>`:''}
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-pay" onclick="openPayModal('${c.id}')">💵 Pago</button>
+          <button class="btn btn-whatsapp" onclick="openWhatsApp('${c.id}','${status}')" style="background:#2196F3;color:#fff;">💬 SMS</button>
+          <button class="btn btn-edit" onclick="openEditModal('${c.id}')">✏️</button>
+          <button class="btn btn-delete" onclick="deleteClient('${c.id}')">🗑</button>
+        </div>
+      </div>`;
+    });
+  }
+  html+='</div>';
+  main.innerHTML=html;
+};
+
+window.toggleSchedule=function(id){const el=document.getElementById('sched-'+id);if(el)el.style.display=el.style.display==='none'?'block':'none';};
+
+// ---- ADD/EDIT ----
+window.openAddModal=function(){
+  editingId=null;
+  document.getElementById('modal-title').textContent='NUEVO CLIENTE';
+  ['name','phone','pass','make','model','year','total','down','weekly','notes'].forEach(f=>document.getElementById('f-'+f).value='');
+  document.getElementById('f-startdate').value=today();
+  document.getElementById('f-numpay').value='';
+  document.getElementById('f-hint').textContent='';
+  document.getElementById('add-modal').classList.add('active');
+};
+
+window.openEditModal=function(id){
+  editingId=id;
+  const c=clients.find(x=>x.id===id);
+  document.getElementById('modal-title').textContent='EDITAR CLIENTE';
+  document.getElementById('f-name').value=c.name;
+  document.getElementById('f-phone').value=c.phone;
+  document.getElementById('f-pass').value=c.portalPass||'';
+  document.getElementById('f-make').value=c.make;
+  document.getElementById('f-model').value=c.model;
+  document.getElementById('f-year').value=c.year;
+  document.getElementById('f-total').value=c.total;
+  document.getElementById('f-down').value=c.down;
+  document.getElementById('f-weekly').value=c.weekly;
+  document.getElementById('f-startdate').value=c.startDate||today();
+  document.getElementById('f-numpay').value=(c.schedule||[]).length||'';
+  document.getElementById('f-notes').value=c.notes||'';
+  calcHint();
+  document.getElementById('add-modal').classList.add('active');
+};
+
+window.saveClient=async function(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){alert('Nombre requerido');return;}
+  const startDate=document.getElementById('f-startdate').value;
+  const numPay=parseInt(document.getElementById('f-numpay').value)||0;
+  if(!startDate){alert('Fecha del primer pago requerida');return;}
+  if(!numPay){alert('Número de pagos requerido');return;}
+
+  const btn=document.getElementById('save-btn');
+  btn.textContent='GUARDANDO...';btn.disabled=true;
+
+  const id=editingId||('c_'+Date.now());
+  const existing=editingId?clients.find(x=>x.id===editingId):{};
+
+  const data={
+    name,
+    phone:document.getElementById('f-phone').value.trim(),
+    portalPass:document.getElementById('f-pass').value.trim(),
+    make:document.getElementById('f-make').value.trim(),
+    model:document.getElementById('f-model').value.trim(),
+    year:document.getElementById('f-year').value,
+    total:Number(document.getElementById('f-total').value)||0,
+    down:Number(document.getElementById('f-down').value)||0,
+    weekly:Number(document.getElementById('f-weekly').value)||0,
+    startDate,
+    schedule:generateSchedule(startDate,numPay),
+    notes:document.getElementById('f-notes').value.trim(),
+    payments:existing.payments||[],
+  };
+
+  try{
+    await setDoc(doc(db,'clients',id),data);
+    closeModal('add-modal');
+  }catch(e){alert('Error guardando: '+e.message);}
+  btn.textContent='GUARDAR';btn.disabled=false;
+};
+
+window.deleteClient=async function(id){
+  const c=clients.find(x=>x.id===id);
+  if(confirm(`¿Eliminar a ${c.name}?`)){
+    try{await deleteDoc(doc(db,'clients',id));}catch(e){alert('Error: '+e.message);}
+  }
+};
+
+// ---- PAYMENTS ----
+window.openPayModal=function(id){
+  payingId=id;
+  const c=clients.find(x=>x.id===id);
+  const nextPay=getNextPayDate(c);
+  document.getElementById('pay-client-info').innerHTML=
+    `<strong>${c.name}</strong> · ${c.year} ${c.make} ${c.model}<br>
+     Próximo: <span style="color:var(--yellow)">${formatDate(nextPay)}</span> &nbsp;|&nbsp;
+     Pagos: <span style="color:var(--gold)">${getPaidCount(c)}/${(c.schedule||[]).length}</span> &nbsp;|&nbsp;
+     Saldo: <span style="color:var(--gold)">${formatMoney(calcBalance(c))}</span>`;
+  document.getElementById('pay-amount').value=c.weekly;
+  document.getElementById('pay-date').value=today();
+  const hist=c.payments||[];
+  document.getElementById('pay-history').innerHTML=hist.length===0
+    ?'<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin pagos aún</div>'
+    :[...hist].reverse().map(p=>`<div class="payment-entry"><span>${formatDate(p.date)}</span><span style="color:var(--green);font-weight:600;">${formatMoney(p.amount)}</span></div>`).join('');
+  document.getElementById('pay-modal').classList.add('active');
+};
+
+window.confirmPayment=async function(){
+  const amount=Number(document.getElementById('pay-amount').value);
+  const date=document.getElementById('pay-date').value;
+  if(!amount||amount<=0){alert('Ingresa el monto');return;}
+  const c=clients.find(x=>x.id===payingId);
+  const schedDate=getNextPayDate(c);
+  const payments=[...(c.payments||[]),{amount,date,schedDate}];
+  const updatedClient={...c,payments};
+  try{
+    await setDoc(doc(db,'clients',c.id),updatedClient);
+    closeModal('pay-modal');
+    // Check if fully paid
+    const newBalance=Math.max(0,Number(c.total)-(payments.reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0)));
+    const remainingPayments=(c.schedule||[]).filter(d=>!new Set(payments.map(p=>p.schedDate).filter(Boolean)).has(d));
+    if(newBalance<=0||remainingPayments.length===0){
+      // Paid off!
+      const msg=getPaidOffMsg(c);
+      if(confirm('🎊 ¡Auto pagado completamente! ¿Enviar mensaje de felicidades al cliente?')){
+        waPhone=c.phone.replace(/\D/g,'');
+        document.getElementById('wa-preview').textContent=msg;
+        document.getElementById('wa-text').value=msg;
+        document.getElementById('wa-modal').classList.add('active');
+      }
+    } else {
+      // Regular thanks message
+      const nextPay=getNextPayDate(updatedClient);
+      const msg=getThanksMsg(updatedClient,nextPay);
+      if(confirm('💬 ¿Enviar mensaje de agradecimiento al cliente?')){
+        waPhone=c.phone.replace(/\D/g,'');
+        document.getElementById('wa-preview').textContent=msg;
+        document.getElementById('wa-text').value=msg;
+        document.getElementById('wa-modal').classList.add('active');
+      }
+    }
+  }catch(e){alert('Error: '+e.message);}
+};
+
+// ---- WHATSAPP ----
+const MESSAGES = {
+  es: {
+    thanks: "Hola {nombre}! 🎉 Le saluda Legacy Motors Garage LLC.\n\n¡Muchas gracias por su pago de {monto} por su {carro}! Lo apreciamos muchísimo.\n\nSaldo restante: {saldo}\nPróximo pago: {proximo}\n\n¡Gracias por su puntualidad y confianza! Es un placer trabajar con usted 😊🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145",
+    paidOff: "Hola {nombre}! 🎊🏆 Legacy Motors Garage LLC.\n\n¡FELICIDADES! Ha terminado de pagar su {carro} completamente. ¡El vehículo es 100% SUYO!\n\nFue un honor acompañarle en este camino. Gracias por su confianza y puntualidad. Que lo disfrute mucho 🚗✨\n\nSi necesita otro vehículo en el futuro, aquí estaremos para servirle.\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145",
+    overdue: {
+      weekly: {
+        1: "Hola {nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nNotamos que su pago de {monto} por su {carro} venció ayer. ¡Creemos que pudo ser un olvido, nos pasa a todos!\n\nPor favor realícelo hoy. Estamos aquí para ayudarle 🙏\n\nSaldo: {saldo}\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        2: "Hola {nombre}! Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que su pago de {monto} por su {carro} lleva 2 días pendiente.\n\nSaldo: {saldo}\n\nPor favor realice su pago hoy o contáctenos si tiene alguna situación 😊\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        3: "Hola {nombre}. Legacy Motors Garage LLC.\n\nSu pago de {monto} por su {carro} lleva 3 días sin realizarse.\n\nSaldo: {saldo}\n\nNecesitamos que se comunique con nosotros HOY para evitar consecuencias. Llámenos 📞\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        4: "Hola {nombre}. Legacy Motors Garage LLC.\n\nSu pago de {monto} por su {carro} lleva 4 días de atraso.\n\nSaldo: {saldo}\n\nEs importante que nos contacte HOY. Si no tenemos comunicación esta semana nos veremos en la necesidad de iniciar el proceso de recuperación del vehículo.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        5: "Hola {nombre}. Legacy Motors Garage LLC.\n\n5 días de atraso en su pago de {monto} · {carro}.\n\nSaldo: {saldo}\n\nURGENTE: Comuníquese HOY. El proceso de recuperación del vehículo puede iniciar en cualquier momento si no hay contacto.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        6: "Hola {nombre}. Legacy Motors Garage LLC.\n\n6 días sin pago ni comunicación. {monto} · {carro}.\n\nSaldo: {saldo}\n\nÚLTIMA OPORTUNIDAD antes de iniciar proceso de recuperación del vehículo. Llame AHORA.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        7: "Hola {nombre}. Legacy Motors Garage LLC.\n\nSu pago de {monto} por su {carro} lleva UNA SEMANA de atraso sin comunicación de su parte.\n\nSaldo: {saldo}\n\nAVISO FORMAL: Hemos iniciado el proceso de recuperación del vehículo. Para detenerlo debe llamarnos HOY.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        default: "Hola {nombre}. Legacy Motors Garage LLC.\n\nSu cuenta lleva {dias} días en proceso de recuperación de vehículo por falta de pago de {monto} · {carro}.\n\nSaldo: {saldo}\n\nPara resolver esta situación llame INMEDIATAMENTE.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC"
+      },
+      biweekly: {
+        1: "Hola {nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nNotamos que su pago quincenal de {monto} por su {carro} venció ayer. ¡Seguro fue un olvido!\n\nPor favor realícelo pronto. Estamos aquí 🙏\n\nSaldo: {saldo}\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        2: "Hola {nombre}! Legacy Motors Garage LLC.\n\nSu pago quincenal de {monto} por su {carro} lleva 2 días pendiente.\n\nSaldo: {saldo}\n\nPor favor contáctenos si tiene alguna situación 😊\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        3: "Hola {nombre}. Legacy Motors Garage LLC.\n\nSu pago de {monto} · {carro} lleva 3 días sin realizarse.\n\nSaldo: {saldo}\n\nPor favor comuníquese con nosotros pronto 🙏\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        4: "Hola {nombre}. Legacy Motors Garage LLC.\n\n4 días de atraso en su pago quincenal de {monto} · {carro}.\n\nSaldo: {saldo}\n\nNecesitamos que nos contacte HOY. Estamos aquí para ayudarle 📞\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        5: "Hola {nombre}. Legacy Motors Garage LLC.\n\n5 días sin pago. {monto} · {carro}.\n\nSaldo: {saldo}\n\nEs importante que se comunique con nosotros HOY para evitar consecuencias.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        6: "Hola {nombre}. Legacy Motors Garage LLC.\n\n6 días de atraso. {monto} · {carro}.\n\nSaldo: {saldo}\n\nURGENTE: Llámenos HOY. Si no hay comunicación esta semana iniciaremos proceso de recuperación del vehículo.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        7: "Hola {nombre}. Legacy Motors Garage LLC.\n\nUNA SEMANA sin pago ni comunicación. {monto} · {carro}.\n\nSaldo: {saldo}\n\nAVISO FORMAL: Hemos iniciado proceso de recuperación del vehículo. Para detenerlo llame HOY.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        8: "Hola {nombre}. Legacy Motors Garage LLC.\n\n8 días de atraso. {monto} · {carro}.\n\nSaldo: {saldo}\n\nProceso de recuperación activo. Llame AHORA para resolverlo.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        9: "Hola {nombre}. Legacy Motors Garage LLC.\n\n9 días en proceso de recuperación. {monto} · {carro}.\n\nSaldo: {saldo}\n\n📞 (559) 540-5145 — Contacto urgente requerido.\n\n— Legacy Motors Garage LLC",
+        10: "Hola {nombre}. Legacy Motors Garage LLC.\n\n10 días. {monto} · {carro}. Saldo: {saldo}\n\nÚLTIMO AVISO. 📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        default: "Hola {nombre}. Legacy Motors Garage LLC.\n\n{dias} días en proceso de recuperación. {monto} · {carro}. Saldo: {saldo}\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC"
+      },
+      monthly: {
+        1: "Hola {nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nSu pago mensual de {monto} por su {carro} venció ayer. ¡Sin duda fue un olvido!\n\nPor favor realícelo cuando pueda esta semana 🙏\n\nSaldo: {saldo}\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        3: "Hola {nombre}! Legacy Motors Garage LLC.\n\nLe recordamos que su pago mensual de {monto} por su {carro} lleva 3 días pendiente.\n\nSaldo: {saldo}\n\nPor favor realícelo pronto o contáctenos 😊\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        5: "Hola {nombre}. Legacy Motors Garage LLC.\n\n5 días de atraso en su pago mensual de {monto} · {carro}.\n\nSaldo: {saldo}\n\nPor favor comuníquese con nosotros esta semana 🙏\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        7: "Hola {nombre}. Legacy Motors Garage LLC.\n\nUNA SEMANA sin pago mensual de {monto} · {carro}.\n\nSaldo: {saldo}\n\nNecesitamos que nos contacte HOY. Si no hay comunicación iniciaremos proceso de recuperación del vehículo.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        10: "Hola {nombre}. Legacy Motors Garage LLC.\n\n10 días de atraso. {monto} · {carro}.\n\nSaldo: {saldo}\n\nURGENTE: Comuníquese HOY. Proceso de recuperación puede iniciar en cualquier momento.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        14: "Hola {nombre}. Legacy Motors Garage LLC.\n\n2 semanas sin pago mensual de {monto} · {carro}.\n\nSaldo: {saldo}\n\nAVISO FORMAL: Hemos iniciado proceso de recuperación del vehículo. Para detenerlo llame HOY.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        default: "Hola {nombre}. Legacy Motors Garage LLC.\n\n{dias} días en proceso de recuperación. {monto} · {carro}. Saldo: {saldo}\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC"
+      }
+    }
+  },
+  en: {
+    thanks: "Hi {nombre}! 🎉 Legacy Motors Garage LLC here.\n\nThank you so much for your payment of {monto} for your {carro}! We truly appreciate it.\n\nRemaining balance: {saldo}\nNext payment: {proximo}\n\nThank you for your trust and reliability! It's a pleasure working with you 😊🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145",
+    paidOff: "Hi {nombre}! 🎊🏆 Legacy Motors Garage LLC here.\n\nCONGRATULATIONS! You have fully paid off your {carro}. The vehicle is 100% YOURS!\n\nIt has been an honor to work with you. Thank you for your trust and reliability. Enjoy your car! 🚗✨\n\nIf you ever need another vehicle, we'll be here for you.\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145",
+    overdue: {
+      weekly: {
+        1: "Hi {nombre}! 😊 Legacy Motors Garage LLC here.\n\nWe noticed your payment of {monto} for your {carro} was due yesterday. We're sure it was just an oversight!\n\nPlease make your payment today. We're here to help 🙏\n\nBalance: {saldo}\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        2: "Hi {nombre}! Legacy Motors Garage LLC here.\n\nFriendly reminder that your payment of {monto} for your {carro} is 2 days past due.\n\nBalance: {saldo}\n\nPlease pay today or contact us if you're going through something 😊\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        3: "Hi {nombre}. Legacy Motors Garage LLC.\n\nYour payment of {monto} for your {carro} is 3 days overdue.\n\nBalance: {saldo}\n\nPlease contact us TODAY to avoid further consequences 📞\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        4: "Hi {nombre}. Legacy Motors Garage LLC.\n\nYour payment of {monto} for your {carro} is 4 days late.\n\nBalance: {saldo}\n\nIt's important you contact us TODAY. If we don't hear from you this week we will have to begin the vehicle repossession process.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        5: "Hi {nombre}. Legacy Motors Garage LLC.\n\n5 days overdue. {monto} · {carro}.\n\nBalance: {saldo}\n\nURGENT: Contact us TODAY. The repossession process can begin at any time without further communication.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        6: "Hi {nombre}. Legacy Motors Garage LLC.\n\n6 days without payment or contact. {monto} · {carro}.\n\nBalance: {saldo}\n\nLAST CHANCE before vehicle repossession begins. Call NOW.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        7: "Hi {nombre}. Legacy Motors Garage LLC.\n\nYour payment of {monto} for your {carro} is ONE WEEK overdue with no contact from you.\n\nBalance: {saldo}\n\nFORMAL NOTICE: We have initiated the vehicle repossession process. To stop it you must call us TODAY.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        default: "Hi {nombre}. Legacy Motors Garage LLC.\n\nYour account is {dias} days into the vehicle repossession process. {monto} · {carro}.\n\nBalance: {saldo}\n\nCall IMMEDIATELY to resolve this.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC"
+      },
+      biweekly: {
+        1: "Hi {nombre}! 😊 Legacy Motors Garage LLC here.\n\nYour bi-weekly payment of {monto} for your {carro} was due yesterday. We're sure it slipped your mind!\n\nPlease take care of it soon 🙏\n\nBalance: {saldo}\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        2: "Hi {nombre}! Legacy Motors Garage LLC.\n\nYour bi-weekly payment of {monto} for your {carro} is 2 days past due.\n\nBalance: {saldo}\n\nPlease contact us if you need help 😊\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        3: "Hi {nombre}. Legacy Motors Garage LLC.\n\nYour payment of {monto} · {carro} is 3 days overdue.\n\nBalance: {saldo}\n\nPlease reach out soon 🙏\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        4: "Hi {nombre}. Legacy Motors Garage LLC.\n\n4 days past due on your payment of {monto} · {carro}.\n\nBalance: {saldo}\n\nPlease contact us TODAY 📞\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        5: "Hi {nombre}. Legacy Motors Garage LLC.\n\n5 days without payment. {monto} · {carro}.\n\nBalance: {saldo}\n\nContact us TODAY to avoid consequences.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        6: "Hi {nombre}. Legacy Motors Garage LLC.\n\n6 days overdue. {monto} · {carro}.\n\nBalance: {saldo}\n\nURGENT: Call TODAY. If no contact this week repossession process will begin.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        7: "Hi {nombre}. Legacy Motors Garage LLC.\n\nONE WEEK without payment or contact. {monto} · {carro}.\n\nBalance: {saldo}\n\nFORMAL NOTICE: Repossession process has been initiated. Call TODAY to stop it.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        default: "Hi {nombre}. Legacy Motors Garage LLC.\n\n{dias} days into repossession process. {monto} · {carro}. Balance: {saldo}\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC"
+      },
+      monthly: {
+        1: "Hi {nombre}! 😊 Legacy Motors Garage LLC here.\n\nYour monthly payment of {monto} for your {carro} was due yesterday. We're sure it was just an oversight!\n\nPlease take care of it this week 🙏\n\nBalance: {saldo}\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        3: "Hi {nombre}! Legacy Motors Garage LLC.\n\nYour monthly payment of {monto} for your {carro} is 3 days past due.\n\nBalance: {saldo}\n\nPlease make your payment soon or contact us 😊\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        5: "Hi {nombre}. Legacy Motors Garage LLC.\n\n5 days overdue on your monthly payment of {monto} · {carro}.\n\nBalance: {saldo}\n\nPlease reach out this week 🙏\n\n— Legacy Motors Garage LLC · (559) 540-5145",
+        7: "Hi {nombre}. Legacy Motors Garage LLC.\n\nONE WEEK without your monthly payment of {monto} · {carro}.\n\nBalance: {saldo}\n\nPlease contact us TODAY. If no communication we will initiate the repossession process.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        10: "Hi {nombre}. Legacy Motors Garage LLC.\n\n10 days overdue. {monto} · {carro}.\n\nBalance: {saldo}\n\nURGENT: Contact us TODAY. Repossession can begin at any time.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        14: "Hi {nombre}. Legacy Motors Garage LLC.\n\n2 weeks without monthly payment. {monto} · {carro}.\n\nBalance: {saldo}\n\nFORMAL NOTICE: Repossession process has been initiated. Call TODAY to stop it.\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC",
+        default: "Hi {nombre}. Legacy Motors Garage LLC.\n\n{dias} days into repossession process. {monto} · {carro}. Balance: {saldo}\n\n📞 (559) 540-5145\n\n— Legacy Motors Garage LLC"
+      }
+    }
+  }
+};
+
+function getOverdueMsg(c, days) {
+  const lang = c.lang || 'es';
+  const freq = c.freq || 'weekly';
+  const msgs = MESSAGES[lang].overdue[freq];
+  
+  // Find the right message key
+  const keys = Object.keys(msgs).filter(k => k !== 'default').map(Number).sort((a,b) => b-a);
+  const key = keys.find(k => days >= k) || keys[keys.length-1];
+  const template = msgs[key] || msgs.default;
+  
+  return template
+    .replace(/{nombre}/g, c.name.split(' ')[0])
+    .replace(/{monto}/g, formatMoney(c.weekly))
+    .replace(/{carro}/g, `${c.year} ${c.make} ${c.model}`)
+    .replace(/{saldo}/g, formatMoney(calcBalance(c)))
+    .replace(/{dias}/g, days);
+}
+
+function getThanksMsg(c, nextPayDate) {
+  const lang = c.lang || 'es';
+  return MESSAGES[lang].thanks
+    .replace(/{nombre}/g, c.name.split(' ')[0])
+    .replace(/{monto}/g, formatMoney(c.weekly))
+    .replace(/{carro}/g, `${c.year} ${c.make} ${c.model}`)
+    .replace(/{saldo}/g, formatMoney(calcBalance(c)))
+    .replace(/{proximo}/g, formatDate(nextPayDate));
+}
+
+function getPaidOffMsg(c) {
+  const lang = c.lang || 'es';
+  return MESSAGES[lang].paidOff
+    .replace(/{nombre}/g, c.name.split(' ')[0])
+    .replace(/{carro}/g, `${c.year} ${c.make} ${c.model}`);
+}
+
+
+window.openWhatsApp=function(id,status){
+  const c=clients.find(x=>x.id===id);
+  waPhone=c.phone.replace(/\D/g,'');
+  const nextPay=getNextPayDate(c);
+  const balance=formatMoney(calcBalance(c));
+  const days=Math.abs(daysUntil(nextPay));
+  const paidCount=getPaidCount(c);
+  const totalPay=(c.schedule||[]).length;
+  let msg='';
+  if(status==='overdue'){
+    msg=`Hola ${c.name}, le saluda Legacy Motors Garage 🚗\n\nSu pago semanal de ${formatMoney(c.weekly)} para su ${c.year} ${c.make} ${c.model} venció hace ${days} día${days!==1?'s':''}.\n\nPagos: ${paidCount} de ${totalPay}\nSaldo pendiente: ${balance}\n\nPor favor contáctenos para ponerse al corriente 🙏\nlegacymotorsgarage.com`;
+  }else if(status==='soon'){
+    msg=`Hola ${c.name}! Le recuerda Legacy Motors Garage 🚗\n\nSu pago de ${formatMoney(c.weekly)} para su ${c.year} ${c.make} ${c.model} vence en ${days} día${days!==1?'s':''}.\n\nFecha: ${formatDate(nextPay)} · Pagos: ${paidCount}/${totalPay} · Saldo: ${balance}\n\nGracias por su puntualidad 😊`;
+  }else{
+    msg=`Hola ${c.name}! Le saluda Legacy Motors Garage 🚗\n\nSu próximo pago de ${formatMoney(c.weekly)} para su ${c.year} ${c.make} ${c.model} es el ${formatDate(nextPay)}.\n\nPagos: ${paidCount}/${totalPay} · Saldo: ${balance}\n\nGracias! 🙏`;
+  }
+  document.getElementById('wa-preview').textContent=msg;
+  document.getElementById('wa-text').value=msg;
+  document.getElementById('wa-modal').classList.add('active');
+};
+
+window.sendWhatsApp=function(){
+  const msg=document.getElementById('wa-text').value;
+  window.location.href = `sms:${waPhone}?body=${encodeURIComponent(msg)}`;
+  closeModal('wa-modal');
+};
+
+document.getElementById('wa-text').addEventListener('input',function(){document.getElementById('wa-preview').textContent=this.value;});
+
+// TODAY BOX
+function renderTodayBox() {
+  const todayStr = today();
+  const todayClients = clients.filter(c => getNextPayDate(c) === todayStr);
+  const overdueClients = clients.filter(c => {
+    const n = getNextPayDate(c);
+    return n && n < todayStr;
+  });
+
+  const box = document.getElementById('today-box');
+  const list = document.getElementById('today-list');
+
+  if (!todayClients.length && !overdueClients.length) {
+    box.style.display = 'none';
+    return;
+  }
+
+  box.style.display = 'block';
+  let html = '';
+
+  if (todayClients.length) {
+    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Pagan Hoy — ${new Date().toLocaleDateString('es-MX',{weekday:'long',month:'long',day:'numeric'})}</div>`;
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">';
+    todayClients.forEach(c => {
+      html += `<div style="background:var(--navy2);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:600;font-size:15px;">${c.name}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${c.year} ${c.make} ${c.model}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--font-display);font-size:20px;color:var(--green);">${formatMoney(c.weekly)}</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">${c.freq==='monthly'?'Mensual':c.freq==='biweekly'?'Quincenal':'Semanal'}</div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  if (overdueClients.length) {
+    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:10px;">⚠️ Pagos Vencidos</div>`;
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">';
+    overdueClients.forEach(c => {
+      const days = Math.abs(daysUntil(getNextPayDate(c)));
+      html += `<div style="background:rgba(255,59,59,0.08);border:1px solid rgba(255,59,59,0.2);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:600;font-size:15px;">${c.name}</div>
+          <div style="font-size:12px;color:#ff8080;margin-top:2px;">${c.year} ${c.make} ${c.model} · ${days}d vencido</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--font-display);font-size:20px;color:var(--red);">${formatMoney(c.weekly)}</div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  list.innerHTML = html;
+}
+
+// SEND SMS TO ALL TODAY
+window.sendDayMessages = function() {
+  const todayStr = today();
+  const todayClients = clients.filter(c => getNextPayDate(c) === todayStr);
+  const overdueClients = clients.filter(c => {
+    const n = getNextPayDate(c);
+    return n && n < todayStr;
+  });
+
+  if (!todayClients.length && !overdueClients.length) {
+    alert('No hay clientes que pagan hoy ni vencidos.');
+    return;
+  }
+
+  let allMessages = [];
+
+  todayClients.forEach(c => {
+    const msg = `Hola ${c.name.split(' ')[0]}! 😊 Le saluda Legacy Motors Garage LLC.
+
+Le recordamos con cariño que hoy es su día de pago de ${formatMoney(c.weekly)} por su ${c.year} ${c.make} ${c.model}.
+
+Saldo restante: ${formatMoney(calcBalance(c))}
+
+¡Gracias por su puntualidad, lo apreciamos mucho! 🙏
+
+— Legacy Motors Garage LLC
+📞 (559) 540-5145`;
+    allMessages.push({ phone: c.phone.replace(/\D/g,''), msg, name: c.name });
+  });
+
+  overdueClients.forEach(c => {
+    const days = Math.abs(daysUntil(getNextPayDate(c)));
+    const msg = `Hola ${c.name.split(' ')[0]}, le saluda Legacy Motors Garage LLC. 🚗
+
+Entendemos que a veces se complican las cosas y estamos aquí para apoyarle. Notamos que su pago de ${formatMoney(c.weekly)} por su ${c.year} ${c.make} ${c.model} lleva ${days} día${days!==1?'s':''} pendiente.
+
+Saldo: ${formatMoney(calcBalance(c))}
+
+Por favor contáctenos cuando pueda, con gusto le ayudamos a ponerse al corriente. 🙏
+
+— Legacy Motors Garage LLC
+📞 (559) 540-5145`;
+    allMessages.push({ phone: c.phone.replace(/\D/g,''), msg, name: c.name });
+  });
+
+  // Send one by one
+  let i = 0;
+  function sendNext() {
+    if (i >= allMessages.length) {
+      alert(`✅ Se abrieron ${allMessages.length} mensaje${allMessages.length!==1?'s':''} para enviar.`);
+      return;
+    }
+    const { phone, msg } = allMessages[i];
+    window.location.href = `sms:${phone}?body=${encodeURIComponent(msg)}`;
+    i++;
+    setTimeout(sendNext, 1500);
+  }
+  sendNext();
+};
+
+// EXPORT CALENDAR .ICS
+window.exportCalendar = function() {
+  let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Legacy Motors Garage//CRM//EN\nCALSCALE:GREGORIAN\n';
+
+  clients.forEach(c => {
+    const paidDates = getPaidDates(c);
+    (c.schedule || []).forEach((d, i) => {
+      if (paidDates.has(d)) return; // Skip paid
+      const dateStr = d.replace(/-/g, '');
+      const uid = `lmg-${c.id}-${i}@legacymotorsgarage.com`;
+      ics += `BEGIN:VEVENT
+`;
+      ics += `UID:${uid}
+`;
+      ics += `DTSTART;VALUE=DATE:${dateStr}
+`;
+      ics += `DTEND;VALUE=DATE:${dateStr}
+`;
+      ics += `SUMMARY:💰 ${c.name} - ${formatMoney(c.weekly)}
+`;
+      ics += `DESCRIPTION:${c.year} ${c.make} ${c.model}\nSaldo: ${formatMoney(calcBalance(c))}\nTel: ${c.phone}
+`;
+      ics += `BEGIN:VALARM
+TRIGGER:-PT0M
+ACTION:DISPLAY
+DESCRIPTION:Pago de ${c.name}
+END:VALARM
+`;
+      ics += `END:VEVENT
+`;
+    });
+  });
+
+  ics += 'END:VCALENDAR';
+
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'legacy-motors-pagos.ics';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+function checkStartupOverdue(){
+  const ov=clients.filter(c=>getStatus(c)==='overdue');
+  if(!ov.length)return;
+  document.getElementById('startup-list').innerHTML=ov.map(c=>{
+    const days=Math.abs(daysUntil(getNextPayDate(c)));
+    return `<div class="startup-item"><div><div style="font-weight:600;">${c.name} · ${c.year} ${c.make} ${c.model}</div><div style="font-size:12px;color:#ff8080;margin-top:2px;">Vencido hace ${days} día${days!==1?'s':''} · Adeuda ${formatMoney(calcBalance(c))}</div></div><button class="btn-msg" onclick="closeModal('startup-modal');openWhatsApp('${c.id}','overdue')" style="font-size:12px;padding:6px 10px;">📱</button></div>`;
+  }).join('');
+  document.getElementById('startup-modal').classList.add('active');
+}
+
+window.closeModal=function(id){document.getElementById(id).classList.remove('active');};
+document.querySelectorAll('.modal-overlay').forEach(el=>{
+  el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});
+});
+</script>
+</body>
+</html>
