@@ -583,33 +583,6 @@ window.renderAll = function() {
       });
     });
 
-    html += `<div class="fin-summary">
-      <div class="fs-item">
-        <div class="fs-label">Restante Este Mes</div>
-        <div class="fs-value" style="color:var(--green);">${formatMoney(restanteMes)}</div>
-        <div class="fs-sub">${pagosRestantes} pago${pagosRestantes!==1?'s':''} pendientes</div>
-      </div>
-      <div class="fs-item">
-        <div class="fs-label">Ingresos / Mes</div>
-        <div class="fs-value">${formatMoney(Math.round(totalMonthly))}</div>
-        <div class="fs-sub">Estimado mensual</div>
-      </div>
-      <div class="fs-item">
-        <div class="fs-label">Total Por Cobrar</div>
-        <div class="fs-value">${formatMoney(totalBalance)}</div>
-        <div class="fs-sub">${activeClients} clientes activos</div>
-      </div>
-      <div class="fs-item">
-        <div class="fs-label">Pago Promedio</div>
-        <div class="fs-value">${formatMoney(Math.round(totalWeekly/Math.max(clients.length,1)))}</div>
-        <div class="fs-sub">Por cliente</div>
-      </div>
-      <div class="fs-item">
-        <div class="fs-label">Cartera Total</div>
-        <div class="fs-value">${clients.length}</div>
-        <div class="fs-sub">Clientes totales</div>
-      </div>
-    </div>`;
     // skip the else block below
   } else {
     filtered.forEach(c=>{
