@@ -347,6 +347,14 @@ window.adminLogout = function() {
 // ---- HELPERS ----
 let clients = [];
 let editingId = null, payingId = null, waPhone = null;
+let currentView = 'grid';
+
+window.setView = function(v) {
+  currentView = v;
+  document.getElementById('btn-grid').classList.toggle('active', v==='grid');
+  document.getElementById('btn-list').classList.toggle('active', v==='list');
+  renderAll();
+};
 
 function today() { return new Date().toISOString().split('T')[0]; }
 function addDays(dateStr, n) { const d = new Date(dateStr+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
@@ -445,9 +453,35 @@ window.renderAll = function() {
     });
   }
 
-  html+=`<div class="section-title">Todos los Clientes</div><div class="clients-grid">`;
+  const isListView = currentView === 'list';
+  html+=`<div class="section-title">Todos los Clientes</div><div class="${isListView ? 'client-list' : 'clients-grid'}">`;
   if(!filtered.length){
     html+=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚗</div><div class="empty-text">Sin clientes aún</div><div style="font-size:14px">Agrega tu primer cliente</div></div>`;
+  } else if(isListView) {
+    filtered.forEach(c=>{
+      const status=getStatus(c);
+      const nextPay=getNextPayDate(c);
+      const days=daysUntil(nextPay);
+      const balance=calcBalance(c);
+      const payColor=status==='overdue'?'var(--red)':status==='soon'?'var(--yellow)':'var(--green)';
+      const dayLabel=days<0?` (${Math.abs(days)}d vencido)`:days===0?' (HOY)':days<=7?` (${days}d)`:'';
+      html+=`<div class="client-list-item ${status}">
+        <div class="cli-name">${c.name}</div>
+        <div class="cli-car">${c.year} ${c.make} ${c.model}</div>
+        <div class="cli-phone">${c.phone}</div>
+        <div class="cli-next" style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</div>
+        <div class="cli-balance">${formatMoney(balance)}</div>
+        <div class="cli-actions">
+          <button class="cli-btn pay" onclick="openPayModal('${c.id}')">💵</button>
+          <button class="cli-btn sms" onclick="openWhatsApp('${c.id}','${status}')">💬</button>
+          <button class="cli-btn" onclick="openEditModal('${c.id}')">✏️</button>
+          <button class="cli-btn" onclick="deleteClient('${c.id}')" style="color:var(--red);">🗑</button>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+    html += '';
+    // skip the else block below
   } else {
     filtered.forEach(c=>{
       const status=getStatus(c);
