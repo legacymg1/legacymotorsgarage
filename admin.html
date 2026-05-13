@@ -562,7 +562,7 @@ window.saveClient=async function(){
     down:Number(document.getElementById('f-down').value)||0,
     weekly:Number(document.getElementById('f-weekly').value)||0,
     startDate,
-    schedule:generateSchedule(startDate,numPay),
+    schedule:generateSchedule(startDate,numPay,freq),
     notes:document.getElementById('f-notes').value.trim(),
     payments:existing.payments||[],
   };
