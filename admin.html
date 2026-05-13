@@ -162,19 +162,31 @@
     .login-box { padding: 32px 24px; }
   }
 
-.client-list{display:flex;flex-direction:column;gap:4px;}
-.client-list-item{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--border);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:12px;}
-.client-list-item.overdue{border-left-color:var(--red);}
-.client-list-item.soon{border-left-color:var(--yellow);}
+.client-list{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.client-list-header{display:grid;grid-template-columns:180px 1fr 120px 130px 100px 110px;gap:0;background:var(--dark2);padding:8px 16px;border-bottom:1px solid var(--border);}
+.cli-header-cell{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);font-weight:600;}
+.client-list-item{display:grid;grid-template-columns:180px 1fr 120px 130px 100px 110px;gap:0;align-items:center;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);border-left:3px solid transparent;transition:background 0.15s;}
+.client-list-item:last-child{border-bottom:none;}
+.client-list-item:hover{background:var(--navy2);}
+.client-list-item.overdue{border-left-color:var(--red);background:rgba(255,59,59,0.03);}
+.client-list-item.soon{border-left-color:var(--yellow);background:rgba(255,214,0,0.03);}
 .client-list-item.ok{border-left-color:var(--green);}
-.cli-name{font-weight:600;font-size:14px;min-width:150px;}
-.cli-car{font-size:13px;color:var(--gold);min-width:150px;}
-.cli-phone{font-size:12px;color:var(--muted);min-width:110px;}
-.cli-next{font-size:12px;min-width:120px;}
-.cli-balance{font-family:var(--font-display);font-size:16px;color:var(--gold);min-width:80px;}
-.cli-actions{display:flex;gap:6px;margin-left:auto;}
-.cli-btn{border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;background:var(--border);color:var(--text);}
+.cli-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px;}
+.cli-car{font-size:12px;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px;}
+.cli-phone{font-size:12px;color:var(--muted);}
+.cli-next{font-size:12px;}
+.cli-balance{font-family:var(--font-display);font-size:15px;color:var(--gold2);text-align:right;padding-right:8px;}
+.cli-actions{display:flex;gap:4px;justify-content:flex-end;}
+.cli-btn{border:none;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;background:var(--border);color:var(--text);}
 .sort-btn.active{background:var(--gold) !important;color:var(--navy3) !important;}
+
+/* FINANCIAL SUMMARY */
+.fin-summary{background:linear-gradient(135deg,var(--dark2),var(--card));border:1px solid var(--gold3);border-radius:16px;padding:24px 28px;margin:24px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px;}
+.fs-item{text-align:center;padding:0 16px;border-right:1px solid var(--border);}
+.fs-item:last-child{border-right:none;}
+.fs-label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:8px;}
+.fs-value{font-family:var(--font-display);font-size:26px;color:var(--gold2);}
+.fs-sub{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:1px;}
 </style>
 </head>
 <body>
@@ -509,13 +521,22 @@ window.renderAll = function() {
   if(!filtered.length){
     html+=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚗</div><div class="empty-text">Sin clientes aún</div><div style="font-size:14px">Agrega tu primer cliente</div></div>`;
   } else if(isListView) {
+    // Header row
+    html += `<div class="client-list-header">
+      <div class="cli-header-cell">Cliente</div>
+      <div class="cli-header-cell">Vehículo</div>
+      <div class="cli-header-cell">Teléfono</div>
+      <div class="cli-header-cell">Próximo Pago</div>
+      <div class="cli-header-cell">Saldo</div>
+      <div class="cli-header-cell">Acciones</div>
+    </div>`;
     filtered.forEach(c=>{
       const status=getStatus(c);
       const nextPay=getNextPayDate(c);
       const days=daysUntil(nextPay);
       const balance=calcBalance(c);
       const payColor=status==='overdue'?'var(--red)':status==='soon'?'var(--yellow)':'var(--green)';
-      const dayLabel=days<0?` (${Math.abs(days)}d vencido)`:days===0?' (HOY)':days<=7?` (${days}d)`:'';
+      const dayLabel=days<0?` (${Math.abs(days)}d)`:days===0?' HOY':days<=7?` (${days}d)`:'';
       html+=`<div class="client-list-item ${status}">
         <div class="cli-name">${c.name}</div>
         <div class="cli-car">${c.year} ${c.make} ${c.model}</div>
@@ -523,15 +544,70 @@ window.renderAll = function() {
         <div class="cli-next" style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</div>
         <div class="cli-balance">${formatMoney(balance)}</div>
         <div class="cli-actions">
-          <button class="cli-btn pay" onclick="openPayModal('${c.id}')">💵</button>
-          <button class="cli-btn sms" onclick="openWhatsApp('${c.id}','${status}')">💬</button>
+          <button class="cli-btn" style="background:var(--green);color:#000;" onclick="openPayModal('${c.id}')">💵</button>
+          <button class="cli-btn" style="background:#2196F3;color:#fff;" onclick="openWhatsApp('${c.id}','${status}')">💬</button>
           <button class="cli-btn" onclick="openEditModal('${c.id}')">✏️</button>
           <button class="cli-btn" onclick="deleteClient('${c.id}')" style="color:var(--red);">🗑</button>
         </div>
       </div>`;
     });
     html += '</div>';
-    html += '';
+    // Add financial summary
+    const totalBalance = clients.reduce((s,c)=>s+calcBalance(c),0);
+    const totalWeekly = clients.reduce((s,c)=>s+Number(c.weekly||0),0);
+    const totalMonthly = clients.reduce((s,c)=>{
+      const freq=c.freq||'weekly';
+      const weekly=Number(c.weekly||0);
+      if(freq==='monthly') return s+weekly;
+      if(freq==='biweekly') return s+(weekly*26/12);
+      return s+(weekly*52/12);
+    },0);
+    const activeClients = clients.filter(c=>calcBalance(c)>0).length;
+
+    // Calculate remaining payments this month
+    const now = new Date();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth()+1, 0);
+    const todayStr = today();
+    const endOfMonthStr = endOfMonth.toISOString().split('T')[0];
+    let restanteMes = 0;
+    let pagosRestantes = 0;
+    clients.forEach(c => {
+      const paidDates = getPaidDates(c);
+      (c.schedule||[]).forEach(d => {
+        if(d >= todayStr && d <= endOfMonthStr && !paidDates.has(d)) {
+          restanteMes += Number(c.weekly||0);
+          pagosRestantes++;
+        }
+      });
+    });
+
+    html += `<div class="fin-summary">
+      <div class="fs-item">
+        <div class="fs-label">Restante Este Mes</div>
+        <div class="fs-value" style="color:var(--green);">${formatMoney(restanteMes)}</div>
+        <div class="fs-sub">${pagosRestantes} pago${pagosRestantes!==1?'s':''} pendientes</div>
+      </div>
+      <div class="fs-item">
+        <div class="fs-label">Ingresos / Mes</div>
+        <div class="fs-value">${formatMoney(Math.round(totalMonthly))}</div>
+        <div class="fs-sub">Estimado mensual</div>
+      </div>
+      <div class="fs-item">
+        <div class="fs-label">Total Por Cobrar</div>
+        <div class="fs-value">${formatMoney(totalBalance)}</div>
+        <div class="fs-sub">${activeClients} clientes activos</div>
+      </div>
+      <div class="fs-item">
+        <div class="fs-label">Pago Promedio</div>
+        <div class="fs-value">${formatMoney(Math.round(totalWeekly/Math.max(clients.length,1)))}</div>
+        <div class="fs-sub">Por cliente</div>
+      </div>
+      <div class="fs-item">
+        <div class="fs-label">Cartera Total</div>
+        <div class="fs-value">${clients.length}</div>
+        <div class="fs-sub">Clientes totales</div>
+      </div>
+    </div>`;
     // skip the else block below
   } else {
     filtered.forEach(c=>{
