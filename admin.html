@@ -353,7 +353,22 @@ function addDays(dateStr, n) { const d = new Date(dateStr+'T12:00:00'); d.setDat
 function formatDate(d) { if(!d) return '—'; const [y,m,day]=d.split('-'); return `${m}/${day}/${y}`; }
 function formatMoney(n) { return '$'+Number(n).toLocaleString('en-US'); }
 function daysUntil(dateStr) { if(!dateStr) return 999; const now=new Date(); now.setHours(0,0,0,0); const d=new Date(dateStr+'T00:00:00'); return Math.round((d-now)/86400000); }
-function generateSchedule(startDate, num) { const s=[]; for(let i=0;i<num;i++) s.push(addDays(startDate,i*7)); return s; }
+function generateSchedule(startDate, num, freq) {
+  const s = [];
+  for (let i = 0; i < num; i++) {
+    if (freq === 'monthly') {
+      const base = new Date(startDate + 'T12:00:00');
+      const d = new Date(base);
+      d.setMonth(d.getMonth() + i);
+      s.push(d.toISOString().split('T')[0]);
+    } else if (freq === 'biweekly') {
+      s.push(addDays(startDate, i * 14));
+    } else {
+      s.push(addDays(startDate, i * 7));
+    }
+  }
+  return s;
+}
 function getPaidDates(c) { return new Set((c.payments||[]).map(p=>p.schedDate).filter(Boolean)); }
 function getNextPayDate(c) { const s=c.schedule||[]; const pd=getPaidDates(c); for(const d of s){if(!pd.has(d))return d;} return s[s.length-1]||null; }
 function getPaidCount(c) { return (c.payments||[]).filter(p=>p.schedDate).length; }
