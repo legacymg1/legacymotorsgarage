@@ -162,10 +162,10 @@
     .login-box { padding: 32px 24px; }
   }
 
-.client-list{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
-.client-list-header{display:grid;grid-template-columns:180px 1fr 120px 130px 90px 120px 110px;gap:0;background:var(--dark2);padding:8px 16px;border-bottom:1px solid var(--border);}
+.client-list{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:12px;overflow-x:auto;min-width:100%;}
+.client-list-header{display:grid;grid-template-columns:160px 160px 110px 120px 80px 100px 130px;min-width:900px;gap:0;background:var(--dark2);padding:8px 16px;border-bottom:1px solid var(--border);}
 .cli-header-cell{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);font-weight:600;}
-.client-list-item{display:grid;grid-template-columns:180px 1fr 120px 130px 90px 120px 110px;gap:0;align-items:center;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);border-left:3px solid transparent;transition:background 0.15s;}
+.client-list-item{display:grid;grid-template-columns:160px 160px 110px 120px 80px 100px 130px;min-width:900px;gap:0;align-items:center;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);border-left:3px solid transparent;transition:background 0.15s;}
 .client-list-item:last-child{border-bottom:none;}
 .client-list-item:hover{background:var(--navy2);}
 .client-list-item.overdue{border-left-color:var(--red);background:rgba(255,59,59,0.03);}
@@ -176,7 +176,7 @@
 .cli-phone{font-size:12px;color:var(--muted);}
 .cli-next{font-size:12px;}
 .cli-balance{font-family:var(--font-display);font-size:15px;color:var(--gold2);text-align:right;padding-right:8px;}
-.cli-actions{display:flex;gap:4px;justify-content:flex-end;}
+.cli-actions{display:flex;gap:4px;justify-content:flex-end;flex-wrap:nowrap;}
 .cli-btn{border:none;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;background:var(--border);color:var(--text);}
 .sort-btn.active{background:var(--gold) !important;color:var(--navy3) !important;}
 
