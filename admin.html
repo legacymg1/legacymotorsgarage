@@ -161,6 +161,20 @@
     .form-row { grid-template-columns: 1fr; }
     .login-box { padding: 32px 24px; }
   }
+
+.client-list{display:flex;flex-direction:column;gap:4px;}
+.client-list-item{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--border);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:12px;}
+.client-list-item.overdue{border-left-color:var(--red);}
+.client-list-item.soon{border-left-color:var(--yellow);}
+.client-list-item.ok{border-left-color:var(--green);}
+.cli-name{font-weight:600;font-size:14px;min-width:150px;}
+.cli-car{font-size:13px;color:var(--gold);min-width:150px;}
+.cli-phone{font-size:12px;color:var(--muted);min-width:110px;}
+.cli-next{font-size:12px;min-width:120px;}
+.cli-balance{font-family:var(--font-display);font-size:16px;color:var(--gold);min-width:80px;}
+.cli-actions{display:flex;gap:6px;margin-left:auto;}
+.cli-btn{border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;background:var(--border);color:var(--text);}
+.sort-btn.active{background:var(--gold) !important;color:var(--navy3) !important;}
 </style>
 </head>
 <body>
@@ -210,7 +224,17 @@
 </div>
 
 <div class="search-wrap">
-    <input class="search-input" placeholder="🔍 Buscar cliente o carro..." id="search-box" oninput="renderAll()">
+    <div style="display:flex;gap:10px;align-items:center;">
+      <input class="search-input" placeholder="🔍 Buscar cliente o carro..." id="search-box" oninput="renderAll()" style="flex:1;">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button id="sort-date" class="sort-btn" onclick="setSort('date')" style="background:var(--border);color:var(--muted);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">📅 FECHA</button>
+        <button id="sort-name" class="sort-btn" onclick="setSort('name')" style="background:var(--border);color:var(--muted);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">A-Z</button>
+        <button id="sort-balance" class="sort-btn" onclick="setSort('balance')" style="background:var(--border);color:var(--muted);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">💰 SALDO</button>
+        <div style="width:1px;height:24px;background:var(--border);"></div>
+        <button id="btn-grid" onclick="setView('grid')" style="background:var(--gold);color:var(--navy3);border:none;border-radius:6px;padding:8px 12px;font-size:16px;cursor:pointer;" title="Vista tarjetas">⊞</button>
+        <button id="btn-list" onclick="setView('list')" style="background:var(--border);color:var(--text);border:none;border-radius:6px;padding:8px 12px;font-size:16px;cursor:pointer;" title="Vista lista">☰</button>
+      </div>
+    </div>
   </div>
 
   <main id="main-content"><div class="loading">Cargando clientes...</div></main>
@@ -348,6 +372,16 @@ window.adminLogout = function() {
 let clients = [];
 let editingId = null, payingId = null, waPhone = null;
 let currentView = 'grid';
+let currentSort = 'status'; // 'status', 'date', 'name', 'balance'
+
+window.setSort = function(s) {
+  currentSort = s;
+  // Update sort button styles
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('sort-'+s);
+  if(btn) btn.classList.add('active');
+  renderAll();
+};
 
 window.setView = function(v) {
   currentView = v;
@@ -439,7 +473,24 @@ window.renderAll = function() {
   document.getElementById('stat-soon').textContent=soon;
   document.getElementById('stat-ok').textContent=ok;
 
-  const filtered=clients.filter(c=>(c.name+c.phone+c.make+c.model+c.year).toLowerCase().includes(search));
+  let filtered=clients.filter(c=>(c.name+c.phone+c.make+c.model+c.year).toLowerCase().includes(search));
+  
+  // Apply sort
+  if(currentSort==='date'){
+    filtered.sort((a,b)=>{
+      const da = a.contractDate||a.startDate||'';
+      const db = b.contractDate||b.startDate||'';
+      return db.localeCompare(da); // newest first
+    });
+  } else if(currentSort==='name'){
+    filtered.sort((a,b)=>a.name.localeCompare(b.name));
+  } else if(currentSort==='balance'){
+    filtered.sort((a,b)=>calcBalance(b)-calcBalance(a)); // highest balance first
+  } else {
+    // Default: overdue first, then soon, then ok
+    const order={'overdue':0,'soon':1,'ok':2};
+    filtered.sort((a,b)=>order[getStatus(a)]-order[getStatus(b)]);
+  }
   const main=document.getElementById('main-content');
   const todayStr=today();
 
