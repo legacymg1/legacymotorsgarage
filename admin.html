@@ -603,7 +603,17 @@ window.openPayModal=function(id){
   const hist=c.payments||[];
   document.getElementById('pay-history').innerHTML=hist.length===0
     ?'<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin pagos aún</div>'
-    :[...hist].reverse().map(p=>`<div class="payment-entry"><span>${formatDate(p.date)}</span><span style="color:var(--green);font-weight:600;">${formatMoney(p.amount)}</span></div>`).join('');
+    :[...hist].map((p,i)=>`
+      <div class="payment-entry" style="flex-direction:column;align-items:flex-start;gap:6px;">
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+          <span style="font-size:12px;color:var(--muted);">Pago ${i+1} · ${formatDate(p.schedDate||p.date)}</span>
+          <button onclick="deletePayment('${c.id}',${i})" style="background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">✕</button>
+        </div>
+        <div style="display:flex;gap:8px;width:100%;">
+          <input type="date" value="${p.date}" onchange="editPayment('${c.id}',${i},'date',this.value)" style="flex:1;background:var(--navy2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;">
+          <input type="number" value="${p.amount}" onchange="editPayment('${c.id}',${i},'amount',this.value)" style="width:90px;background:var(--navy2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--green);font-size:12px;font-weight:600;">
+        </div>
+      </div>`).join('');
   document.getElementById('pay-modal').classList.add('active');
 };
 
@@ -958,6 +968,26 @@ function checkStartupOverdue(){
   }).join('');
   document.getElementById('startup-modal').classList.add('active');
 }
+
+window.editPayment=async function(clientId, idx, field, value){
+  const c=clients.find(x=>x.id===clientId);
+  if(!c||!c.payments[idx]) return;
+  c.payments[idx][field] = field==='amount' ? Number(value) : value;
+  try{
+    await setDoc(doc(db,'clients',clientId),c);
+  }catch(e){alert('Error: '+e.message);}
+};
+
+window.deletePayment=async function(clientId, idx){
+  if(!confirm('¿Eliminar este pago?')) return;
+  const c=clients.find(x=>x.id===clientId);
+  if(!c) return;
+  c.payments.splice(idx,1);
+  try{
+    await setDoc(doc(db,'clients',clientId),c);
+    closeModal('pay-modal');
+  }catch(e){alert('Error: '+e.message);}
+};
 
 window.closeModal=function(id){document.getElementById(id).classList.remove('active');};
 document.querySelectorAll('.modal-overlay').forEach(el=>{
