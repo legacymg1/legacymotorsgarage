@@ -256,11 +256,11 @@
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Monto de Pago ($)</label><input class="form-input" id="f-weekly" placeholder="150" type="number" oninput="calcHint()"><div class="form-hint" id="f-weekly-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Ingresa el monto según la frecuencia seleccionada</div></div>
-      <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="calcHint()"><div class="form-hint" id="f-hint"></div></div>
+      <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="setTimeout(calcHint,50)"><div class="form-hint" id="f-hint"></div></div>
     </div>
     <div class="form-group">
       <label class="form-label">Frecuencia de Pago</label>
-      <select class="form-input" id="f-freq" onchange="calcHint()" oninput="calcHint()">
+      <select class="form-input" id="f-freq" onchange="setTimeout(calcHint,50)" oninput="setTimeout(calcHint,50)">
         <option value="weekly">Semanal (cada 7 días)</option>
         <option value="biweekly">Quincenal (cada 14 días)</option>
         <option value="monthly">Mensual (mismo día cada mes)</option>
@@ -268,7 +268,7 @@
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha de Contrato</label><input class="form-input" id="f-contractdate" type="date"></div>
-      <div class="form-group"><label class="form-label">Fecha Primer Pago</label><input class="form-input" id="f-startdate" type="date" oninput="calcHint()"></div>
+      <div class="form-group"><label class="form-label">Fecha Primer Pago</label><input class="form-input" id="f-startdate" type="date" onchange="setTimeout(calcHint,50)"></div>
     </div>
     <div class="form-group"><label class="form-label">Notas</label><input class="form-input" id="f-notes" placeholder="Información adicional..."></div>
     <div class="modal-actions">
