@@ -975,22 +975,43 @@ function getPaidOffMsg(c) {
 
 window.openWhatsApp=function(id,status){
   const c=clients.find(x=>x.id===id);
+  if(!c) return;
   waPhone=c.phone.replace(/\D/g,'');
+  const lang=c.lang||'es';
   const nextPay=getNextPayDate(c);
   const balance=formatMoney(calcBalance(c));
   const days=Math.abs(daysUntil(nextPay));
   const paidCount=getPaidCount(c);
   const totalPay=(c.schedule||[]).length;
+  const nombre=c.name.split(' ')[0];
+  const carro=`${c.year} ${c.make} ${c.model}`;
   let msg='';
-  if(status==='overdue'){
-    msg=`Hola ${c.name}, le saluda Legacy Motors Garage 🚗\n\nSu pago semanal de ${formatMoney(c.weekly)} para su ${c.year} ${c.make} ${c.model} venció hace ${days} día${days!==1?'s':''}.\n\nPagos: ${paidCount} de ${totalPay}\nSaldo pendiente: ${balance}\n\nPor favor contáctenos para ponerse al corriente 🙏\nlegacymotorsgarage.com`;
-  }else if(status==='soon'){
-    msg=`Hola ${c.name}! Le recuerda Legacy Motors Garage 🚗\n\nSu pago de ${formatMoney(c.weekly)} para su ${c.year} ${c.make} ${c.model} vence en ${days} día${days!==1?'s':''}.\n\nFecha: ${formatDate(nextPay)} · Pagos: ${paidCount}/${totalPay} · Saldo: ${balance}\n\nGracias por su puntualidad 😊`;
-  }else{
-    msg=`Hola ${c.name}! Le saluda Legacy Motors Garage 🚗\n\nSu próximo pago de ${formatMoney(c.weekly)} para su ${c.year} ${c.make} ${c.model} es el ${formatDate(nextPay)}.\n\nPagos: ${paidCount}/${totalPay} · Saldo: ${balance}\n\nGracias! 🙏`;
+
+  if(status==='insurance'){
+    if(lang==='en'){
+      msg=`Hi ${nombre}! Legacy Motors Garage LLC here.\n\nWe noticed your vehicle insurance${c.insurance?' ('+c.insurance+')':''} for your ${carro} is expired or missing.\n\nPlease update your insurance and send us proof of coverage as soon as possible.\n\nThank you!\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    } else {
+      msg=`Hola ${nombre}! Le saluda Legacy Motors Garage LLC.\n\nNotamos que el seguro de su ${carro}${c.insurance?' ('+c.insurance+')':''} está vencido o no tenemos registro.\n\nPor favor actualice su seguro y envíenos comprobante a la brevedad.\n\nGracias!\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    }
+  } else if(status==='overdue'){
+    msg=getOverdueMsg(c,days);
+  } else if(status==='soon'){
+    if(lang==='en'){
+      msg=`Hi ${nombre}! Legacy Motors Garage LLC here. 🚗\n\nFriendly reminder that your payment of ${formatMoney(c.weekly)} for your ${carro} is due in ${days} day${days!==1?'s':''}.\n\nDue: ${formatDate(nextPay)} · Payments: ${paidCount}/${totalPay} · Balance: ${balance}\n\nThank you for your reliability! 😊\n\n— Legacy Motors Garage LLC · (559) 540-5145`;
+    } else {
+      msg=`Hola ${nombre}! Le recuerda Legacy Motors Garage LLC 🚗\n\nSu pago de ${formatMoney(c.weekly)} para su ${carro} vence en ${days} día${days!==1?'s':''}.\n\nFecha: ${formatDate(nextPay)} · Pagos: ${paidCount}/${totalPay} · Saldo: ${balance}\n\nGracias por su puntualidad 😊\n\n— Legacy Motors Garage LLC · (559) 540-5145`;
+    }
+  } else {
+    if(lang==='en'){
+      msg=`Hi ${nombre}! Legacy Motors Garage LLC here. 🚗\n\nYour next payment of ${formatMoney(c.weekly)} for your ${carro} is on ${formatDate(nextPay)}.\n\nPayments: ${paidCount}/${totalPay} · Balance: ${balance}\n\nThank you! 🙏\n\n— Legacy Motors Garage LLC · (559) 540-5145`;
+    } else {
+      msg=`Hola ${nombre}! Le saluda Legacy Motors Garage LLC 🚗\n\nSu próximo pago de ${formatMoney(c.weekly)} para su ${carro} es el ${formatDate(nextPay)}.\n\nPagos: ${paidCount}/${totalPay} · Saldo: ${balance}\n\nGracias! 🙏\n\n— Legacy Motors Garage LLC · (559) 540-5145`;
+    }
   }
+
   document.getElementById('wa-preview').textContent=msg;
   document.getElementById('wa-text').value=msg;
+  waPhone=c.phone.replace(/\D/g,'');
   document.getElementById('wa-modal').classList.add('active');
 };
 
