@@ -402,7 +402,13 @@ window.setView = function(v) {
   renderAll();
 };
 
-function today() { return new Date().toISOString().split('T')[0]; }
+function today() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${year}-${month}-${day}`;
+}
 function addDays(dateStr, n) { const d = new Date(dateStr+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
 function formatDate(d) { if(!d) return '—'; const [y,m,day]=d.split('-'); return `${m}/${day}/${y}`; }
 function formatMoney(n) { return '$'+Number(n).toLocaleString('en-US'); }
