@@ -1099,35 +1099,22 @@ window.sendDayMessages = function() {
   let allMessages = [];
 
   todayClients.forEach(c => {
-    const msg = `Hola ${c.name.split(' ')[0]}! 😊 Le saluda Legacy Motors Garage LLC.
-
-Le recordamos con cariño que hoy es su día de pago de ${formatMoney(c.weekly)} por su ${c.year} ${c.make} ${c.model}.
-
-Saldo restante: ${formatMoney(calcBalance(c))}
-
-¡Gracias por su puntualidad, lo apreciamos mucho! 🙏
-
-— Legacy Motors Garage LLC
-📞 (559) 540-5145`;
+    const lang = c.lang || 'es';
+    let msg;
+    if(lang === 'en'){
+      msg = `Hi ${c.name.split(' ')[0]}! 😊 Legacy Motors Garage LLC here.\n\nFriendly reminder that today is your payment day! Your payment of ${formatMoney(c.weekly)} for your ${c.year} ${c.make} ${c.model} is due today.\n\nRemaining balance: ${formatMoney(calcBalance(c))}\n\nThank you so much for your reliability! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    } else {
+      msg = `Hola ${c.name.split(' ')[0]}! 😊 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que hoy es su día de pago de ${formatMoney(c.weekly)} por su ${c.year} ${c.make} ${c.model}.\n\nSaldo restante: ${formatMoney(calcBalance(c))}\n\n¡Gracias por su puntualidad, lo apreciamos mucho! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    }
     allMessages.push({ phone: c.phone.replace(/\D/g,''), msg, name: c.name });
   });
 
   overdueClients.forEach(c => {
     const days = Math.abs(daysUntil(getNextPayDate(c)));
-    const msg = `Hola ${c.name.split(' ')[0]}, le saluda Legacy Motors Garage LLC. 🚗
-
-Entendemos que a veces se complican las cosas y estamos aquí para apoyarle. Notamos que su pago de ${formatMoney(c.weekly)} por su ${c.year} ${c.make} ${c.model} lleva ${days} día${days!==1?'s':''} pendiente.
-
-Saldo: ${formatMoney(calcBalance(c))}
-
-Por favor contáctenos cuando pueda, con gusto le ayudamos a ponerse al corriente. 🙏
-
-— Legacy Motors Garage LLC
-📞 (559) 540-5145`;
+    const msg = getOverdueMsg(c, days);
     allMessages.push({ phone: c.phone.replace(/\D/g,''), msg, name: c.name });
   });
 
-  // Send one by one
   let i = 0;
   function sendNext() {
     if (i >= allMessages.length) {
