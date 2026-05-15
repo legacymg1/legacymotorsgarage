@@ -663,7 +663,7 @@ window.renderAll = function() {
         <div class="card-actions">
           <button class="btn btn-pay" onclick="openPayModal('${c.id}')">💵 Pago</button>
           <button class="btn btn-whatsapp" onclick="openWhatsApp('${c.id}','${status}')" style="background:#2196F3;color:#fff;">💬 SMS</button>
-          ${(!c.insurance||c.insuranceExp<today())?`<button class="btn" onclick="openWhatsApp('${c.id}','insurance')" style="background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>`:''}
+          ${(!c.insurance||c.insuranceExp<today())?`<button class="btn" onclick="openWhatsApp('" + c.id + "','insurance')" style="background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>`:''}
           <button class="btn btn-edit" onclick="openEditModal('${c.id}')">✏️</button>
           <button class="btn btn-delete" onclick="deleteClient('${c.id}')">🗑</button>
         </div>
