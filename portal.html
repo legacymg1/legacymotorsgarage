@@ -108,6 +108,19 @@
   ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
   @media(max-width:480px){.login-box{padding:36px 24px;}.welcome-name{font-size:22px;}.balance-amount{font-size:34px;}}
+
+.insurance-section{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-top:16px;}
+.insurance-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.insurance-title{font-family:var(--font-display);font-size:20px;font-weight:300;color:var(--white);}
+.insurance-badge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:1px;}
+.ins-none{background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);}
+.ins-expired{background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);}
+.ins-soon{background:rgba(255,214,0,0.12);color:var(--yellow);border:1px solid var(--yellow);}
+.ins-active{background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);}
+.ins-form{margin-top:16px;border-top:1px solid var(--border);padding-top:16px;}
+.ins-form-title{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:12px;}
+.ins-btn{width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:14px;font-family:var(--font-display);font-size:18px;cursor:pointer;margin-top:8px;}
+.ins-success{color:var(--green);font-size:13px;text-align:center;margin-top:8px;}
 </style>
 </head>
 <body>
@@ -143,7 +156,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
@@ -192,12 +205,79 @@ window.doLogin = async function() {
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app').style.display='block';
       renderPortal();
+      updateInsuranceDisplay();
     } else {
       errEl.textContent = 'Teléfono o contraseña incorrectos';
     }
   } catch(e) {
     errEl.textContent = 'Error de conexión. Intenta de nuevo.';
   }
+};
+
+function updateInsuranceDisplay() {
+  const c = currentClient;
+  if(!c) return;
+  const badge = document.getElementById('ins-badge');
+  const current = document.getElementById('ins-current');
+  const expEl = document.getElementById('ins-exp');
+  if(!badge) return;
+
+  const todayStr = today();
+  if(!c.insurance) {
+    badge.className='insurance-badge ins-none';
+    badge.textContent='⚠️ SIN SEGURO';
+    current.textContent='No tenemos registro de su seguro.';
+    expEl.textContent='Por favor actualice su información.';
+  } else {
+    const daysLeft = c.insuranceExp ? Math.round((new Date(c.insuranceExp+'T00:00:00')-new Date(todayStr+'T00:00:00'))/86400000) : 999;
+    if(daysLeft < 0) {
+      badge.className='insurance-badge ins-expired';
+      badge.textContent='🔴 VENCIDO';
+    } else if(daysLeft <= 30) {
+      badge.className='insurance-badge ins-soon';
+      badge.textContent=`⚠️ VENCE EN ${daysLeft}D`;
+    } else {
+      badge.className='insurance-badge ins-active';
+      badge.textContent='✅ ACTIVO';
+    }
+    current.textContent=`${c.insuranceCompany||''}${c.insurance?' · Póliza: '+c.insurance:''}`;
+    expEl.textContent=c.insuranceExp?`Vence: ${formatDate(c.insuranceExp)}`:'';
+    // Pre-fill form
+    if(document.getElementById('ins-company')) document.getElementById('ins-company').value = c.insuranceCompany||'';
+    if(document.getElementById('ins-number')) document.getElementById('ins-number').value = c.insurance||'';
+    if(document.getElementById('ins-exp-date')) document.getElementById('ins-exp-date').value = c.insuranceExp||'';
+  }
+}
+
+window.updateInsurance = async function() {
+  const company = document.getElementById('ins-company').value.trim();
+  const number = document.getElementById('ins-number').value.trim();
+  const expDate = document.getElementById('ins-exp-date').value;
+  if(!number) { alert('Por favor ingresa el número de póliza'); return; }
+  
+  const btn = document.querySelector('.ins-btn');
+  btn.textContent = 'Guardando...';
+  btn.disabled = true;
+  
+  try {
+    const db2 = getFirestore();
+    await setDoc(doc(db2,'clients',currentClient.id), {
+      ...currentClient,
+      insurance: number,
+      insuranceCompany: company,
+      insuranceExp: expDate
+    });
+    currentClient.insurance = number;
+    currentClient.insuranceCompany = company;
+    currentClient.insuranceExp = expDate;
+    document.getElementById('ins-success').style.display='block';
+    updateInsuranceDisplay();
+    setTimeout(()=>{ document.getElementById('ins-success').style.display='none'; }, 3000);
+  } catch(e) {
+    alert('Error al guardar: ' + e.message);
+  }
+  btn.textContent = 'Actualizar Seguro / Update Insurance';
+  btn.disabled = false;
 };
 
 window.doLogout = function() {
@@ -282,6 +362,25 @@ function renderPortal() {
       <div class="npc-amount">
         <div class="npc-amount-value">${formatMoney(c.weekly)}</div>
         <div class="npc-amount-label">pago semanal</div>
+      </div>
+    </div>
+
+    <!-- INSURANCE -->
+    <div class="insurance-section" id="insurance-section">
+      <div class="insurance-header">
+        <div class="insurance-title">🛡️ Seguro / Insurance</div>
+        <span class="insurance-badge" id="ins-badge"></span>
+      </div>
+      <div id="ins-current" style="font-size:14px;color:var(--muted);margin-bottom:4px;"></div>
+      <div id="ins-exp" style="font-size:13px;color:var(--muted);"></div>
+      <div class="ins-form">
+        <div class="ins-form-title">Actualizar Seguro / Update Insurance</div>
+        <input class="fi" id="ins-company" placeholder="Aseguradora / Insurance Company" style="margin-bottom:10px;">
+        <input class="fi" id="ins-number" placeholder="Número de Póliza / Policy Number" style="margin-bottom:10px;">
+        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Fecha Vencimiento / Expiration Date</label>
+        <input class="fi" id="ins-exp-date" type="date" style="margin-bottom:10px;">
+        <button class="ins-btn" onclick="updateInsurance()">Actualizar Seguro / Update Insurance</button>
+        <div class="ins-success" id="ins-success" style="display:none;">✓ Seguro actualizado correctamente</div>
       </div>
     </div>
 
