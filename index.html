@@ -14685,6 +14685,27 @@ function adminLogout(){setAdmin(false);}
 if(isAdmin)setAdmin(true);
 
 let adminKey='';
+let logoTaps=0;
+let logoTimer=null;
+
+// Mobile: tap logo 5 times to activate admin
+document.addEventListener('DOMContentLoaded',()=>{
+  const logo=document.querySelector('.nav-logo');
+  if(logo){
+    logo.addEventListener('click',()=>{
+      logoTaps++;
+      clearTimeout(logoTimer);
+      if(logoTaps>=5){
+        logoTaps=0;
+        const p=prompt('Admin password:');
+        if(p===ADMIN_PASS)setAdmin(true);
+      } else {
+        logoTimer=setTimeout(()=>{logoTaps=0;},2000);
+      }
+    });
+  }
+});
+
 document.addEventListener('keydown',e=>{
   adminKey+=e.key;
   if(adminKey.includes('admin')){const p=prompt('Admin password:');if(p===ADMIN_PASS)setAdmin(true);adminKey='';}
