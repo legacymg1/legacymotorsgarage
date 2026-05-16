@@ -157,6 +157,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
@@ -241,6 +242,11 @@ function updateInsuranceDisplay() {
       badge.textContent='✅ ACTIVO';
     }
     current.textContent=`${c.insuranceCompany||''}${c.insurance?' · Póliza: '+c.insurance:''}`;
+    // Show photo if exists
+    const preview = document.getElementById('ins-photo-preview');
+    if(preview && c.insurancePhotoURL) {
+      preview.innerHTML = `<a href="${c.insurancePhotoURL}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 12px;font-size:12px;text-decoration:none;">📄 Ver foto de póliza / View insurance photo</a>`;
+    }
     expEl.textContent=c.insuranceExp?`Vence: ${formatDate(c.insuranceExp)}`:'';
     // Pre-fill form
     if(document.getElementById('ins-company')) document.getElementById('ins-company').value = c.insuranceCompany||'';
@@ -253,26 +259,39 @@ window.updateInsurance = async function() {
   const company = document.getElementById('ins-company').value.trim();
   const number = document.getElementById('ins-number').value.trim();
   const expDate = document.getElementById('ins-exp-date').value;
-  if(!number) { alert('Por favor ingresa el número de póliza'); return; }
+  if(!number) { alert('Por favor ingresa el número de póliza / Please enter policy number'); return; }
   
   const btn = document.querySelector('.ins-btn');
   btn.textContent = 'Guardando...';
   btn.disabled = true;
   
   try {
+    let photoURL = currentClient.insurancePhotoURL || '';
+    
+    // Upload photo if selected
+    const photoFile = document.getElementById('ins-photo').files[0];
+    if(photoFile) {
+      btn.textContent = 'Subiendo foto...';
+      const storage = getStorage();
+      const photoRef = ref(storage, `insurance/${currentClient.id}/${Date.now()}_${photoFile.name}`);
+      await uploadBytes(photoRef, photoFile);
+      photoURL = await getDownloadURL(photoRef);
+    }
+    
     const db2 = getFirestore();
-    await setDoc(doc(db2,'clients',currentClient.id), {
+    const updated = {
       ...currentClient,
       insurance: number,
       insuranceCompany: company,
-      insuranceExp: expDate
-    });
-    currentClient.insurance = number;
-    currentClient.insuranceCompany = company;
-    currentClient.insuranceExp = expDate;
+      insuranceExp: expDate,
+      insurancePhotoURL: photoURL
+    };
+    await setDoc(doc(db2,'clients',currentClient.id), updated);
+    currentClient = {...currentClient, insurance: number, insuranceCompany: company, insuranceExp: expDate, insurancePhotoURL: photoURL};
     document.getElementById('ins-success').style.display='block';
+    document.getElementById('ins-success').textContent = photoFile ? '✓ Seguro e imagen actualizados / Insurance and photo updated' : '✓ Seguro actualizado / Insurance updated';
     updateInsuranceDisplay();
-    setTimeout(()=>{ document.getElementById('ins-success').style.display='none'; }, 3000);
+    setTimeout(()=>{ document.getElementById('ins-success').style.display='none'; }, 4000);
   } catch(e) {
     alert('Error al guardar: ' + e.message);
   }
@@ -379,6 +398,11 @@ function renderPortal() {
         <input class="fi" id="ins-number" placeholder="Número de Póliza / Policy Number" style="margin-bottom:10px;">
         <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Fecha Vencimiento / Expiration Date</label>
         <input class="fi" id="ins-exp-date" type="date" style="margin-bottom:10px;">
+        <div style="margin-bottom:10px;">
+          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Foto de Póliza / Insurance Photo (opcional)</label>
+          <input type="file" id="ins-photo" accept="image/*,application/pdf" style="width:100%;background:var(--navy2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
+          <div id="ins-photo-preview" style="margin-top:8px;"></div>
+        </div>
         <button class="ins-btn" onclick="updateInsurance()">Actualizar Seguro / Update Insurance</button>
         <div class="ins-success" id="ins-success" style="display:none;">✓ Seguro actualizado correctamente</div>
       </div>
