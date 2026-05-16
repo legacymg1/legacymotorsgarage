@@ -14682,7 +14682,7 @@ function setAdmin(on){
   renderCars();
 }
 function adminLogout(){setAdmin(false);}
-if(isAdmin)setAdmin(true);
+document.addEventListener('DOMContentLoaded',()=>{ if(isAdmin)setAdmin(true); });
 
 let adminKey='';
 let logoTaps=0;
