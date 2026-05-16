@@ -288,7 +288,7 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
 </div>
 
 <nav id="navbar">
-  <div class="nav-logo" onclick="handleLogoTap()">
+  <div class="nav-logo">
     <a href="#"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABgAAAAQACAYAAAAncZJCAAAAAXNSR0IArs4c6QAAAIRlWElmTU0A
 KgAAAAgABQESAAMAAAABAAEAAAEaAAUAAAABAAAASgEbAAUAAAABAAAAUgEoAAMAAAABAAIAAIdp
 AAQAAAABAAAAWgAAAAAAAABIAAAAAQAAAEgAAAABAAOgAQADAAAAAQABAACgAgAEAAAAAQAABgCg
@@ -14682,7 +14682,7 @@ function setAdmin(on){
   renderCars();
 }
 function adminLogout(){setAdmin(false);}
-document.addEventListener('DOMContentLoaded',()=>{ if(isAdmin)setAdmin(true); });
+if(isAdmin)setAdmin(true);
 
 let adminKey='';
 let logoTaps=0;
@@ -14695,7 +14695,10 @@ window.handleLogoTap = function(){
   if(logoTaps>=5){
     logoTaps=0;
     const p=prompt('Admin password:');
-    if(p===ADMIN_PASS)setAdmin(true);
+    if(p===ADMIN_PASS){
+      sessionStorage.setItem('lmg_admin','true');
+      setAdmin(true);
+    }
   } else {
     logoTimer=setTimeout(()=>{logoTaps=0;},2000);
   }
@@ -14874,22 +14877,24 @@ renderCars();
 </script>
 
 <script>
-var logoTaps2=0;
-var logoTimer2=null;
-function handleLogoTap(){
-  logoTaps2++;
-  clearTimeout(logoTimer2);
-  if(logoTaps2>=5){
-    logoTaps2=0;
+var secretTaps=0;
+var secretTimer=null;
+function secretTap(){
+  secretTaps++;
+  clearTimeout(secretTimer);
+  if(secretTaps>=3){
+    secretTaps=0;
     var p=prompt('Admin password:');
     if(p==='lmg2025admin'){
       sessionStorage.setItem('lmg_admin','true');
-      location.reload();
+      if(typeof setAdmin==='function') setAdmin(true);
+      else location.reload();
     }
   } else {
-    logoTimer2=setTimeout(function(){logoTaps2=0;},2000);
+    secretTimer=setTimeout(function(){secretTaps=0;},2000);
   }
 }
 </script>
+<div onclick="secretTap()" style="position:fixed;bottom:0;right:0;width:60px;height:60px;z-index:9999;cursor:default;-webkit-tap-highlight-color:transparent;"></div>
 </body>
 </html>
