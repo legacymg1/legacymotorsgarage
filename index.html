@@ -14872,5 +14872,24 @@ function sendMessage(){
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});});
 renderCars();
 </script>
+
+<script>
+var logoTaps2=0;
+var logoTimer2=null;
+function handleLogoTap(){
+  logoTaps2++;
+  clearTimeout(logoTimer2);
+  if(logoTaps2>=5){
+    logoTaps2=0;
+    var p=prompt('Admin password:');
+    if(p==='lmg2025admin'){
+      sessionStorage.setItem('lmg_admin','true');
+      location.reload();
+    }
+  } else {
+    logoTimer2=setTimeout(function(){logoTaps2=0;},2000);
+  }
+}
+</script>
 </body>
 </html>
