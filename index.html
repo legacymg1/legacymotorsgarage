@@ -14673,15 +14673,15 @@ window.addEventListener('scroll',()=>{
   document.getElementById('navbar').classList.toggle('scrolled',scrollY>60);
 });
 
-function toggleMenu(){document.getElementById('mobile-menu').classList.toggle('open');}
+window.toggleMenu = function(){document.getElementById('mobile-menu').classList.toggle('open');}
 
-function setAdmin(on){
+window.setAdmin = function(on){
   isAdmin=on;
   if(on){sessionStorage.setItem('lmg_admin','true');document.getElementById('admin-bar').classList.add('on');document.getElementById('add-car-btn').style.display='block';}
   else{sessionStorage.removeItem('lmg_admin');document.getElementById('admin-bar').classList.remove('on');document.getElementById('add-car-btn').style.display='none';}
   renderCars();
 }
-function adminLogout(){setAdmin(false);}
+window.adminLogout = function(){setAdmin(false);}
 if(isAdmin)setAdmin(true);
 
 let adminKey='';
@@ -14725,7 +14725,7 @@ document.addEventListener('keydown',e=>{
   if(adminKey.length>10)adminKey='';
 });
 
-function renderCars(){
+window.renderCars = function(){
   const grid=document.getElementById('cars-grid');
   if(!cars.length){
     grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--silver)"><div style="font-size:48px;margin-bottom:16px;">🚗</div><div style="font-family:var(--font-display);font-size:22px;font-weight:300;margin-bottom:8px;color:var(--white)">Coming Soon · Próximamente</div><div style="font-size:13px;letter-spacing:1px">View our current inventory on Facebook Marketplace</div></div>';
@@ -14762,7 +14762,7 @@ function renderCars(){
   }).join('');
 }
 
-function openCarModal(carId=null){
+window.openCarModal = function(carId){
   editingCarId=carId;
   const modal=document.getElementById('car-modal');
   const title=document.getElementById('car-modal-title');
@@ -14794,9 +14794,9 @@ function openCarModal(carId=null){
   document.getElementById('car-video').value='';
   modal.style.display='flex';
 }
-function closeCarModal(){document.getElementById('car-modal').classList.remove('active');}
+window.closeCarModal = function(){document.getElementById('car-modal').classList.remove('active');}
 
-async function saveCar(){
+window.saveCar = async function(){
   const make=document.getElementById('car-make').value.trim();
   const model=document.getElementById('car-model').value.trim();
   if(!make||!model){alert('Enter make and model');return;}
@@ -14858,12 +14858,12 @@ async function saveCar(){
 }
 
 
-async function deleteCar(id){
+window.deleteCar = async function(id){
   if(!confirm('Delete this vehicle?')) return;
   await deleteDoc(doc(db,'inventory',id));
 }
 
-async function removePhoto(carId, photoIndex){
+window.removePhoto = async function(carId, photoIndex){
   const c=cars.find(x=>x.id===carId);
   if(!c) return;
   c.photos.splice(photoIndex,1);
@@ -14872,7 +14872,7 @@ async function removePhoto(carId, photoIndex){
   openCarModal(carId);
 }
 
-function sendMessage(){
+window.sendMessage = function(){
   const name=document.getElementById('cf-name').value.trim();
   const phone=document.getElementById('cf-phone').value.trim();
   const interest=document.getElementById('cf-interest').value;
