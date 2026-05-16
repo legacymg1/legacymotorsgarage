@@ -14649,9 +14649,9 @@ const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
   authDomain: "legacy-motors-garage.firebaseapp.com",
   projectId: "legacy-motors-garage",
-  storageBucket: "legacy-motors-garage.appspot.com",
-  messagingSenderId: "762193424986",
-  appId: "1:762193424986:web:abc123"
+  storageBucket: "legacy-motors-garage.firebasestorage.app",
+  messagingSenderId: "783567672493",
+  appId: "1:783567672493:web:3a825f2f59ec1c25e9a224"
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -14685,10 +14685,25 @@ function adminLogout(){setAdmin(false);}
 if(isAdmin)setAdmin(true);
 
 let adminKey='';
+// Mobile: tap logo 5 times to activate admin
+// Logo tap - inside module so setAdmin is accessible
 let logoTaps=0;
 let logoTimer=null;
+document.addEventListener('DOMContentLoaded',()=>{
+  const logoEl=document.getElementById('nav-logo-btn');
+  if(logoEl) logoEl.addEventListener('click',()=>{
+    logoTaps++;
+    clearTimeout(logoTimer);
+    if(logoTaps>=5){
+      logoTaps=0;
+      const p=prompt('Admin password:');
+      if(p===ADMIN_PASS) setAdmin(true);
+    } else {
+      logoTimer=setTimeout(()=>{logoTaps=0;},2000);
+    }
+  });
+});
 
-// Mobile: tap logo 5 times to activate admin
 window.handleLogoTap = function(){
   logoTaps++;
   clearTimeout(logoTimer);
@@ -14876,25 +14891,6 @@ document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('cl
 renderCars();
 </script>
 
-<script>
-var secretTaps=0;
-var secretTimer=null;
-function secretTap(){
-  secretTaps++;
-  clearTimeout(secretTimer);
-  if(secretTaps>=3){
-    secretTaps=0;
-    var p=prompt('Admin password:');
-    if(p==='lmg2025admin'){
-      sessionStorage.setItem('lmg_admin','true');
-      if(typeof setAdmin==='function') setAdmin(true);
-      else location.reload();
-    }
-  } else {
-    secretTimer=setTimeout(function(){secretTaps=0;},2000);
-  }
-}
-</script>
-<div onclick="secretTap()" style="position:fixed;bottom:0;right:0;width:60px;height:60px;z-index:9999;cursor:default;-webkit-tap-highlight-color:transparent;"></div>
+
 </body>
 </html>
