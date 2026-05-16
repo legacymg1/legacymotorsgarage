@@ -663,7 +663,7 @@ window.renderAll = function() {
         <div class="card-actions">
           <button class="btn btn-pay" onclick="openPayModal('${c.id}')">💵 Pago</button>
           <button class="btn btn-whatsapp" onclick="openWhatsApp('${c.id}','${status}')" style="background:#2196F3;color:#fff;">💬 SMS</button>
-          ${(!c.insurance||c.insuranceExp<today())?`<button class="btn" onclick="openWhatsApp('" + c.id + "','insurance')" style="background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>`:''}
+          ${(!c.insurance||c.insuranceExp<today())?`<button class="btn" data-cid="${c.id}" onclick="openInsuranceSMS(this.dataset.cid)" style="background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>`:''}
           <button class="btn btn-edit" onclick="openEditModal('${c.id}')">✏️</button>
           <button class="btn btn-delete" onclick="deleteClient('${c.id}')">🗑</button>
         </div>
@@ -972,6 +972,22 @@ function getPaidOffMsg(c) {
     .replace(/{carro}/g, `${c.year} ${c.make} ${c.model}`);
 }
 
+
+window.openInsuranceSMS=function(id){
+  const c=clients.find(x=>x.id===id);
+  if(!c) return;
+  const lang=c.lang||'es';
+  const nombre=c.name.split(' ')[0];
+  const carro=`${c.year} ${c.make} ${c.model}`;
+  let msg;
+  if(lang==='en'){
+    msg=`Hi ${nombre}! Legacy Motors Garage LLC here.\n\nWe noticed your vehicle insurance${c.insurance?' ('+c.insurance+')':''} for your ${carro} is expired or missing.\n\nPlease update your insurance and send us proof of coverage as soon as possible.\n\nThank you!\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+  } else {
+    msg=`Hola ${nombre}! Le saluda Legacy Motors Garage LLC.\n\nNotamos que el seguro de su ${carro}${c.insurance?' ('+c.insurance+')':''} está vencido o no tenemos registro.\n\nPor favor actualice su seguro y envíenos comprobante a la brevedad.\n\nGracias!\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+  }
+  const phone=c.phone.replace(/\D/g,'');
+  window.location.href=`sms:${phone}?body=${encodeURIComponent(msg)}`;
+};
 
 window.openWhatsApp=function(id,status){
   const c=clients.find(x=>x.id===id);
