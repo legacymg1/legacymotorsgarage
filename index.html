@@ -272,6 +272,13 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
   .hero-cars-img img{max-height:280px;}
 }
 </style>
+<meta property="og:title" content="Legacy Motors Garage LLC - Drive Your Legacy">
+<meta property="og:description" content="Buy Here Pay Here · Hablamos Español · Porterville, CA · No Credit? No Problem · 30-Day Warranty">
+<meta property="og:image" content="https://legacymotorsgarage.com/logo.png">
+<meta property="og:url" content="https://legacymotorsgarage.com">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://legacymotorsgarage.com/logo.png">
 </head>
 <body>
 
@@ -14611,27 +14618,56 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
 
 <!-- ADD CAR MODAL -->
 <div class="modal-overlay" id="car-modal">
-  <div class="modal">
-    <div class="modal-title">Add Vehicle / Agregar Vehículo</div>
+  <div class="modal" style="max-height:85vh;overflow-y:auto;">
+    <div class="modal-title" id="car-modal-title">Add Vehicle / Agregar Vehículo</div>
     <input class="cf-input" id="car-year" placeholder="Year / Año" type="number">
     <input class="cf-input" id="car-make" placeholder="Make / Marca (Toyota)">
     <input class="cf-input" id="car-model" placeholder="Model / Modelo (Camry)">
     <input class="cf-input" id="car-price" placeholder="Price / Precio ($)" type="number">
     <input class="cf-input" id="car-weekly" placeholder="Weekly Payment / Pago Semanal ($)" type="number">
     <input class="cf-input" id="car-miles" placeholder="Mileage / Millas">
-    <input class="cf-input" id="car-img" placeholder="Photo URL / URL de foto (optional)">
     <textarea class="cf-input" id="car-desc" rows="2" placeholder="Description / Descripción" style="resize:vertical;"></textarea>
+    <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;">📸 Fotos / Photos</label>
+    <input type="file" class="cf-input" id="car-photos" accept="image/*" multiple style="padding:8px;cursor:pointer;">
+    <div id="car-photo-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+    <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">🎥 Video</label>
+    <input type="file" class="cf-input" id="car-video" accept="video/*" style="padding:8px;cursor:pointer;">
+    <div id="car-upload-progress" style="display:none;margin-top:8px;font-size:13px;color:#ccc;text-align:center;">Subiendo archivos...</div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeCarModal()">Cancel</button>
-      <button class="btn-save" onclick="saveCar()">Save / Guardar</button>
+      <button class="btn-save" id="car-save-btn" onclick="saveCar()">Save / Guardar</button>
     </div>
   </div>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
+  authDomain: "legacy-motors-garage.firebaseapp.com",
+  projectId: "legacy-motors-garage",
+  storageBucket: "legacy-motors-garage.appspot.com",
+  messagingSenderId: "762193424986",
+  appId: "1:762193424986:web:abc123"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
 const ADMIN_PASS='lmg2025admin';
 let isAdmin=sessionStorage.getItem('lmg_admin')==='true';
-let cars=JSON.parse(localStorage.getItem('lmg_cars')||'[]');
+let cars=[];
+let editingCarId=null;
+
+// Load cars from Firebase
+onSnapshot(collection(db,'inventory'), snap=>{
+  cars = snap.docs.map(d=>({id:d.id,...d.data()}));
+  cars.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  renderCars();
+});
 
 window.addEventListener('scroll',()=>{
   document.getElementById('navbar').classList.toggle('scrolled',scrollY>60);
@@ -14658,52 +14694,153 @@ document.addEventListener('keydown',e=>{
 function renderCars(){
   const grid=document.getElementById('cars-grid');
   if(!cars.length){
-    grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--silver);">
-      <div style="font-size:48px;margin-bottom:16px;">🚗</div>
-      <div style="font-family:var(--font-display);font-size:22px;font-weight:300;margin-bottom:8px;color:var(--white);">Coming Soon · Próximamente</div>
-      <div style="font-size:13px;letter-spacing:1px;">View our current inventory on Facebook Marketplace</div>
-    </div>`;
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--silver)"><div style="font-size:48px;margin-bottom:16px;">🚗</div><div style="font-family:var(--font-display);font-size:22px;font-weight:300;margin-bottom:8px;color:var(--white)">Coming Soon · Próximamente</div><div style="font-size:13px;letter-spacing:1px">View our current inventory on Facebook Marketplace</div></div>';
     return;
   }
-  grid.innerHTML=cars.map((c,i)=>`
-    <div class="car-card">
-      ${c.img?`<img class="car-img" src="${c.img}" alt="${c.year} ${c.make} ${c.model}">`:`<div class="car-placeholder">🚗</div>`}
-      <div class="car-body">
-        <div class="car-meta">${c.year} · ${c.make}</div>
-        <div class="car-name">${c.model}</div>
-        <div class="car-tags">
-          ${c.miles?`<span class="car-tag">${c.miles}</span>`:''}
-          <span class="car-tag">Financing Available</span>
-          <span class="car-tag">30-Day Warranty</span>
-        </div>
-        ${c.desc?`<div class="car-desc">${c.desc}</div>`:''}
-        <div class="car-footer">
-          <div><div class="car-price">$${Number(c.price||0).toLocaleString()}</div>${c.weekly?`<div class="car-weekly">$${c.weekly}/week · semana</div>`:''}</div>
-          <div style="display:flex;align-items:center;">
-            <button class="car-inquire" onclick="window.open('tel:5595405145')">Inquire</button>
-            ${isAdmin?`<button class="car-delete" onclick="deleteCar(${i})">✕</button>`:''}
-          </div>
-        </div>
-      </div>
-    </div>
-  `).join('');
+  grid.innerHTML=cars.map(function(c,i){
+    // Build media section
+    var media='';
+    if(c.photos&&c.photos.length>0){
+      if(c.photos.length>1){
+        media='<div style="display:flex;gap:4px;overflow-x:auto;padding:4px;">';
+        c.photos.forEach(function(p){ media+='<img src="'+p+'" style="height:140px;min-width:140px;object-fit:cover;border-radius:8px;">'; });
+        media+='</div>';
+      } else {
+        media='<img class="car-img" src="'+c.photos[0]+'" alt="'+c.year+' '+c.make+' '+c.model+'">';
+      }
+    } else if(c.img){
+      media='<img class="car-img" src="'+c.img+'" alt="'+c.year+' '+c.make+' '+c.model+'">';
+    } else {
+      media='<div class="car-placeholder">🚗</div>';
+    }
+    if(c.videoURL) media+='<video src="'+c.videoURL+'" controls style="width:100%;border-radius:8px;margin-top:4px;" playsinline></video>';
+    
+    var tags='';
+    if(c.miles) tags+='<span class="car-tag">'+c.miles+'</span>';
+    tags+='<span class="car-tag">Financing Available</span><span class="car-tag">30-Day Warranty</span>';
+    
+    var desc=c.desc?'<div class="car-desc">'+c.desc+'</div>':'';
+    var weekly=c.weekly?'<div class="car-weekly">$'+c.weekly+'/week · semana</div>':'';
+    var carId=c.id;
+    var adminBtns=isAdmin?('<button onclick="openCarModal(\''+carId+'\')" style="background:rgba(255,214,0,0.15);color:#ffd700;border:1px solid #ffd700;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:4px;">✏️</button><button class="car-delete" onclick="deleteCar(\''+carId+'\')">✕</button>'):'';
+    
+    return '<div class="car-card">'+media+'<div class="car-body"><div class="car-meta">'+c.year+' · '+c.make+'</div><div class="car-name">'+c.model+'</div><div class="car-tags">'+tags+'</div>'+desc+'<div class="car-footer"><div><div class="car-price">$'+Number(c.price||0).toLocaleString()+'</div>'+weekly+'</div><div style="display:flex;align-items:center;"><button class="car-inquire" onclick="window.location.href='tel:5595405145'">Inquire</button>'+adminBtns+'</div></div></div></div>';
+  }).join('');
 }
 
-function openCarModal(){document.getElementById('car-modal').classList.add('active');}
+function openCarModal(carId=null){
+  editingCarId=carId;
+  const modal=document.getElementById('car-modal');
+  const title=document.getElementById('car-modal-title');
+  if(carId){
+    const c=cars.find(x=>x.id===carId);
+    title.textContent='Edit Vehicle / Editar Vehículo';
+    document.getElementById('car-year').value=c.year||'';
+    document.getElementById('car-make').value=c.make||'';
+    document.getElementById('car-model').value=c.model||'';
+    document.getElementById('car-price').value=c.price||'';
+    document.getElementById('car-weekly').value=c.weekly||'';
+    document.getElementById('car-miles').value=c.miles||'';
+    document.getElementById('car-desc').value=c.desc||'';
+    // Show existing photos
+    const preview=document.getElementById('car-photo-preview');
+    preview.innerHTML=(c.photos||[]).map((p,i)=>`<div style="position:relative;"><img src="${p}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;"><button onclick="removePhoto('${carId}',${i})" style="position:absolute;top:-4px;right:-4px;background:red;color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;cursor:pointer;">×</button></div>`).join('');
+  } else {
+    title.textContent='Add Vehicle / Agregar Vehículo';
+    document.getElementById('car-year').value='';
+    document.getElementById('car-make').value='';
+    document.getElementById('car-model').value='';
+    document.getElementById('car-price').value='';
+    document.getElementById('car-weekly').value='';
+    document.getElementById('car-miles').value='';
+    document.getElementById('car-desc').value='';
+    document.getElementById('car-photo-preview').innerHTML='';
+  }
+  document.getElementById('car-photos').value='';
+  document.getElementById('car-video').value='';
+  modal.style.display='flex';
+}
 function closeCarModal(){document.getElementById('car-modal').classList.remove('active');}
 
-function saveCar(){
+async function saveCar(){
   const make=document.getElementById('car-make').value.trim();
   const model=document.getElementById('car-model').value.trim();
   if(!make||!model){alert('Enter make and model');return;}
+  
+  const btn=document.getElementById('car-save-btn');
+  const progress=document.getElementById('car-upload-progress');
+  btn.disabled=true;
+  btn.textContent='Guardando...';
+  
+  try {
+    const id = editingCarId || ('car_'+Date.now());
+    const existing = editingCarId ? cars.find(c=>c.id===editingCarId) : {};
+    
+    // Upload photos
+    let photos = existing.photos || [];
+    const photoFiles = document.getElementById('car-photos').files;
+    if(photoFiles.length > 0) {
+      progress.style.display='block';
+      progress.textContent='Subiendo fotos...';
+      for(const file of photoFiles) {
+        const r = ref(storage, `inventory/${id}/${Date.now()}_${file.name}`);
+        await uploadBytes(r, file);
+        const url = await getDownloadURL(r);
+        photos.push(url);
+      }
+    }
+    
+    // Upload video
+    let videoURL = existing.videoURL || '';
+    const videoFile = document.getElementById('car-video').files[0];
+    if(videoFile) {
+      progress.textContent='Subiendo video...';
+      const vr = ref(storage, `inventory/${id}/video_${Date.now()}_${videoFile.name}`);
+      await uploadBytes(vr, videoFile);
+      videoURL = await getDownloadURL(vr);
+    }
+    
+    const data = {
+      year: document.getElementById('car-year').value,
+      make, model,
+      price: document.getElementById('car-price').value,
+      weekly: document.getElementById('car-weekly').value,
+      miles: document.getElementById('car-miles').value,
+      desc: document.getElementById('car-desc').value.trim(),
+      photos, videoURL,
+      img: photos[0]||existing.img||'',
+      createdAt: existing.createdAt || Date.now(),
+      updatedAt: Date.now()
+    };
+    
+    await setDoc(doc(db,'inventory',id), data);
+    closeCarModal();
+  } catch(e) {
+    alert('Error: '+e.message);
+  }
+  btn.disabled=false;
+  btn.textContent='Save / Guardar';
+  progress.style.display='none';
+}
   cars.push({year:document.getElementById('car-year').value,make,model,price:document.getElementById('car-price').value,weekly:document.getElementById('car-weekly').value,miles:document.getElementById('car-miles').value,img:document.getElementById('car-img').value,desc:document.getElementById('car-desc').value});
   localStorage.setItem('lmg_cars',JSON.stringify(cars));
   ['car-year','car-make','car-model','car-price','car-weekly','car-miles','car-img','car-desc'].forEach(id=>document.getElementById(id).value='');
   renderCars();closeCarModal();
 }
 
-function deleteCar(i){
-  if(confirm('Remove this vehicle?')){cars.splice(i,1);localStorage.setItem('lmg_cars',JSON.stringify(cars));renderCars();}
+async function deleteCar(id){
+  if(!confirm('Delete this vehicle?')) return;
+  await deleteDoc(doc(db,'inventory',id));
+}
+
+async function removePhoto(carId, photoIndex){
+  const c=cars.find(x=>x.id===carId);
+  if(!c) return;
+  c.photos.splice(photoIndex,1);
+  c.img=c.photos[0]||'';
+  await setDoc(doc(db,'inventory',carId),c);
+  openCarModal(carId);
+}
 }
 
 function sendMessage(){
