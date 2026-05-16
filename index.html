@@ -288,7 +288,7 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
 </div>
 
 <nav id="navbar">
-  <div class="nav-logo">
+  <div class="nav-logo" onclick="handleLogoTap()">
     <a href="#"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABgAAAAQACAYAAAAncZJCAAAAAXNSR0IArs4c6QAAAIRlWElmTU0A
 KgAAAAgABQESAAMAAAABAAEAAAEaAAUAAAABAAAASgEbAAUAAAABAAAAUgEoAAMAAAABAAIAAIdp
 AAQAAAABAAAAWgAAAAAAAABIAAAAAQAAAEgAAAABAAOgAQADAAAAAQABAACgAgAEAAAAAQAABgCg
@@ -14689,22 +14689,17 @@ let logoTaps=0;
 let logoTimer=null;
 
 // Mobile: tap logo 5 times to activate admin
-document.addEventListener('DOMContentLoaded',()=>{
-  const logo=document.querySelector('.nav-logo');
-  if(logo){
-    logo.addEventListener('click',()=>{
-      logoTaps++;
-      clearTimeout(logoTimer);
-      if(logoTaps>=5){
-        logoTaps=0;
-        const p=prompt('Admin password:');
-        if(p===ADMIN_PASS)setAdmin(true);
-      } else {
-        logoTimer=setTimeout(()=>{logoTaps=0;},2000);
-      }
-    });
+window.handleLogoTap = function(){
+  logoTaps++;
+  clearTimeout(logoTimer);
+  if(logoTaps>=5){
+    logoTaps=0;
+    const p=prompt('Admin password:');
+    if(p===ADMIN_PASS)setAdmin(true);
+  } else {
+    logoTimer=setTimeout(()=>{logoTaps=0;},2000);
   }
-});
+};
 
 document.addEventListener('keydown',e=>{
   adminKey+=e.key;
