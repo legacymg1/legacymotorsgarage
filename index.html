@@ -14758,7 +14758,7 @@ function renderCars(){
     var carId=c.id;
     var adminBtns=isAdmin?('<button onclick="openCarModal(\''+carId+'\')" style="background:rgba(255,214,0,0.15);color:#ffd700;border:1px solid #ffd700;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:4px;">✏️</button><button class="car-delete" onclick="deleteCar(\''+carId+'\')">✕</button>'):'';
     
-    return '<div class="car-card">'+media+'<div class="car-body"><div class="car-meta">'+c.year+' · '+c.make+'</div><div class="car-name">'+c.model+'</div><div class="car-tags">'+tags+'</div>'+desc+'<div class="car-footer"><div><div class="car-price">$'+Number(c.price||0).toLocaleString()+'</div>'+weekly+'</div><div style="display:flex;align-items:center;"><button class="car-inquire" onclick="window.location.href='tel:5595405145'">Inquire</button>'+adminBtns+'</div></div></div></div>';
+    return '<div class="car-card">'+media+'<div class="car-body"><div class="car-meta">'+c.year+' · '+c.make+'</div><div class="car-name">'+c.model+'</div><div class="car-tags">'+tags+'</div>'+desc+'<div class="car-footer"><div><div class="car-price">$'+Number(c.price||0).toLocaleString()+'</div>'+weekly+'</div><div style="display:flex;align-items:center;"><button class="car-inquire" onclick="callDealer()">Inquire</button>'+adminBtns+'</div></div></div></div>';
   }).join('');
 }
 
@@ -14856,11 +14856,7 @@ async function saveCar(){
   btn.textContent='Save / Guardar';
   progress.style.display='none';
 }
-  cars.push({year:document.getElementById('car-year').value,make,model,price:document.getElementById('car-price').value,weekly:document.getElementById('car-weekly').value,miles:document.getElementById('car-miles').value,img:document.getElementById('car-img').value,desc:document.getElementById('car-desc').value});
-  localStorage.setItem('lmg_cars',JSON.stringify(cars));
-  ['car-year','car-make','car-model','car-price','car-weekly','car-miles','car-img','car-desc'].forEach(id=>document.getElementById(id).value='');
-  renderCars();closeCarModal();
-}
+
 
 async function deleteCar(id){
   if(!confirm('Delete this vehicle?')) return;
@@ -14874,7 +14870,6 @@ async function removePhoto(carId, photoIndex){
   c.img=c.photos[0]||'';
   await setDoc(doc(db,'inventory',carId),c);
   openCarModal(carId);
-}
 }
 
 function sendMessage(){
