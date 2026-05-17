@@ -274,7 +274,12 @@
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha de Nacimiento</label><input class="form-input" id="f-dob" type="date"></div>
-      <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="f-address" placeholder="123 Main St, Porterville, CA 93257"></div>
+      <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="f-address" placeholder="123 Main St"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Ciudad / City</label><input class="form-input" id="f-city" placeholder="Porterville"></div>
+      <div class="form-group"><label class="form-label">Estado / State</label><input class="form-input" id="f-state" placeholder="CA" style="max-width:80px;"></div>
+      <div class="form-group"><label class="form-label">ZIP</label><input class="form-input" id="f-zip" placeholder="93257" style="max-width:80px;"></div>
     </div>
     <!-- INVENTORY & ID - moved to top -->
     <div class="form-row">
@@ -297,6 +302,15 @@
         </select>
       </div>
       <div class="form-group"><label class="form-label">Número de ID</label><input class="form-input" id="f-id-number" placeholder="A1234567"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Estado del ID</label><input class="form-input" id="f-id-state" placeholder="CA"></div>
+      <div class="form-group"><label class="form-label">Vencimiento del ID</label><input class="form-input" id="f-id-expiry" type="date"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">📸 Foto del ID</label>
+      <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;">
+      <div id="f-id-preview" style="margin-top:6px;"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Idioma de Comunicación</label>
@@ -364,15 +378,7 @@
       </div>
     </div>
     <div class="form-group"><label class="form-label">Notas</label><input class="form-input" id="f-notes" placeholder="Información adicional..."></div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Estado del ID / State</label><input class="form-input" id="f-id-state" placeholder="CA"></div>
-      <div class="form-group"><label class="form-label">Vencimiento del ID</label><input class="form-input" id="f-id-expiry" type="date"></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">📸 Foto del ID</label>
-      <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;">
-      <div id="f-id-preview" style="margin-top:6px;"></div>
-    </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('add-modal')">Cancelar</button>
       <button class="btn-save" style="background:var(--border);color:var(--text);margin-right:8px;" onclick="generateContractFromForm()">📄 Contrato</button>
@@ -918,6 +924,9 @@ window.saveClient=async function(){
     phone:document.getElementById('f-phone').value.trim(),
     dob:document.getElementById('f-dob')?document.getElementById('f-dob').value:'',
     address:document.getElementById('f-address')?document.getElementById('f-address').value.trim():'',
+    city:document.getElementById('f-city')?document.getElementById('f-city').value.trim():'',
+    state:document.getElementById('f-state')?document.getElementById('f-state').value.trim():'',
+    zip:document.getElementById('f-zip')?document.getElementById('f-zip').value.trim():'',
     portalPass:document.getElementById('f-pass').value.trim(),
     make:document.getElementById('f-make').value.trim(),
     model:document.getElementById('f-model').value.trim(),
@@ -1460,6 +1469,12 @@ window.generateContractFromForm = function() {
     invNum: document.getElementById('f-inventory-num')?.value.trim() || '',
     idType: document.getElementById('f-id-type')?.value || '',
     idNumber: document.getElementById('f-id-number')?.value.trim() || '',
+    idExpiry: document.getElementById('f-id-expiry')?.value || '',
+    address: document.getElementById('f-address')?.value.trim() || '',
+    city: document.getElementById('f-city')?.value.trim() || '',
+    state: document.getElementById('f-state')?.value.trim() || '',
+    zip: document.getElementById('f-zip')?.value.trim() || '',
+    dob: document.getElementById('f-dob')?.value || '',
   });
   // Open English contract
   window.open('contracts.html?' + params.toString(), '_blank');
@@ -1495,6 +1510,10 @@ window.generateContract = function(clientId) {
     idNumber: c.idNumber || '',
     dob: c.dob || '',
     address: c.address || '',
+    city: c.city || '',
+    state: c.state || '',
+    zip: c.zip || '',
+    idExpiry: c.idExpiry || '',
     clientId: c.id
   });
   
