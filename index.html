@@ -14620,12 +14620,14 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
 <div class="modal-overlay" id="car-modal">
   <div class="modal" style="max-height:85vh;overflow-y:auto;">
     <div class="modal-title" id="car-modal-title">Add Vehicle / Agregar Vehículo</div>
+    <div style="background:var(--gold);color:var(--dark);border-radius:8px;padding:6px 12px;text-align:center;font-weight:700;font-size:13px;margin-bottom:8px;" id="inv-number-display">Inventory # Auto-assigned</div>
     <input class="cf-input" id="car-year" placeholder="Year / Año" type="number">
     <input class="cf-input" id="car-make" placeholder="Make / Marca (Toyota)">
     <input class="cf-input" id="car-model" placeholder="Model / Modelo (Camry)">
     <input class="cf-input" id="car-price" placeholder="Price / Precio ($)" type="number">
     <input class="cf-input" id="car-weekly" placeholder="Weekly Payment / Pago Semanal ($)" type="number">
     <input class="cf-input" id="car-miles" placeholder="Mileage / Millas">
+    <input class="cf-input" id="car-vin" placeholder="VIN Number">
     <textarea class="cf-input" id="car-desc" rows="2" placeholder="Description / Descripción" style="resize:vertical;"></textarea>
     <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;">📸 Fotos / Photos</label>
     <input type="file" class="cf-input" id="car-photos" accept="image/*" multiple style="padding:8px;cursor:pointer;">
@@ -14636,6 +14638,26 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeCarModal()">Cancel</button>
       <button class="btn-save" id="car-save-btn" onclick="saveCar()">Save / Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CAR DETAIL MODAL -->
+<div id="car-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9000;overflow-y:auto;padding:20px;">
+  <div style="max-width:700px;margin:0 auto;background:#12161f;border-radius:16px;overflow:hidden;position:relative;">
+    <button onclick="closeCarDetail()" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;z-index:10;">✕</button>
+    <!-- Media slider -->
+    <div id="cdm-media" style="background:#000;min-height:240px;"></div>
+    <!-- Info -->
+    <div style="padding:20px;">
+      <div id="cdm-invnum" style="font-size:11px;letter-spacing:2px;color:#f0c040;text-transform:uppercase;margin-bottom:4px;"></div>
+      <div id="cdm-title" style="font-size:24px;font-weight:700;color:#fff;margin-bottom:4px;"></div>
+      <div id="cdm-price" style="font-size:22px;color:#f0c040;font-weight:700;margin-bottom:4px;"></div>
+      <div id="cdm-weekly" style="font-size:14px;color:#aaa;margin-bottom:12px;"></div>
+      <div id="cdm-details" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;"></div>
+      <div id="cdm-desc" style="font-size:14px;color:#ccc;line-height:1.6;margin-bottom:20px;"></div>
+      <button onclick="window.location.href='tel:5595405145'" style="width:100%;background:linear-gradient(135deg,#f0c040,#c8960c);color:#000;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:1px;">📞 CALL NOW · LLÁMANOS</button>
+      <p style="text-align:center;font-size:12px;color:#666;margin-top:8px;">(559) 540-5145 · legacymotorsgarage.com</p>
     </div>
   </div>
 </div>
@@ -14726,41 +14748,74 @@ document.addEventListener('keydown',e=>{
 });
 
 window.renderCars = function(){
-  const grid=document.getElementById('cars-grid');
+  var grid=document.getElementById('cars-grid');
+  if(!grid) return;
   if(!cars.length){
     grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--silver)"><div style="font-size:48px;margin-bottom:16px;">🚗</div><div style="font-family:var(--font-display);font-size:22px;font-weight:300;margin-bottom:8px;color:var(--white)">Coming Soon · Próximamente</div><div style="font-size:13px;letter-spacing:1px">View our current inventory on Facebook Marketplace</div></div>';
     return;
   }
   grid.innerHTML=cars.map(function(c,i){
-    // Build media section
-    var media='';
-    if(c.photos&&c.photos.length>0){
-      if(c.photos.length>1){
-        media='<div style="display:flex;gap:4px;overflow-x:auto;padding:4px;">';
-        c.photos.forEach(function(p){ media+='<img src="'+p+'" style="height:140px;min-width:140px;object-fit:cover;border-radius:8px;">'; });
-        media+='</div>';
-      } else {
-        media='<img class="car-img" src="'+c.photos[0]+'" alt="'+c.year+' '+c.make+' '+c.model+'">';
-      }
-    } else if(c.img){
-      media='<img class="car-img" src="'+c.img+'" alt="'+c.year+' '+c.make+' '+c.model+'">';
-    } else {
-      media='<div class="car-placeholder">🚗</div>';
-    }
-    if(c.videoURL) media+='<video src="'+c.videoURL+'" controls style="width:100%;border-radius:8px;margin-top:4px;" playsinline></video>';
-    
-    var tags='';
-    if(c.miles) tags+='<span class="car-tag">'+c.miles+'</span>';
-    tags+='<span class="car-tag">Financing Available</span><span class="car-tag">30-Day Warranty</span>';
-    
-    var desc=c.desc?'<div class="car-desc">'+c.desc+'</div>':'';
-    var weekly=c.weekly?'<div class="car-weekly">$'+c.weekly+'/week · semana</div>':'';
-    var carId=c.id;
-    var adminBtns=isAdmin?('<button onclick="openCarModal(\''+carId+'\')" style="background:rgba(255,214,0,0.15);color:#ffd700;border:1px solid #ffd700;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:4px;">✏️</button><button class="car-delete" onclick="deleteCar(\''+carId+'\')">✕</button>'):'';
-    
-    return '<div class="car-card">'+media+'<div class="car-body"><div class="car-meta">'+c.year+' · '+c.make+'</div><div class="car-name">'+c.model+'</div><div class="car-tags">'+tags+'</div>'+desc+'<div class="car-footer"><div><div class="car-price">$'+Number(c.price||0).toLocaleString()+'</div>'+weekly+'</div><div style="display:flex;align-items:center;"><button class="car-inquire" onclick="callDealer()">Inquire</button>'+adminBtns+'</div></div></div></div>';
+    var thumb = (c.photos&&c.photos[0]) ? '<img src="'+c.photos[0]+'" style="width:100%;height:180px;object-fit:cover;display:block;" loading="lazy">' : '<div style="width:100%;height:180px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;font-size:48px;">🚗</div>';
+    var videoIcon = c.videoURL ? '<div style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;">▶ Video</div>' : '';
+    var photoCount = (c.photos&&c.photos.length>1) ? '<div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.7);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;">📷 '+c.photos.length+'</div>' : '';
+    var invBadge = c.inventoryNum ? '<div style="position:absolute;top:8px;left:8px;background:rgba(240,192,64,0.9);color:#000;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">#'+c.inventoryNum+'</div>' : '';
+    var cid=c.id;
+    var cid=c.id;
+    var adminBtns = isAdmin ? '<div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid rgba(255,255,255,0.06);" onclick="event.stopPropagation()"><button data-cid="'+cid+'" onclick="openCarModal(this.dataset.cid)" style="flex:1;background:rgba(255,214,0,0.15);color:#ffd700;border:1px solid #ffd700;border-radius:6px;padding:5px;font-size:11px;cursor:pointer;">✏️ Edit</button><button data-cid="'+cid+'" onclick="deleteCar(this.dataset.cid)" style="background:rgba(255,59,59,0.15);color:#ff4444;border:1px solid #ff4444;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;">🗑</button></div>' : '';
+    return '<div data-cid="'+cid+'" onclick="openCarDetail(this.dataset.cid)" style="background:#12161f;border-radius:12px;overflow:hidden;cursor:pointer;transition:transform 0.2s;border:1px solid rgba(255,255,255,0.08);" onmouseover="this.style.transform=\'translateY(-3px)\'" onmouseout="this.style.transform=\'none\'">'
+      +'<div style="position:relative;">'+thumb+videoIcon+photoCount+invBadge+'</div>'
+      +'<div style="padding:12px;">'
+      +'<div style="font-size:11px;color:#f0c040;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;">'+c.year+' '+c.make+'</div>'
+      +'<div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px;">'+c.model+'</div>'
+      +'<div style="font-size:20px;font-weight:700;color:#f0c040;">$'+Number(c.price||0).toLocaleString()+'</div>'
+      +(c.weekly?'<div style="font-size:12px;color:#aaa;margin-top:2px;">$'+c.weekly+'/wk · semana</div>':'')
+      +(c.miles?'<div style="font-size:12px;color:#888;margin-top:4px;">'+c.miles+'</div>':'')
+      +'</div>'
+      +adminBtns
+      +'</div>';
   }).join('');
-}
+};
+
+window.openCarDetail = function(carId){
+  var c=cars.find(function(x){return x.id===carId;});
+  if(!c) return;
+  
+  // Build media
+  var mediaHtml='';
+  if(c.photos&&c.photos.length>0){
+    mediaHtml='<div style="position:relative;">';
+    // Photo slider
+    mediaHtml+='<div id="cdm-slides" style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;">';
+    c.photos.forEach(function(p){
+      mediaHtml+='<img src="'+p+'" style="min-width:100%;height:280px;object-fit:cover;scroll-snap-align:start;" loading="lazy">';
+    });
+    mediaHtml+='</div>';
+    if(c.photos.length>1) mediaHtml+='<div style="text-align:center;padding:6px;font-size:11px;color:#aaa;">← Swipe for more photos →</div>';
+    mediaHtml+='</div>';
+  } else {
+    mediaHtml='<div style="height:200px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;font-size:64px;">🚗</div>';
+  }
+  if(c.videoURL){
+    mediaHtml+='<video src="'+c.videoURL+'" controls style="width:100%;max-height:300px;display:block;" preload="none" poster="'+(c.photos&&c.photos[0]?c.photos[0]:'')+'"></video>';
+  }
+  
+  document.getElementById('cdm-media').innerHTML=mediaHtml;
+  document.getElementById('cdm-invnum').textContent=c.inventoryNum?'Inventory #'+c.inventoryNum:'';
+  document.getElementById('cdm-title').textContent=c.year+' '+c.make+' '+c.model;
+  document.getElementById('cdm-price').textContent='$'+Number(c.price||0).toLocaleString();
+  document.getElementById('cdm-weekly').textContent=c.weekly?'$'+c.weekly+' / week · semana':'';
+  document.getElementById('cdm-details').innerHTML=(c.miles?'<span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">🛣 '+c.miles+'</span>':'')+(c.vin?'<span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">VIN: '+c.vin+'</span>':'')+'<span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">✅ 30-Day Warranty</span><span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">💰 Financing Available</span>';
+  document.getElementById('cdm-desc').textContent=c.desc||'';
+  document.getElementById('car-detail-modal').style.display='block';
+  document.body.style.overflow='hidden';
+};
+
+window.closeCarDetail = function(){
+  document.getElementById('car-detail-modal').style.display='none';
+  document.body.style.overflow='';
+  document.getElementById('cdm-media').innerHTML='';
+};
+
 
 window.openCarModal = function(carId){
   editingCarId=carId;
@@ -14888,4 +14943,5 @@ renderCars();
 
 
 </body>
+</html></body>
 </html>
