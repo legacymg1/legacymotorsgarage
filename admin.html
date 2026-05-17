@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- LMG CRM v3.1 -->
+<!DOCTYPE html><!-- LMG CRM v3.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -774,6 +774,7 @@ window.openEditModal=function(id){
 };
 
 window.saveClient=async function(){
+  console.log("saveClient v3.3 running");
   const name=document.getElementById('f-name').value.trim();
   if(!name){alert('Nombre requerido');return;}
   const startDate=document.getElementById('f-startdate').value;
@@ -790,6 +791,29 @@ window.saveClient=async function(){
   const freq=document.getElementById('f-freq')?document.getElementById('f-freq').value:'weekly';
   const lang=document.getElementById('f-lang')?document.getElementById('f-lang').value:'es';
   const contractDate=document.getElementById('f-contractdate')?document.getElementById('f-contractdate').value:'';
+
+  // ID photo
+  let idPhotoURL = existing.idPhotoURL||'';
+  const idPhotoFile = document.getElementById('f-id-photo')?.files[0];
+  if(idPhotoFile){
+    try {
+      const st = getStorage();
+      const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_'+idPhotoFile.name);
+      await uploadBytes(idRef, idPhotoFile);
+      idPhotoURL = await getDownloadURL(idRef);
+    } catch(storErr){ console.log('ID photo skipped:', storErr); }
+  }
+
+  // Inventory sold update
+  const invNum = document.getElementById('f-inventory-num')?.value.trim();
+  if(invNum){
+    try {
+      const invSnap = await getDocs(query(collection(db,'inventory'),where('inventoryNum','==',invNum)));
+      if(!invSnap.empty){
+        await setDoc(doc(db,'inventory',invSnap.docs[0].id),{...invSnap.docs[0].data(),status:'sold'});
+      }
+    } catch(invErr){ console.log('Inventory update skipped:', invErr); }
+  }
 
   const data={
     name,
