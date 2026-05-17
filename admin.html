@@ -101,8 +101,8 @@
   .sched-next { color: var(--yellow); font-weight: 700; }
   .sched-upcoming { color: var(--muted); }
 
-  .card-actions { padding: 10px 16px 14px; display: flex; gap: 8px; }
-  .btn { flex: 1; padding: 9px 12px; border-radius: 8px; font-family: var(--font-body); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.2s; }
+  .card-actions { padding: 10px 16px 14px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .btn { padding: 9px 12px; border-radius: 8px; font-family: var(--font-body); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.2s; }
   .btn-pay { background: var(--green); color: #000; }
   .btn-whatsapp { background: #25d366; color: #000; }
   .btn-edit { background: var(--border); color: var(--text); }
@@ -690,10 +690,10 @@ window.renderAll = function() {
         </div>
         <div class="card-actions">
           <button class="btn btn-pay" onclick="openPayModal('${c.id}')">💵 Pago</button>
-          <button class="btn btn-whatsapp" onclick="openWhatsApp('${c.id}','${status}')" style="background:#2196F3;color:#fff;">💬 SMS</button>
-          ${(!c.insurance||c.insuranceExp<today())?`<button class="btn" data-cid="${c.id}" onclick="openInsuranceSMS(this.dataset.cid)" style="background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>`:''}
-          <button class="btn btn-edit" onclick="openEditModal('${c.id}')">✏️</button>
-          <button class="btn btn-delete" onclick="deleteClient('${c.id}')">🗑</button>
+          <button class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" onclick="openWhatsApp('${c.id}','${status}')">💬 SMS</button>
+          ${(!c.insurance||c.insuranceExp<today())?`<button class="btn" data-cid="${c.id}" onclick="openInsuranceSMS(this.dataset.cid)" style="flex:0;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>`:''}
+          <button class="btn btn-edit" style="flex:0;padding:9px 10px;" onclick="openEditModal('${c.id}')">✏️</button>
+          <button class="btn btn-delete" style="flex:0;padding:9px 10px;" onclick="deleteClient('${c.id}')">🗑</button>
         </div>
       </div>`;
     });
