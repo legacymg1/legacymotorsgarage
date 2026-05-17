@@ -666,7 +666,7 @@ window.renderAll = function() {
         <div class="card-header"><div><div class="client-name">${c.name}</div><div class="client-phone">${c.phone} &nbsp;${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
           ${c.idNumber?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">🪪 ID: '+(c.idType||'')+' '+c.idNumber+'</div>':''}
           ${c.lastLogin ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Portal: '+formatDate(c.lastLogin.split('T')[0])+' '+new Date(c.lastLogin).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})+'</div>' : '<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Sin acceso al portal</div>'}
-        </div></div>${badge}</div>
+        </div>${badge}</div>
         <div class="card-body">
           <div class="car-info">${c.year} ${c.make} ${c.model}</div>
           ${(function(){
