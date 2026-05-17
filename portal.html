@@ -265,6 +265,18 @@ function updateInsuranceDisplay() {
   }
 }
 
+window.toggleIDForm = function() {
+  const form = document.getElementById('id-edit-form');
+  const btn = document.getElementById('id-edit-btn');
+  if(form.style.display === 'none'){
+    form.style.display = 'block';
+    btn.textContent = '✕ Cancelar / Cancel';
+  } else {
+    form.style.display = 'none';
+    btn.textContent = '✏️ Editar / Edit ID';
+  }
+};
+
 window.updateID = async function() {
   const idType = document.getElementById('portal-id-type').value;
   const idNumber = document.getElementById('portal-id-number').value.trim();
@@ -289,6 +301,8 @@ window.updateID = async function() {
     currentClient = updated;
     
     document.getElementById('id-success').style.display='block';
+    document.getElementById('id-edit-form').style.display='none';
+    document.getElementById('id-edit-btn').textContent='✏️ Editar / Edit ID';
     updateIDDisplay();
     setTimeout(()=>{ document.getElementById('id-success').style.display='none'; }, 3000);
   } catch(e) {
@@ -486,7 +500,10 @@ function renderPortal() {
         <span id="id-badge" class="insurance-badge"></span>
       </div>
       <div id="id-current" style="font-size:14px;color:var(--muted);margin-bottom:4px;"></div>
-      <div class="ins-form">
+      <div style="margin-top:10px;">
+        <button onclick="toggleIDForm()" id="id-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;width:100%;">✏️ Editar / Edit ID</button>
+      </div>
+      <div class="ins-form" id="id-edit-form" style="display:none;margin-top:12px;">
         <div class="ins-form-title">Actualizar ID / Update ID</div>
         <select class="fi" id="portal-id-type" style="margin-bottom:10px;">
           <option value="">Tipo de ID / ID Type...</option>
