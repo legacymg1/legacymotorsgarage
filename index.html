@@ -14858,7 +14858,7 @@ window.openCarModal = function(carId){
 }
 window.closeCarModal = function(){document.getElementById('car-modal').style.display='none';}
 
-function generateInvNum(){
+window.generateInvNum = function generateInvNum(){
   if(!cars.length) return '0001';
   var nums=cars.map(function(c){return parseInt(c.inventoryNum)||0;}).filter(Boolean);
   var next=nums.length?Math.max.apply(null,nums)+1:1;
