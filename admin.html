@@ -664,8 +664,8 @@ window.renderAll = function() {
 
       html+=`<div class="client-card ${status}">
         <div class="card-header"><div><div class="client-name">${c.name}</div><div class="client-phone">${c.phone} &nbsp;${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
-          ${c.idNumber?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">🪪 ID: ${c.idType||''} ${c.idNumber}</div>`:''}
-          ${c.lastLogin ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Portal: ${formatDate(c.lastLogin.split('T')[0])} ${new Date(c.lastLogin).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</div>` : '<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Sin acceso al portal</div>'}
+          ${c.idNumber?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">🪪 ID: '+(c.idType||'')+' '+c.idNumber+'</div>':''}
+          ${c.lastLogin ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Portal: '+formatDate(c.lastLogin.split('T')[0])+' '+new Date(c.lastLogin).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})+'</div>' : '<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Sin acceso al portal</div>'}
         </div></div>${badge}</div>
         <div class="card-body">
           <div class="car-info">${c.year} ${c.make} ${c.model}</div>
@@ -678,7 +678,7 @@ window.renderAll = function() {
             if(daysLeft<=30) return `<div style="font-size:11px;background:rgba(255,214,0,0.12);color:var(--yellow);border:1px solid var(--yellow);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">⚠️ Seguro vence en ${daysLeft}d</div>`;
             return `<div style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">✅ Seguro activo · ${c.insurance}${c.insurancePhotoURL?' <a href="'+c.insurancePhotoURL+'" target="_blank" style="color:var(--green);">📄</a>':''}</div>`;
           })()}
-          ${c.contractDate ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📋 Contrato: ${formatDate(c.contractDate)}</div>` : ''}
+          ${c.contractDate ? '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📋 Contrato: '+formatDate(c.contractDate)+'</div>' : ''}
           <div class="payment-row"><span class="pay-label">${c.freq==='monthly'?'Pago mensual':c.freq==='biweekly'?'Pago quincenal':'Pago semanal'}</span><span class="pay-value">${formatMoney(c.weekly)}</span></div>
           <div class="payment-row"><span class="pay-label">Próximo pago</span><span class="pay-value" style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</span></div>
           <div class="payment-row"><span class="pay-label">Pagos</span><span class="pay-value">${paidCount} de ${totalPay}</span></div>
@@ -686,7 +686,7 @@ window.renderAll = function() {
           <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
           <div class="progress-label"><span>${formatMoney(calcPaid(c))} pagado</span><span>${progress}%</span></div>
           ${schedHTML}
-          ${c.notes?`<div style="margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;">${c.notes}</div>`:''}
+          ${c.notes?'<div style="margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;">'+c.notes+'</div>':''}
         </div>
         <div class="card-actions">
           <button class="btn btn-pay" onclick="openPayModal('${c.id}')">💵 Pago</button>
