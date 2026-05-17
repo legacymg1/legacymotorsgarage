@@ -586,20 +586,19 @@ window.calcFinancing = function(changedField) {
     return n * 7 / 30.44;
   }
 
-  // Finance charge based on numPay
+  // Finance charge = 20% per 6-month period, proportional to loan duration
   if(changedField !== 'weekly' && numPay > 0) {
-    const months = monthsFromPay(numPay, freq);
-    const periods = months / 6;
+    const daysPerPay = freq === 'monthly' ? 30.44 : freq === 'biweekly' ? 14 : 7;
+    const months = (numPay * daysPerPay) / 30.44;
+    const periods = months / 6; // proportional - 3 months = 0.5 period = 10%
     const financeCharge = baseFinanced * 0.20 * periods;
     const totalFinanced = baseFinanced + financeCharge;
     
     // Auto-calculate payment amount
-    if(numPay > 0) {
-      const payAmt = totalFinanced / numPay;
-      const weeklyEl = document.getElementById('f-weekly');
-      if(weeklyEl && changedField !== 'weekly') weeklyEl.value = payAmt.toFixed(2);
-      weekly = payAmt;
-    }
+    const payAmt = totalFinanced / numPay;
+    const weeklyEl = document.getElementById('f-weekly');
+    if(weeklyEl && changedField !== 'weekly') weeklyEl.value = payAmt.toFixed(2);
+    weekly = payAmt;
 
     // Update summary
     const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -620,24 +619,24 @@ window.calcFinancing = function(changedField) {
     // months = numPay * daysPerPay / 30.44
     // This is iterative - approximate with binary search
     let lo = 1, hi = 600, best = 0;
-    const daysPerPay = freq === 'monthly' ? 30.44 : freq === 'biweekly' ? 14 : 7;
-    for(let iter = 0; iter < 50; iter++) {
-      const mid = Math.round((lo + hi) / 2);
-      const months = mid * daysPerPay / 30.44;
-      const periods = months / 6;
-      const totalF = baseFinanced * (1 + 0.20 * periods);
-      const pay = totalF / mid;
-      if(pay > weekly) lo = mid + 1;
-      else { best = mid; hi = mid - 1; }
-    }
-    if(best > 0) {
-      const numPayEl = document.getElementById('f-numpay');
-      if(numPayEl) numPayEl.value = best;
-      
-      const months = best * daysPerPay / 30.44;
-      const periods = months / 6;
-      const financeCharge = baseFinanced * 0.20 * periods;
+    // Reverse: given payment amount, find numPay using proportional interest
+    // totalFinanced(n) = baseFinanced * (1 + 0.20 * (n*days/30.44)/6)
+    // payment = totalFinanced(n) / n
+    // Solve: weekly * n = baseFinanced + baseFinanced * 0.20 * n*days/(30.44*6)
+    // weekly * n - baseFinanced * 0.20 * n*days/182.64 = baseFinanced
+    // n * (weekly - baseFinanced * 0.20 * days/182.64) = baseFinanced
+    const daysPerPay2 = freq === 'monthly' ? 30.44 : freq === 'biweekly' ? 14 : 7;
+    const ratePerPay = baseFinanced * 0.20 * daysPerPay2 / 182.64;
+    const calcNumPay = baseFinanced > 0 && (weekly - ratePerPay) > 0 
+      ? Math.ceil(baseFinanced / (weekly - ratePerPay)) 
+      : 0;
+    const numPayEl = document.getElementById('f-numpay');
+    if(numPayEl && calcNumPay > 0) numPayEl.value = calcNumPay;
+    {
+      const months2 = (calcNumPay * daysPerPay2) / 30.44;
+      const financeCharge = baseFinanced * 0.20 * (months2/6);
       const totalFinanced = baseFinanced + financeCharge;
+      const best = calcNumPay;
       
       const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
       const fsTodayEl = document.getElementById('fs-today');
