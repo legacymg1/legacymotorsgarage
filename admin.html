@@ -328,33 +328,48 @@
       <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="f-model" placeholder="Camry"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Precio del Vehículo ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcFinancing()"></div>
-      <div class="form-group"><label class="form-label">Down Payment ($)</label><input class="form-input" id="f-down" placeholder="1000" type="number" oninput="calcFinancing()"></div>
+      <div class="form-group"><label class="form-label">Precio del Vehículo ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcFinancing('price')"></div>
+      <div class="form-group"><label class="form-label">Down Payment ($)</label><input class="form-input" id="f-down" placeholder="1000" type="number" oninput="calcFinancing('down')"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Sales Tax ($)</label><input class="form-input" id="f-tax" placeholder="0" type="number" oninput="calcFinancing()"></div>
-      <div class="form-group"><label class="form-label">DMV Fees ($)</label><input class="form-input" id="f-dmv" placeholder="0" type="number" oninput="calcFinancing()"></div>
+      <div class="form-group"><label class="form-label">Sales Tax ($)</label><input class="form-input" id="f-tax" placeholder="0" type="number" oninput="calcFinancing('tax')"></div>
+      <div class="form-group"><label class="form-label">DMV Fees ($)</label><input class="form-input" id="f-dmv" placeholder="0" type="number" oninput="calcFinancing('dmv')"></div>
     </div>
     <div style="background:var(--navy2);border-radius:10px;padding:12px;margin-bottom:8px;" id="financing-summary">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:8px;">💰 Resumen Financiero</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">
-        <div>Doc Fee: <strong>$70.00</strong></div>
-        <div style="color:var(--green);">Paga Hoy: <strong id="fs-today">$0.00</strong></div>
-        <div>Cantidad Financiada: <strong id="fs-financed">$0.00</strong></div>
-        <div>Finance Charge (79.02%): <strong id="fs-charge" style="color:var(--red);">$0.00</strong></div>
-        <div style="grid-column:1/-1;">Total de Pagos: <strong id="fs-total-pay" style="color:var(--gold);font-size:14px;">$0.00</strong></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+        <div style="background:rgba(0,200,83,0.1);border-radius:6px;padding:6px 8px;">
+          💵 Paga Hoy<br><strong id="fs-today" style="font-size:14px;color:var(--green);">$0.00</strong>
+          <div style="font-size:10px;color:var(--muted);">Down + Taxes + DMV</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:6px 8px;">
+          📋 Base a Financiar<br><strong id="fs-base" style="font-size:14px;">$0.00</strong>
+          <div style="font-size:10px;color:var(--muted);">Precio + $70 Doc - Down</div>
+        </div>
+        <div style="background:rgba(255,59,59,0.08);border-radius:6px;padding:6px 8px;">
+          📈 Finance Charge<br><strong id="fs-charge" style="font-size:14px;color:var(--red);">$0.00</strong>
+          <div style="font-size:10px;color:var(--muted);">Interés 79.02% APR</div>
+        </div>
+        <div style="background:rgba(240,192,64,0.1);border-radius:6px;padding:6px 8px;">
+          🏦 Total Financiado<br><strong id="fs-financed" style="font-size:14px;color:var(--gold);">$0.00</strong>
+          <div style="font-size:10px;color:var(--muted);">Base + Finance Charge</div>
+        </div>
+        <div style="grid-column:1/-1;background:rgba(240,192,64,0.15);border-radius:6px;padding:8px;text-align:center;">
+          💳 Monto de Pago Calculado: <strong id="fs-total-pay" style="font-size:16px;color:var(--gold);">$0.00</strong>
+          <div style="font-size:10px;color:var(--muted);">Total Financiado ÷ No. Pagos</div>
+        </div>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group" style="display:none"><!--spacer--></div
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Monto de Pago ($)</label><input class="form-input" id="f-weekly" placeholder="150" type="number" oninput="calcHint()"><div class="form-hint" id="f-weekly-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Ingresa el monto según la frecuencia seleccionada</div></div>
-      <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="calcFinancing()"><div class="form-hint" id="f-hint" style="cursor:pointer;text-decoration:underline;" onclick="calcHint()">Toca para calcular fechas</div></div>
+      <div class="form-group"><label class="form-label">Monto de Pago ($)</label><input class="form-input" id="f-weekly" placeholder="150" type="number" oninput="calcFinancing('weekly')"><div class="form-hint" id="f-weekly-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Ingresa el monto según la frecuencia seleccionada</div></div>
+      <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="calcFinancing('numpay')"><div class="form-hint" id="f-hint" style="cursor:pointer;text-decoration:underline;" onclick="calcHint()">Toca para calcular fechas</div></div>
     </div>
     <div class="form-group">
       <label class="form-label">Frecuencia de Pago</label>
-      <select class="form-input" id="f-freq" onchange="setTimeout(calcHint,50)" oninput="setTimeout(calcHint,50)">
+      <select class="form-input" id="f-freq" onchange="calcFinancing('freq')" oninput="calcFinancing('freq')">
         <option value="weekly">Semanal (cada 7 días)</option>
         <option value="biweekly">Quincenal (cada 14 días)</option>
         <option value="monthly">Mensual (mismo día cada mes)</option>
@@ -547,48 +562,101 @@ window.lookupInventory = function(invNum) {
   });
 };
 
-window.calcFinancing = function() {
+window.calcFinancing = function(changedField) {
   const price = parseFloat(document.getElementById('f-total')?.value) || 0;
   const down = parseFloat(document.getElementById('f-down')?.value) || 0;
   const tax = parseFloat(document.getElementById('f-tax')?.value) || 0;
   const dmv = parseFloat(document.getElementById('f-dmv')?.value) || 0;
   const docFee = 70;
-  
-  // Taxes and DMV paid upfront, NOT financed
-  const amountFinanced = Math.max(0, price + docFee - down);
-  // APR 79.02% = 20% per 6 months
-  // Finance charge = 20% of balance per 6 months * number of 6-month periods
-  const numPay = parseInt(document.getElementById('f-numpay')?.value) || 0;
   const freq = document.getElementById('f-freq')?.value || 'weekly';
-  
-  // Calculate periods of 6 months
-  let months = 0;
-  if(freq === 'weekly') months = numPay * 7 / 30.44;
-  else if(freq === 'biweekly') months = numPay * 14 / 30.44;
-  else months = numPay;
-  
-  const sixMonthPeriods = months / 6;
-  const financeCharge = amountFinanced * 0.20 * sixMonthPeriods;
-  const totalPayments = amountFinanced + financeCharge;
-  
-  const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  
-  const fsFinanced = document.getElementById('fs-financed');
-  const fsCharge = document.getElementById('fs-charge');
-  const fsTotalPay = document.getElementById('fs-total-pay');
-  
+
+  // Taxes/DMV paid upfront, NOT financed
   const paidToday = down + tax + dmv;
-  const fsTodayEl = document.getElementById('fs-today');
-  if(fsTodayEl) fsTodayEl.textContent = fmt(paidToday);
-  if(fsFinanced) fsFinanced.textContent = fmt(amountFinanced);
-  if(fsCharge) fsCharge.textContent = fmt(financeCharge);
-  if(fsTotalPay) fsTotalPay.textContent = fmt(totalPayments);
+  const baseFinanced = Math.max(0, price + docFee - down);
+
+  // Finance charge = 20% of base financed (per 6 months) * periods
+  // We need numPay or weekly to calculate
+  let numPay = parseInt(document.getElementById('f-numpay')?.value) || 0;
+  let weekly = parseFloat(document.getElementById('f-weekly')?.value) || 0;
+
+  // Calculate months from numPay + freq
+  function monthsFromPay(n, f) {
+    if(f === 'monthly') return n;
+    if(f === 'biweekly') return n * 14 / 30.44;
+    return n * 7 / 30.44;
+  }
+
+  // Finance charge based on numPay
+  if(changedField !== 'weekly' && numPay > 0) {
+    const months = monthsFromPay(numPay, freq);
+    const periods = months / 6;
+    const financeCharge = baseFinanced * 0.20 * periods;
+    const totalFinanced = baseFinanced + financeCharge;
+    
+    // Auto-calculate payment amount
+    if(numPay > 0) {
+      const payAmt = totalFinanced / numPay;
+      const weeklyEl = document.getElementById('f-weekly');
+      if(weeklyEl && changedField !== 'weekly') weeklyEl.value = payAmt.toFixed(2);
+      weekly = payAmt;
+    }
+
+    // Update summary
+    const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const fsTodayEl = document.getElementById('fs-today');
+    const fsFinanced = document.getElementById('fs-financed');
+    const fsCharge = document.getElementById('fs-charge');
+    const fsTotalPay = document.getElementById('fs-total-pay');
+    const fsBase = document.getElementById('fs-base');
+    if(fsTodayEl) fsTodayEl.textContent = fmt(paidToday);
+    if(fsBase) fsBase.textContent = fmt(baseFinanced);
+    if(fsFinanced) fsFinanced.textContent = fmt(totalFinanced);
+    if(fsCharge) fsCharge.textContent = fmt(financeCharge);
+    if(fsTotalPay) fsTotalPay.textContent = fmt(weekly > 0 ? weekly : (numPay > 0 ? totalFinanced/numPay : 0));
+
+  } else if(changedField === 'weekly' && weekly > 0 && baseFinanced > 0) {
+    // User changed payment amount - recalculate numPay
+    // totalFinanced = baseFinanced * (1 + 0.20 * months/6)
+    // months = numPay * daysPerPay / 30.44
+    // This is iterative - approximate with binary search
+    let lo = 1, hi = 600, best = 0;
+    const daysPerPay = freq === 'monthly' ? 30.44 : freq === 'biweekly' ? 14 : 7;
+    for(let iter = 0; iter < 50; iter++) {
+      const mid = Math.round((lo + hi) / 2);
+      const months = mid * daysPerPay / 30.44;
+      const periods = months / 6;
+      const totalF = baseFinanced * (1 + 0.20 * periods);
+      const pay = totalF / mid;
+      if(pay > weekly) lo = mid + 1;
+      else { best = mid; hi = mid - 1; }
+    }
+    if(best > 0) {
+      const numPayEl = document.getElementById('f-numpay');
+      if(numPayEl) numPayEl.value = best;
+      
+      const months = best * daysPerPay / 30.44;
+      const periods = months / 6;
+      const financeCharge = baseFinanced * 0.20 * periods;
+      const totalFinanced = baseFinanced + financeCharge;
+      
+      const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+      const fsTodayEl = document.getElementById('fs-today');
+      const fsFinanced = document.getElementById('fs-financed');
+      const fsCharge = document.getElementById('fs-charge');
+      const fsTotalPay = document.getElementById('fs-total-pay');
+      const fsBase2 = document.getElementById('fs-base');
+      if(fsTodayEl) fsTodayEl.textContent = fmt(paidToday);
+      if(fsBase2) fsBase2.textContent = fmt(baseFinanced);
+      if(fsFinanced) fsFinanced.textContent = fmt(totalFinanced);
+      if(fsCharge) fsCharge.textContent = fmt(financeCharge);
+      if(fsTotalPay) fsTotalPay.textContent = fmt(weekly);
+    }
+  }
   
-  // Also trigger calcHint
   window.calcHint();
 };
 
-window.calcHint = function() {
+window.calcHintwindow.calcHint = function() {
   const total=parseFloat(document.getElementById('f-total').value)||0;
   const down=parseFloat(document.getElementById('f-down').value)||0;
   const weekly=parseFloat(document.getElementById('f-weekly').value)||0;
