@@ -307,16 +307,21 @@ function updateIDDisplay() {
   if(!c.idNumber) {
     badge.className='insurance-badge ins-none';
     badge.textContent='⚠️ SIN ID';
-    current.textContent='No tenemos su identificación en archivo.';
+    current.textContent='No tenemos su identificación en archivo. Por favor actualice. / We don\'t have your ID on file. Please update.';
   } else {
     badge.className='insurance-badge ins-active';
     badge.textContent='✅ ID EN ARCHIVO';
-    current.textContent=`${c.idType||''} · ${c.idNumber}`;
+    current.textContent=(c.idType||'')+' · '+c.idNumber;
+    // Pre-fill form with existing data
     if(document.getElementById('portal-id-type')) document.getElementById('portal-id-type').value = c.idType||'';
     if(document.getElementById('portal-id-number')) document.getElementById('portal-id-number').value = c.idNumber||'';
   }
-  if(preview && c.idPhotoURL) {
-    preview.innerHTML = `<a href="${c.idPhotoURL}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 12px;font-size:12px;text-decoration:none;">📷 Ver foto de ID / View ID photo</a>`;
+  if(preview) {
+    if(c.idPhotoURL) {
+      preview.innerHTML = '<a href="'+c.idPhotoURL+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 12px;font-size:12px;text-decoration:none;">📷 Ver foto de ID / View ID photo</a>';
+    } else {
+      preview.innerHTML = '';
+    }
   }
 }
 

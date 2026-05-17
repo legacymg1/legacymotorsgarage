@@ -383,7 +383,7 @@
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
@@ -681,6 +681,7 @@ window.renderAll = function() {
           })()}
           ${c.contractDate ? '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📋 Contrato: '+formatDate(c.contractDate)+'</div>' : ''}
           ${c.vehicleInventoryNum ? '<div style="font-size:11px;color:var(--gold);margin-bottom:8px;">🔑 Inventario #'+c.vehicleInventoryNum+'</div>' : ''}
+          ${c.idNumber ? '<div style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 ID ✓</div>' : '<div style="font-size:11px;background:rgba(255,59,59,0.1);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 Sin ID</div>'}
           <div class="payment-row"><span class="pay-label">${c.freq==='monthly'?'Pago mensual':c.freq==='biweekly'?'Pago quincenal':'Pago semanal'}</span><span class="pay-value">${formatMoney(c.weekly)}</span></div>
           <div class="payment-row"><span class="pay-label">Próximo pago</span><span class="pay-value" style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</span></div>
           <div class="payment-row"><span class="pay-label">Pagos</span><span class="pay-value">${paidCount} de ${totalPay}</span></div>
