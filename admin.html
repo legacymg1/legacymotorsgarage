@@ -566,7 +566,7 @@ window.renderAll = function() {
   }
 
   const isListView = currentView === 'list';
-  html+=`<div class="section-title">Todos los Clientes</div><div class="${isListView ? 'client-list' : 'clients-grid'}">`;
+  html+=`<div class="section-title">Todos los Clientes</div><div class="${isListView ? 'client-list' : 'clients-grid'}" style="${isListView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
   if(!filtered.length){
     html+=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚗</div><div class="empty-text">Sin clientes aún</div><div style="font-size:14px">Agrega tu primer cliente</div></div>`;
   } else if(isListView) {
