@@ -14765,9 +14765,9 @@ window.renderCars = function(){
     return '<div data-cid="'+cid+'" onclick="openCarDetail(this.dataset.cid)" style="background:#12161f;border-radius:12px;overflow:hidden;cursor:pointer;transition:transform 0.2s;border:1px solid rgba(255,255,255,0.08);" onmouseover="this.style.transform=\'translateY(-3px)\'" onmouseout="this.style.transform=\'none\'">'
       +'<div style="position:relative;">'+thumb+videoIcon+photoCount+invBadge+'</div>'
       +'<div style="padding:12px 14px 14px;">'
-      +'<div style="font-size:13px;font-weight:700;color:#f0c040;letter-spacing:0.5px;margin-bottom:1px;">'+c.year+' '+c.make+'</div>'
+      +'<div style="font-size:24px;font-weight:800;color:#f0c040;letter-spacing:0.5px;margin-bottom:1px;">'+c.year+' '+c.make+'</div>'
       +'<div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:8px;line-height:1.1;">'+c.model+'</div>'
-      +'<div style="font-size:24px;font-weight:800;color:#f0c040;margin-bottom:6px;">$'+Number(c.price||0).toLocaleString()+'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:#f0c040;margin-bottom:6px;">$'+Number(c.price||0).toLocaleString()+'</div>'
       +(c.weekly?'<div style="font-size:11px;color:#aaa;margin-bottom:8px;">$'+c.weekly+' / semana</div>':'')
       +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">'
       +(c.miles?'<span style="background:rgba(255,255,255,0.07);color:#bbb;border-radius:20px;padding:3px 8px;font-size:10px;">🛣 '+c.miles+'</span>':'')
