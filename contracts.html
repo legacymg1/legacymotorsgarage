@@ -70,8 +70,7 @@
   <div class="four-col">
     <div class="field"><label>Contract Number / No. de Contrato</label><div class="field-line">{{CONTRACT_NUMBER}}</div></div>
     <div class="field"><label>Contract Date / Fecha</label><div class="field-line">{{CONTRACT_DATE}}</div></div>
-    <div class="field"><label>Inventory No. / No. Inventario</label><div class="field-line">{{INVENTORY_NUMBER}}</div></div>
-    <div class="field"><label>Stock No.</label><div class="field-line">{{STOCK_NUMBER}}</div></div>
+    <div class="field"><label>Inventory No.</label><div class="field-line">{{INVENTORY_NUMBER}}</div></div>
   </div>
 </div>
 
@@ -459,13 +458,12 @@
     .replace(/\{\{CONTRACT_NUMBER\}\}/g, contractNum)
     .replace(/\{\{CONTRACT_DATE\}\}/g, p.get('contractDate') || today)
     .replace(/\{\{INVENTORY_NUMBER\}\}/g, p.get('invNum') || '')
-    .replace(/\{\{STOCK_NUMBER\}\}/g, p.get('invNum') || '')
     .replace(/\{\{BUYER_NAME\}\}/g, p.get('name') || '')
     .replace(/\{\{BUYER_PHONE\}\}/g, p.get('phone') || '')
-    .replace(/\{\{BUYER_ADDRESS\}\}/g, '')
+    .replace(/\{\{BUYER_ADDRESS\}\}/g, p.get('address') || '')
     .replace(/\{\{BUYER_CITY_STATE_ZIP\}\}/g, '')
     .replace(/\{\{BUYER_DL\}\}/g, p.get('idType')==="Driver's License" ? p.get('idNumber') : '')
-    .replace(/\{\{BUYER_DOB\}\}/g, '')
+    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob') || '')
     .replace(/\{\{BUYER_ID_TYPE\}\}/g, p.get('idType') || '')
     .replace(/\{\{BUYER_ID_NUMBER\}\}/g, p.get('idNumber') || '')
     .replace(/\{\{BUYER_ID_STATE\}\}/g, 'CA')
@@ -498,12 +496,74 @@
     .replace(/\{\{NET_RESTOCK\}\}/g, '____')
     .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, '____');
 
-  // Add print button
-  const printBtn = document.createElement('div');
-  printBtn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:999;display:flex;gap:10px;';
-  printBtn.innerHTML = '<button onclick="window.print()" style="background:#000;color:#f0c040;border:2px solid #f0c040;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:1px;">🖨️ PRINT / IMPRIMIR</button>';
-  document.body.appendChild(printBtn);
+  // Make all field-line divs editable
+  document.querySelectorAll('.field-line').forEach(el => {
+    el.contentEditable = 'true';
+    el.style.outline = 'none';
+    el.style.borderBottom = '1px solid #666';
+    el.style.minHeight = '20px';
+    el.style.cursor = 'text';
+  });
+
+  // Add action buttons
+  const actionBar = document.createElement('div');
+  actionBar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid #f0c040;padding:12px 20px;display:flex;gap:10px;justify-content:center;z-index:999;';
+  actionBar.innerHTML = `
+    <button onclick="saveContract()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">💾 GUARDAR / SAVE</button>
+    <button onclick="window.print()" style="background:transparent;color:#f0c040;border:2px solid #f0c040;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ IMPRIMIR / PRINT</button>
+    <button onclick="window.close()" style="background:transparent;color:#aaa;border:1px solid #444;border-radius:8px;padding:12px 20px;font-size:14px;cursor:pointer;">✕ CERRAR</button>
+  `;
+  document.body.appendChild(actionBar);
+  document.body.style.paddingBottom = '80px';
 })();
+
+async function saveContract() {
+  const clientId = new URLSearchParams(window.location.search).get('clientId');
+  if(!clientId){ alert('No client ID found. Print only.'); return; }
+  
+  // Collect all editable field values
+  const fields = {};
+  document.querySelectorAll('.field-line').forEach((el, i) => {
+    fields['field_'+i] = el.textContent.trim();
+  });
+  
+  // Save to Firebase
+  try {
+    const {initializeApp, getApps} = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+    const {getFirestore, doc, setDoc, getDoc} = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    
+    const firebaseConfig = {
+      apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
+      authDomain: "legacy-motors-garage.firebaseapp.com",
+      projectId: "legacy-motors-garage",
+      storageBucket: "legacy-motors-garage.firebasestorage.app",
+      messagingSenderId: "783567672493",
+      appId: "1:783567672493:web:3a825f2f59ec1c25e9a224"
+    };
+    
+    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    
+    // Get existing client data
+    const clientRef = doc(db, 'clients', clientId);
+    const clientSnap = await getDoc(clientRef);
+    const existing = clientSnap.exists() ? clientSnap.data() : {};
+    
+    // Save contract data
+    await setDoc(clientRef, {
+      ...existing,
+      contract: {
+        fields,
+        savedAt: new Date().toISOString(),
+        url: window.location.search
+      }
+    });
+    
+    alert('✅ Contrato guardado en el perfil del cliente');
+  } catch(e) {
+    alert('Error guardando: ' + e.message);
+  }
+}
 </script>
 </body>
 </html>
