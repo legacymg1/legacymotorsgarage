@@ -14858,6 +14858,13 @@ window.openCarModal = function(carId){
 }
 window.closeCarModal = function(){document.getElementById('car-modal').style.display='none';}
 
+function generateInvNum(){
+  if(!cars.length) return '0001';
+  var nums=cars.map(function(c){return parseInt(c.inventoryNum)||0;}).filter(Boolean);
+  var next=nums.length?Math.max.apply(null,nums)+1:1;
+  return String(next).padStart(4,'0');
+}
+
 window.saveCar = async function(){
   const make=document.getElementById('car-make').value.trim();
   const model=document.getElementById('car-model').value.trim();
@@ -14953,11 +14960,4 @@ renderCars();
 
 </body>
 </html></body>
-</htmlfunction generateInvNum(){
-  if(!cars.length) return '0001';
-  var nums=cars.map(function(c){return parseInt(c.inventoryNum)||0;}).filter(Boolean);
-  var next=nums.length?Math.max.apply(null,nums)+1:1;
-  return String(next).padStart(4,'0');
-}
-
->
+</html>
