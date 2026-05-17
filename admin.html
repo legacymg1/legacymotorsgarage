@@ -700,6 +700,7 @@ window.renderAll = function() {
           <button class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" onclick="openWhatsApp('${c.id}','${status}')">💬 SMS</button>
           ${(!c.insurance||c.insuranceExp<today())?'<button class="btn" data-cid="'+c.id+'" onclick="openInsuranceSMS(this.dataset.cid)" style="flex:0;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>':''}
           <button class="btn btn-edit" style="flex:0;padding:9px 10px;" onclick="openEditModal('${c.id}')">✏️</button>
+          <button class="btn" style="flex:0;padding:9px 10px;background:var(--gold3);color:var(--navy3);" onclick="generateContract('${c.id}')" title="Generar Contrato">📄</button>
           <button class="btn btn-delete" style="flex:0;padding:9px 10px;" onclick="deleteClient('${c.id}')">🗑</button>
         </div>
       </div>`;
@@ -1294,6 +1295,36 @@ window.deletePayment=async function(clientId, idx){
     await setDoc(doc(db,'clients',clientId),c);
     closeModal('pay-modal');
   }catch(e){alert('Error: '+e.message);}
+};
+
+window.generateContract = function(clientId) {
+  const c = clients.find(x => x.id === clientId);
+  if(!c) return;
+  
+  // Build contract URL with client data as query params
+  const params = new URLSearchParams({
+    name: c.name || '',
+    phone: c.phone || '',
+    address: '',
+    year: c.year || '',
+    make: c.make || '',
+    model: c.model || '',
+    vin: c.vin || '',
+    miles: c.miles || '',
+    price: c.total || '',
+    down: c.down || '',
+    weekly: c.weekly || '',
+    freq: c.freq || 'weekly',
+    numPay: (c.schedule||[]).length || '',
+    startDate: c.startDate || '',
+    contractDate: c.contractDate || '',
+    invNum: c.vehicleInventoryNum || '',
+    idType: c.idType || '',
+    idNumber: c.idNumber || '',
+    clientId: c.id
+  });
+  
+  window.open('contracts.html?' + params.toString(), '_blank');
 };
 
 window.closeModal=function(id){document.getElementById(id).classList.remove('active');};
