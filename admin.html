@@ -319,6 +319,31 @@
       </div>
     </div>
     <div class="form-group"><label class="form-label">Notas</label><input class="form-input" id="f-notes" placeholder="Información adicional..."></div>
+    <div style="background:var(--navy2);border-radius:10px;padding:12px;margin-top:4px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:10px;">📋 Identificación del Cliente</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tipo de ID</label>
+          <select class="form-input" id="f-id-type">
+            <option value="">Seleccionar...</option>
+            <option value="Driver's License">Driver's License / Lic. de Manejo</option>
+            <option value="Passport">Passport / Pasaporte</option>
+            <option value="Matricula Consular">Matrícula Consular</option>
+            <option value="State ID">State ID</option>
+            <option value="Other">Other / Otro</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Número de ID</label><input class="form-input" id="f-id-number" placeholder="A1234567"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Estado / State</label><input class="form-input" id="f-id-state" placeholder="CA"></div>
+        <div class="form-group"><label class="form-label">Vencimiento / Expiry</label><input class="form-input" id="f-id-expiry" type="date"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">📸 Foto del ID</label>
+        <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;">
+        <div id="f-id-preview" style="margin-top:6px;"></div>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('add-modal')">Cancelar</button>
       <button class="btn-save" id="save-btn" onclick="saveClient()">GUARDAR</button>
@@ -638,7 +663,10 @@ window.renderAll = function() {
       }
 
       html+=`<div class="client-card ${status}">
-        <div class="card-header"><div><div class="client-name">${c.name}</div><div class="client-phone">${c.phone} &nbsp;${c.lang==='en'?'🇺🇸':'🇲🇽'}</div></div>${badge}</div>
+        <div class="card-header"><div><div class="client-name">${c.name}</div><div class="client-phone">${c.phone} &nbsp;${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
+          ${c.idNumber?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">🪪 ID: ${c.idType||''} ${c.idNumber}</div>`:''}
+          ${c.lastLogin ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Portal: ${formatDate(c.lastLogin.split('T')[0])} ${new Date(c.lastLogin).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</div>` : '<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Sin acceso al portal</div>'}
+        </div></div>${badge}</div>
         <div class="card-body">
           <div class="car-info">${c.year} ${c.make} ${c.model}</div>
           ${(()=>{
@@ -772,6 +800,11 @@ window.saveClient=async function(){
     freq,
     lang,
     contractDate,
+    idType: document.getElementById('f-id-type')?document.getElementById('f-id-type').value:'',
+    idNumber: document.getElementById('f-id-number')?document.getElementById('f-id-number').value.trim():'',
+    idState: document.getElementById('f-id-state')?document.getElementById('f-id-state').value.trim():'',
+    idExpiry: document.getElementById('f-id-expiry')?document.getElementById('f-id-expiry').value:'',
+    idPhotoURL,
     insurance: document.getElementById('f-insurance')?document.getElementById('f-insurance').value.trim():'',
     insuranceExp: document.getElementById('f-insurance-exp')?document.getElementById('f-insurance-exp').value:'',
     startDate,
@@ -981,9 +1014,9 @@ window.openInsuranceSMS=function(id){
   const carro=`${c.year} ${c.make} ${c.model}`;
   let msg;
   if(lang==='en'){
-    msg=`Hi ${nombre}! Legacy Motors Garage LLC here.\n\nWe noticed your vehicle insurance${c.insurance?' ('+c.insurance+')':''} for your ${carro} is expired or missing.\n\nPlease update your insurance and send us proof of coverage as soon as possible.\n\nThank you!\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    msg=`Hi ${nombre}! 🛡️ Legacy Motors Garage LLC here.\n\nWe truly care about your safety and protection on the road! We noticed that the insurance on your ${carro}${c.insurance?' (Policy: '+c.insurance+')':''} appears to be expired or we don't have it on file.\n\nWe want to make sure you're always covered and protected. Please update your insurance info and send us a copy of your proof of insurance at your earliest convenience.\n\nWe're here to help! 😊\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   } else {
-    msg=`Hola ${nombre}! Le saluda Legacy Motors Garage LLC.\n\nNotamos que el seguro de su ${carro}${c.insurance?' ('+c.insurance+')':''} está vencido o no tenemos registro.\n\nPor favor actualice su seguro y envíenos comprobante a la brevedad.\n\nGracias!\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    msg=`Hola ${nombre}! 🛡️ Le saluda Legacy Motors Garage LLC.\n\nNos importa mucho su seguridad y bienestar en el camino. Notamos que el seguro de su ${carro}${c.insurance?' (Póliza: '+c.insurance+')':''} está vencido o no tenemos registro en su archivo.\n\nQueremos asegurarnos de que siempre esté protegido/a. Por favor actualice su información de seguro y envíenos copia de su tarjeta de seguro a la brevedad.\n\n¡Estamos aquí para ayudarle! 😊\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
   const phone=c.phone.replace(/\D/g,'');
   window.location.href=`sms:${phone}?body=${encodeURIComponent(msg)}`;

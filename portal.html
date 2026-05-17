@@ -207,6 +207,16 @@ window.doLogin = async function() {
       document.getElementById('app').style.display='block';
       renderPortal();
       updateInsuranceDisplay();
+      updateIDDisplay();
+      // Track last login
+      try {
+        const db2 = getFirestore();
+        await setDoc(doc(db2,'clients',match.id), {
+          ...match,
+          lastLogin: new Date().toISOString(),
+          loginCount: (match.loginCount||0) + 1
+        });
+      } catch(e) { console.log('Login tracking error:', e); }
     } else {
       errEl.textContent = 'Teléfono o contraseña incorrectos';
     }
@@ -255,6 +265,61 @@ function updateInsuranceDisplay() {
   }
 }
 
+window.updateID = async function() {
+  const idType = document.getElementById('portal-id-type').value;
+  const idNumber = document.getElementById('portal-id-number').value.trim();
+  if(!idNumber) { alert('Por favor ingresa tu número de ID / Please enter your ID number'); return; }
+  
+  const btn = document.querySelectorAll('.ins-btn')[1];
+  if(btn) { btn.textContent = 'Guardando...'; btn.disabled = true; }
+  
+  try {
+    let idPhotoURL = currentClient.idPhotoURL || '';
+    const photoFile = document.getElementById('portal-id-photo').files[0];
+    if(photoFile) {
+      const storage = getStorage();
+      const idRef = ref(storage, `ids/${currentClient.id}/${Date.now()}_${photoFile.name}`);
+      await uploadBytes(idRef, photoFile);
+      idPhotoURL = await getDownloadURL(idRef);
+    }
+    
+    const db2 = getFirestore();
+    const updated = { ...currentClient, idType, idNumber, idPhotoURL };
+    await setDoc(doc(db2,'clients',currentClient.id), updated);
+    currentClient = updated;
+    
+    document.getElementById('id-success').style.display='block';
+    updateIDDisplay();
+    setTimeout(()=>{ document.getElementById('id-success').style.display='none'; }, 3000);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+  if(btn) { btn.textContent = 'Actualizar ID / Update ID'; btn.disabled = false; }
+};
+
+function updateIDDisplay() {
+  const c = currentClient;
+  const badge = document.getElementById('id-badge');
+  const current = document.getElementById('id-current');
+  const preview = document.getElementById('portal-id-preview');
+  if(!badge) return;
+  
+  if(!c.idNumber) {
+    badge.className='insurance-badge ins-none';
+    badge.textContent='⚠️ SIN ID';
+    current.textContent='No tenemos su identificación en archivo.';
+  } else {
+    badge.className='insurance-badge ins-active';
+    badge.textContent='✅ ID EN ARCHIVO';
+    current.textContent=`${c.idType||''} · ${c.idNumber}`;
+    if(document.getElementById('portal-id-type')) document.getElementById('portal-id-type').value = c.idType||'';
+    if(document.getElementById('portal-id-number')) document.getElementById('portal-id-number').value = c.idNumber||'';
+  }
+  if(preview && c.idPhotoURL) {
+    preview.innerHTML = `<a href="${c.idPhotoURL}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 12px;font-size:12px;text-decoration:none;">📷 Ver foto de ID / View ID photo</a>`;
+  }
+}
+
 window.updateInsurance = async function() {
   const company = document.getElementById('ins-company').value.trim();
   const number = document.getElementById('ins-number').value.trim();
@@ -291,6 +356,7 @@ window.updateInsurance = async function() {
     document.getElementById('ins-success').style.display='block';
     document.getElementById('ins-success').textContent = photoFile ? '✓ Seguro e imagen actualizados / Insurance and photo updated' : '✓ Seguro actualizado / Insurance updated';
     updateInsuranceDisplay();
+      updateIDDisplay();
     setTimeout(()=>{ document.getElementById('ins-success').style.display='none'; }, 4000);
   } catch(e) {
     alert('Error al guardar: ' + e.message);
@@ -405,6 +471,32 @@ function renderPortal() {
         </div>
         <button class="ins-btn" onclick="updateInsurance()">Actualizar Seguro / Update Insurance</button>
         <div class="ins-success" id="ins-success" style="display:none;">✓ Seguro actualizado correctamente</div>
+      </div>
+    </div>
+
+    <!-- ID SECTION -->
+    <div class="insurance-section" id="id-section" style="margin-top:16px;">
+      <div class="insurance-header">
+        <div class="insurance-title">🪪 Identificación / ID</div>
+        <span id="id-badge" class="insurance-badge"></span>
+      </div>
+      <div id="id-current" style="font-size:14px;color:var(--muted);margin-bottom:4px;"></div>
+      <div class="ins-form">
+        <div class="ins-form-title">Actualizar ID / Update ID</div>
+        <select class="fi" id="portal-id-type" style="margin-bottom:10px;">
+          <option value="">Tipo de ID / ID Type...</option>
+          <option value="Driver's License">Driver's License / Lic. de Manejo</option>
+          <option value="Passport">Passport / Pasaporte</option>
+          <option value="Matricula Consular">Matrícula Consular</option>
+          <option value="State ID">State ID</option>
+          <option value="Other">Other / Otro</option>
+        </select>
+        <input class="fi" id="portal-id-number" placeholder="Número de ID / ID Number" style="margin-bottom:10px;">
+        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">📸 Foto del ID / ID Photo</label>
+        <input type="file" class="fi" id="portal-id-photo" accept="image/*" style="margin-bottom:10px;padding:8px;cursor:pointer;">
+        <div id="portal-id-preview" style="margin-bottom:10px;"></div>
+        <button class="ins-btn" onclick="updateID()">Actualizar ID / Update ID</button>
+        <div class="ins-success" id="id-success" style="display:none;">✓ ID actualizado correctamente</div>
       </div>
     </div>
 
