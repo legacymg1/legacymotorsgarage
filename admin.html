@@ -656,7 +656,7 @@ window.calcFinancing = function(changedField) {
   window.calcHint();
 };
 
-window.calcHintwindow.calcHint = function() {
+window.calcHint = function() {
   const total=parseFloat(document.getElementById('f-total').value)||0;
   const down=parseFloat(document.getElementById('f-down').value)||0;
   const weekly=parseFloat(document.getElementById('f-weekly').value)||0;
@@ -681,8 +681,8 @@ function startListening() {
     clients = snap.docs.map(d => ({id: d.id, ...d.data()}));
     document.getElementById('sync-status').textContent = '● En línea';
     document.getElementById('sync-status').className = 'sync-status';
-    renderAll();
-    renderTodayBox();
+    if(window.renderAll) window.renderAll();
+    if(window.renderTodayBox) window.renderTodayBox();
     checkStartupOverdue();
   }, () => {
     document.getElementById('sync-status').textContent = '● Sin conexión';
