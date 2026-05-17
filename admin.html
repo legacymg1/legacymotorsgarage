@@ -66,13 +66,13 @@
   .btn-msg { background: var(--red); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 
   .clients-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-  .client-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: transform 0.2s; }
+  .client-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: visible; transition: transform 0.2s; }
   .client-card:hover { transform: translateY(-2px); }
   .client-card.overdue { border-color: var(--red); }
   .client-card.soon { border-color: var(--yellow); }
   .client-card.ok { border-color: var(--green); }
 
-  .card-header { padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .card-header { padding: 14px 16px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--border); min-height: unset; }
   .client-name { font-weight: 600; font-size: 16px; }
   .client-phone { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
