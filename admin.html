@@ -276,6 +276,28 @@
       <div class="form-group"><label class="form-label">Fecha de Nacimiento</label><input class="form-input" id="f-dob" type="date"></div>
       <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="f-address" placeholder="123 Main St, Porterville, CA 93257"></div>
     </div>
+    <!-- INVENTORY & ID - moved to top -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">🔑 No. Inventario del Vehículo</label>
+        <input class="form-input" id="f-inventory-num" placeholder="Ej: 0001" oninput="lookupInventory(this.value)">
+        <div id="inv-lookup-status" style="font-size:11px;color:var(--gold);margin-top:4px;"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">🪪 Tipo de ID</label>
+        <select class="form-input" id="f-id-type">
+          <option value="">Seleccionar...</option>
+          <option value="Driver's License">Driver's License / Lic. de Manejo</option>
+          <option value="Passport">Passport / Pasaporte</option>
+          <option value="Matricula Consular">Matrícula Consular</option>
+          <option value="State ID">State ID</option>
+          <option value="Other">Other / Otro</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Número de ID</label><input class="form-input" id="f-id-number" placeholder="A1234567"></div>
+    </div>
     <div class="form-group">
       <label class="form-label">Idioma de Comunicación</label>
       <select class="form-input" id="f-lang">
@@ -303,9 +325,10 @@
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:8px;">💰 Resumen Financiero</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">
         <div>Doc Fee: <strong>$70.00</strong></div>
-        <div>Total a Financiar: <strong id="fs-financed">$0.00</strong></div>
+        <div style="color:var(--green);">Paga Hoy: <strong id="fs-today">$0.00</strong></div>
+        <div>Cantidad Financiada: <strong id="fs-financed">$0.00</strong></div>
         <div>Finance Charge (79.02%): <strong id="fs-charge" style="color:var(--red);">$0.00</strong></div>
-        <div>Total de Pagos: <strong id="fs-total-pay" style="color:var(--gold);">$0.00</strong></div>
+        <div style="grid-column:1/-1;">Total de Pagos: <strong id="fs-total-pay" style="color:var(--gold);font-size:14px;">$0.00</strong></div>
       </div>
     </div>
     <div class="form-row">
@@ -325,7 +348,6 @@
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha de Contrato</label><input class="form-input" id="f-contractdate" type="date"></div>
-      <div class="form-group"><label class="form-label">No. Inventario del Vehículo</label><input class="form-input" id="f-inventory-num" placeholder="Ej: 0001"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha Primer Pago</label><input class="form-input" id="f-startdate" type="date" onchange="setTimeout(calcHint,50)"></div>
@@ -342,30 +364,14 @@
       </div>
     </div>
     <div class="form-group"><label class="form-label">Notas</label><input class="form-input" id="f-notes" placeholder="Información adicional..."></div>
-    <div style="background:var(--navy2);border-radius:10px;padding:12px;margin-top:4px;">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:10px;">📋 Identificación del Cliente</div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Tipo de ID</label>
-          <select class="form-input" id="f-id-type">
-            <option value="">Seleccionar...</option>
-            <option value="Driver's License">Driver's License / Lic. de Manejo</option>
-            <option value="Passport">Passport / Pasaporte</option>
-            <option value="Matricula Consular">Matrícula Consular</option>
-            <option value="State ID">State ID</option>
-            <option value="Other">Other / Otro</option>
-          </select>
-        </div>
-        <div class="form-group"><label class="form-label">Número de ID</label><input class="form-input" id="f-id-number" placeholder="A1234567"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Estado / State</label><input class="form-input" id="f-id-state" placeholder="CA"></div>
-        <div class="form-group"><label class="form-label">Vencimiento / Expiry</label><input class="form-input" id="f-id-expiry" type="date"></div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">📸 Foto del ID</label>
-        <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;">
-        <div id="f-id-preview" style="margin-top:6px;"></div>
-      </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Estado del ID / State</label><input class="form-input" id="f-id-state" placeholder="CA"></div>
+      <div class="form-group"><label class="form-label">Vencimiento del ID</label><input class="form-input" id="f-id-expiry" type="date"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">📸 Foto del ID</label>
+      <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;">
+      <div id="f-id-preview" style="margin-top:6px;"></div>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('add-modal')">Cancelar</button>
@@ -509,6 +515,32 @@ function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),
 function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
 function calcProgress(c) { const t=Number(c.total); if(!t) return 0; return Math.min(100,Math.round(calcPaid(c)/t*100)); }
 
+window.lookupInventory = function(invNum) {
+  const status = document.getElementById('inv-lookup-status');
+  if(!invNum || invNum.length < 1) { if(status) status.textContent = ''; return; }
+  
+  // Find car in inventory
+  // We need to fetch from Firebase inventory collection
+  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js').then(({getFirestore, collection, query, where, getDocs}) => {
+    const db2 = getFirestore();
+    getDocs(query(collection(db2,'inventory'), where('inventoryNum','==',invNum))).then(snap => {
+      if(snap.empty) {
+        if(status) status.textContent = '❌ No encontrado';
+        return;
+      }
+      const car = snap.docs[0].data();
+      // Auto-fill car fields
+      if(document.getElementById('f-year')) document.getElementById('f-year').value = car.year || '';
+      if(document.getElementById('f-make')) document.getElementById('f-make').value = car.make || '';
+      if(document.getElementById('f-model')) document.getElementById('f-model').value = car.model || '';
+      if(document.getElementById('f-total')) document.getElementById('f-total').value = car.price || '';
+      if(document.getElementById('f-miles')) document.getElementById('f-miles').value = car.miles || '';
+      if(status) status.textContent = '✅ ' + car.year + ' ' + car.make + ' ' + car.model;
+      window.calcFinancing();
+    });
+  });
+};
+
 window.calcFinancing = function() {
   const price = parseFloat(document.getElementById('f-total')?.value) || 0;
   const down = parseFloat(document.getElementById('f-down')?.value) || 0;
@@ -516,7 +548,8 @@ window.calcFinancing = function() {
   const dmv = parseFloat(document.getElementById('f-dmv')?.value) || 0;
   const docFee = 70;
   
-  const amountFinanced = Math.max(0, price + tax + dmv + docFee - down);
+  // Taxes and DMV paid upfront, NOT financed
+  const amountFinanced = Math.max(0, price + docFee - down);
   // APR 79.02% = 20% per 6 months
   // Finance charge = 20% of balance per 6 months * number of 6-month periods
   const numPay = parseInt(document.getElementById('f-numpay')?.value) || 0;
@@ -538,6 +571,9 @@ window.calcFinancing = function() {
   const fsCharge = document.getElementById('fs-charge');
   const fsTotalPay = document.getElementById('fs-total-pay');
   
+  const paidToday = down + tax + dmv;
+  const fsTodayEl = document.getElementById('fs-today');
+  if(fsTodayEl) fsTodayEl.textContent = fmt(paidToday);
   if(fsFinanced) fsFinanced.textContent = fmt(amountFinanced);
   if(fsCharge) fsCharge.textContent = fmt(financeCharge);
   if(fsTotalPay) fsTotalPay.textContent = fmt(totalPayments);
