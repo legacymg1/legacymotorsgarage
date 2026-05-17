@@ -14619,7 +14619,10 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
 <!-- ADD CAR MODAL -->
 <div class="modal-overlay" id="car-modal">
   <div class="modal" style="max-height:85vh;overflow-y:auto;">
-    <div class="modal-title" id="car-modal-title">Add Vehicle / Agregar Vehículo</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div class="modal-title" id="car-modal-title" style="margin-bottom:0;">Add Vehicle / Agregar Vehículo</div>
+    <button onclick="closeCarModal()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;flex-shrink:0;">✕</button>
+  </div>
     <div style="background:var(--gold);color:var(--dark);border-radius:8px;padding:6px 12px;text-align:center;font-weight:700;font-size:13px;margin-bottom:8px;" id="inv-number-display">Inventory # Auto-assigned</div>
     <input class="cf-input" id="car-year" placeholder="Year / Año" type="number">
     <input class="cf-input" id="car-make" placeholder="Make / Marca (Toyota)">
@@ -14853,7 +14856,7 @@ window.openCarModal = function(carId){
   document.getElementById('car-video').value='';
   modal.style.display='flex';
 }
-window.closeCarModal = function(){document.getElementById('car-modal').classList.remove('active');}
+window.closeCarModal = function(){document.getElementById('car-modal').style.display='none';}
 
 window.saveCar = async function(){
   const make=document.getElementById('car-make').value.trim();
