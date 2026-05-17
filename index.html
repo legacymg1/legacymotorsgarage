@@ -14905,6 +14905,8 @@ window.saveCar = async function(){
       desc: document.getElementById('car-desc').value.trim(),
       photos, videoURL,
       img: photos[0]||existing.img||'',
+      inventoryNum: existing.inventoryNum || generateInvNum(),
+      vin: document.getElementById('car-vin')?document.getElementById('car-vin').value.trim():'',
       createdAt: existing.createdAt || Date.now(),
       updatedAt: Date.now()
     };
@@ -14951,4 +14953,11 @@ renderCars();
 
 </body>
 </html></body>
-</html>
+</htmlfunction generateInvNum(){
+  if(!cars.length) return '0001';
+  var nums=cars.map(function(c){return parseInt(c.inventoryNum)||0;}).filter(Boolean);
+  var next=nums.length?Math.max.apply(null,nums)+1:1;
+  return String(next).padStart(4,'0');
+}
+
+>
