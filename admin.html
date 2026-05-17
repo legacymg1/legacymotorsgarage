@@ -292,12 +292,28 @@
       <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="f-model" placeholder="Camry"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Precio Total ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcHint()"></div>
-      <div class="form-group"><label class="form-label">Down Payment ($)</label><input class="form-input" id="f-down" placeholder="1000" type="number" oninput="calcHint()"></div>
+      <div class="form-group"><label class="form-label">Precio del Vehículo ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcFinancing()"></div>
+      <div class="form-group"><label class="form-label">Down Payment ($)</label><input class="form-input" id="f-down" placeholder="1000" type="number" oninput="calcFinancing()"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Sales Tax ($)</label><input class="form-input" id="f-tax" placeholder="0" type="number" oninput="calcFinancing()"></div>
+      <div class="form-group"><label class="form-label">DMV Fees ($)</label><input class="form-input" id="f-dmv" placeholder="0" type="number" oninput="calcFinancing()"></div>
+    </div>
+    <div style="background:var(--navy2);border-radius:10px;padding:12px;margin-bottom:8px;" id="financing-summary">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:8px;">💰 Resumen Financiero</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;">
+        <div>Doc Fee: <strong>$70.00</strong></div>
+        <div>Total a Financiar: <strong id="fs-financed">$0.00</strong></div>
+        <div>Finance Charge (79.02%): <strong id="fs-charge" style="color:var(--red);">$0.00</strong></div>
+        <div>Total de Pagos: <strong id="fs-total-pay" style="color:var(--gold);">$0.00</strong></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="display:none"><!--spacer--></div
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Monto de Pago ($)</label><input class="form-input" id="f-weekly" placeholder="150" type="number" oninput="calcHint()"><div class="form-hint" id="f-weekly-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Ingresa el monto según la frecuencia seleccionada</div></div>
-      <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number"><div class="form-hint" id="f-hint" style="cursor:pointer;text-decoration:underline;" onclick="calcHint()">Toca para calcular fechas</div></div>
+      <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="calcFinancing()"><div class="form-hint" id="f-hint" style="cursor:pointer;text-decoration:underline;" onclick="calcHint()">Toca para calcular fechas</div></div>
     </div>
     <div class="form-group">
       <label class="form-label">Frecuencia de Pago</label>
@@ -492,6 +508,43 @@ function getStatus(c) {
 function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0); }
 function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
 function calcProgress(c) { const t=Number(c.total); if(!t) return 0; return Math.min(100,Math.round(calcPaid(c)/t*100)); }
+
+window.calcFinancing = function() {
+  const price = parseFloat(document.getElementById('f-total')?.value) || 0;
+  const down = parseFloat(document.getElementById('f-down')?.value) || 0;
+  const tax = parseFloat(document.getElementById('f-tax')?.value) || 0;
+  const dmv = parseFloat(document.getElementById('f-dmv')?.value) || 0;
+  const docFee = 70;
+  
+  const amountFinanced = Math.max(0, price + tax + dmv + docFee - down);
+  // APR 79.02% = 20% per 6 months
+  // Finance charge = 20% of balance per 6 months * number of 6-month periods
+  const numPay = parseInt(document.getElementById('f-numpay')?.value) || 0;
+  const freq = document.getElementById('f-freq')?.value || 'weekly';
+  
+  // Calculate periods of 6 months
+  let months = 0;
+  if(freq === 'weekly') months = numPay * 7 / 30.44;
+  else if(freq === 'biweekly') months = numPay * 14 / 30.44;
+  else months = numPay;
+  
+  const sixMonthPeriods = months / 6;
+  const financeCharge = amountFinanced * 0.20 * sixMonthPeriods;
+  const totalPayments = amountFinanced + financeCharge;
+  
+  const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  
+  const fsFinanced = document.getElementById('fs-financed');
+  const fsCharge = document.getElementById('fs-charge');
+  const fsTotalPay = document.getElementById('fs-total-pay');
+  
+  if(fsFinanced) fsFinanced.textContent = fmt(amountFinanced);
+  if(fsCharge) fsCharge.textContent = fmt(financeCharge);
+  if(fsTotalPay) fsTotalPay.textContent = fmt(totalPayments);
+  
+  // Also trigger calcHint
+  window.calcHint();
+};
 
 window.calcHint = function() {
   const total=parseFloat(document.getElementById('f-total').value)||0;
@@ -839,6 +892,9 @@ window.saveClient=async function(){
     freq,
     lang,
     contractDate,
+    salesTax: Number(document.getElementById('f-tax')?.value)||0,
+    dmvFees: Number(document.getElementById('f-dmv')?.value)||0,
+    docFee: 70,
     vehicleInventoryNum: document.getElementById('f-inventory-num')?document.getElementById('f-inventory-num').value.trim():'',
     idType: document.getElementById('f-id-type')?document.getElementById('f-id-type').value:'',
     idNumber: document.getElementById('f-id-number')?document.getElementById('f-id-number').value.trim():'',
@@ -1113,6 +1169,30 @@ window.sendWhatsApp=function(){
 document.getElementById('wa-text').addEventListener('input',function(){document.getElementById('wa-preview').textContent=this.value;});
 
 // TODAY BOX
+function getBirthdayClients() {
+  const todayStr = today();
+  const mm = todayStr.slice(5,7);
+  const dd = todayStr.slice(8,10);
+  return clients.filter(c => {
+    if(!c.dob) return false;
+    return c.dob.slice(5,7) === mm && c.dob.slice(8,10) === dd;
+  });
+}
+
+window.sendBirthdayMsg = function(id) {
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  const lang = c.lang || 'es';
+  let msg;
+  if(lang === 'en'){
+    msg = `Happy Birthday ${c.name.split(' ')[0]}! 🎂🎉\n\nAll of us at Legacy Motors Garage LLC wish you a wonderful birthday filled with joy and happiness!\n\nThank you for trusting us — it's a pleasure to serve you! 🚗✨\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+  } else {
+    msg = `¡Feliz Cumpleaños ${c.name.split(' ')[0]}! 🎂🎉\n\nTodo el equipo de Legacy Motors Garage LLC le desea un maravilloso día lleno de alegría y felicidad.\n\n¡Gracias por su confianza — es un placer servirle! 🚗✨\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+  }
+  const phone = c.phone.replace(/\D/g,'');
+  window.location.href = `sms:${phone}?body=${encodeURIComponent(msg)}`;
+};
+
 function renderTodayBox() {
   const todayStr = today();
   const todayClients = clients.filter(c => getNextPayDate(c) === todayStr);
@@ -1129,8 +1209,27 @@ function renderTodayBox() {
     return;
   }
 
+  // Check birthdays
+  const bdayClients = getBirthdayClients();
+  
   box.style.display = 'block';
   let html = '';
+  
+  if(bdayClients.length) {
+    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#ff9500;margin-bottom:10px;">🎂 CUMPLEAÑOS HOY</div>`;
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">';
+    bdayClients.forEach(c => {
+      const age = new Date().getFullYear() - parseInt(c.dob.slice(0,4));
+      html += `<div style="background:rgba(255,149,0,0.1);border:1px solid rgba(255,149,0,0.4);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:600;font-size:15px;">${c.name}</div>
+          <div style="font-size:12px;color:#ff9500;margin-top:2px;">🎂 ${age} años · ${c.year} ${c.make} ${c.model}</div>
+        </div>
+        <button onclick="sendBirthdayMsg('${c.id}')" style="background:#ff9500;color:#000;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">💬 Felicitar</button>
+      </div>`;
+    });
+    html += '</div>';
+  }
 
   if (todayClients.length) {
     html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Pagan Hoy — ${new Date().toLocaleDateString('es-MX',{weekday:'long',month:'long',day:'numeric'})}</div>`;
