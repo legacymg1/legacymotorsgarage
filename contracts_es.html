@@ -304,7 +304,7 @@
     .replace(/\{\{BUYER_NAME\}\}/g, p.get('name')||'')
     .replace(/\{\{BUYER_PHONE\}\}/g, p.get('phone')||'')
     .replace(/\{\{BUYER_ADDRESS\}\}/g, p.get('address')||'')
-    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob')||'')
+    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob') ? new Date(p.get('dob')+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'}) : '')
     .replace(/\{\{BUYER_CITY_STATE_ZIP\}\}/g, [p.get('city'),p.get('state'),p.get('zip')].filter(Boolean).join(', '))
     .replace(/\{\{BUYER_DL\}\}/g, p.get('idType')==="Driver's License"?p.get('idNumber')||'':'')
     .replace(/\{\{BUYER_ID_TYPE\}\}/g, p.get('idType')||'')
