@@ -14797,8 +14797,13 @@ window.openCarDetail = function(carId){
   
   // Build media
   var mediaHtml='';
+  const soldRibbon = c.status==='sold' ?
+    '<div style="position:absolute;top:0;right:0;width:0;height:0;border-style:solid;border-width:0 100px 100px 0;border-color:transparent #c8960c transparent transparent;z-index:10;"></div>'+
+    '<div style="position:absolute;top:14px;right:-6px;transform:rotate(45deg);background:linear-gradient(135deg,#c8960c,#f0c040);color:#000;font-size:15px;font-weight:900;letter-spacing:2px;padding:5px 22px;text-align:center;width:110px;z-index:11;">SOLD</div>'
+    : '';
+
   if(c.photos&&c.photos.length>0){
-    mediaHtml='<div style="position:relative;">';
+    mediaHtml='<div style="position:relative;">'+ soldRibbon;
     // Photo slider
     mediaHtml+='<div id="cdm-slides" style="display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;">';
     c.photos.forEach(function(p){
@@ -14808,7 +14813,7 @@ window.openCarDetail = function(carId){
     if(c.photos.length>1) mediaHtml+='<div style="text-align:center;padding:6px;font-size:11px;color:#aaa;">← Swipe for more photos →</div>';
     mediaHtml+='</div>';
   } else {
-    mediaHtml='<div style="height:200px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;font-size:64px;">🚗</div>';
+    mediaHtml='<div style="position:relative;height:200px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;font-size:64px;">🚗'+soldRibbon+'</div>';
   }
   if(c.videoURL){
     mediaHtml+='<video src="'+c.videoURL+'" controls style="width:100%;max-height:300px;display:block;" preload="none" poster="'+(c.photos&&c.photos[0]?c.photos[0]:'')+'"></video>';
