@@ -149,7 +149,6 @@
       <div class="payment-row"><span>Document Preparation Fee / Honorarios de Documentación</span><span>$70.00</span></div>
       <div class="payment-row"><span>Sales Tax / Impuesto de Ventas ({{TAX_RATE}}%)</span><span>${{SALES_TAX}}</span></div>
       <div class="payment-row"><span>DMV Registration Fees / Tarifas DMV</span><span>${{DMV_FEES}}</span></div>
-      <div class="payment-row"><span>GPS Device Agreement (if applicable)</span><span>${{GPS_FEE}}</span></div>
       <div class="payment-row"><span>Contract Cancellation Option (if selected)</span><span>${{CANCELLATION_FEE}}</span></div>
       <div class="payment-row"><span>Other: _______________________</span><span>$_________</span></div>
       <div class="payment-row highlight"><span>Total Cash Price / Precio Total</span><span>${{TOTAL_CASH_PRICE}}</span></div>
@@ -454,6 +453,7 @@
   const today = new Date().toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'numeric'});
   
   // Replace all template variables
+  // Apply all replacements
   document.body.innerHTML = document.body.innerHTML
     .replace(/\{\{CONTRACT_NUMBER\}\}/g, contractNum)
     .replace(/\{\{CONTRACT_DATE\}\}/g, p.get('contractDate') || today)
@@ -476,26 +476,62 @@
     .replace(/\{\{VEH_MILES\}\}/g, p.get('miles') || '')
     .replace(/\{\{VEH_COLOR\}\}/g, '')
     .replace(/\{\{VEH_PLATE\}\}/g, '')
-    .replace(/\{\{VEHICLE_PRICE\}\}/g, parseFloat(p.get('price')||0).toLocaleString('en-US',{minimumFractionDigits:2}))
-    .replace(/\{\{DOWN_PAYMENT\}\}/g, parseFloat(p.get('down')||0).toLocaleString('en-US',{minimumFractionDigits:2}))
-    .replace(/\{\{AMOUNT_FINANCED\}\}/g, (parseFloat(p.get('price')||0)-parseFloat(p.get('down')||0)+70).toLocaleString('en-US',{minimumFractionDigits:2}))
-    .replace(/\{\{PAYMENT_AMOUNT\}\}/g, parseFloat(p.get('weekly')||0).toLocaleString('en-US',{minimumFractionDigits:2}))
-    .replace(/\{\{PAYMENT_FREQUENCY\}\}/g, p.get('freq')==='monthly'?'Monthly / Mensual':p.get('freq')==='biweekly'?'Bi-Weekly / Quincenal':'Weekly / Semanal')
-    .replace(/\{\{NUM_PAYMENTS\}\}/g, p.get('numPay') || '')
-    .replace(/\{\{FIRST_PAYMENT_DATE\}\}/g, p.get('startDate') || '')
+    // Financial calculations
+  const price = parseFloat(p.get('price')||0);
+  const down = parseFloat(p.get('down')||0);
+  const tax = parseFloat(p.get('tax')||0);
+  const dmv = parseFloat(p.get('dmv')||0);
+  const numPay = parseInt(p.get('numPay')||0);
+  const weekly = parseFloat(p.get('weekly')||0);
+  const freq = p.get('freq')||'weekly';
+  const ccoaFee = parseFloat(p.get('ccoaFee')||0);
+  const ccoaAccepted = p.get('ccoa') === 'yes';
+  
+  // CCOA restock fee
+  let restockFee = 0, netRestock = 0;
+  if(ccoaAccepted) {
+    restockFee = price <= 4999 ? 175 : price <= 9999 ? 350 : 500;
+    netRestock = restockFee - ccoaFee;
+  }
+  
+  const docFee = 70;
+  const totalCashPrice = price + docFee + tax + dmv + (ccoaAccepted ? ccoaFee : 0);
+  const amountFinanced = Math.max(0, price + docFee - down);
+  
+  // Finance charge proportional to duration
+  const daysPerPay = freq === 'monthly' ? 30.44 : freq === 'biweekly' ? 14 : 7;
+  const months = (numPay * daysPerPay) / 30.44;
+  const periods = months / 6;
+  const financeCharge = amountFinanced * 0.20 * periods;
+  const totalOfPayments = amountFinanced + financeCharge;
+  
+  const fmt = n => n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const freqLabel = freq==='monthly'?'Monthly / Mensual':freq==='biweekly'?'Bi-Weekly / Quincenal':'Weekly / Semanal';
+  
+  // 2 business days from contract date for CCOA expiry
+  const contDate = p.get('contractDate') ? new Date(p.get('contractDate')) : new Date();
+  let bizDays = 0, expiryDate = new Date(contDate);
+  while(bizDays < 2) { expiryDate.setDate(expiryDate.getDate()+1); if(expiryDate.getDay()!==0&&expiryDate.getDay()!==6) bizDays++; }
+  const expiryStr = expiryDate.toLocaleDateString('en-US')
+    .replace(/\{\{VEHICLE_PRICE\}\}/g, fmt(price))
+    .replace(/\{\{DOWN_PAYMENT\}\}/g, fmt(down))
+    .replace(/\{\{AMOUNT_FINANCED\}\}/g, fmt(amountFinanced))
+    .replace(/\{\{PAYMENT_AMOUNT\}\}/g, fmt(weekly||totalOfPayments/numPay))
+    .replace(/\{\{PAYMENT_FREQUENCY\}\}/g, freqLabel)
+    .replace(/\{\{NUM_PAYMENTS\}\}/g, numPay||'')
+    .replace(/\{\{FIRST_PAYMENT_DATE\}\}/g, p.get('startDate')||'')
     .replace(/\{\{LAST_PAYMENT_DATE\}\}/g, '')
-    .replace(/\{\{TAX_RATE\}\}/g, '0')
-    .replace(/\{\{SALES_TAX\}\}/g, '0.00')
-    .replace(/\{\{DMV_FEES\}\}/g, '____')
-    .replace(/\{\{GPS_FEE\}\}/g, '____')
-    .replace(/\{\{CANCELLATION_FEE\}\}/g, '____')
-    .replace(/\{\{TOTAL_CASH_PRICE\}\}/g, '____')
-    .replace(/\{\{FINANCE_CHARGE\}\}/g, '____')
-    .replace(/\{\{TOTAL_OF_PAYMENTS\}\}/g, '____')
-    .replace(/\{\{CCOA_FEE\}\}/g, '____')
-    .replace(/\{\{RESTOCK_FEE\}\}/g, '____')
-    .replace(/\{\{NET_RESTOCK\}\}/g, '____')
-    .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, '____');
+    .replace(/\{\{TAX_RATE\}\}/g, tax>0?(tax/price*100).toFixed(2):'0')
+    .replace(/\{\{SALES_TAX\}\}/g, fmt(tax))
+    .replace(/\{\{DMV_FEES\}\}/g, fmt(dmv))
+    .replace(/\{\{CANCELLATION_FEE\}\}/g, ccoaAccepted ? fmt(ccoaFee) : 'N/A')
+    .replace(/\{\{TOTAL_CASH_PRICE\}\}/g, fmt(totalCashPrice))
+    .replace(/\{\{FINANCE_CHARGE\}\}/g, fmt(financeCharge))
+    .replace(/\{\{TOTAL_OF_PAYMENTS\}\}/g, fmt(totalOfPayments))
+    .replace(/\{\{CCOA_FEE\}\}/g, ccoaAccepted ? fmt(ccoaFee) : 'N/A')
+    .replace(/\{\{RESTOCK_FEE\}\}/g, ccoaAccepted ? fmt(restockFee) : 'N/A')
+    .replace(/\{\{NET_RESTOCK\}\}/g, ccoaAccepted ? fmt(netRestock) : 'N/A')
+    .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, ccoaAccepted ? expiryStr : 'N/A');
 
   // Make all field-line divs editable
   document.querySelectorAll('.field-line').forEach(el => {

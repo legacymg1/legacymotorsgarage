@@ -360,6 +360,25 @@
         </div>
       </div>
     </div>
+    <!-- CCOA Option -->
+    <div style="background:var(--navy2);border-radius:10px;padding:12px;margin-bottom:8px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:8px;">📋 Contract Cancellation Option (CCOA)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Requerido por CA Vehicle Code §11709.2 — Opcional para el cliente</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">¿El cliente acepta el CCOA?</label>
+          <select class="form-input" id="f-ccoa" onchange="calcCCOA()">
+            <option value="no">No acepta</option>
+            <option value="yes">Sí acepta</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tarifa CCOA (auto-calculada)</label>
+          <input class="form-input" id="f-ccoa-fee" placeholder="$0" readonly style="background:var(--navy3);color:var(--gold);font-weight:700;">
+        </div>
+      </div>
+      <div id="ccoa-details" style="font-size:11px;color:var(--muted);display:none;margin-top:4px;"></div>
+    </div>
     <div class="form-row">
       <div class="form-group" style="display:none"><!--spacer--></div
     </div>
@@ -535,6 +554,27 @@ function getStatus(c) {
 function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0); }
 function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
 function calcProgress(c) { const t=Number(c.total); if(!t) return 0; return Math.min(100,Math.round(calcPaid(c)/t*100)); }
+
+window.calcCCOA = function() {
+  const price = parseFloat(document.getElementById('f-total')?.value) || 0;
+  const accepts = document.getElementById('f-ccoa')?.value === 'yes';
+  const details = document.getElementById('ccoa-details');
+  const feeEl = document.getElementById('f-ccoa-fee');
+  if(!accepts) {
+    if(feeEl) feeEl.value = '$0';
+    if(details) details.style.display = 'none';
+    return;
+  }
+  let optFee = 0, restockFee = 0;
+  if(price <= 4999) { optFee = 75; restockFee = 175; }
+  else if(price <= 9999) { optFee = 150; restockFee = 350; }
+  else { optFee = 250; restockFee = 500; }
+  if(feeEl) feeEl.value = '$' + optFee;
+  if(details) {
+    details.style.display = 'block';
+    details.textContent = 'Tarifa: $'+optFee+' | Si devuelve el carro: $'+restockFee+' restock - $'+optFee+' pagado = $'+(restockFee-optFee)+' neto';
+  }
+};
 
 window.lookupInventory = function(invNum) {
   const status = document.getElementById('inv-lookup-status');
@@ -1005,6 +1045,8 @@ window.saveClient=async function(){
     lang,
     contractDate,
     salesTax: Number(document.getElementById('f-tax')?.value)||0,
+    ccoaAccepted: document.getElementById('f-ccoa')?.value === 'yes',
+    ccoaFee: document.getElementById('f-ccoa')?.value === 'yes' ? (Number(document.getElementById('f-total')?.value)||0) <= 4999 ? 75 : (Number(document.getElementById('f-total')?.value)||0) <= 9999 ? 150 : 250 : 0,
     dmvFees: Number(document.getElementById('f-dmv')?.value)||0,
     docFee: 70,
     vehicleInventoryNum: document.getElementById('f-inventory-num')?document.getElementById('f-inventory-num').value.trim():'',
@@ -1581,6 +1623,10 @@ window.generateContract = function(clientId) {
     state: c.state || '',
     zip: c.zip || '',
     idExpiry: c.idExpiry || '',
+    ccoa: c.ccoaAccepted ? 'yes' : 'no',
+    ccoaFee: c.ccoaFee || 0,
+    tax: c.salesTax || 0,
+    dmv: c.dmvFees || 0,
     clientId: c.id
   });
   
