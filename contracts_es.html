@@ -265,69 +265,57 @@
 
 </div>
 
+
 <script>
 (function(){
   const p = new URLSearchParams(window.location.search);
-
-  // ── Cálculos financieros ──────────────────────────────────────
-  const price     = parseFloat(p.get('price')  || 0);
-  const down      = parseFloat(p.get('down')   || 0);
-  const tax       = parseFloat(p.get('tax')    || 0);
-  const dmv       = parseFloat(p.get('dmv')    || 0);
-  const numPay    = parseInt(  p.get('numPay') || 0);
-  const weekly    = parseFloat(p.get('weekly') || 0);
+  const price     = parseFloat(p.get('price')   || 0);
+  const down      = parseFloat(p.get('down')    || 0);
+  const tax       = parseFloat(p.get('tax')     || 0);
+  const dmv       = parseFloat(p.get('dmv')     || 0);
+  const numPay    = parseInt(  p.get('numPay')  || 0);
+  const weekly    = parseFloat(p.get('weekly')  || 0);
   const freq      = p.get('freq') || 'weekly';
   const ccoaFee   = parseFloat(p.get('ccoaFee') || 0);
   const ccoaYes   = p.get('ccoa') === 'yes';
-
-  const docFee         = 70;
+  const docFee    = 70;
   const baseFinanced   = Math.max(0, price + docFee - down);
   const totalCashPrice = price + docFee + tax + dmv + (ccoaYes ? ccoaFee : 0);
-
-  const daysPerPay  = freq === 'monthly' ? 30.44 : freq === 'biweekly' ? 14 : 7;
-  const months      = numPay > 0 ? (numPay * daysPerPay) / 30.44 : 6;
-  const periods     = months / 6;
+  const daysPerPay = freq==='monthly'?30.44:freq==='biweekly'?14:7;
+  const months    = numPay > 0 ? (numPay * daysPerPay) / 30.44 : 6;
+  const periods   = months / 6;
   const financeCharge   = baseFinanced * 0.20 * periods;
   const totalOfPayments = baseFinanced + financeCharge;
-  const payAmt      = numPay > 0 ? totalOfPayments / numPay : (weekly || 0);
-
+  const payAmt    = numPay > 0 ? totalOfPayments / numPay : weekly;
   let restockFee = 0, netRestock = 0;
-  if(ccoaYes){
-    restockFee = price <= 4999 ? 175 : price <= 9999 ? 350 : 500;
-    netRestock = restockFee - ccoaFee;
-  }
-
+  if(ccoaYes){ restockFee = price<=4999?175:price<=9999?350:500; netRestock = restockFee - ccoaFee; }
   const fmt = n => Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
   const freqLabel = freq==='monthly'?'Mensual':freq==='biweekly'?'Quincenal':'Semanal';
-
   const contDate = p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00') : new Date();
-  let bizDays = 0;
-  const expiryDate = new Date(contDate);
-  while(bizDays < 2){ expiryDate.setDate(expiryDate.getDate()+1); if(expiryDate.getDay()!==0&&expiryDate.getDay()!==6) bizDays++; }
-  const expiryStr = expiryDate.toLocaleDateString('es-MX');
-  const contractNum = 'LMG-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-5);
+  let bizDays=0; const expDate=new Date(contDate);
+  while(bizDays<2){expDate.setDate(expDate.getDate()+1);if(expDate.getDay()!==0&&expDate.getDay()!==6)bizDays++;}
+  const contractNum = 'LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5);
   const todayStr = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
 
-  // ── Reemplazar variables ──────────────────────────────────────
   document.body.innerHTML = document.body.innerHTML
     .replace(/\{\{CONTRACT_NUMBER\}\}/g, contractNum)
-    .replace(/\{\{CONTRACT_DATE\}\}/g, p.get('contractDate') || todayStr)
-    .replace(/\{\{INVENTORY_NUMBER\}\}/g, p.get('invNum') || '')
-    .replace(/\{\{BUYER_NAME\}\}/g, p.get('name') || '')
-    .replace(/\{\{BUYER_PHONE\}\}/g, p.get('phone') || '')
-    .replace(/\{\{BUYER_ADDRESS\}\}/g, p.get('address') || '')
-    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob') || '')
+    .replace(/\{\{CONTRACT_DATE\}\}/g, p.get('contractDate')||todayStr)
+    .replace(/\{\{INVENTORY_NUMBER\}\}/g, p.get('invNum')||'')
+    .replace(/\{\{BUYER_NAME\}\}/g, p.get('name')||'')
+    .replace(/\{\{BUYER_PHONE\}\}/g, p.get('phone')||'')
+    .replace(/\{\{BUYER_ADDRESS\}\}/g, p.get('address')||'')
+    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob')||'')
     .replace(/\{\{BUYER_CITY_STATE_ZIP\}\}/g, [p.get('city'),p.get('state'),p.get('zip')].filter(Boolean).join(', '))
-    .replace(/\{\{BUYER_DL\}\}/g, p.get('idType')==="Driver's License" ? (p.get('idNumber')||'') : '')
-    .replace(/\{\{BUYER_ID_TYPE\}\}/g, p.get('idType') || '')
-    .replace(/\{\{BUYER_ID_NUMBER\}\}/g, p.get('idNumber') || '')
-    .replace(/\{\{BUYER_ID_STATE\}\}/g, p.get('idState') || 'CA')
-    .replace(/\{\{BUYER_ID_EXPIRY\}\}/g, p.get('idExpiry') || '')
-    .replace(/\{\{VEH_YEAR\}\}/g, p.get('year') || '')
-    .replace(/\{\{VEH_MAKE\}\}/g, p.get('make') || '')
-    .replace(/\{\{VEH_MODEL\}\}/g, p.get('model') || '')
-    .replace(/\{\{VEH_VIN\}\}/g, p.get('vin') || '')
-    .replace(/\{\{VEH_MILES\}\}/g, p.get('miles') || '')
+    .replace(/\{\{BUYER_DL\}\}/g, p.get('idType')==="Driver's License"?p.get('idNumber')||'':'')
+    .replace(/\{\{BUYER_ID_TYPE\}\}/g, p.get('idType')||'')
+    .replace(/\{\{BUYER_ID_NUMBER\}\}/g, p.get('idNumber')||'')
+    .replace(/\{\{BUYER_ID_STATE\}\}/g, p.get('idState')||'CA')
+    .replace(/\{\{BUYER_ID_EXPIRY\}\}/g, p.get('idExpiry')||'')
+    .replace(/\{\{VEH_YEAR\}\}/g, p.get('year')||'')
+    .replace(/\{\{VEH_MAKE\}\}/g, p.get('make')||'')
+    .replace(/\{\{VEH_MODEL\}\}/g, p.get('model')||'')
+    .replace(/\{\{VEH_VIN\}\}/g, p.get('vin')||'')
+    .replace(/\{\{VEH_MILES\}\}/g, p.get('miles')||'')
     .replace(/\{\{VEH_COLOR\}\}/g, '')
     .replace(/\{\{VEH_PLATE\}\}/g, '')
     .replace(/\{\{VEHICLE_PRICE\}\}/g, fmt(price))
@@ -335,59 +323,57 @@
     .replace(/\{\{AMOUNT_FINANCED\}\}/g, fmt(baseFinanced))
     .replace(/\{\{PAYMENT_AMOUNT\}\}/g, fmt(payAmt))
     .replace(/\{\{PAYMENT_FREQUENCY\}\}/g, freqLabel)
-    .replace(/\{\{NUM_PAYMENTS\}\}/g, numPay || '')
-    .replace(/\{\{FIRST_PAYMENT_DATE\}\}/g, p.get('startDate') || '')
+    .replace(/\{\{NUM_PAYMENTS\}\}/g, numPay||'')
+    .replace(/\{\{FIRST_PAYMENT_DATE\}\}/g, p.get('startDate')||'')
     .replace(/\{\{LAST_PAYMENT_DATE\}\}/g, '')
-    .replace(/\{\{TAX_RATE\}\}/g, tax > 0 ? (tax/price*100).toFixed(2) : '0')
+    .replace(/\{\{TAX_RATE\}\}/g, tax>0?(tax/price*100).toFixed(2):'0')
     .replace(/\{\{SALES_TAX\}\}/g, fmt(tax))
-    .replace(/\{\{DMV_FEES\}\}/g, dmv > 0 ? fmt(dmv) : '____')
-    .replace(/\{\{CANCELLATION_FEE\}\}/g, ccoaYes ? fmt(ccoaFee) : 'N/A')
+    .replace(/\{\{DMV_FEES\}\}/g, dmv>0?fmt(dmv):'____')
+    .replace(/\{\{CANCELLATION_FEE\}\}/g, ccoaYes?fmt(ccoaFee):'N/A')
     .replace(/\{\{TOTAL_CASH_PRICE\}\}/g, fmt(totalCashPrice))
     .replace(/\{\{FINANCE_CHARGE\}\}/g, fmt(financeCharge))
     .replace(/\{\{TOTAL_OF_PAYMENTS\}\}/g, fmt(totalOfPayments))
-    .replace(/\{\{CCOA_FEE\}\}/g, ccoaYes ? fmt(ccoaFee) : 'N/A')
-    .replace(/\{\{RESTOCK_FEE\}\}/g, ccoaYes ? fmt(restockFee) : 'N/A')
-    .replace(/\{\{NET_RESTOCK\}\}/g, ccoaYes ? fmt(netRestock) : 'N/A')
-    .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, ccoaYes ? expiryStr : 'N/A');
+    .replace(/\{\{CCOA_FEE\}\}/g, ccoaYes?fmt(ccoaFee):'N/A')
+    .replace(/\{\{RESTOCK_FEE\}\}/g, ccoaYes?fmt(restockFee):'N/A')
+    .replace(/\{\{NET_RESTOCK\}\}/g, ccoaYes?fmt(netRestock):'N/A')
+    .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, ccoaYes?expDate.toLocaleDateString('es-MX'):'N/A');
 
-  // ── Marcar CCOA ───────────────────────────────────────────────
-  const acceptBoxEs = document.getElementById('ccoa-accept-check');
-  const declineBoxEs = document.getElementById('ccoa-decline-check');
-  if(acceptBoxEs && declineBoxEs) {
-    const target = ccoaYes ? acceptBoxEs : declineBoxEs;
-    target.innerHTML = '<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
+  // Marcar CCOA
+  const acceptChk = document.getElementById('ccoa-accept-check');
+  const declineChk = document.getElementById('ccoa-decline-check');
+  if(acceptChk&&declineChk){
+    const chk = ccoaYes ? acceptChk : declineChk;
+    chk.innerHTML = '<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
   }
 
-  // ── Campos editables ──────────────────────────────────────────
-  document.querySelectorAll('.field-line').forEach(el => {
-    el.contentEditable = 'true';
-    el.style.outline = 'none';
-    el.style.borderBottom = '1px solid #666';
-    el.style.minHeight = '20px';
-    el.style.cursor = 'text';
+  // Campos editables
+  document.querySelectorAll('.field-line').forEach(el=>{
+    el.contentEditable='true'; el.style.outline='none';
+    el.style.borderBottom='1px solid #999'; el.style.cursor='text';
   });
-  document.querySelectorAll('.tila-cell .value').forEach(el => {
-    el.contentEditable = 'true'; el.style.cursor = 'text'; el.style.outline = 'none';
+  document.querySelectorAll('.tila-cell .value').forEach(el=>{
+    el.contentEditable='true'; el.style.cursor='text'; el.style.outline='none';
   });
-  document.querySelectorAll('.payment-row span:last-child').forEach(el => {
-    el.contentEditable = 'true'; el.style.cursor = 'text'; el.style.outline = 'none'; el.style.minWidth = '80px'; el.style.display = 'inline-block';
+  document.querySelectorAll('.payment-row span:last-child').forEach(el=>{
+    el.contentEditable='true'; el.style.cursor='text'; el.style.outline='none';
+    el.style.minWidth='60px'; el.style.display='inline-block';
   });
-  document.querySelectorAll('.opt-box').forEach(box => {
-    box.style.cursor = 'pointer';
-    box.onclick = function() {
-      document.querySelectorAll('.opt-box .checkbox').forEach(c => c.innerHTML = '');
-      this.querySelector('.checkbox').innerHTML = '<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
+  document.querySelectorAll('.opt-box').forEach(box=>{
+    box.style.cursor='pointer';
+    box.onclick=function(){
+      document.querySelectorAll('.opt-box .checkbox').forEach(c=>c.innerHTML='');
+      this.querySelector('.checkbox').innerHTML='<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
     };
   });
 
-  // ── Barra de acciones ─────────────────────────────────────────
-  const bar = document.createElement('div');
-  bar.className = 'no-print';
-  bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid #f0c040;padding:12px 20px;display:flex;gap:10px;justify-content:center;z-index:999;';
-  bar.innerHTML = '<button onclick="window.print()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ IMPRIMIR / PRINT</button>'
-    + '<button onclick="window.close()" style="background:transparent;color:#aaa;border:1px solid #444;border-radius:8px;padding:12px 20px;font-size:14px;cursor:pointer;">✕ CERRAR</button>';
+  // Barra de acciones
+  const bar=document.createElement('div');
+  bar.className='no-print';
+  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid #f0c040;padding:12px;display:flex;gap:10px;justify-content:center;z-index:9999;';
+  bar.innerHTML='<button onclick="window.print()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ IMPRIMIR</button>'
+    +'<button onclick="window.close()" style="background:transparent;color:#aaa;border:1px solid #444;border-radius:8px;padding:12px 16px;font-size:14px;cursor:pointer;">✕ CERRAR</button>';
   document.body.appendChild(bar);
-  document.body.style.paddingBottom = '80px';
+  document.body.style.paddingBottom='80px';
 })();
 </script>
 </body>

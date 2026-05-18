@@ -434,6 +434,7 @@
 
 
 
+
 </body>
 </html>E html>
 <html lang="en">
@@ -870,198 +871,131 @@
 </div><!-- end page 3 -->
 
 
+
 <script>
-// Auto-fill contract from URL parameters
 (function(){
   const p = new URLSearchParams(window.location.search);
-  
-  function fill(id, val) {
-    const el = document.getElementById(id);
-    if(el && val) el.textContent = val;
-  }
-  
-  function set(selector, val) {
-    const el = document.querySelector(selector);
-    if(el && val) el.textContent = val;
-  }
-  
-  // Generate contract number
-  const contractNum = 'LMG-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-5);
-  const today = new Date().toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'numeric'});
-  
-  // Replace all template variables
-  // Apply all replacements
+  const price     = parseFloat(p.get('price')   || 0);
+  const down      = parseFloat(p.get('down')    || 0);
+  const tax       = parseFloat(p.get('tax')     || 0);
+  const dmv       = parseFloat(p.get('dmv')     || 0);
+  const numPay    = parseInt(  p.get('numPay')  || 0);
+  const weekly    = parseFloat(p.get('weekly')  || 0);
+  const freq      = p.get('freq') || 'weekly';
+  const ccoaFee   = parseFloat(p.get('ccoaFee') || 0);
+  const ccoaYes   = p.get('ccoa') === 'yes';
+  const docFee    = 70;
+  const baseFinanced   = Math.max(0, price + docFee - down);
+  const totalCashPrice = price + docFee + tax + dmv + (ccoaYes ? ccoaFee : 0);
+  const daysPerPay = freq==='monthly'?30.44:freq==='biweekly'?14:7;
+  const months    = numPay > 0 ? (numPay * daysPerPay) / 30.44 : 6;
+  const periods   = months / 6;
+  const financeCharge   = baseFinanced * 0.20 * periods;
+  const totalOfPayments = baseFinanced + financeCharge;
+  const payAmt    = numPay > 0 ? totalOfPayments / numPay : weekly;
+  let restockFee = 0, netRestock = 0;
+  if(ccoaYes){ restockFee = price<=4999?175:price<=9999?350:500; netRestock = restockFee - ccoaFee; }
+  const fmt = n => Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const freqLabel = freq==='monthly'?'Monthly / Mensual':freq==='biweekly'?'Bi-Weekly / Quincenal':'Weekly / Semanal';
+  const contDate = p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00') : new Date();
+  let bizDays=0; const expDate=new Date(contDate);
+  while(bizDays<2){expDate.setDate(expDate.getDate()+1);if(expDate.getDay()!==0&&expDate.getDay()!==6)bizDays++;}
+  const contractNum = 'LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5);
+  const todayStr = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
+
   document.body.innerHTML = document.body.innerHTML
     .replace(/\{\{CONTRACT_NUMBER\}\}/g, contractNum)
-    .replace(/\{\{CONTRACT_DATE\}\}/g, p.get('contractDate') || today)
-    .replace(/\{\{INVENTORY_NUMBER\}\}/g, p.get('invNum') || '')
-    .replace(/\{\{BUYER_NAME\}\}/g, p.get('name') || '')
-    .replace(/\{\{BUYER_PHONE\}\}/g, p.get('phone') || '')
-    .replace(/\{\{BUYER_ADDRESS\}\}/g, p.get('address') || '')
-    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob') || '')
+    .replace(/\{\{CONTRACT_DATE\}\}/g, p.get('contractDate')||todayStr)
+    .replace(/\{\{INVENTORY_NUMBER\}\}/g, p.get('invNum')||'')
+    .replace(/\{\{BUYER_NAME\}\}/g, p.get('name')||'')
+    .replace(/\{\{BUYER_PHONE\}\}/g, p.get('phone')||'')
+    .replace(/\{\{BUYER_ADDRESS\}\}/g, p.get('address')||'')
+    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob')||'')
     .replace(/\{\{BUYER_CITY_STATE_ZIP\}\}/g, [p.get('city'),p.get('state'),p.get('zip')].filter(Boolean).join(', '))
-    .replace(/\{\{BUYER_DL\}\}/g, p.get('idType')==="Driver's License" ? p.get('idNumber') : '')
-    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob') || '')
-    .replace(/\{\{BUYER_ID_TYPE\}\}/g, p.get('idType') || '')
-    .replace(/\{\{BUYER_ID_NUMBER\}\}/g, p.get('idNumber') || '')
-    .replace(/\{\{BUYER_ID_STATE\}\}/g, 'CA')
-    .replace(/\{\{BUYER_ID_EXPIRY\}\}/g, p.get('idExpiry') || '')
-    .replace(/\{\{VEH_YEAR\}\}/g, p.get('year') || '')
-    .replace(/\{\{VEH_MAKE\}\}/g, p.get('make') || '')
-    .replace(/\{\{VEH_MODEL\}\}/g, p.get('model') || '')
-    .replace(/\{\{VEH_VIN\}\}/g, p.get('vin') || '')
-    .replace(/\{\{VEH_MILES\}\}/g, p.get('miles') || '')
+    .replace(/\{\{BUYER_DL\}\}/g, p.get('idType')==="Driver's License"?p.get('idNumber')||'':'')
+    .replace(/\{\{BUYER_ID_TYPE\}\}/g, p.get('idType')||'')
+    .replace(/\{\{BUYER_ID_NUMBER\}\}/g, p.get('idNumber')||'')
+    .replace(/\{\{BUYER_ID_STATE\}\}/g, p.get('idState')||'CA')
+    .replace(/\{\{BUYER_ID_EXPIRY\}\}/g, p.get('idExpiry')||'')
+    .replace(/\{\{VEH_YEAR\}\}/g, p.get('year')||'')
+    .replace(/\{\{VEH_MAKE\}\}/g, p.get('make')||'')
+    .replace(/\{\{VEH_MODEL\}\}/g, p.get('model')||'')
+    .replace(/\{\{VEH_VIN\}\}/g, p.get('vin')||'')
+    .replace(/\{\{VEH_MILES\}\}/g, p.get('miles')||'')
     .replace(/\{\{VEH_COLOR\}\}/g, '')
     .replace(/\{\{VEH_PLATE\}\}/g, '')
-    // Financial calculations
-  const price = parseFloat(p.get('price')||0);
-  const down = parseFloat(p.get('down')||0);
-  const tax = parseFloat(p.get('tax')||0);
-  const dmv = parseFloat(p.get('dmv')||0);
-  const numPay = parseInt(p.get('numPay')||0);
-  const weekly = parseFloat(p.get('weekly')||0);
-  const freq = p.get('freq')||'weekly';
-  const ccoaFee = parseFloat(p.get('ccoaFee')||0);
-  const ccoaAccepted = p.get('ccoa') === 'yes';
-  
-  // CCOA restock fee
-  let restockFee = 0, netRestock = 0;
-  if(ccoaAccepted) {
-    restockFee = price <= 4999 ? 175 : price <= 9999 ? 350 : 500;
-    netRestock = restockFee - ccoaFee;
-  }
-  
-  const docFee = 70;
-  const totalCashPrice = price + docFee + tax + dmv + (ccoaAccepted ? ccoaFee : 0);
-  const amountFinanced = Math.max(0, price + docFee - down);
-  
-  // Finance charge proportional to duration
-  const daysPerPay = freq === 'monthly' ? 30.44 : freq === 'biweekly' ? 14 : 7;
-  const months = (numPay * daysPerPay) / 30.44;
-  const periods = months / 6;
-  const financeCharge = amountFinanced * 0.20 * periods;
-  const totalOfPayments = amountFinanced + financeCharge;
-  
-  const fmt = n => n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const freqLabel = freq==='monthly'?'Monthly / Mensual':freq==='biweekly'?'Bi-Weekly / Quincenal':'Weekly / Semanal';
-  
-  // 2 business days from contract date for CCOA expiry
-  const contDate = p.get('contractDate') ? new Date(p.get('contractDate')) : new Date();
-  let bizDays = 0, expiryDate = new Date(contDate);
-  while(bizDays < 2) { expiryDate.setDate(expiryDate.getDate()+1); if(expiryDate.getDay()!==0&&expiryDate.getDay()!==6) bizDays++; }
-  const expiryStr = expiryDate.toLocaleDateString('en-US')
     .replace(/\{\{VEHICLE_PRICE\}\}/g, fmt(price))
     .replace(/\{\{DOWN_PAYMENT\}\}/g, fmt(down))
-    .replace(/\{\{AMOUNT_FINANCED\}\}/g, fmt(amountFinanced))
-    .replace(/\{\{PAYMENT_AMOUNT\}\}/g, fmt(weekly||totalOfPayments/numPay))
+    .replace(/\{\{AMOUNT_FINANCED\}\}/g, fmt(baseFinanced))
+    .replace(/\{\{PAYMENT_AMOUNT\}\}/g, fmt(payAmt))
     .replace(/\{\{PAYMENT_FREQUENCY\}\}/g, freqLabel)
     .replace(/\{\{NUM_PAYMENTS\}\}/g, numPay||'')
     .replace(/\{\{FIRST_PAYMENT_DATE\}\}/g, p.get('startDate')||'')
     .replace(/\{\{LAST_PAYMENT_DATE\}\}/g, '')
     .replace(/\{\{TAX_RATE\}\}/g, tax>0?(tax/price*100).toFixed(2):'0')
     .replace(/\{\{SALES_TAX\}\}/g, fmt(tax))
-    .replace(/\{\{DMV_FEES\}\}/g, fmt(dmv))
-    .replace(/\{\{CANCELLATION_FEE\}\}/g, ccoaAccepted ? fmt(ccoaFee) : 'N/A')
+    .replace(/\{\{DMV_FEES\}\}/g, dmv>0?fmt(dmv):'____')
+    .replace(/\{\{CANCELLATION_FEE\}\}/g, ccoaYes?fmt(ccoaFee):'N/A')
     .replace(/\{\{TOTAL_CASH_PRICE\}\}/g, fmt(totalCashPrice))
     .replace(/\{\{FINANCE_CHARGE\}\}/g, fmt(financeCharge))
     .replace(/\{\{TOTAL_OF_PAYMENTS\}\}/g, fmt(totalOfPayments))
-    .replace(/\{\{CCOA_FEE\}\}/g, ccoaAccepted ? fmt(ccoaFee) : 'N/A')
-    .replace(/\{\{RESTOCK_FEE\}\}/g, ccoaAccepted ? fmt(restockFee) : 'N/A')
-    .replace(/\{\{NET_RESTOCK\}\}/g, ccoaAccepted ? fmt(netRestock) : 'N/A')
-    .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, ccoaAccepted ? expiryStr : 'N/A');
+    .replace(/\{\{CCOA_FEE\}\}/g, ccoaYes?fmt(ccoaFee):'N/A')
+    .replace(/\{\{RESTOCK_FEE\}\}/g, ccoaYes?fmt(restockFee):'N/A')
+    .replace(/\{\{NET_RESTOCK\}\}/g, ccoaYes?fmt(netRestock):'N/A')
+    .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, ccoaYes?expDate.toLocaleDateString('en-US'):'N/A');
 
-  // Make all field-line divs editable
-  document.querySelectorAll('.field-line').forEach(el => {
-    el.contentEditable = 'true';
-    el.style.outline = 'none';
-    el.style.borderBottom = '1px solid #666';
-    el.style.minHeight = '20px';
-    el.style.cursor = 'text';
+  // Mark CCOA checkbox
+  const acceptChk = document.getElementById('ccoa-accept-check');
+  const declineChk = document.getElementById('ccoa-decline-check');
+  if(acceptChk&&declineChk){
+    const chk = ccoaYes ? acceptChk : declineChk;
+    chk.innerHTML = '<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
+  }
+
+  // Make fields editable
+  document.querySelectorAll('.field-line').forEach(el=>{
+    el.contentEditable='true'; el.style.outline='none';
+    el.style.borderBottom='1px solid #999'; el.style.cursor='text';
   });
-  // Make tila values editable too
-  document.querySelectorAll('.tila-cell .value').forEach(el => {
-    el.contentEditable = 'true';
-    el.style.cursor = 'text';
-    el.style.outline = 'none';
+  document.querySelectorAll('.tila-cell .value').forEach(el=>{
+    el.contentEditable='true'; el.style.cursor='text'; el.style.outline='none';
   });
-  // Make payment-row values editable
-  document.querySelectorAll('.payment-row span:last-child').forEach(el => {
-    el.contentEditable = 'true';
-    el.style.cursor = 'text';
-    el.style.outline = 'none';
-    el.style.minWidth = '80px';
-    el.style.display = 'inline-block';
+  document.querySelectorAll('.payment-row span:last-child').forEach(el=>{
+    el.contentEditable='true'; el.style.cursor='text'; el.style.outline='none';
+    el.style.minWidth='60px'; el.style.display='inline-block';
   });
-  // Make CCOA checkboxes clickable to toggle
-  document.querySelectorAll('.opt-box').forEach(box => {
-    box.style.cursor = 'pointer';
-    box.onclick = function() {
-      document.querySelectorAll('.opt-box .checkbox').forEach(c => c.innerHTML = '');
-      this.querySelector('.checkbox').innerHTML = '<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
+  document.querySelectorAll('.opt-box').forEach(box=>{
+    box.style.cursor='pointer';
+    box.onclick=function(){
+      document.querySelectorAll('.opt-box .checkbox').forEach(c=>c.innerHTML='');
+      this.querySelector('.checkbox').innerHTML='<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
     };
   });
 
-  // Add action buttons
-  const actionBar = document.createElement('div');
-  actionBar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid #f0c040;padding:12px 20px;display:flex;gap:10px;justify-content:center;z-index:999;';
-  actionBar.innerHTML = `
-    <button onclick="saveContract()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">💾 GUARDAR / SAVE</button>
-    <button onclick="window.print()" style="background:transparent;color:#f0c040;border:2px solid #f0c040;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ IMPRIMIR / PRINT</button>
-    <button onclick="window.close()" style="background:transparent;color:#aaa;border:1px solid #444;border-radius:8px;padding:12px 20px;font-size:14px;cursor:pointer;">✕ CERRAR</button>
-  `;
-  document.body.appendChild(actionBar);
-  document.body.style.paddingBottom = '80px';
+  // Action bar
+  const bar=document.createElement('div');
+  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid #f0c040;padding:12px;display:flex;gap:10px;justify-content:center;z-index:9999;';
+  bar.innerHTML='<button onclick="saveContract()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">💾 GUARDAR</button>'
+    +'<button onclick="window.print()" style="background:transparent;color:#f0c040;border:2px solid #f0c040;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ IMPRIMIR</button>'
+    +'<button onclick="window.close()" style="background:transparent;color:#aaa;border:1px solid #444;border-radius:8px;padding:12px 16px;font-size:14px;cursor:pointer;">✕ CERRAR</button>';
+  document.body.appendChild(bar);
+  document.body.style.paddingBottom='80px';
 })();
 
-async function saveContract() {
-  const clientId = new URLSearchParams(window.location.search).get('clientId');
-  if(!clientId){ 
-    alert('Para guardar, genera el contrato desde la tarjeta del cliente (botón 📄), no desde el formulario.');
-    return; 
-  }
-  
-  // Collect all editable field values
-  const fields = {};
-  document.querySelectorAll('.field-line').forEach((el, i) => {
-    fields['field_'+i] = el.textContent.trim();
-  });
-  
-  // Save to Firebase
-  try {
-    const {initializeApp, getApps} = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
-    const {getFirestore, doc, setDoc, getDoc} = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-    
-    const firebaseConfig = {
-      apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
-      authDomain: "legacy-motors-garage.firebaseapp.com",
-      projectId: "legacy-motors-garage",
-      storageBucket: "legacy-motors-garage.firebasestorage.app",
-      messagingSenderId: "783567672493",
-      appId: "1:783567672493:web:3a825f2f59ec1c25e9a224"
-    };
-    
-    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    
-    // Get existing client data
-    const clientRef = doc(db, 'clients', clientId);
-    const clientSnap = await getDoc(clientRef);
-    const existing = clientSnap.exists() ? clientSnap.data() : {};
-    
-    // Save contract data
-    await setDoc(clientRef, {
-      ...existing,
-      contract: {
-        fields,
-        savedAt: new Date().toISOString(),
-        url: window.location.search
-      }
-    });
-    
-    alert('✅ Contrato guardado en el perfil del cliente');
-  } catch(e) {
-    alert('Error guardando: ' + e.message);
-  }
+async function saveContract(){
+  const clientId=new URLSearchParams(window.location.search).get('clientId');
+  if(!clientId){alert('Genera el contrato desde la tarjeta del cliente (botón 📄) para poder guardarlo.');return;}
+  try{
+    const {initializeApp,getApps}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+    const {getFirestore,doc,setDoc,getDoc}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const cfg={apiKey:"AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",authDomain:"legacy-motors-garage.firebaseapp.com",projectId:"legacy-motors-garage",storageBucket:"legacy-motors-garage.firebasestorage.app",messagingSenderId:"783567672493",appId:"1:783567672493:web:3a825f2f59ec1c25e9a224"};
+    const app=getApps().length?getApps()[0]:initializeApp(cfg);
+    const db=getFirestore(app);
+    const snap=await getDoc(doc(db,'clients',clientId));
+    const existing=snap.exists()?snap.data():{};
+    await setDoc(doc(db,'clients',clientId),{...existing,contract:{params:window.location.search,savedAt:new Date().toISOString()}});
+    alert('✅ Contrato guardado');
+  }catch(e){alert('Error: '+e.message);}
 }
 </script>
 </body>
