@@ -1008,10 +1008,11 @@ window.saveClient=async function(){
   const idPhotoFile = document.getElementById('f-id-photo')?.files[0];
   if(idPhotoFile){
     try {
-      const st = getStorage();
-      const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_'+idPhotoFile.name);
-      await uploadBytes(idRef, idPhotoFile);
-      idPhotoURL = await getDownloadURL(idRef);
+      const {getStorage:gs2, ref:ref2, uploadBytes:ub2, getDownloadURL:gdl2} = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js');
+      const st = gs2();
+      const idRef = ref2(st, 'ids/'+id+'/'+Date.now()+'_'+idPhotoFile.name);
+      await ub2(idRef, idPhotoFile);
+      idPhotoURL = await gdl2(idRef);
     } catch(storErr){ console.log('ID photo skipped:', storErr); }
   }
 
@@ -1064,9 +1065,11 @@ window.saveClient=async function(){
   };
 
   try{
+    console.log('Saving client data:', JSON.stringify(data).slice(0,200));
     await setDoc(doc(db,'clients',id),data);
+    console.log('Saved successfully!');
     closeModal('add-modal');
-  }catch(e){alert('Error guardando: '+e.message);}
+  }catch(e){console.error('Save error:',e);alert('Error guardando: '+e.message);}
   btn.textContent='GUARDAR';btn.disabled=false;
 };
 
@@ -1601,7 +1604,11 @@ window.generateContract = function(clientId) {
   const params = new URLSearchParams({
     name: c.name || '',
     phone: c.phone || '',
-    address: '',
+    dob: c.dob || '',
+    address: c.address || '',
+    city: c.city || '',
+    state: c.state || '',
+    zip: c.zip || '',
     year: c.year || '',
     make: c.make || '',
     model: c.model || '',
@@ -1617,11 +1624,7 @@ window.generateContract = function(clientId) {
     invNum: c.vehicleInventoryNum || '',
     idType: c.idType || '',
     idNumber: c.idNumber || '',
-    dob: c.dob || '',
-    address: c.address || '',
-    city: c.city || '',
-    state: c.state || '',
-    zip: c.zip || '',
+    idState: c.idState || '',
     idExpiry: c.idExpiry || '',
     ccoa: c.ccoaAccepted ? 'yes' : 'no',
     ccoaFee: c.ccoaFee || 0,
