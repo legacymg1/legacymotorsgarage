@@ -1008,11 +1008,10 @@ window.saveClient=async function(){
   const idPhotoFile = document.getElementById('f-id-photo')?.files[0];
   if(idPhotoFile){
     try {
-      const {getStorage:gs2, ref:ref2, uploadBytes:ub2, getDownloadURL:gdl2} = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js');
-      const st = gs2();
-      const idRef = ref2(st, 'ids/'+id+'/'+Date.now()+'_'+idPhotoFile.name);
-      await ub2(idRef, idPhotoFile);
-      idPhotoURL = await gdl2(idRef);
+      const st = getStorage();
+      const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_'+idPhotoFile.name);
+      await uploadBytes(idRef, idPhotoFile);
+      idPhotoURL = await getDownloadURL(idRef);
     } catch(storErr){ console.log('ID photo skipped:', storErr); }
   }
 
