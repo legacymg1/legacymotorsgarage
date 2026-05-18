@@ -1618,6 +1618,8 @@ window.generateContractFromForm = function() {
     state: document.getElementById('f-state')?.value.trim() || '',
     zip: document.getElementById('f-zip')?.value.trim() || '',
     dob: document.getElementById('f-dob')?.value || '',
+    tax: document.getElementById('f-tax')?.value || 0,
+    dmv: document.getElementById('f-dmv')?.value || 0,
   });
   // Open English contract
   window.open('contracts.html?' + params.toString(), '_blank');
