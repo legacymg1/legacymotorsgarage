@@ -806,10 +806,10 @@ window.renderAll = function() {
         <div style="font-size:13px;color:var(--cream2);font-weight:500;">${formatMoney(c.weekly)}</div>
         <div class="cli-balance">${formatMoney(balance)}</div>
         <div class="cli-actions">
-          <button class="cli-btn" style="background:var(--green);color:#000;" onclick="openPayModal('${c.id}')">💵</button>
-          <button class="cli-btn" style="background:#2196F3;color:#fff;" onclick="openWhatsApp('${c.id}','${status}')">💬</button>
-          <button class="cli-btn" onclick="openEditModal('${c.id}')">✏️</button>
-          <button class="cli-btn" onclick="deleteClient('${c.id}')" style="color:var(--red);">🗑</button>
+          <button class="cli-btn" style="background:var(--green);color:#000;" onclick="event.stopPropagation();openPayModal('${c.id}')">💵</button>
+          <button class="cli-btn" style="background:#2196F3;color:#fff;" onclick="event.stopPropagation();openWhatsApp('${c.id}','${status}')">💬</button>
+          <button class="cli-btn" onclick="event.stopPropagation();openEditModal('${c.id}')">✏️</button>
+          <button class="cli-btn" onclick="event.stopPropagation();deleteClient('${c.id}')" style="color:var(--red);">🗑</button>
         </div>
       </div>`;
     });
@@ -903,12 +903,12 @@ window.renderAll = function() {
           ${c.notes?'<div style="margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;">'+c.notes+'</div>':''}
         </div>
         <div class="card-actions">
-          <button class="btn btn-pay" onclick="openPayModal('${c.id}')">💵 Pago</button>
-          <button class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" onclick="openWhatsApp('${c.id}','${status}')">💬 SMS</button>
-          ${(!c.insurance||c.insuranceExp<today())?'<button class="btn" data-cid="'+c.id+'" onclick="openInsuranceSMS(this.dataset.cid)" style="flex:0;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>':''}
-          <button class="btn btn-edit" style="flex:0;padding:9px 10px;" onclick="openEditModal('${c.id}')">✏️</button>
-          <button class="btn" style="flex:0;padding:9px 10px;background:var(--gold3);color:var(--navy3);" onclick="generateContract('${c.id}')" title="Generar Contrato">📄</button>
-          <button class="btn btn-delete" style="flex:0;padding:9px 10px;" onclick="deleteClient('${c.id}')">🗑</button>
+          <button class="btn btn-pay" onclick="event.stopPropagation();openPayModal('${c.id}')">💵 Pago</button>
+          <button class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" onclick="event.stopPropagation();openWhatsApp('${c.id}','${status}')">💬 SMS</button>
+          ${(!c.insurance||c.insuranceExp<today())?'<button class="btn" data-cid="'+c.id+'" onclick="event.stopPropagation();openInsuranceSMS(this.dataset.cid)" style="flex:0;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>':''}
+          <button class="btn btn-edit" style="flex:0;padding:9px 10px;" onclick="event.stopPropagation();openEditModal('${c.id}')">✏️</button>
+          <button class="btn" style="flex:0;padding:9px 10px;background:var(--gold3);color:var(--navy3);" onclick="event.stopPropagation();generateContract('${c.id}')" title="Generar Contrato">📄</button>
+          <button class="btn btn-delete" style="flex:0;padding:9px 10px;" onclick="event.stopPropagation();deleteClient('${c.id}')">🗑</button>
         </div>
       </div>`;
     });
@@ -984,7 +984,13 @@ window.openEditModal=function(id){
   document.getElementById('f-notes').value=c.notes||'';
   // Personal info
   const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
-  set('f-dob',c.dob);
+  // Date inputs need special handling
+  const setDate=(id,val)=>{const el=document.getElementById(id);if(el&&val){el.value=val;el.setAttribute('value',val);}};
+  setDate('f-dob', c.dob);
+  setDate('f-contractdate', c.contractDate);
+  setDate('f-startdate', c.startDate||today());
+  setDate('f-id-expiry', c.idExpiry);
+  setDate('f-insurance-exp', c.insuranceExp);
   set('f-address',c.address);
   set('f-city',c.city);
   set('f-state',c.state);
@@ -998,7 +1004,6 @@ window.openEditModal=function(id){
   set('f-tax',c.salesTax);
   set('f-dmv',c.dmvFees);
   set('f-inventory-num',c.vehicleInventoryNum);
-  set('f-contractdate',c.contractDate);
   set('f-miles',c.miles);
   // Settings
   set('f-lang',c.lang||'es');
@@ -1033,7 +1038,7 @@ window.saveClient=async function(){
 
   const freq=document.getElementById('f-freq')?document.getElementById('f-freq').value:'weekly';
   const lang=document.getElementById('f-lang')?document.getElementById('f-lang').value:'es';
-  const contractDate=document.getElementById('f-contractdate')?document.getElementById('f-contractdate').value:'';
+  const contractDate=document.getElementById('f-contractdate')?.value || existing.contractDate || '';
 
   // ID photo
   let idPhotoURL = existing.idPhotoURL||'';
@@ -1106,8 +1111,18 @@ window.saveClient=async function(){
 
 window.deleteClient=async function(id){
   const c=clients.find(x=>x.id===id);
+  if(!c) return;
   if(confirm(`¿Eliminar a ${c.name}?`)){
-    try{await deleteDoc(doc(db,'clients',id));}catch(e){alert('Error: '+e.message);}
+    try{
+      await deleteDoc(doc(db,'clients',id));
+      // Restore inventory car to available
+      if(c.vehicleInventoryNum){
+        const invSnap = await getDocs(query(collection(db,'inventory'),where('inventoryNum','==',c.vehicleInventoryNum)));
+        if(!invSnap.empty){
+          await setDoc(doc(db,'inventory',invSnap.docs[0].id),{...invSnap.docs[0].data(),status:'available'});
+        }
+      }
+    }catch(e){alert('Error: '+e.message);}
   }
 };
 
