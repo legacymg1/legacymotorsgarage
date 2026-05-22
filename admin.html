@@ -806,8 +806,8 @@ window.renderAll = function() {
         <div style="font-size:13px;color:var(--cream2);font-weight:500;">${formatMoney(c.weekly)}</div>
         <div class="cli-balance">${formatMoney(balance)}</div>
         <div class="cli-actions">
-          <button class="cli-btn" style="background:var(--green);color:#000;" onclick="event.stopPropagation();event.preventDefault();setTimeout(()=>openPayModal('${c.id}'),10)">💵</button>
-          <button class="cli-btn" style="background:#2196F3;color:#fff;" onclick="event.stopPropagation();event.preventDefault();setTimeout(()=>openWhatsApp('${c.id}','${status}'),10)">💬</button>
+          <button class="cli-btn" style="background:var(--green);color:#000;" onclick="console.log('PAY CLICK','${c.id}');event.stopPropagation();event.preventDefault();setTimeout(()=>openPayModal('${c.id}'),10)">💵</button>
+          <button class="cli-btn" style="background:#2196F3;color:#fff;" onclick="console.log('SMS CLICK','${c.id}');event.stopPropagation();event.preventDefault();setTimeout(()=>openWhatsApp('${c.id}','${status}'),10)">💬</button>
           <button class="cli-btn" onclick="event.stopPropagation();openEditModal('${c.id}')">✏️</button>
           <button class="cli-btn" onclick="event.stopPropagation();deleteClient('${c.id}')" style="color:var(--red);">🗑</button>
         </div>
@@ -903,8 +903,8 @@ window.renderAll = function() {
           ${c.notes?'<div style="margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;">'+c.notes+'</div>':''}
         </div>
         <div class="card-actions">
-          <button class="btn btn-pay" onclick="event.stopPropagation();event.preventDefault();setTimeout(()=>openPayModal('${c.id}'),10)">💵 Pago</button>
-          <button class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" onclick="event.stopPropagation();event.preventDefault();setTimeout(()=>openWhatsApp('${c.id}','${status}'),10)">💬 SMS</button>
+          <button class="btn btn-pay" onclick="console.log('PAY CLICK','${c.id}');event.stopPropagation();event.preventDefault();setTimeout(()=>openPayModal('${c.id}'),10)">💵 Pago</button>
+          <button class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" onclick="console.log('SMS CLICK','${c.id}');event.stopPropagation();event.preventDefault();setTimeout(()=>openWhatsApp('${c.id}','${status}'),10)">💬 SMS</button>
           ${(!c.insurance||c.insuranceExp<today())?'<button class="btn" data-cid="'+c.id+'" onclick="event.stopPropagation();openInsuranceSMS(this.dataset.cid)" style="flex:0;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>':''}
           <button class="btn btn-edit" style="flex:0;padding:9px 10px;" onclick="event.stopPropagation();openEditModal('${c.id}')">✏️</button>
           <button class="btn" style="flex:0;padding:9px 10px;background:var(--gold3);color:var(--navy3);" onclick="event.stopPropagation();generateContract('${c.id}')" title="Generar Contrato">📄</button>
@@ -1128,6 +1128,7 @@ window.deleteClient=async function(id){
 
 // ---- PAYMENTS ----
 window.openPayModal=function(id){
+  console.log("openPayModal called:", id);
   payingId=id;
   const c=clients.find(x=>x.id===id);
   const nextPay=getNextPayDate(c);
@@ -1322,6 +1323,7 @@ window.openInsuranceSMS=function(id){
 };
 
 window.openWhatsApp=function(id,status){
+  console.log("openWhatsApp called:", id, status);
   const c=clients.find(x=>x.id===id);
   if(!c) return;
   waPhone=c.phone.replace(/\D/g,'');
@@ -1694,6 +1696,10 @@ window.closeModal=function(id){document.getElementById(id).classList.remove('act
 document.querySelectorAll('.modal-overlay').forEach(el=>{
   el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});
 });
+// DEBUG - remove after fix
+document.addEventListener('click', function(e){
+  console.log('CLICK TARGET:', e.target.tagName, e.target.className, e.target.id, e.target.textContent.slice(0,20));
+}, true); // capture phase
 </script>
 </body>
 </html>
