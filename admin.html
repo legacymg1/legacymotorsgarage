@@ -198,6 +198,10 @@
     <div class="login-title">Panel Administrativo</div>
     <label class="login-label">Contraseña</label>
     <input class="login-input" type="password" id="admin-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')adminLogin()">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;text-align:left;">
+      <input type="checkbox" id="remember-me" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;">
+      <label for="remember-me" style="font-size:12px;color:var(--muted);cursor:pointer;user-select:none;">Mantenerme conectado</label>
+    </div>
     <button class="login-btn" onclick="adminLogin()">ENTRAR</button>
     <div class="login-error" id="login-error"></div>
   </div>
@@ -387,11 +391,12 @@
       <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="calcFinancing('numpay')"><div class="form-hint" id="f-hint" style="cursor:pointer;text-decoration:underline;" onclick="calcHint()">Toca para calcular fechas</div></div>
     </div>
     <div class="form-group">
-      <label class="form-label">Frecuencia de Pago</label>
-      <select class="form-input" id="f-freq" onchange="calcFinancing('freq')" oninput="calcFinancing('freq')">
-        <option value="weekly">Semanal (cada 7 días)</option>
-        <option value="biweekly">Quincenal (cada 14 días)</option>
-        <option value="monthly">Mensual (mismo día cada mes)</option>
+      <label class="form-label">Tipo de Venta</label>
+      <select class="form-input" id="f-freq" onchange="toggleCashSale();calcFinancing('freq')" oninput="calcFinancing('freq')">
+        <option value="weekly">A Plazos — Semanal (cada 7 días)</option>
+        <option value="biweekly">A Plazos — Quincenal (cada 14 días)</option>
+        <option value="monthly">A Plazos — Mensual (mismo día cada mes)</option>
+        <option value="cash">💵 VENTA EN UNA SOLA EXHIBICIÓN (Contado)</option>
       </select>
     </div>
     <div class="form-row">
@@ -470,10 +475,13 @@ const db = getFirestore(app);
 
 // ---- ADMIN AUTH (simple password) ----
 const ADMIN_PASS = "lmg2025admin"; // ← Cambia esta contraseña
+const ADMIN_SESSION_KEY = 'lmg_admin_session';
 
 window.adminLogin = function() {
   const pass = document.getElementById('admin-pass').value;
   if (pass === ADMIN_PASS) {
+    const remember = document.getElementById('remember-me')?.checked;
+    if(remember) localStorage.setItem(ADMIN_SESSION_KEY, '1');
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     startListening();
@@ -483,16 +491,26 @@ window.adminLogin = function() {
 };
 
 window.adminLogout = function() {
+  localStorage.removeItem(ADMIN_SESSION_KEY);
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('admin-pass').value = '';
 };
 
+// Auto-login if session saved
+(function checkSession(){
+  if(localStorage.getItem(ADMIN_SESSION_KEY)==='1'){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    startListening();
+  }
+})();
+
 // ---- HELPERS ----
 let clients = [];
 let editingId = null, payingId = null, waPhone = null;
 let currentView = 'grid';
-let currentSort = 'status'; // 'status', 'date', 'name', 'balance'
+let currentSort = 'next'; // 'next', 'status', 'date', 'name', 'balance'
 
 window.setSort = function(s) {
   currentSort = s;
@@ -1319,7 +1337,9 @@ window.openInsuranceSMS=function(id){
     msg=`Hola ${nombre}! 🛡️ Le saluda Legacy Motors Garage LLC.\n\nNos importa mucho su seguridad y bienestar en el camino. Notamos que el seguro de su ${carro}${c.insurance?' (Póliza: '+c.insurance+')':''} está vencido o no tenemos registro en su archivo.\n\nQueremos asegurarnos de que siempre esté protegido/a. Por favor actualice su información de seguro y envíenos copia de su tarjeta de seguro a la brevedad.\n\n¡Estamos aquí para ayudarle! 😊\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
   const phone=c.phone.replace(/\D/g,'');
-  window.location.href=`sms:${phone}?body=${encodeURIComponent(msg)}`;
+  const smsLink=`sms:${phone}?body=${encodeURIComponent(msg)}`;
+  // Use <a> click instead of location.href so we don't navigate away
+  const a=document.createElement('a'); a.href=smsLink; a.click();
 };
 
 window.openWhatsApp=function(id,status){
@@ -1367,7 +1387,7 @@ window.openWhatsApp=function(id,status){
 
 window.sendWhatsApp=function(){
   const msg=document.getElementById('wa-text').value;
-  window.location.href = `sms:${waPhone}?body=${encodeURIComponent(msg)}`;
+  const _a1=document.createElement('a');_a1.href=`sms:${waPhone}?body=${encodeURIComponent(msg)}`;_a1.click();
   closeModal('wa-modal');
 };
 
@@ -1384,6 +1404,35 @@ function getBirthdayClients() {
   });
 }
 
+// Service reminder: contractDate exactly 3, 6, 9, 12 months ago (±1 day window)
+function getServiceReminderClients() {
+  const todayD = new Date(today()+'T12:00:00');
+  return clients.filter(c => {
+    if(!c.contractDate) return false;
+    const start = new Date(c.contractDate+'T12:00:00');
+    const diffDays = Math.round((todayD - start)/86400000);
+    // Check every 90-day interval (3mo, 6mo, 9mo, 12mo...)
+    return diffDays > 0 && diffDays % 90 === 0;
+  });
+}
+
+window.sendServiceMsg = function(id) {
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  const lang = c.lang || 'es';
+  const nombre = c.name.split(' ')[0];
+  const carro = `${c.year} ${c.make} ${c.model}`;
+  const months = c.contractDate ? Math.round((new Date(today()+'T12:00:00') - new Date(c.contractDate+'T12:00:00')) / (86400000*30)) : 3;
+  let msg;
+  if(lang === 'en'){
+    msg = `Hi ${nombre}! 🚗🔧 Legacy Motors Garage LLC here.\n\nIt's been ${months} months since you got your ${carro} — time for a quick check-up!\n\nAs our valued customer, we're happy to offer you a FREE general inspection. Come by and let us make sure everything is running perfectly for you.\n\n📍 Visit us anytime — no appointment needed!\n📞 (559) 540-5145\n\nWe appreciate your trust! 😊\n— Legacy Motors Garage LLC`;
+  } else {
+    msg = `Hola ${nombre}! 🚗🔧 Le saluda Legacy Motors Garage LLC.\n\nYa han pasado ${months} meses desde que se llevó su ${carro} — ¡es tiempo de un chequeo rápido!\n\nComo cliente valioso, le ofrecemos una REVISIÓN GENERAL GRATUITA. Pase a vernos y con gusto revisamos que todo esté en perfectas condiciones.\n\n📍 ¡Visítenos cuando guste, sin cita!\n📞 (559) 540-5145\n\n¡Gracias por su confianza! 😊\n— Legacy Motors Garage LLC`;
+  }
+  const phone = c.phone.replace(/\D/g,'');
+  const a = document.createElement('a'); a.href = `sms:${phone}?body=${encodeURIComponent(msg)}`; a.click();
+};
+
 window.sendBirthdayMsg = function(id) {
   const c = clients.find(x => x.id === id);
   if(!c) return;
@@ -1395,7 +1444,24 @@ window.sendBirthdayMsg = function(id) {
     msg = `¡Feliz Cumpleaños ${c.name.split(' ')[0]}! 🎂🎉\n\nTodo el equipo de Legacy Motors Garage LLC le desea un maravilloso día lleno de alegría y felicidad.\n\n¡Gracias por su confianza — es un placer servirle! 🚗✨\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
   const phone = c.phone.replace(/\D/g,'');
-  window.location.href = `sms:${phone}?body=${encodeURIComponent(msg)}`;
+  const _a2=document.createElement('a');_a2.href=`sms:${phone}?body=${encodeURIComponent(msg)}`;_a2.click();
+};
+
+// Send individual friendly payment-day reminder to a single client
+window.sendFriendlyTodayMsg = function(id) {
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  const lang = c.lang || 'es';
+  const nombre = c.name.split(' ')[0];
+  const carro = `${c.year} ${c.make} ${c.model}`;
+  let msg;
+  if(lang === 'en'){
+    msg = `Hi ${nombre}! 😊 Legacy Motors Garage LLC here.\n\nFriendly reminder that today is your payment day! Your payment of ${formatMoney(c.weekly)} for your ${carro} is due today.\n\nRemaining balance: ${formatMoney(calcBalance(c))}\n\nThank you so much for your reliability! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+  } else {
+    msg = `Hola ${nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que hoy es su día de pago de ${formatMoney(c.weekly)} por su ${carro}.\n\nSaldo restante: ${formatMoney(calcBalance(c))}\n\n¡Gracias por su puntualidad, lo apreciamos mucho! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+  }
+  const phone = c.phone.replace(/\D/g,'');
+  const a = document.createElement('a'); a.href = `sms:${phone}?body=${encodeURIComponent(msg)}`; a.click();
 };
 
 function renderTodayBox() {
@@ -1409,16 +1475,34 @@ function renderTodayBox() {
   const box = document.getElementById('today-box');
   const list = document.getElementById('today-list');
 
-  if (!todayClients.length && !overdueClients.length) {
+  // Check birthdays
+  const bdayClients = getBirthdayClients();
+  // Check service reminders (every 3 months from contract date)
+  const serviceClients = getServiceReminderClients();
+  
+  if (!todayClients.length && !overdueClients.length && !bdayClients.length && !serviceClients.length) {
     box.style.display = 'none';
     return;
   }
 
-  // Check birthdays
-  const bdayClients = getBirthdayClients();
-  
   box.style.display = 'block';
   let html = '';
+  
+  if(serviceClients.length) {
+    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#00bcd4;margin-bottom:10px;">🔧 RECORDATORIO DE SERVICIO</div>`;
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">';
+    serviceClients.forEach(c => {
+      const months = Math.round((new Date(today()+'T12:00:00') - new Date(c.contractDate+'T12:00:00')) / (86400000*30));
+      html += `<div style="background:rgba(0,188,212,0.08);border:1px solid rgba(0,188,212,0.3);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:600;font-size:15px;">${c.name}</div>
+          <div style="font-size:12px;color:#00bcd4;margin-top:2px;">🔧 ${months} meses · ${c.year} ${c.make} ${c.model}</div>
+        </div>
+        <button onclick="sendServiceMsg('${c.id}')" style="background:#00bcd4;color:#000;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">💬 Servicio</button>
+      </div>`;
+    });
+    html += '</div>';
+  }
   
   if(bdayClients.length) {
     html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#ff9500;margin-bottom:10px;">🎂 CUMPLEAÑOS HOY</div>`;
@@ -1445,9 +1529,10 @@ function renderTodayBox() {
           <div style="font-weight:600;font-size:15px;">${c.name}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px;">${c.year} ${c.make} ${c.model}</div>
         </div>
-        <div style="text-align:right;">
+        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
           <div style="font-family:var(--font-display);font-size:20px;color:var(--green);">${formatMoney(c.weekly)}</div>
           <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">${c.freq==='monthly'?'Mensual':c.freq==='biweekly'?'Quincenal':'Semanal'}</div>
+          <button onclick="sendFriendlyTodayMsg('${c.id}')" style="background:var(--green);color:#000;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">💬 SMS</button>
         </div>
       </div>`;
     });
@@ -1515,7 +1600,7 @@ window.sendDayMessages = function() {
       return;
     }
     const { phone, msg } = allMessages[i];
-    window.location.href = `sms:${phone}?body=${encodeURIComponent(msg)}`;
+    const _a2=document.createElement('a');_a2.href=`sms:${phone}?body=${encodeURIComponent(msg)}`;_a2.click();
     i++;
     setTimeout(sendNext, 1500);
   }
@@ -1608,9 +1693,19 @@ window.deletePayment=async function(clientId, idx){
   }catch(e){alert('Error: '+e.message);}
 };
 
+// Toggle cash-sale UI
+window.toggleCashSale = function() {
+  const freq = document.getElementById('f-freq').value;
+  const payFields = document.getElementById('pay-fields-section');
+  if(payFields) payFields.style.display = freq === 'cash' ? 'none' : '';
+};
+
 window.generateContractFromForm = function() {
   const name = document.getElementById('f-name').value.trim();
   if(!name){ alert('Por favor ingresa el nombre del cliente primero'); return; }
+  const freq = document.getElementById('f-freq')?.value || 'weekly';
+  // Get client lang for Spanish civil code compliance
+  const clientLang = document.getElementById('f-lang')?.value || 'es';
   const params = new URLSearchParams({
     name: name,
     phone: document.getElementById('f-phone')?.value.trim() || '',
@@ -1622,7 +1717,7 @@ window.generateContractFromForm = function() {
     price: document.getElementById('f-total')?.value || '',
     down: document.getElementById('f-down')?.value || '',
     weekly: document.getElementById('f-weekly')?.value || '',
-    freq: document.getElementById('f-freq')?.value || 'weekly',
+    freq: freq,
     numPay: document.getElementById('f-numpay')?.value || '',
     startDate: document.getElementById('f-startdate')?.value || '',
     contractDate: document.getElementById('f-contractdate')?.value || '',
@@ -1639,11 +1734,18 @@ window.generateContractFromForm = function() {
     dmv: document.getElementById('f-dmv')?.value || 0,
     clientId: editingId || '',
   });
-  // Open English contract
-  window.open('contracts.html?' + params.toString(), '_blank');
-  // If Spanish client, also open Spanish contract (required by CA Civil Code §1632)
-  if(c.lang === 'es') {
-    setTimeout(() => window.open('contracts_es.html?' + params.toString(), '_blank'), 500);
+  if(freq === 'cash') {
+    // Cash / single-payment sale contract
+    window.open('contracts_cash.html?' + params.toString(), '_blank');
+    if(clientLang === 'es') {
+      setTimeout(() => window.open('contracts_cash_es.html?' + params.toString(), '_blank'), 500);
+    }
+  } else {
+    // Installment contract
+    window.open('contracts.html?' + params.toString(), '_blank');
+    if(clientLang === 'es') {
+      setTimeout(() => window.open('contracts_es.html?' + params.toString(), '_blank'), 500);
+    }
   }
 };
 
@@ -1684,11 +1786,16 @@ window.generateContract = function(clientId) {
     clientId: c.id
   });
   
-  // Open English contract
-  window.open('contracts.html?' + params.toString(), '_blank');
-  // If Spanish client, also open Spanish contract (required by CA Civil Code §1632)
-  if(c.lang === 'es') {
-    setTimeout(() => window.open('contracts_es.html?' + params.toString(), '_blank'), 500);
+  if(c.freq === 'cash') {
+    window.open('contracts_cash.html?' + params.toString(), '_blank');
+    if(c.lang === 'es') {
+      setTimeout(() => window.open('contracts_cash_es.html?' + params.toString(), '_blank'), 500);
+    }
+  } else {
+    window.open('contracts.html?' + params.toString(), '_blank');
+    if(c.lang === 'es') {
+      setTimeout(() => window.open('contracts_es.html?' + params.toString(), '_blank'), 500);
+    }
   }
 };
 
@@ -1696,10 +1803,7 @@ window.closeModal=function(id){document.getElementById(id).classList.remove('act
 document.querySelectorAll('.modal-overlay').forEach(el=>{
   el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});
 });
-// DEBUG - remove after fix
-document.addEventListener('click', function(e){
-  console.log('CLICK TARGET:', e.target.tagName, e.target.className, e.target.id, e.target.textContent.slice(0,20));
-}, true); // capture phase
+// v3.4 - debug listener removed
 </script>
 </body>
 </html>
