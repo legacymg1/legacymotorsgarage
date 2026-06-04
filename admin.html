@@ -556,9 +556,22 @@ function generateSchedule(startDate, num, freq) {
   return s;
 }
 function getPaidDates(c) { return new Set((c.payments||[]).map(p=>p.schedDate).filter(Boolean)); }
-function getNextPayDate(c) { const s=c.schedule||[]; const pd=getPaidDates(c); for(const d of s){if(!pd.has(d))return d;} return s[s.length-1]||null; }
 function getPaidCount(c) { return (c.payments||[]).filter(p=>p.schedDate).length; }
+function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0); }
+function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
+function isPaidOff(c) {
+  const totalPay = c.numPay || (c.schedule||[]).length || 0;
+  return calcBalance(c) <= 0 || (totalPay > 0 && getPaidCount(c) >= totalPay);
+}
+function getNextPayDate(c) {
+  if (isPaidOff(c)) return null;
+  const s=c.schedule||[];
+  const pd=getPaidDates(c);
+  for(const d of s){if(!pd.has(d))return d;}
+  return null;
+}
 function getStatus(c) {
+  if (isPaidOff(c)) return 'paidoff';
   const n=getNextPayDate(c);
   if(!n) return 'ok';
   const d=daysUntil(n);
@@ -569,8 +582,6 @@ function getStatus(c) {
   if(d<=soonDays) return 'soon';
   return 'ok';
 }
-function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0); }
-function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
 function calcProgress(c) { const t=Number(c.total); if(!t) return 0; return Math.min(100,Math.round(calcPaid(c)/t*100)); }
 
 window.calcCCOA = function() {
@@ -873,7 +884,7 @@ window.renderAll = function() {
       const progress=calcProgress(c);
       const balance=calcBalance(c);
 
-      const badge=status==='overdue'?`<span class="status-badge badge-overdue">VENCIDO</span>`:status==='soon'?`<span class="status-badge badge-soon">${c.freq==='monthly'?'PRÓXIMO PAGO':c.freq==='biweekly'?'PRÓXIMO PAGO':'ESTA SEMANA'}</span>`:`<span class="status-badge badge-ok">AL CORRIENTE</span>`;
+      const badge=status==='paidoff'?`<span class="status-badge badge-ok">PAGADO</span>`:status==='overdue'?`<span class="status-badge badge-overdue">VENCIDO</span>`:status==='soon'?`<span class="status-badge badge-soon">${c.freq==='monthly'?'PRÓXIMO PAGO':c.freq==='biweekly'?'PRÓXIMO PAGO':'ESTA SEMANA'}</span>`:`<span class="status-badge badge-ok">AL CORRIENTE</span>`;
       const dayLabel=days<0?` (${Math.abs(days)}d vencido)`:days===0?' (HOY)':days<=7?` (${days}d)`:'';
       const payColor=status==='overdue'?'var(--red)':status==='soon'?'var(--yellow)':'var(--green)';
 
@@ -912,7 +923,7 @@ window.renderAll = function() {
           ${c.vehicleInventoryNum ? '<div style="font-size:11px;color:var(--gold);margin-bottom:8px;">🔑 Inventario #'+c.vehicleInventoryNum+'</div>' : ''}
           ${c.idNumber ? '<div style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 ID ✓</div>' : '<div style="font-size:11px;background:rgba(255,59,59,0.1);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 Sin ID</div>'}
           <div class="payment-row"><span class="pay-label">${c.freq==='monthly'?'Pago mensual':c.freq==='biweekly'?'Pago quincenal':'Pago semanal'}</span><span class="pay-value">${formatMoney(c.weekly)}</span></div>
-          <div class="payment-row"><span class="pay-label">Próximo pago</span><span class="pay-value" style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</span></div>
+          <div class="payment-row"><span class="pay-label">Próximo pago</span><span class="pay-value" style="color:${payColor}">${status==='paidoff'?'Auto pagado':formatDate(nextPay)+dayLabel}</span></div>
           <div class="payment-row"><span class="pay-label">Pagos</span><span class="pay-value">${paidCount} de ${totalPay}</span></div>
           <div class="payment-row"><span class="pay-label">Saldo</span><span class="pay-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
           <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
