@@ -1745,18 +1745,16 @@ window.generateContractFromForm = function() {
     dmv: document.getElementById('f-dmv')?.value || 0,
     clientId: editingId || '',
   });
-  if(freq === 'cash') {
-    // Cash / single-payment sale contract
-    window.open('contracts_cash.html?' + params.toString(), '_blank');
-    if(clientLang === 'es') {
-      setTimeout(() => window.open('contracts_cash_es.html?' + params.toString(), '_blank'), 500);
-    }
-  } else {
-    // Installment contract
-    window.open('contracts.html?' + params.toString(), '_blank');
-    if(clientLang === 'es') {
-      setTimeout(() => window.open('contracts_es.html?' + params.toString(), '_blank'), 500);
-    }
+  // Open the English (legally-binding) contract, plus the Spanish translation
+  // when the client's language is Spanish (CA Civil Code §1632). Both windows are
+  // opened directly inside this click so the popup blocker doesn't block the 2nd.
+  const enFile = freq === 'cash' ? 'contracts_cash.html' : 'contracts.html';
+  const esFile = freq === 'cash' ? 'contracts_cash_es.html' : 'contracts_es.html';
+  const qs = '?' + params.toString();
+  const w1 = window.open(enFile + qs, '_blank');
+  if(clientLang === 'es') {
+    const w2 = window.open(esFile + qs, '_blank');
+    if(!w1 || !w2) alert('⚠️ Tu navegador bloqueó una ventana. Permite las ventanas emergentes (pop-ups) para este sitio y vuelve a generar el contrato.');
   }
 };
 
@@ -1797,16 +1795,15 @@ window.generateContract = function(clientId) {
     clientId: c.id
   });
   
-  if(c.freq === 'cash') {
-    window.open('contracts_cash.html?' + params.toString(), '_blank');
-    if(c.lang === 'es') {
-      setTimeout(() => window.open('contracts_cash_es.html?' + params.toString(), '_blank'), 500);
-    }
-  } else {
-    window.open('contracts.html?' + params.toString(), '_blank');
-    if(c.lang === 'es') {
-      setTimeout(() => window.open('contracts_es.html?' + params.toString(), '_blank'), 500);
-    }
+  // Open English contract, plus Spanish translation when the client is Spanish.
+  // Both opened directly inside this click so the popup blocker doesn't block the 2nd.
+  const enFile = c.freq === 'cash' ? 'contracts_cash.html' : 'contracts.html';
+  const esFile = c.freq === 'cash' ? 'contracts_cash_es.html' : 'contracts_es.html';
+  const qs = '?' + params.toString();
+  const w1 = window.open(enFile + qs, '_blank');
+  if(c.lang === 'es') {
+    const w2 = window.open(esFile + qs, '_blank');
+    if(!w1 || !w2) alert('⚠️ Tu navegador bloqueó una ventana. Permite las ventanas emergentes (pop-ups) para este sitio y vuelve a generar el contrato.');
   }
 };
 
