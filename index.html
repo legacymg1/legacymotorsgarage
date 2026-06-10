@@ -30,6 +30,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 48px;height:100px
 nav.scrolled{}
 .nav-logo img{height:105px;width:auto;display:block;}
 .nav-links{display:flex;align-items:center;gap:36px;}
+.top-strip{position:fixed;top:100px;left:0;right:0;z-index:999;background:#0a0d18;border-bottom:1px solid var(--border);text-align:center;padding:8px 12px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold2);white-space:nowrap;overflow:hidden;}
 .nav-links a{color:rgba(255,255,255,0.6);text-decoration:none;font-size:12px;font-weight:400;letter-spacing:1.8px;text-transform:uppercase;transition:color 0.2s;}
 .nav-links a:hover{color:var(--white);}
 .nav-access{display:flex;align-items:center;gap:8px;color:rgba(255,255,255,0.6);text-decoration:none;font-size:12px;letter-spacing:1.8px;text-transform:uppercase;border:1px solid rgba(255,255,255,0.15);border-radius:3px;padding:8px 16px;transition:all 0.2s;}
@@ -87,7 +88,7 @@ section{padding:100px 64px;}
 .why-text{font-size:14px;color:var(--silver);line-height:1.9;font-weight:300;}
 
 /* CARS */
-.cars-section{background:var(--black);}
+.cars-section{background:var(--black);padding-top:160px;}
 .cars-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1px;background:var(--border);margin-bottom:1px;}
 .car-card{background:var(--dark);overflow:hidden;transition:background 0.3s;}
 .car-card:hover{background:var(--dark2);}
@@ -214,6 +215,8 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
   /* Nav */
   nav{padding:0 20px;height:80px;}
   .nav-logo img{height:70px;}
+  .top-strip{top:80px;font-size:9px;letter-spacing:1px;padding:7px 8px;}
+  .cars-section{padding-top:120px;}
   .hero-wrapper{margin-top:80px;}
 
   /* Hero banner - zoom out on mobile to show full image */
@@ -7344,6 +7347,8 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></a>
   </div>
 </nav>
 
+<div class="top-strip">Hablamos Español &nbsp;·&nbsp; Financing Available &nbsp;·&nbsp; Buy Here Pay Here</div>
+
 <div class="mobile-menu" id="mobile-menu">
   <button class="mobile-close" onclick="toggleMenu()">✕</button>
   <a href="#cars" onclick="toggleMenu()">Inventory</a>
@@ -7353,30 +7358,6 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></a>
   <a href="portal.html" onclick="toggleMenu()">Access Account</a>
 </div>
 
-<!-- HERO -->
-<div class="hero-wrapper">
-  <!-- TEXT BLOCK TOP -->
-  <div class="hero-text-block">
-    <div class="hero-top-badge">Hablamos Español &nbsp;·&nbsp; Financing Available &nbsp;·&nbsp; Buy Here Pay Here</div>
-    <h1 class="hero-main-title">Legacy Motors Garage</h1>
-    <p class="hero-main-sub">Buy With Confidence &nbsp;·&nbsp; Compra Con Confianza</p>
-  </div>
-
-
-  <!-- BUTTONS BLOCK -->
-  <div class="hero-btns-block">
-    <div class="hero-btns">
-      <a href="#cars" style="background:#ffffff;color:#000000;border:none;border-radius:2px;padding:13px 28px;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;text-decoration:none;white-space:nowrap;display:inline-block;">See Inventory / Ver Carros</a>
-      <a href="#contact" style="background:transparent;color:#ffffff;border:1px solid rgba(255,255,255,0.6);border-radius:2px;padding:13px 28px;font-size:11px;font-weight:400;letter-spacing:2px;text-transform:uppercase;cursor:pointer;text-decoration:none;white-space:nowrap;display:inline-block;">Contact Us / Contáctanos</a>
-    </div>
-    <div class="hero-badge-bottom">
-      <span>Porterville, CA</span><span class="dot">·</span>
-      <span>Hablamos Español</span><span class="dot">·</span>
-      <span>Buy Here Pay Here</span><span class="dot">·</span>
-      <span>No Credit? No Problem</span>
-    </div>
-  </div>
-</div>
 
 <!-- CARS -->
 <section class="cars-section" id="cars">
