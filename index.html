@@ -14862,6 +14862,29 @@ window.generateInvNum = function generateInvNum(){
   return String(next).padStart(4,'0');
 }
 
+// Convert any picked image (including iPhone HEIC) to a web-friendly JPEG via canvas.
+// Runs on the phone where the browser can decode HEIC; if a browser can't decode
+// the format it safely falls back to uploading the original file.
+function toJpeg(file){
+  return new Promise(function(resolve){
+    if(!file || (file.type && file.type.indexOf('image/')!==0 && !/\.(heic|heif)$/i.test(file.name||''))){ resolve(file); return; }
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var maxW=1600, w=img.naturalWidth, h=img.naturalHeight;
+        if(!w||!h){ URL.revokeObjectURL(url); resolve(file); return; }
+        if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        cv.toBlob(function(b){ URL.revokeObjectURL(url); resolve(b?new File([b],(file.name||'photo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}):file); },'image/jpeg',0.85);
+      }catch(e){ URL.revokeObjectURL(url); resolve(file); }
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); resolve(file); };
+    img.src=url;
+  });
+}
+
 window.saveCar = async function(){
   const make=document.getElementById('car-make').value.trim();
   const model=document.getElementById('car-model').value.trim();
@@ -14882,9 +14905,12 @@ window.saveCar = async function(){
     if(photoFiles.length > 0) {
       progress.style.display='block';
       progress.textContent='Subiendo fotos...';
+      let _pi=0;
       for(const file of photoFiles) {
-        const r = ref(storage, `inventory/${id}/${Date.now()}_${file.name}`);
-        await uploadBytes(r, file);
+        _pi++; progress.textContent='Procesando foto '+_pi+' de '+photoFiles.length+'...';
+        const conv = await toJpeg(file);
+        const r = ref(storage, `inventory/${id}/${Date.now()}_${conv.name}`);
+        await uploadBytes(r, conv);
         const url = await getDownloadURL(r);
         photos.push(url);
       }
