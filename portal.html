@@ -159,6 +159,30 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
+// Convert any picked image (including iPhone HEIC) to a web-friendly JPEG via canvas.
+// Runs on the phone where the browser can decode HEIC; if a browser can't decode
+// the format it safely falls back to uploading the original file.
+function toJpeg(file){
+  return new Promise(function(resolve){
+    if(!file || (file.type && file.type.indexOf('image/')!==0 && !/\.(heic|heif)$/i.test(file.name||''))){ resolve(file); return; }
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var maxW=1600, w=img.naturalWidth, h=img.naturalHeight;
+        if(!w||!h){ URL.revokeObjectURL(url); resolve(file); return; }
+        if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        cv.toBlob(function(b){ URL.revokeObjectURL(url); resolve(b?new File([b],(file.name||'photo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}):file); },'image/jpeg',0.85);
+      }catch(e){ URL.revokeObjectURL(url); resolve(file); }
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); resolve(file); };
+    img.src=url;
+  });
+}
+
+
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
   authDomain: "legacy-motors-garage.firebaseapp.com",
@@ -290,8 +314,9 @@ window.updateID = async function() {
     const photoFile = document.getElementById('portal-id-photo').files[0];
     if(photoFile) {
       const storage = getStorage();
-      const idRef = ref(storage, `ids/${currentClient.id}/${Date.now()}_${photoFile.name}`);
-      await uploadBytes(idRef, photoFile);
+      const _idf = await toJpeg(photoFile);
+      const idRef = ref(storage, `ids/${currentClient.id}/${Date.now()}_${_idf.name}`);
+      await uploadBytes(idRef, _idf);
       idPhotoURL = await getDownloadURL(idRef);
     }
     
@@ -357,8 +382,9 @@ window.updateInsurance = async function() {
     if(photoFile) {
       btn.textContent = 'Subiendo foto...';
       const storage = getStorage();
-      const photoRef = ref(storage, `insurance/${currentClient.id}/${Date.now()}_${photoFile.name}`);
-      await uploadBytes(photoRef, photoFile);
+      const _insf = await toJpeg(photoFile);
+      const photoRef = ref(storage, `insurance/${currentClient.id}/${Date.now()}_${_insf.name}`);
+      await uploadBytes(photoRef, _insf);
       photoURL = await getDownloadURL(photoRef);
     }
     
