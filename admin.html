@@ -332,6 +332,10 @@
       <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="f-model" placeholder="Camry"></div>
     </div>
     <div class="form-row">
+      <div class="form-group"><label class="form-label">VIN</label><input class="form-input" id="f-vin" placeholder="Número VIN del carro"></div>
+      <div class="form-group"><label class="form-label">Millas</label><input class="form-input" id="f-miles" placeholder="85000" type="number"></div>
+    </div>
+    <div class="form-row">
       <div class="form-group"><label class="form-label">Precio del Vehículo ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcFinancing('price')"></div>
       <div class="form-group"><label class="form-label">Down Payment ($)</label><input class="form-input" id="f-down" placeholder="1000" type="number" oninput="calcFinancing('down')"></div>
     </div>
@@ -623,6 +627,7 @@ window.lookupInventory = function(invNum) {
       if(document.getElementById('f-year')) document.getElementById('f-year').value = car.year || '';
       if(document.getElementById('f-make')) document.getElementById('f-make').value = car.make || '';
       if(document.getElementById('f-model')) document.getElementById('f-model').value = car.model || '';
+      if(document.getElementById('f-vin')) document.getElementById('f-vin').value = car.vin || '';
       if(document.getElementById('f-total')) document.getElementById('f-total').value = car.price || '';
       if(document.getElementById('f-miles')) document.getElementById('f-miles').value = car.miles || '';
       if(status) status.textContent = '✅ ' + car.year + ' ' + car.make + ' ' + car.model;
@@ -1034,6 +1039,7 @@ window.openEditModal=function(id){
   set('f-dmv',c.dmvFees);
   set('f-inventory-num',c.vehicleInventoryNum);
   set('f-miles',c.miles);
+  set('f-vin',c.vin);
   // Settings
   set('f-lang',c.lang||'es');
   set('f-freq',c.freq||'weekly');
@@ -1104,6 +1110,8 @@ window.saveClient=async function(){
     make:document.getElementById('f-make').value.trim(),
     model:document.getElementById('f-model').value.trim(),
     year:document.getElementById('f-year').value,
+    vin:document.getElementById('f-vin')?.value.trim() || existing.vin || '',
+    miles:document.getElementById('f-miles')?.value.trim() || existing.miles || '',
     total:Number(document.getElementById('f-total').value)||0,
     down:Number(document.getElementById('f-down').value)||0,
     weekly:Number(document.getElementById('f-weekly').value)||0,
@@ -1211,7 +1219,7 @@ window.confirmPayment=async function(){
     } else {
       // Regular thanks message
       const nextPay=getNextPayDate(updatedClient);
-      const msg=getThanksMsg(updatedClient,nextPay);
+      const msg=getThanksMsg(updatedClient,nextPay,amount);
       if(confirm('💬 ¿Enviar mensaje de agradecimiento al cliente?')){
         waPhone=c.phone.replace(/\D/g,'');
         document.getElementById('wa-preview').textContent=msg;
@@ -1317,11 +1325,14 @@ function getOverdueMsg(c, days) {
     .replace(/{dias}/g, days);
 }
 
-function getThanksMsg(c, nextPayDate) {
+function getThanksMsg(c, nextPayDate, paidAmount) {
   const lang = c.lang || 'es';
+  // Use the amount the client ACTUALLY paid (last payment), not the scheduled weekly amount
+  const amt = (paidAmount!=null && paidAmount!=='') ? paidAmount
+    : ((c.payments && c.payments.length) ? c.payments[c.payments.length-1].amount : c.weekly);
   return MESSAGES[lang].thanks
     .replace(/{nombre}/g, c.name.split(' ')[0])
-    .replace(/{monto}/g, formatMoney(c.weekly))
+    .replace(/{monto}/g, formatMoney(amt))
     .replace(/{carro}/g, `${c.year} ${c.make} ${c.model}`)
     .replace(/{saldo}/g, formatMoney(calcBalance(c)))
     .replace(/{proximo}/g, formatDate(nextPayDate));
@@ -1725,6 +1736,8 @@ window.generateContractFromForm = function() {
     year: document.getElementById('f-year')?.value || '',
     make: document.getElementById('f-make')?.value.trim() || '',
     model: document.getElementById('f-model')?.value.trim() || '',
+    vin: document.getElementById('f-vin')?.value.trim() || '',
+    miles: document.getElementById('f-miles')?.value.trim() || '',
     price: document.getElementById('f-total')?.value || '',
     down: document.getElementById('f-down')?.value || '',
     weekly: document.getElementById('f-weekly')?.value || '',

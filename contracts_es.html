@@ -42,6 +42,7 @@
   .checkbox { width: 14px; height: 14px; border: 1.5px solid #000; display: inline-block; flex-shrink: 0; }
   .page-break { page-break-after: always; }
   .footer-note { font-size: 7.5pt; color: #555; text-align: center; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 6px; }
+  .watermark { font-size: 8pt; color: #aaa; text-align: center; }
   @media print {
     body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     .no-print, .action-bar { display: none !important; }
@@ -50,10 +51,15 @@
       padding: 0.4in; 
       page-break-before: always; 
       break-before: page;
+      min-height: auto;
     }
-    .page:first-of-type { 
-      page-break-before: avoid; 
-      break-before: avoid; 
+    .page:first-of-type {
+      page-break-before: avoid;
+      break-before: avoid;
+    }
+    .page:last-of-type {
+      page-break-after: avoid;
+      break-after: avoid;
     }
     @page { margin: 0.4in; size: letter; }
   }
@@ -61,12 +67,13 @@
 </head>
 <body>
 
+<!-- ==================== PÁGINA 1: CONTRATO DE VENTA A PLAZOS ==================== -->
 <div class="page">
 
 <div class="header-box">
   <h1>Legacy Motors Garage LLC</h1>
   <h2>Contrato de Venta a Plazos</h2>
-  <p class="subtitle">Retail Installment Sale Contract · Compra Aquí Paga Aquí · Licencia de Distribuidor No. 83177 · Permiso de Vendedor No. 235986016</p>
+  <p class="subtitle">Compre Aquí Pague Aquí · Licencia de Distribuidor No. 83177 · Permiso de Vendedor No. 235986016</p>
   <div class="dealer-info">
     <span>21122 Ave 152, Porterville, CA 93257</span>
     <span>📞 (559) 540-5145</span>
@@ -79,7 +86,6 @@
     <div class="field"><label>No. de Contrato</label><div class="field-line">{{CONTRACT_NUMBER}}</div></div>
     <div class="field"><label>Fecha del Contrato</label><div class="field-line">{{CONTRACT_DATE}}</div></div>
     <div class="field"><label>No. de Inventario</label><div class="field-line">{{INVENTORY_NUMBER}}</div></div>
-    <div class="field"><label>Vendedor / Distribuidor</label><div class="field-line">Legacy Motors Garage LLC</div></div>
   </div>
 </div>
 
@@ -87,7 +93,7 @@
   <div class="section-title">1. Información del Comprador</div>
   <div class="three-col">
     <div class="field"><label>Nombre Legal Completo</label><div class="field-line">{{BUYER_NAME}}</div></div>
-    <div class="field"><label>Licencia de Manejo / ID No.</label><div class="field-line">{{BUYER_DL}}</div></div>
+    <div class="field"><label>No. de Licencia de Manejo</label><div class="field-line">{{BUYER_DL}}</div></div>
     <div class="field"><label>Fecha de Nacimiento</label><div class="field-line">{{BUYER_DOB}}</div></div>
   </div>
   <div class="three-col" style="margin-top:5px;">
@@ -98,8 +104,8 @@
   <div class="four-col" style="margin-top:5px;">
     <div class="field"><label>Tipo de ID</label><div class="field-line">{{BUYER_ID_TYPE}}</div></div>
     <div class="field"><label>Número de ID</label><div class="field-line">{{BUYER_ID_NUMBER}}</div></div>
-    <div class="field"><label>Estado</label><div class="field-line">{{BUYER_ID_STATE}}</div></div>
-    <div class="field"><label>Vencimiento del ID</label><div class="field-line">{{BUYER_ID_EXPIRY}}</div></div>
+    <div class="field"><label>Estado de ID</label><div class="field-line">{{BUYER_ID_STATE}}</div></div>
+    <div class="field"><label>Vencimiento de ID</label><div class="field-line">{{BUYER_ID_EXPIRY}}</div></div>
   </div>
 </div>
 
@@ -113,9 +119,9 @@
   </div>
   <div class="four-col" style="margin-top:5px;">
     <div class="field"><label>Número VIN</label><div class="field-line">{{VEH_VIN}}</div></div>
-    <div class="field"><label>Millaje / Millas</label><div class="field-line">{{VEH_MILES}}</div></div>
+    <div class="field"><label>Odómetro (Millas)</label><div class="field-line">{{VEH_MILES}}</div></div>
     <div class="field"><label>Placa</label><div class="field-line">{{VEH_PLATE}}</div></div>
-    <div class="field"><label>No. Inventario</label><div class="field-line">{{INVENTORY_NUMBER}}</div></div>
+    <div class="field"><label>No. de Inventario</label><div class="field-line">{{INVENTORY_NUMBER}}</div></div>
   </div>
 </div>
 
@@ -123,27 +129,27 @@
   <div class="tila-title">⚠️ Divulgación Federal — Verdad en los Préstamos (Truth in Lending Act)</div>
   <div class="tila-grid">
     <div class="tila-cell">
-      <label>Tasa Porcentual Anual (APR)<br>Annual Percentage Rate</label>
+      <label>Tasa de Porcentaje Anual (APR)</label>
       <div class="value">79.02%</div>
       <small>Costo del crédito como tasa anual</small>
     </div>
     <div class="tila-cell">
-      <label>Cargo Financiero<br>Finance Charge</label>
+      <label>Cargo Financiero</label>
       <div class="value">${{FINANCE_CHARGE}}</div>
-      <small>Costo total del crédito en dólares</small>
+      <small>Monto en dólares que costará el crédito</small>
     </div>
     <div class="tila-cell">
-      <label>Cantidad Financiada<br>Amount Financed</label>
+      <label>Cantidad Financiada</label>
       <div class="value">${{AMOUNT_FINANCED}}</div>
       <small>Crédito otorgado a su nombre</small>
     </div>
     <div class="tila-cell">
-      <label>Total de Pagos<br>Total of Payments</label>
+      <label>Total de Pagos</label>
       <div class="value">${{TOTAL_OF_PAYMENTS}}</div>
-      <small>Total después de todos los pagos</small>
+      <small>Cantidad pagada después de todos los pagos</small>
     </div>
   </div>
-  <p style="font-size:8pt;margin-top:6px;color:#555;text-align:center;">El APR del 79.02% se calcula como el 20% del saldo pendiente cobrado cada seis (6) meses, convertido a tasa porcentual anual conforme a lo exigido por el Reglamento Z de la Ley de Verdad en los Préstamos (15 U.S.C. § 1601 et seq.).</p>
+  <p style="font-size:8pt;margin-top:6px;color:#555;text-align:center;">El APR del 79.02% se calcula como el 20% del saldo pendiente cobrado cada seis (6) meses, convertido a una tasa de porcentaje anual conforme a lo exigido por el Reglamento Z de la Ley de Verdad en los Préstamos (15 U.S.C. § 1601 et seq.).</p>
 </div>
 
 <div class="section">
@@ -151,20 +157,21 @@
   <div class="two-col">
     <div class="payment-box">
       <div class="payment-row"><span>Precio del Vehículo</span><span>${{VEHICLE_PRICE}}</span></div>
-      <div class="payment-row"><span>Honorarios de Documentación</span><span>$70.00</span></div>
+      <div class="payment-row"><span>Honorarios de Preparación de Documentos</span><span>$70.00</span></div>
       <div class="payment-row"><span>Impuesto de Ventas ({{TAX_RATE}}%)</span><span>${{SALES_TAX}}</span></div>
-      <div class="payment-row"><span>Tarifas del DMV</span><span>${{DMV_FEES}}</span></div>
-      <div class="payment-row"><span>Opción de Cancelación (si aplica)</span><span>${{CANCELLATION_FEE}}</span></div>
+      <div class="payment-row"><span>Tarifas de Registro del DMV</span><span>${{DMV_FEES}}</span></div>
+      <div class="payment-row"><span>Opción de Cancelación del Contrato (si aplica)</span><span>${{CANCELLATION_FEE}}</span></div>
+      <div class="payment-row"><span>Otro: _______________________</span><span>$_________</span></div>
       <div class="payment-row highlight"><span>Precio Total</span><span>${{TOTAL_CASH_PRICE}}</span></div>
-      <div class="payment-row"><span>Menos: Pago Inicial (Down Payment)</span><span>(${{DOWN_PAYMENT}})</span></div>
+      <div class="payment-row"><span>Menos: Pago Inicial (Down)</span><span>(${{DOWN_PAYMENT}})</span></div>
       <div class="payment-row total"><span>CANTIDAD FINANCIADA</span><span>${{AMOUNT_FINANCED}}</span></div>
     </div>
     <div class="payment-box">
       <div class="payment-row"><span>Frecuencia de Pago</span><span>{{PAYMENT_FREQUENCY}}</span></div>
-      <div class="payment-row"><span>Monto de Pago</span><span>${{PAYMENT_AMOUNT}}</span></div>
+      <div class="payment-row"><span>Monto del Pago</span><span>${{PAYMENT_AMOUNT}}</span></div>
       <div class="payment-row"><span>Número de Pagos</span><span>{{NUM_PAYMENTS}}</span></div>
-      <div class="payment-row"><span>Fecha del Primer Pago</span><span>{{FIRST_PAYMENT_DATE}}</span></div>
-      <div class="payment-row"><span>Fecha del Último Pago</span><span>{{LAST_PAYMENT_DATE}}</span></div>
+      <div class="payment-row"><span>Primer Pago</span><span>{{FIRST_PAYMENT_DATE}}</span></div>
+      <div class="payment-row"><span>Último Pago</span><span>{{LAST_PAYMENT_DATE}}</span></div>
       <div class="payment-row"><span>Cargo Financiero (APR 79.02%)</span><span>${{FINANCE_CHARGE}}</span></div>
       <div class="payment-row total"><span>TOTAL DE PAGOS</span><span>${{TOTAL_OF_PAYMENTS}}</span></div>
     </div>
@@ -174,106 +181,258 @@
 <div class="section">
   <div class="section-title">4. Instrucciones de Pago</div>
   <div class="clause">
-    <span class="clause-title">Métodos de Pago:</span> El Comprador puede realizar sus pagos mediante: (a) Efectivo en persona en 21122 Ave 152, Porterville, CA 93257 durante horas de operación; (b) Zelle a ev@legacymotorsgarage.com. <strong>El Comprador NO está obligado a realizar sus pagos en persona.</strong> Los pagos por Zelle deben incluir el nombre completo del comprador y el número de contrato en el campo de nota.
+    <span class="clause-title">Métodos de Pago:</span> El Comprador puede realizar pagos por: (a) Efectivo en persona en 21122 Ave 152, Porterville, CA 93257 durante horario laboral; (b) Zelle a ev@legacymotorsgarage.com. El Vendedor podrá agregar métodos de pago adicionales a su discreción. <strong>El Comprador NO está obligado a pagar en persona.</strong> Los pagos por Zelle deben incluir el nombre completo del comprador y el número de contrato en el campo de nota.
   </div>
   <div class="clause">
-    <span class="clause-title">Cargos por Mora:</span> Un pago se considera tardío si no se recibe antes del cierre de operaciones en la fecha de vencimiento. El Vendedor se reserva el derecho de cobrar un cargo por mora equivalente al <strong>5% del pago vencido o $15.00, lo que sea menor</strong>, por cada pago no recibido dentro de los 10 días posteriores a su fecha de vencimiento, conforme al Código Civil de California §2982(c).
+    <span class="clause-title">Pagos Atrasados:</span> Un pago se considera atrasado si no se recibe antes del cierre de operaciones en la fecha de vencimiento. El Vendedor se reserva el derecho de cobrar un cargo por atraso igual al <strong>5% de la cuota no pagada o $15.00, lo que sea menor</strong>, por cada cuota no pagada dentro de los 10 días de su fecha de vencimiento, según lo permitido por el Código Civil de California §2982(c). Los cargos por atraso se suman a la cuota no pagada y no subsanan ningún incumplimiento.
   </div>
   <div class="clause">
-    <span class="clause-title">Aceleración del Saldo:</span> En caso de incumplimiento, el Vendedor podrá declarar el <strong>saldo total impagado inmediatamente exigible</strong> sin previo aviso adicional. El Comprador no tendrá derecho a subsanar el incumplimiento una vez que el Vendedor haya declarado el saldo acelerado.
+    <span class="clause-title">Aceleración del Saldo:</span> Ante cualquier incumplimiento, el Vendedor podrá, a su exclusiva opción, declarar el <strong>saldo total pendiente inmediatamente vencido y exigible</strong> sin previo aviso adicional. El Comprador no tendrá derecho a subsanar un incumplimiento después de que el Vendedor haya declarado el saldo acelerado.
   </div>
   <div class="clause">
-    <span class="clause-title">Costos de Recuperación del Vehículo:</span> En caso de recuperación (repo), el Comprador será responsable de TODOS los costos asociados, incluyendo: grúa, almacenaje (acumulado diariamente), reacondicionamiento, tarifas de subasta y honorarios de abogados. Si el vehículo se vende por menos del saldo adeudado (incluidos costos de recuperación), <strong>el Comprador seguirá siendo personalmente responsable del saldo deficiente.</strong> Si hay excedente, se remitirá al Comprador conforme al Código Civil de California §2983.2.
+    <span class="clause-title">Costos de Recuperación:</span> En caso de recuperación (repossession), el Comprador será responsable de TODOS los costos asociados, incluyendo, entre otros: grúa, almacenamiento (que se acumula diariamente), reacondicionamiento, tarifas de subasta y honorarios de abogados. Estos montos se sumarán al saldo deficiente adeudado por el Comprador. Tras la recuperación y venta del Vehículo, si el producto neto es menor que el total adeudado (incluidos los costos de recuperación), <strong>el Comprador seguirá siendo personalmente responsable de todo el saldo deficiente.</strong> Si el producto neto excede lo adeudado, cualquier excedente se entregará al Comprador conforme al Código Civil de California §2983.2.
   </div>
-</div>
-
-<div class="section">
-  <div class="section-title">5. Interés de Garantía (Gravamen / Lien)</div>
   <div class="clause">
-    El Comprador otorga a <strong>Legacy Motors Garage LLC</strong> un interés de garantía sobre el Vehículo descrito en este contrato, incluyendo todos los accesorios y sus derivados, para garantizar el pago del Total de Pagos y el cumplimiento de todas las obligaciones bajo este Contrato. Legacy Motors Garage LLC será designado como <strong>PRIMER ACREEDOR PRENDARIO</strong> en el Título del Vehículo hasta que todas las cantidades adeudadas sean pagadas en su totalidad, conforme al Código Comercial de California §9101 et seq.
+    <span class="clause-title">Sin Reinstalación Después de la Recuperación:</span> El Comprador reconoce que una vez que el vehículo haya sido recuperado y vendido en subasta o venta privada, <strong>el Comprador no tiene derecho a reclamar el vehículo</strong> a menos que lo redima ANTES de la venta pagando el saldo acelerado completo más todos los costos de recuperación y almacenamiento. NO se aceptarán pagos parciales después de la recuperación salvo que el Vendedor lo acuerde por escrito.
   </div>
 </div>
 
 <div class="section">
-  <div class="section-title">6. Incumplimiento y Recuperación del Vehículo</div>
+  <div class="section-title">5. Interés de Garantía / Gravamen</div>
   <div class="clause">
-    El Comprador estará en incumplimiento si: (a) cualquier pago no se realiza en su fecha de vencimiento; (b) el Comprador no mantiene el seguro requerido; (c) el Comprador traslada el Vehículo fuera de California sin consentimiento escrito del Vendedor; (d) el Comprador proporciona información falsa; (e) el Comprador se declara insolvente o en quiebra. En caso de incumplimiento, el Vendedor podrá, sin previo aviso adicional (excepto el exigido por ley), declarar el saldo total inmediatamente exigible y/o recuperar el Vehículo. <strong>El Vendedor tiene el derecho de utilizar el dispositivo GPS instalado en el Vehículo para localizarlo con fines de recuperación.</strong>
+    El Comprador otorga por este medio al Vendedor, <strong>Legacy Motors Garage LLC</strong>, un interés de garantía sobre el Vehículo aquí descrito, incluyendo todos los accesorios, aditamentos y productos derivados, para asegurar el pago del Total de Pagos y el cumplimiento de todas las obligaciones bajo este Contrato. El Vendedor figurará como <strong>PRIMER ACREEDOR PRENDARIO (FIRST LIENHOLDER)</strong> en el Certificado de Título hasta que se paguen en su totalidad todas las cantidades adeudadas. Este interés de garantía se otorga conforme al Código Comercial de California §9101 et seq.
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">6. Incumplimiento y Recuperación</div>
+  <div class="clause">
+    El Comprador estará en incumplimiento si: (a) cualquier pago no se realiza en su fecha de vencimiento; (b) el Comprador no mantiene el seguro requerido; (c) el Comprador traslada el Vehículo fuera de California sin consentimiento escrito del Vendedor; (d) el Comprador proporciona información falsa; (e) el Comprador se declara insolvente o en quiebra. En caso de incumplimiento, el Vendedor podrá, sin previo aviso (salvo el exigido por la ley de California), declarar el saldo total pendiente inmediatamente exigible y/o recuperar el Vehículo. <strong>El Vendedor tiene el derecho de utilizar el dispositivo GPS instalado en el Vehículo para localizarlo con fines de recuperación.</strong> El Comprador será responsable de todos los costos de recuperación, almacenamiento y reventa según lo permitido por el Código Civil de California §2983.2.
   </div>
 </div>
 
 <div class="section">
   <div class="section-title">7. Requisito de Seguro</div>
   <div class="clause">
-    El Comprador se compromete a mantener, a su propio costo, seguro de colisión y cobertura comprensiva sobre el Vehículo en todo momento, con Legacy Motors Garage LLC designado como Beneficiario de Pérdida (Loss Payee). La cobertura mínima debe cumplir con el Código de Vehículos de California §16000. El Comprador debe proporcionar comprobante de seguro dentro de los 5 días posteriores a la compra y notificar al Vendedor ante cualquier cambio o renovación de póliza.
+    El Comprador se compromete a mantener, a su propio costo, cobertura de seguro comprensiva y de colisión sobre el Vehículo en todo momento, con Legacy Motors Garage LLC listado como Beneficiario de Pérdida (Loss Payee). La cobertura mínima debe cumplir con el Código de Vehículos de California §16000. El Comprador debe presentar comprobante de seguro dentro de los 5 días posteriores a la compra y notificar al Vendedor sobre cualquier cambio o renovación de la póliza. No mantener el seguro constituye un incumplimiento de este Contrato.
   </div>
 </div>
 
 <div class="section">
   <div class="section-title">8. Opción de Cancelación del Contrato</div>
   <div class="clause">
-    De conformidad con el Código de Vehículos de California §11709.2, se notifica al Comprador la disponibilidad de un <strong>Acuerdo de Opción de Cancelación de Contrato (AOCC)</strong>. Este es un acuerdo <strong>OPCIONAL</strong>. Las tarifas son las siguientes:
+    De conformidad con el Código de Vehículos de California §11709.2, se notifica al Comprador la disponibilidad de un <strong>Acuerdo de Opción de Cancelación de Contrato (AOCC / CCOA)</strong>. Este es un acuerdo <strong>OPCIONAL</strong>. Las tarifas son las siguientes:
   </div>
   <div style="border:1px solid #000;padding:8px;margin:6px 0;font-size:9pt;">
-    <strong>Precio del Vehículo $0 – $4,999:</strong> Tarifa de Opción: $75.00 | Tarifa de Realmacenamiento: $175.00 | Neto al devolver: <strong>$100.00</strong><br>
-    <strong>Precio del Vehículo $5,000 – $9,999:</strong> Tarifa de Opción: $150.00 | Tarifa de Realmacenamiento: $350.00 | Neto al devolver: <strong>$200.00</strong><br>
-    <strong>Precio del Vehículo $10,000 – $39,999:</strong> Tarifa de Opción: $250.00 | Tarifa de Realmacenamiento: $500.00 | Neto al devolver: <strong>$250.00</strong>
+    <strong>Precio del Vehículo $0 – $4,999:</strong> Tarifa de Opción: $75.00 | Tarifa de Reposición: $175.00 | Total si se devuelve: $175.00 (menos $75 ya pagados) = <strong>$100.00 neto</strong><br>
+    <strong>Precio del Vehículo $5,000 – $9,999:</strong> Tarifa de Opción: $150.00 | Tarifa de Reposición: $350.00 | Total si se devuelve: $350.00 (menos $150 ya pagados) = <strong>$200.00 neto</strong><br>
+    <strong>Precio del Vehículo $10,000 – $39,999:</strong> Tarifa de Opción: $250.00 | Tarifa de Reposición: $500.00 | Total si se devuelve: $500.00 (menos $250 ya pagados) = <strong>$250.00 neto</strong>
   </div>
   <div class="opt-box" id="ccoa-accept-box">
     <div class="checkbox" id="ccoa-accept-check" style="background:#000;"></div>
-    <span><strong>ACEPTO</strong> el Acuerdo de Opción de Cancelación por ${{CCOA_FEE}}. Iniciales: <span class="initial-box"></span></span>
+    <span><strong>ACEPTO</strong> el Acuerdo de Opción de Cancelación de Contrato por ${{CCOA_FEE}}. Iniciales: <span class="initial-box"></span></span>
   </div>
   <div class="opt-box" id="ccoa-decline-box">
     <div class="checkbox" id="ccoa-decline-check" style="background:#000;"></div>
-    <span><strong>RECHAZO</strong> el Acuerdo de Opción de Cancelación. Entiendo que NO tengo derecho a cancelar este contrato después de firmarlo. Iniciales: <span class="initial-box"></span></span>
+    <span><strong>RECHAZO</strong> el Acuerdo de Opción de Cancelación de Contrato. Entiendo que NO tengo derecho a cancelar este contrato después de firmarlo. Iniciales: <span class="initial-box"></span></span>
   </div>
 </div>
 
 <div class="section">
   <div class="section-title">9. Garantía Limitada</div>
   <div class="clause">
-    El Vendedor otorga una <strong>Garantía Limitada de 30 Días / 1,000 Millas</strong> (lo que ocurra primero), que cubre únicamente defectos en el tren motriz (motor, transmisión y eje de transmisión). Esta garantía NO cubre: (a) desgaste normal; (b) daños por accidente, mal uso o negligencia; (c) componentes que no sean del tren motriz; (d) defectos cosméticos; (e) vehículos con alteración del odómetro. <strong>TODAS LAS DEMÁS GARANTÍAS, EXPRESAS O IMPLÍCITAS, INCLUYENDO LAS GARANTÍAS IMPLÍCITAS DE COMERCIABILIDAD E IDONEIDAD PARA UN FIN ESPECÍFICO, QUEDAN EXPRESAMENTE EXCLUIDAS EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEY DE CALIFORNIA.</strong>
+    El Vendedor ofrece una <strong>Garantía Limitada de 30 Días / 1,000 Millas</strong> (lo que ocurra primero) que cubre únicamente defectos en el tren motriz (motor, transmisión y eje de tracción). Esta garantía NO cubre: (a) desgaste normal por uso; (b) daños causados por accidente, mal uso o negligencia; (c) componentes fuera del tren motriz, incluyendo, entre otros: sistemas eléctricos, A/C, frenos, suspensión, emisiones, defectos cosméticos; (d) cualquier vehículo con odómetro alterado o manipulado; (e) vehículos de uso comercial. La reparación bajo garantía debe realizarse por el Vendedor o un taller autorizado. El Comprador debe reportar los defectos por escrito dentro del periodo de garantía. <strong>TODAS LAS DEMÁS GARANTÍAS, EXPRESAS O IMPLÍCITAS, INCLUYENDO LAS GARANTÍAS IMPLÍCITAS DE COMERCIABILIDAD E IDONEIDAD PARA UN PROPÓSITO PARTICULAR, QUEDAN POR ESTE MEDIO RENUNCIADAS EN LA MEDIDA MÁXIMA PERMITIDA POR LA LEY DE CALIFORNIA.</strong>
   </div>
 </div>
 
 <div class="section">
-  <div class="section-title">10. Historial y Condición del Vehículo</div>
+  <div class="section-title">10. Divulgación del Historial y Condición del Vehículo</div>
   <div class="clause">
-    El Comprador reconoce haber recibido: (a) un Reporte de Historial del Vehículo (Vehicle History Report); (b) una Certificación del Distribuidor sobre el Estado del Vehículo; (c) la Guía del Comprador Federal (Federal Buyer's Guide). El Comprador reconoce haber tenido la oportunidad de que un mecánico independiente inspeccionara el vehículo antes de la compra. El Comprador acepta el vehículo en condición "TAL COMO ESTÁ" excepto por lo cubierto por la Garantía Limitada.
+    El Comprador reconoce haber recibido: (a) un Reporte de Historial del Vehículo (VHR) que divulga el historial de título disponible, reportes de accidentes y lecturas del odómetro; (b) una Certificación del Distribuidor sobre la Condición del Vehículo; (c) una Guía del Comprador Federal (Buyer's Guide) que divulga los términos de la garantía. El Comprador reconoce haber tenido la oportunidad de que un mecánico independiente inspeccionara el vehículo antes de la compra. El Comprador acepta el vehículo en su condición "TAL COMO ESTÁ" (AS-IS), salvo lo cubierto por la Garantía Limitada anterior.
   </div>
 </div>
 
 <div class="section">
   <div class="section-title">11. Términos Adicionales</div>
-  <div class="clause"><span class="clause-title">A. Ley Aplicable:</span> Este Contrato se regirá por las leyes del Estado de California, incluyendo la Ley Rees-Levering de Ventas y Financiamiento de Vehículos de Motor (Código Civil §2981 et seq.) y la Ley de Financiamiento de Ventas de Automóviles.</div>
-  <div class="clause"><span class="clause-title">B. Acuerdo Completo:</span> Este Contrato constituye el acuerdo completo entre las partes. Ninguna representación oral será vinculante. Cualquier modificación debe hacerse por escrito y ser firmada por ambas partes.</div>
-  <div class="clause"><span class="clause-title">C. Sin Renuncia:</span> La aceptación por parte del Vendedor de un pago tardío o parcial no constituirá renuncia a ningún derecho de declarar incumplimiento por violaciones posteriores.</div>
-  <div class="clause"><span class="clause-title">D. Notificación sobre California Civil Code §1632:</span> Debido a que las negociaciones de esta venta se condujeron principalmente en español, el Comprador tiene derecho a recibir una copia de este contrato en español antes de firmarlo. / Because the negotiations for this sale were conducted primarily in Spanish, Buyer has the right to receive a copy of this contract in Spanish before signing.</div>
+  <div class="clause">
+    <span class="clause-title">A. Ley Aplicable:</span> Este Contrato se regirá por las leyes del Estado de California, incluyendo la Ley Rees-Levering de Venta y Financiamiento de Vehículos (Código Civil §2981 et seq.) y la Automobile Sales Finance Act.
+  </div>
+  <div class="clause">
+    <span class="clause-title">B. Acuerdo Completo:</span> Este Contrato, junto con cualquier anexo específicamente incorporado, constituye el acuerdo completo entre las partes. Ninguna representación oral será vinculante. Cualquier modificación debe hacerse por escrito y ser firmada por ambas partes.
+  </div>
+  <div class="clause">
+    <span class="clause-title">C. Divisibilidad:</span> Si alguna disposición de este Contrato resulta inválida o inaplicable, las disposiciones restantes permanecerán en pleno vigor y efecto.
+  </div>
+  <div class="clause">
+    <span class="clause-title">D. Sin Renuncia:</span> La aceptación por parte del Vendedor de un pago tardío o parcial no constituirá una renuncia a ningún derecho de declarar incumplimiento por violaciones posteriores.
+  </div>
+  <div class="clause">
+    <span class="clause-title">E. Honorarios de Abogados:</span> En cualquier procedimiento legal derivado de este Contrato, la parte prevaleciente tendrá derecho a honorarios razonables de abogados y costos, según lo permitido por la ley de California.
+  </div>
+  <div class="clause">
+    <span class="clause-title">F. Aviso del Derecho a una Copia:</span> El Comprador tiene derecho a una copia de este Contrato al momento de firmarlo. Conforme al Código Civil de California §2983, el Vendedor debe entregar una copia al Comprador dentro de un día hábil.
+  </div>
 </div>
 
 <div class="section">
   <div class="section-title">12. Firmas</div>
   <div class="warning-box">
-    <strong>⚠️ AVISO AL COMPRADOR:</strong> No firme este contrato antes de leerlo o si contiene espacios en blanco. Tiene derecho a una copia completamente llenada de este contrato. Al firmar este contrato, usted acepta todos los términos y condiciones aquí establecidos. / Do not sign this contract before reading it or if it contains blank spaces.
+    <strong>⚠️ AVISO AL COMPRADOR:</strong> No firme este contrato antes de leerlo o si contiene espacios en blanco. Tiene derecho a una copia completamente llenada de este contrato. Bajo la ley de California, usted tiene ciertos derechos.
   </div>
   <div class="sign-box">
-    <p style="font-size:9pt;margin-bottom:8px;">Al firmar, el Comprador reconoce: (1) haber leído y entendido este Contrato en su totalidad; (2) haber recibido una copia completa; (3) que este es un compromiso legal vinculante.</p>
+    <p style="font-size:9pt;margin-bottom:8px;">Al firmar a continuación, el Comprador reconoce: (1) haber leído y entendido este Contrato en su totalidad; (2) haber recibido una copia completa; (3) entender que esta es una obligación legal vinculante; (4) que ninguna representación oral fuera de este Contrato es vinculante.</p>
     <div class="sign-row">
-      <div class="sign-line">Firma del Comprador / Buyer Signature<br>{{BUYER_NAME}}</div>
-      <div class="sign-line">Fecha / Date</div>
+      <div class="sign-line">Firma del Comprador<br>{{BUYER_NAME}}</div>
+      <div class="sign-line">Fecha</div>
     </div>
     <div class="sign-row" style="margin-top:16px;">
-      <div class="sign-line">Firma del Vendedor / Seller Signature<br>Enrique Ivan Villagomez Linares<br>Legacy Motors Garage LLC</div>
-      <div class="sign-line">Fecha / Date</div>
+      <div class="sign-line">Firma del Vendedor<br>Enrique Ivan Villagomez Linares<br>Legacy Motors Garage LLC — Representante Autorizado</div>
+      <div class="sign-line">Fecha</div>
     </div>
   </div>
 </div>
 
 <div class="footer-note">
   Legacy Motors Garage LLC · Licencia de Distribuidor No. 83177 · Permiso de Vendedor No. 235986016 · 21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>
-  Este contrato cumple con el Código Civil de California §2981 et seq. (Ley Rees-Levering), la Ley de Financiamiento de Ventas de Automóviles, TILA/Reglamento Z, y el Código Civil §1632.
+  Este contrato cumple con el Código Civil de California §2981 et seq. (Ley Rees-Levering), la Automobile Sales Finance Act y TILA/Reglamento Z.
 </div>
 
+</div><!-- fin página 1 -->
+
+<!-- ==================== PÁGINA 2: ACUERDO DE CONSENTIMIENTO GPS ==================== -->
+<div class="page page-break" style="margin-top:0.5in;">
+
+<div class="header-box">
+  <h1>Legacy Motors Garage LLC</h1>
+  <h2>Acuerdo de Consentimiento y Divulgación de Dispositivo GPS</h2>
+  <p class="subtitle">GPS Device Consent & Disclosure Agreement · Licencia de Distribuidor No. 83177</p>
 </div>
+
+<div class="section">
+  <div class="four-col">
+    <div class="field"><label>No. de Contrato</label><div class="field-line">{{CONTRACT_NUMBER}}</div></div>
+    <div class="field"><label>Fecha</label><div class="field-line">{{CONTRACT_DATE}}</div></div>
+    <div class="field"><label>Comprador</label><div class="field-line">{{BUYER_NAME}}</div></div>
+    <div class="field"><label>Vehículo</label><div class="field-line">{{VEH_YEAR}} {{VEH_MAKE}} {{VEH_MODEL}} &nbsp;·&nbsp; VIN: {{VEH_VIN}}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Aviso y Consentimiento del Dispositivo GPS</div>
+  <div class="clause">
+    <span class="clause-title">1. Instalación del Dispositivo:</span> Se notifica al Comprador que el Vehículo descrito anteriormente contiene un dispositivo electrónico de rastreo GPS (Sistema de Posicionamiento Global) instalado por Legacy Motors Garage LLC. El dispositivo es capaz de rastrear la ubicación del vehículo en tiempo real.
+  </div>
+  <div class="clause">
+    <span class="clause-title">2. Aceptación Voluntaria — NO Requerida para la Compra:</span> <strong>La aceptación de este acuerdo GPS es completamente voluntaria y NO es una condición de la compra del vehículo.</strong> El Comprador puede rechazar este acuerdo sin afectar su derecho a comprar el vehículo ni ningún otro término del Contrato de Venta a Plazos.
+  </div>
+  <div class="clause">
+    <span class="clause-title">3. Uso Permitido de los Datos GPS:</span> Legacy Motors Garage LLC acuerda que los datos de rastreo GPS SOLO se accederán y usarán en las siguientes circunstancias: (a) cuando el Comprador esté en incumplimiento bajo el Contrato de Venta a Plazos; (b) para localizar el Vehículo con fines de recuperación conforme al Código Civil de California §2983.2; (c) según lo exija la autoridad policial con la debida facultad legal. Los datos GPS NO se usarán para ningún otro propósito, incluyendo, entre otros, el monitoreo de las actividades diarias del Comprador, el rastreo de ubicación para fines distintos al incumplimiento, o la venta a terceros.
+  </div>
+  <div class="clause">
+    <span class="clause-title">4. Derecho a Cancelar:</span> <strong>El Comprador puede cancelar este Acuerdo GPS en cualquier momento mediante notificación por escrito a Legacy Motors Garage LLC.</strong> Tras la cancelación, el Vendedor deshabilitará el rastreo GPS dentro de 5 días hábiles. La cancelación de este Acuerdo GPS no afecta ningún otro término del Contrato de Venta a Plazos.
+  </div>
+  <div class="clause">
+    <span class="clause-title">5. Protección de Privacidad:</span> Legacy Motors Garage LLC mantendrá todos los datos GPS en estricta confidencialidad y no los compartirá con ningún tercero salvo lo exigido por la ley o lo necesario para efectuar una recuperación legal. Todos los datos se manejarán en cumplimiento con la Ley de Privacidad del Consumidor de California (CCPA) y las leyes federales de privacidad aplicables.
+  </div>
+  <div class="clause">
+    <span class="clause-title">6. Manipulación Prohibida:</span> El Comprador acuerda no manipular, deshabilitar, retirar ni interferir con el dispositivo GPS. Cualquier manipulación constituirá un incumplimiento del Contrato de Venta a Plazos y podrá resultar en la recuperación del Vehículo. La manipulación también puede violar el Código Penal de California §502.
+  </div>
+  <div class="clause">
+    <span class="clause-title">7. Sin Cargo Adicional:</span> No hay cargo adicional para el Comprador por el dispositivo GPS en sí. Este acuerdo rige únicamente los términos y condiciones de su uso.
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Elección del Comprador</div>
+  <div class="opt-box" style="margin-bottom:10px;">
+    <div class="checkbox"></div>
+    <span style="font-size:10pt;"><strong>CONSIENTO</strong> el Acuerdo del Dispositivo GPS según lo descrito anteriormente. Entiendo que el rastreo GPS solo se usará en caso de incumplimiento y/o recuperación, y que puedo cancelar este acuerdo en cualquier momento por escrito. <br>Iniciales: <span class="initial-box"></span></span>
+  </div>
+  <div class="opt-box">
+    <div class="checkbox"></div>
+    <span style="font-size:10pt;"><strong>RECHAZO</strong> este Acuerdo del Dispositivo GPS. Entiendo que Legacy Motors Garage LLC aún puede tener otros medios para localizar el vehículo en caso de incumplimiento. <br>Iniciales: <span class="initial-box"></span></span>
+  </div>
+</div>
+
+<div class="sign-box" style="margin-top:20px;">
+  <div class="sign-row">
+    <div class="sign-line">Firma del Comprador<br>{{BUYER_NAME}}</div>
+    <div class="sign-line">Fecha</div>
+  </div>
+  <div class="sign-row" style="margin-top:16px;">
+    <div class="sign-line">Representante del Vendedor<br>Enrique Ivan Villagomez Linares · Legacy Motors Garage LLC</div>
+    <div class="sign-line">Fecha</div>
+  </div>
+</div>
+
+<div class="footer-note">
+  Legacy Motors Garage LLC · Licencia de Distribuidor No. 83177 · 21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>
+  Este Acuerdo GPS cumple con el Código Civil de California §1798.99.1 et seq. y las leyes de privacidad aplicables. El Comprador tiene derecho a una copia de este acuerdo.
+</div>
+
+</div><!-- fin página 2 -->
+
+<!-- ==================== PÁGINA 3: OPCIÓN DE CANCELACIÓN DE CONTRATO ==================== -->
+<div class="page page-break" style="margin-top:0.5in;">
+
+<div class="header-box">
+  <h1>Legacy Motors Garage LLC</h1>
+  <h2>Acuerdo de Opción de Cancelación de Contrato (AOCC)</h2>
+  <p class="subtitle">Contract Cancellation Option Agreement · Código de Vehículos de California §11709.2 · Licencia de Distribuidor No. 83177</p>
+</div>
+
+<div class="section">
+  <div class="four-col">
+    <div class="field"><label>No. de Contrato</label><div class="field-line">{{CONTRACT_NUMBER}}</div></div>
+    <div class="field"><label>Fecha</label><div class="field-line">{{CONTRACT_DATE}}</div></div>
+    <div class="field"><label>Comprador</label><div class="field-line">{{BUYER_NAME}}</div></div>
+    <div class="field"><label>Tarifa de Opción</label><div class="field-line">${{CCOA_FEE}}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Términos de la Opción de Cancelación</div>
+  <div class="clause">
+    De conformidad con el Código de Vehículos de California §11709.2, Legacy Motors Garage LLC ofrece al Comprador la opción de cancelar el Contrato de Venta a Plazos dentro de <strong>dos (2) días hábiles</strong> a partir de la fecha del contrato, sujeto a los siguientes términos y condiciones. <strong>ESTE ES UN ACUERDO OPCIONAL.</strong> El Comprador no está obligado a adquirir esta opción.
+  </div>
+  <div class="clause">
+    <span class="clause-title">1. Tarifa de Opción Pagada:</span> ${{CCOA_FEE}} (no reembolsable si el Comprador no cancela dentro del periodo de 2 días).
+  </div>
+  <div class="clause">
+    <span class="clause-title">2. Tarifa de Reposición al Cancelar:</span> ${{RESTOCK_FEE}}. La Tarifa de Opción ya pagada se aplicará a la Tarifa de Reposición. Monto neto adeudado al devolver: ${{NET_RESTOCK}}.
+  </div>
+  <div class="clause">
+    <span class="clause-title">3. Condiciones de Devolución del Vehículo:</span> Para ejercer esta opción, el Comprador debe: (a) devolver el vehículo a Legacy Motors Garage LLC en 21122 Ave 152, Porterville, CA 93257 dentro de 2 días hábiles de la fecha del contrato, durante horario laboral; (b) devolver el vehículo en la misma o mejor condición que al entregarlo, con no más de 250 millas adicionales recorridas; (c) devolver todas las llaves, documentación y accesorios; (d) proporcionar aviso de cancelación por escrito.
+  </div>
+  <div class="clause">
+    <span class="clause-title">4. Reembolso al Devolver:</span> Tras el ejercicio válido de esta opción y la devolución del vehículo en condición aceptable, el Vendedor reembolsará el pago inicial del Comprador dentro de 10 días hábiles, menos la Tarifa de Reposición Neta indicada arriba.
+  </div>
+  <div class="clause">
+    <span class="clause-title">5. Limitaciones:</span> Esta opción NO puede ejercerse si: (a) el vehículo ha estado en un accidente; (b) el vehículo ha sufrido daños; (c) el vehículo ha sido conducido más de 250 millas desde la entrega; (d) el vehículo ha sido alterado o modificado; (e) el Comprador ha recibido o intentado recibir indemnización de seguro.
+  </div>
+  <div class="clause">
+    <span class="clause-title">6. Vencimiento:</span> Esta opción vence al cierre de operaciones el {{CCOA_EXPIRY_DATE}} (2 días hábiles desde la fecha del contrato). Si no se ejerce para esa fecha, esta opción queda anulada y el Contrato de Venta a Plazos permanece en pleno vigor.
+  </div>
+</div>
+
+<div class="sign-box" style="margin-top:20px;">
+  <p style="font-size:9pt;margin-bottom:8px;"><strong>Al firmar a continuación, el Comprador reconoce:</strong> (1) que este es un acuerdo OPCIONAL; (2) que la tarifa de opción no es reembolsable a menos que la opción de cancelación se ejerza válidamente; (3) que ha leído y entendido todos los términos anteriores; (4) que recibió una copia de este acuerdo.</p>
+  <div class="sign-row">
+    <div class="sign-line">Firma del Comprador<br>{{BUYER_NAME}}</div>
+    <div class="sign-line">Fecha</div>
+  </div>
+  <div class="sign-row" style="margin-top:16px;">
+    <div class="sign-line">Representante del Vendedor<br>Enrique Ivan Villagomez Linares · Legacy Motors Garage LLC</div>
+    <div class="sign-line">Fecha</div>
+  </div>
+</div>
+
+<div class="footer-note">
+  Legacy Motors Garage LLC · Licencia de Distribuidor No. 83177 · 21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>
+  Este Acuerdo de Opción de Cancelación de Contrato se emite conforme al Código de Vehículos de California §11709.2. El Comprador tiene derecho a una copia de este acuerdo al momento de firmarlo.
+</div>
+
+</div><!-- fin página 3 -->
 
 
 <script type="module">
@@ -299,22 +458,22 @@
   const payAmt    = numPay > 0 ? totalOfPayments / numPay : weekly;
   let restockFee = 0, netRestock = 0;
   if(ccoaYes){ restockFee = price<=4999?175:price<=9999?350:500; netRestock = restockFee - ccoaFee; }
-  const fmt = n => Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const freqLabel = freq==='monthly'?'Mensual':freq==='biweekly'?'Quincenal':'Semanal';
+  const fmt = n => Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const freqLabel = freq==='monthly'?'Monthly / Mensual':freq==='biweekly'?'Bi-Weekly / Quincenal':'Weekly / Semanal';
   const contDate = p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00') : new Date();
   let bizDays=0; const expDate=new Date(contDate);
   while(bizDays<2){expDate.setDate(expDate.getDate()+1);if(expDate.getDay()!==0&&expDate.getDay()!==6)bizDays++;}
   const contractNum = 'LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5);
-  const todayStr = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const todayStr = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}); // MM/DD/YYYY
 
   document.body.innerHTML = document.body.innerHTML
     .replace(/\{\{CONTRACT_NUMBER\}\}/g, contractNum)
-    .replace(/\{\{CONTRACT_DATE\}\}/g, p.get('contractDate')||todayStr)
+    .replace(/\{\{CONTRACT_DATE\}\}/g, p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00').toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : todayStr)
     .replace(/\{\{INVENTORY_NUMBER\}\}/g, p.get('invNum')||'')
     .replace(/\{\{BUYER_NAME\}\}/g, p.get('name')||'')
     .replace(/\{\{BUYER_PHONE\}\}/g, p.get('phone')||'')
     .replace(/\{\{BUYER_ADDRESS\}\}/g, p.get('address')||'')
-    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob') ? new Date(p.get('dob')+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'}) : '')
+    .replace(/\{\{BUYER_DOB\}\}/g, p.get('dob') ? new Date(p.get('dob')+'T12:00:00').toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '')
     .replace(/\{\{BUYER_CITY_STATE_ZIP\}\}/g, [p.get('city'),p.get('state'),p.get('zip')].filter(Boolean).join(', '))
     .replace(/\{\{BUYER_DL\}\}/g, p.get('idType')==="Driver's License"?p.get('idNumber')||'':'')
     .replace(/\{\{BUYER_ID_TYPE\}\}/g, p.get('idType')||'')
@@ -334,7 +493,7 @@
     .replace(/\{\{PAYMENT_AMOUNT\}\}/g, fmt(payAmt))
     .replace(/\{\{PAYMENT_FREQUENCY\}\}/g, freqLabel)
     .replace(/\{\{NUM_PAYMENTS\}\}/g, numPay||'')
-    .replace(/\{\{FIRST_PAYMENT_DATE\}\}/g, p.get('startDate')||'')
+    .replace(/\{\{FIRST_PAYMENT_DATE\}\}/g, p.get('startDate') ? new Date(p.get('startDate')+'T12:00:00').toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '')
     .replace(/\{\{LAST_PAYMENT_DATE\}\}/g, '')
     .replace(/\{\{TAX_RATE\}\}/g, tax>0?(tax/price*100).toFixed(2):'0')
     .replace(/\{\{SALES_TAX\}\}/g, fmt(tax))
@@ -346,9 +505,9 @@
     .replace(/\{\{CCOA_FEE\}\}/g, ccoaYes?fmt(ccoaFee):'N/A')
     .replace(/\{\{RESTOCK_FEE\}\}/g, ccoaYes?fmt(restockFee):'N/A')
     .replace(/\{\{NET_RESTOCK\}\}/g, ccoaYes?fmt(netRestock):'N/A')
-    .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, ccoaYes?expDate.toLocaleDateString('es-MX'):'N/A');
+    .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, ccoaYes?expDate.toLocaleDateString('en-US'):'N/A');
 
-  // Marcar CCOA
+  // Mark CCOA checkbox
   const acceptChk = document.getElementById('ccoa-accept-check');
   const declineChk = document.getElementById('ccoa-decline-check');
   if(acceptChk&&declineChk){
@@ -356,7 +515,7 @@
     chk.innerHTML = '<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
   }
 
-  // Campos editables
+  // Make fields editable
   document.querySelectorAll('.field-line').forEach(el=>{
     el.contentEditable='true'; el.style.outline='none';
     el.style.borderBottom='1px solid #999'; el.style.cursor='text';
@@ -376,19 +535,21 @@
     };
   });
 
-  // Barra de acciones
+  // Action bar
   const bar=document.createElement('div');
   bar.className='no-print action-bar';
   bar.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid #f0c040;padding:12px;display:flex;gap:10px;justify-content:center;z-index:9999;';
-  bar.innerHTML='<button onclick="window.print()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ IMPRIMIR</button>'
+  bar.innerHTML='<button onclick="saveContract()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">💾 GUARDAR</button>'
+    +'<button onclick="window.print()" style="background:transparent;color:#f0c040;border:2px solid #f0c040;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ IMPRIMIR</button>'
     +'<button onclick="window.close()" style="background:transparent;color:#aaa;border:1px solid #444;border-radius:8px;padding:12px 16px;font-size:14px;cursor:pointer;">✕ CERRAR</button>';
   document.body.appendChild(bar);
   document.body.style.paddingBottom='80px';
 })();
 
-window.saveContractES = async function(){
+window.saveContract = async function(){
   const clientId=new URLSearchParams(window.location.search).get('clientId');
-  if(!clientId){alert('Genera el contrato desde la tarjeta del cliente (botón 📄) para guardarlo.');return;}
+  if(!clientId){alert('No client linked. To save, generate the contract from the client card (📄) instead of the form button.');return;}
+  // Collect all edited contenteditable values
   const editedFields={};
   document.querySelectorAll('[contenteditable=true]').forEach((el,i)=>{editedFields['f'+i]=el.textContent.trim();});
   try{
@@ -399,10 +560,9 @@ window.saveContractES = async function(){
     const db=getFirestore(app);
     const snap=await getDoc(doc(db,'clients',clientId));
     const existing=snap.exists()?snap.data():{};
-    await setDoc(doc(db,'clients',clientId),{...existing,contract_es:{params:window.location.search,editedFields,savedAt:new Date().toISOString()}});
-    alert('✅ Contrato guardado');
+    await setDoc(doc(db,'clients',clientId),{...existing,contract:{params:window.location.search,editedFields,savedAt:new Date().toISOString()}});
+    alert('✅ Contract saved!');
   }catch(e){alert('Error: '+e.message);}
-};
-</script>
+}</script>
 </body>
 </html>
