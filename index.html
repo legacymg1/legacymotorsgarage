@@ -14647,7 +14647,7 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getStorage, ref, uploadBytes, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
@@ -14905,25 +14905,36 @@ window.saveCar = async function(){
     const photoFiles = document.getElementById('car-photos').files;
     if(photoFiles.length > 0) {
       progress.style.display='block';
-      progress.textContent='Subiendo fotos...';
-      let _pi=0;
-      for(const file of photoFiles) {
-        _pi++; progress.textContent='Procesando foto '+_pi+' de '+photoFiles.length+'...';
+      progress.textContent='Subiendo '+photoFiles.length+' foto(s)...';
+      let _done=0;
+      // Convert + upload ALL photos in parallel (much faster); Promise.all keeps their order
+      const uploads = [...photoFiles].map(async (file, i) => {
         const conv = await toJpeg(file);
-        const r = ref(storage, `inventory/${id}/${Date.now()}_${conv.name}`);
+        const r = ref(storage, `inventory/${id}/${Date.now()}_${i}_${conv.name}`);
         await uploadBytes(r, conv);
         const url = await getDownloadURL(r);
-        photos.push(url);
-      }
+        _done++; progress.textContent = 'Subidas '+_done+' de '+photoFiles.length+' fotos...';
+        return url;
+      });
+      const _newUrls = await Promise.all(uploads);
+      photos.push(..._newUrls);
     }
     
     // Upload video
     let videoURL = existing.videoURL || '';
     const videoFile = document.getElementById('car-video').files[0];
     if(videoFile) {
-      progress.textContent='Subiendo video...';
+      const mb = (videoFile.size/1048576).toFixed(0);
+      progress.textContent='Subiendo video ('+mb+' MB)... 0%';
       const vr = ref(storage, `inventory/${id}/video_${Date.now()}_${videoFile.name}`);
-      await uploadBytes(vr, videoFile);
+      const _task = uploadBytesResumable(vr, videoFile);
+      await new Promise((resolve, reject) => {
+        _task.on('state_changed',
+          (snap) => { const pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100); progress.textContent = 'Subiendo video ('+mb+' MB)... '+pct+'%'; },
+          reject,
+          resolve
+        );
+      });
       videoURL = await getDownloadURL(vr);
     }
     
