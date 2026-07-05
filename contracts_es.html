@@ -463,7 +463,7 @@
   const contDate = p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00') : new Date();
   let bizDays=0; const expDate=new Date(contDate);
   while(bizDays<2){expDate.setDate(expDate.getDate()+1);if(expDate.getDay()!==0&&expDate.getDay()!==6)bizDays++;}
-  const contractNum = 'LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5);
+  const contractNum = p.get('contractNum') || ('LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5));
   const todayStr = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}); // MM/DD/YYYY
 
   document.body.innerHTML = document.body.innerHTML

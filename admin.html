@@ -1728,7 +1728,9 @@ window.generateContractFromForm = function() {
   const freq = document.getElementById('f-freq')?.value || 'weekly';
   // Get client lang for Spanish civil code compliance
   const clientLang = document.getElementById('f-lang')?.value || 'es';
+  const contractNum = (freq === 'cash' ? 'LMG-CASH-' : 'LMG-') + new Date().getFullYear() + '-' + String(Date.now()).slice(-5);
   const params = new URLSearchParams({
+    contractNum: contractNum,
     name: name,
     phone: document.getElementById('f-phone')?.value.trim() || '',
     dob: document.getElementById('f-dob')?.value || '',
@@ -1776,7 +1778,9 @@ window.generateContract = function(clientId) {
   if(!c) return;
   
   // Build contract URL with client data as query params
+  const contractNum = (c.freq === 'cash' ? 'LMG-CASH-' : 'LMG-') + new Date().getFullYear() + '-' + String(Date.now()).slice(-5);
   const params = new URLSearchParams({
+    contractNum: contractNum,
     name: c.name || '',
     phone: c.phone || '',
     dob: c.dob || '',
