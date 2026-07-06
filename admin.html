@@ -214,6 +214,7 @@
     </div>
     <div class="header-right">
       <span class="sync-status" id="sync-status">● En línea</span>
+      <button onclick="migratePhones()" style="background:rgba(138,180,255,0.15);color:#8ab4ff;border:1px solid #8ab4ff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.5px;margin-right:8px;" title="Corre esto UNA sola vez para el login del portal">🔧 Migrar teléfonos</button>
       <button class="logout-btn" onclick="adminLogout()">Salir</button>
     </div>
   </header>
@@ -232,7 +233,6 @@
     <div style="display:flex;gap:8px;">
       <button onclick="sendDayMessages()" style="background:var(--navy3);color:var(--gold);border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">💬 ENVIAR SMS A TODOS</button>
       <button onclick="exportCalendar()" style="background:var(--navy3);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">📆 EXPORTAR CALENDARIO</button>
-      <button onclick="migratePhones()" style="background:var(--navy3);color:#8ab4ff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;" title="Corre esto UNA vez para el login del portal">🔧 MIGRAR TELÉFONOS</button>
     </div>
   </div>
   <div id="today-list" style="padding:16px 20px;"></div>
