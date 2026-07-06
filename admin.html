@@ -500,7 +500,7 @@ window.adminLogin = async function() {
     await signInWithEmailAndPassword(auth, email, pass);
     // onAuthStateChanged maneja el resto
   } catch(e) {
-    errEl.textContent = 'Correo o contraseña incorrectos';
+    errEl.textContent = 'No entró — código: ' + (e.code || e.message);
   }
 };
 
