@@ -131,12 +131,20 @@
     <img src="logo.png" class="login-logo" onerror="this.style.display='none'">
     <div class="login-tagline">Drive Your Legacy</div>
     <div class="login-title">Consulta tu cuenta</div>
-    <label class="fl">Número de Teléfono</label>
-    <input class="fi" type="tel" id="l-phone" placeholder="555 555 5555" onkeydown="if(event.key==='Enter')doLogin()">
-    <label class="fl">Contraseña</label>
-    <input class="fi" type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="login-btn" onclick="doLogin()">VER MI CUENTA</button>
+    <div id="step-phone">
+      <label class="fl">Número de Teléfono</label>
+      <input class="fi" type="tel" id="l-phone" placeholder="555 555 5555" onkeydown="if(event.key==='Enter')sendCode()">
+      <button class="login-btn" id="send-code-btn" onclick="sendCode()">ENVIAR CÓDIGO</button>
+      <div style="font-size:11px;color:#8a93a6;margin-top:10px;">Te enviaremos un código por mensaje de texto (SMS).</div>
+    </div>
+    <div id="step-code" style="display:none;">
+      <label class="fl">Código que recibiste por SMS</label>
+      <input class="fi" type="tel" inputmode="numeric" id="l-code" placeholder="123456" onkeydown="if(event.key==='Enter')verifyCode()">
+      <button class="login-btn" id="verify-code-btn" onclick="verifyCode()">VERIFICAR</button>
+      <button onclick="backToPhone()" style="background:transparent;border:none;color:#8a93a6;font-size:12px;cursor:pointer;margin-top:10px;">← Cambiar número</button>
+    </div>
     <div class="login-error" id="l-error"></div>
+    <div id="recaptcha-container"></div>
     <div class="login-footer">¿Necesitas ayuda? <a href="https://wa.me/15592345678">Contáctanos</a></div>
   </div>
 </div>
@@ -156,8 +164,9 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 // Convert any picked image (including iPhone HEIC) to a web-friendly JPEG via canvas.
 // Runs on the phone where the browser can decode HEIC; if a browser can't decode
@@ -184,7 +193,7 @@ function toJpeg(file){
 
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
+  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
   authDomain: "legacy-motors-garage.firebaseapp.com",
   projectId: "legacy-motors-garage",
   storageBucket: "legacy-motors-garage.firebasestorage.app",
@@ -194,6 +203,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 let currentClient = null;
 
@@ -211,43 +221,69 @@ function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
 function calcProgress(c) { const t=Number(c.total); if(!t) return 0; return Math.min(100,Math.round(calcPaid(c)/t*100)); }
 function getStatus(c) { const n=getNextPayDate(c); if(!n) return 'ok'; const d=daysUntil(n); if(d<0) return 'overdue'; if(d<=3) return 'soon'; return 'ok'; }
 
-window.doLogin = async function() {
-  const phone = normalizePhone(document.getElementById('l-phone').value);
-  const pass = document.getElementById('l-pass').value.trim();
-  const errEl = document.getElementById('l-error');
-  errEl.textContent = 'Verificando...';
+let confirmationResult = null;
+function showLoginError(msg){ const e=document.getElementById('l-error'); if(e) e.textContent = msg||''; }
 
-  if(!phone||!pass){errEl.textContent='Ingresa tu teléfono y contraseña';return;}
-
-  try {
-    const snap = await getDocs(collection(db,'clients'));
-    const match = snap.docs.map(d=>({id:d.id,...d.data()})).find(c =>
-      normalizePhone(c.phone||'') === phone && (c.portalPass||'') === pass
-    );
-    if(match){
-      currentClient = match;
-      errEl.textContent = '';
-      document.getElementById('login-screen').style.display='none';
-      document.getElementById('app').style.display='block';
-      renderPortal();
-      updateInsuranceDisplay();
-      updateIDDisplay();
-      // Track last login
-      try {
-        const db2 = getFirestore();
-        await setDoc(doc(db2,'clients',match.id), {
-          ...match,
-          lastLogin: new Date().toISOString(),
-          loginCount: (match.loginCount||0) + 1
-        });
-      } catch(e) { console.log('Login tracking error:', e); }
-    } else {
-      errEl.textContent = 'Teléfono o contraseña incorrectos';
-    }
-  } catch(e) {
-    errEl.textContent = 'Error de conexión. Intenta de nuevo.';
-  }
+window.backToPhone = function(){
+  document.getElementById('step-code').style.display='none';
+  document.getElementById('step-phone').style.display='block';
+  document.getElementById('l-code').value='';
+  showLoginError('');
 };
+
+window.sendCode = async function(){
+  const digits = String(document.getElementById('l-phone').value||'').replace(/\D/g,'');
+  showLoginError('');
+  let e164='';
+  if(digits.length===10) e164='+1'+digits;
+  else if(digits.length===11 && digits[0]==='1') e164='+'+digits;
+  else { showLoginError('Escribe un número de 10 dígitos'); return; }
+  const btn=document.getElementById('send-code-btn'); btn.disabled=true; btn.textContent='ENVIANDO...';
+  try{
+    if(!window._recaptcha){ window._recaptcha = new RecaptchaVerifier(auth, 'recaptcha-container', {size:'invisible'}); }
+    confirmationResult = await signInWithPhoneNumber(auth, e164, window._recaptcha);
+    document.getElementById('step-phone').style.display='none';
+    document.getElementById('step-code').style.display='block';
+    const cf=document.getElementById('l-code'); if(cf) cf.focus();
+  }catch(err){
+    showLoginError('No se pudo enviar el código. Revisa el número e intenta de nuevo.');
+    try{ if(window._recaptcha){ window._recaptcha.clear(); window._recaptcha=null; } }catch(_){}
+  }
+  btn.disabled=false; btn.textContent='ENVIAR CÓDIGO';
+};
+
+window.verifyCode = async function(){
+  const code = String(document.getElementById('l-code').value||'').trim();
+  showLoginError('');
+  if(!code || !confirmationResult){ showLoginError('Escribe el código que recibiste por SMS'); return; }
+  const btn=document.getElementById('verify-code-btn'); btn.disabled=true; btn.textContent='VERIFICANDO...';
+  try{
+    await confirmationResult.confirm(code);
+    // onAuthStateChanged carga el portal
+  }catch(err){
+    showLoginError('Código incorrecto. Intenta de nuevo.');
+  }
+  btn.disabled=false; btn.textContent='VERIFICAR';
+};
+
+// Al verificar el SMS cargamos SOLO su expediente (las reglas solo permiten el que coincide con su teléfono)
+onAuthStateChanged(auth, async (user)=>{
+  if(!user || !user.phoneNumber){
+    document.getElementById('app').style.display='none';
+    document.getElementById('login-screen').style.display='flex';
+    return;
+  }
+  try{
+    const qs = await getDocs(query(collection(db,'clients'), where('phoneE164','==', user.phoneNumber)));
+    if(qs.empty){ showLoginError('No encontramos una cuenta con ese número. Contáctanos para ayudarte.'); await signOut(auth); return; }
+    currentClient = { id: qs.docs[0].id, ...qs.docs[0].data() };
+    showLoginError('');
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    renderPortal(); updateInsuranceDisplay(); updateIDDisplay();
+    try{ await updateDoc(doc(db,'clients',currentClient.id), { lastLogin: new Date().toISOString() }); }catch(e){}
+  }catch(e){ showLoginError('Error de conexión. Intenta de nuevo.'); }
+});
 
 function updateInsuranceDisplay() {
   const c = currentClient;
@@ -320,10 +356,8 @@ window.updateID = async function() {
       idPhotoURL = await getDownloadURL(idRef);
     }
     
-    const db2 = getFirestore();
-    const updated = { ...currentClient, idType, idNumber, idPhotoURL };
-    await setDoc(doc(db2,'clients',currentClient.id), updated);
-    currentClient = updated;
+    await updateDoc(doc(db,'clients',currentClient.id), { idType, idNumber, idPhotoURL });
+    currentClient = { ...currentClient, idType, idNumber, idPhotoURL };
     
     document.getElementById('id-success').style.display='block';
     document.getElementById('id-edit-form').style.display='none';
@@ -388,15 +422,7 @@ window.updateInsurance = async function() {
       photoURL = await getDownloadURL(photoRef);
     }
     
-    const db2 = getFirestore();
-    const updated = {
-      ...currentClient,
-      insurance: number,
-      insuranceCompany: company,
-      insuranceExp: expDate,
-      insurancePhotoURL: photoURL
-    };
-    await setDoc(doc(db2,'clients',currentClient.id), updated);
+    await updateDoc(doc(db,'clients',currentClient.id), { insurance: number, insuranceCompany: company, insuranceExp: expDate, insurancePhotoURL: photoURL });
     currentClient = {...currentClient, insurance: number, insuranceCompany: company, insuranceExp: expDate, insurancePhotoURL: photoURL};
     document.getElementById('ins-success').style.display='block';
     document.getElementById('ins-success').textContent = photoFile ? '✓ Seguro e imagen actualizados / Insurance and photo updated' : '✓ Seguro actualizado / Insurance updated';
@@ -410,12 +436,16 @@ window.updateInsurance = async function() {
   btn.disabled = false;
 };
 
-window.doLogout = function() {
+window.doLogout = async function() {
   currentClient = null;
+  try{ await signOut(auth); }catch(e){}
   document.getElementById('app').style.display='none';
+  const sc=document.getElementById('step-code'), sp=document.getElementById('step-phone');
+  if(sc) sc.style.display='none'; if(sp) sp.style.display='block';
+  const ph=document.getElementById('l-phone'); if(ph) ph.value='';
+  const cd=document.getElementById('l-code'); if(cd) cd.value='';
+  showLoginError('');
   document.getElementById('login-screen').style.display='flex';
-  document.getElementById('l-phone').value='';
-  document.getElementById('l-pass').value='';
 };
 
 function renderPortal() {

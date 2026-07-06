@@ -290,6 +290,19 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
   <button onclick="adminLogout()" style="background:var(--cream2);color:var(--black);border:none;padding:5px 16px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;">EXIT</button>
 </div>
 
+<!-- STAFF LOGIN MODAL -->
+<div id="admin-login-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:100000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#12161f;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.6);">
+    <div style="font-family:var(--font-display);font-size:22px;color:#fff;margin-bottom:4px;">Acceso Staff</div>
+    <div style="font-size:12px;color:#888;margin-bottom:18px;letter-spacing:1px;">Solo personal autorizado</div>
+    <input id="admin-login-email" type="email" placeholder="Correo" autocomplete="username" style="width:100%;box-sizing:border-box;background:#0a0d18;border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:12px;color:#fff;font-size:14px;margin-bottom:10px;">
+    <input id="admin-login-pass" type="password" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAdminLogin()" style="width:100%;box-sizing:border-box;background:#0a0d18;border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:12px;color:#fff;font-size:14px;margin-bottom:8px;">
+    <div id="admin-login-error" style="color:#ff5a5a;font-size:12px;min-height:16px;margin-bottom:8px;"></div>
+    <button onclick="doAdminLogin()" style="width:100%;background:linear-gradient(135deg,#f0c040,#c8960c);color:#000;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">Entrar</button>
+    <button onclick="document.getElementById('admin-login-modal').style.display='none'" style="width:100%;background:transparent;color:#888;border:none;padding:10px;font-size:13px;cursor:pointer;margin-top:4px;">Cancelar</button>
+  </div>
+</div>
+
 <nav id="navbar">
   <div class="nav-logo">
     <a href="#"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABgAAAAQACAYAAAAncZJCAAAAAXNSR0IArs4c6QAAAIRlWElmTU0A
@@ -14648,9 +14661,10 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-0ti5j8",
+  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
   authDomain: "legacy-motors-garage.firebaseapp.com",
   projectId: "legacy-motors-garage",
   storageBucket: "legacy-motors-garage.firebasestorage.app",
@@ -14659,10 +14673,11 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 const storage = getStorage(app);
 
-const ADMIN_PASS='lmg2025admin';
-let isAdmin=sessionStorage.getItem('lmg_admin')==='true';
+const STAFF_EMAILS=['ev@legacymotorsgarage.com'];
+let isAdmin=false;
 let cars=[];
 let editingCarId=null;
 
@@ -14685,12 +14700,35 @@ window.toggleMenu = function(){document.getElementById('mobile-menu').classList.
 
 window.setAdmin = function(on){
   isAdmin=on;
-  if(on){sessionStorage.setItem('lmg_admin','true');document.getElementById('admin-bar').classList.add('on');document.getElementById('add-car-btn').style.display='block';}
-  else{sessionStorage.removeItem('lmg_admin');document.getElementById('admin-bar').classList.remove('on');document.getElementById('add-car-btn').style.display='none';}
+  if(on){document.getElementById('admin-bar').classList.add('on');const b=document.getElementById('add-car-btn');if(b)b.style.display='block';}
+  else{document.getElementById('admin-bar').classList.remove('on');const b=document.getElementById('add-car-btn');if(b)b.style.display='none';}
   if(typeof renderCars==='function')renderCars();
 }
-window.adminLogout = function(){setAdmin(false);}
-if(isAdmin)setAdmin(true);
+window.adminLogout = function(){ signOut(auth); };
+
+// Staff login modal
+window.triggerAdmin = function(){ const m=document.getElementById('admin-login-modal'); if(m){ m.style.display='flex'; const e=document.getElementById('admin-login-email'); if(e) e.focus(); } };
+window.doAdminLogin = async function(){
+  const email=(document.getElementById('admin-login-email').value||'').trim().toLowerCase();
+  const pass=document.getElementById('admin-login-pass').value;
+  const err=document.getElementById('admin-login-error'); err.textContent='';
+  if(!email||!pass){ err.textContent='Escribe correo y contraseña'; return; }
+  try{ await signInWithEmailAndPassword(auth,email,pass); }
+  catch(e){ err.textContent='Correo o contraseña incorrectos'; }
+};
+
+// Firebase Auth drives admin mode (los writes están forzados por las reglas de todos modos)
+onAuthStateChanged(auth, (user)=>{
+  const isStaff = user && STAFF_EMAILS.includes((user.email||'').toLowerCase());
+  if(isStaff && user.emailVerified){
+    const m=document.getElementById('admin-login-modal'); if(m) m.style.display='none';
+    const err=document.getElementById('admin-login-error'); if(err) err.textContent='';
+    setAdmin(true);
+  } else {
+    if(isStaff && !user.emailVerified){ const err=document.getElementById('admin-login-error'); if(err) err.textContent='Verifica tu correo (entra al panel admin para reenviar el link).'; }
+    setAdmin(false);
+  }
+});
 
 let adminKey='';
 // Mobile: tap logo 5 times to activate admin
@@ -14704,8 +14742,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     clearTimeout(logoTimer);
     if(logoTaps>=5){
       logoTaps=0;
-      const p=prompt('Admin password:');
-      if(p===ADMIN_PASS) setAdmin(true);
+      triggerAdmin();
     } else {
       logoTimer=setTimeout(()=>{logoTaps=0;},2000);
     }
@@ -14717,11 +14754,7 @@ window.handleLogoTap = function(){
   clearTimeout(logoTimer);
   if(logoTaps>=5){
     logoTaps=0;
-    const p=prompt('Admin password:');
-    if(p===ADMIN_PASS){
-      sessionStorage.setItem('lmg_admin','true');
-      setAdmin(true);
-    }
+    triggerAdmin();
   } else {
     logoTimer=setTimeout(()=>{logoTaps=0;},2000);
   }
@@ -14729,7 +14762,7 @@ window.handleLogoTap = function(){
 
 document.addEventListener('keydown',e=>{
   adminKey+=e.key;
-  if(adminKey.includes('admin')){const p=prompt('Admin password:');if(p===ADMIN_PASS)setAdmin(true);adminKey='';}
+  if(adminKey.includes('admin')){triggerAdmin();adminKey='';}
   if(adminKey.length>10)adminKey='';
 });
 
