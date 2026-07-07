@@ -214,7 +214,6 @@
     </div>
     <div class="header-right">
       <span class="sync-status" id="sync-status">● En línea</span>
-      <button onclick="migratePhones()" style="background:rgba(138,180,255,0.15);color:#8ab4ff;border:1px solid #8ab4ff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.5px;margin-right:8px;" title="Corre esto UNA sola vez para el login del portal">🔧 Migrar teléfonos</button>
       <button class="logout-btn" onclick="adminLogout()">Salir</button>
     </div>
   </header>
@@ -500,7 +499,10 @@ window.adminLogin = async function() {
     await signInWithEmailAndPassword(auth, email, pass);
     // onAuthStateChanged maneja el resto
   } catch(e) {
-    errEl.textContent = 'No entró — código: ' + (e.code || e.message);
+    const code = e.code || '';
+    errEl.textContent = code === 'auth/too-many-requests' ? 'Demasiados intentos. Espera unos minutos e intenta de nuevo.'
+      : code === 'auth/network-request-failed' ? 'Sin conexión. Revisa tu internet.'
+      : 'Correo o contraseña incorrectos';
   }
 };
 
