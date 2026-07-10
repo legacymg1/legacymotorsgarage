@@ -323,6 +323,13 @@
       </select>
     </div>
     <div class="form-row">
+      <div class="form-group" style="background:rgba(232,182,74,0.06);border:1px solid rgba(232,182,74,0.25);border-radius:10px;padding:12px;">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+          <input type="checkbox" id="f-sms-consent" style="margin-top:3px;width:18px;height:18px;flex:none;cursor:pointer;">
+          <span style="line-height:1.45;"><strong style="color:var(--gold);font-size:13px;">Consentimiento SMS de marketing</strong><br>
+          <span style="color:var(--muted);font-size:12px;">El cliente autorizó <b>por escrito</b> recibir mensajes de cumpleaños, servicio y promociones. No es obligatorio para el crédito.</span></span>
+        </label>
+      </div>
       <div class="form-group"><label class="form-label">Contraseña Portal</label><input class="form-input" id="f-pass" placeholder="Crea una contraseña"></div>
       <div class="form-group"><label class="form-label">Año del Carro</label><input class="form-input" id="f-year" placeholder="2019" type="number"></div>
     </div>
@@ -403,7 +410,8 @@
       </select>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Fecha de Contrato</label><input class="form-input" id="f-contractdate" type="date"></div>
+      <div class="form-group"><label class="form-label">Fecha de Contrato</label><input class="form-input" id="f-contractdate" type="date" onchange="autoFillService()"></div>
+      <div class="form-group"><label class="form-label">Último Servicio</label><input class="form-input" id="f-lastservice" type="date" onchange="autoFillService()"><div class="form-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Se llena solo con la fecha del contrato. Cámbiala cuando el carro regrese al taller.</div></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha Primer Pago</label><input class="form-input" id="f-startdate" type="date" onchange="setTimeout(calcHint,50)"></div>
@@ -462,7 +470,7 @@
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, updateDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -1020,7 +1028,8 @@ window.toggleSchedule=function(id){const el=document.getElementById('sched-'+id)
 window.openAddModal=function(){
   editingId=null;
   document.getElementById('modal-title').textContent='NUEVO CLIENTE';
-  ['name','phone','pass','make','model','year','total','down','weekly','notes'].forEach(f=>document.getElementById('f-'+f).value='');
+  ['name','phone','pass','make','model','year','total','down','weekly','notes','dob','contractdate','lastservice','vin','miles','address','city','zip','id-number'].forEach(f=>{const el=document.getElementById('f-'+f);if(el)el.value='';});
+  const _c=document.getElementById('f-sms-consent'); if(_c) _c.checked=false;
   document.getElementById('f-startdate').value=today();
   document.getElementById('f-numpay').value='';
   document.getElementById('f-hint').textContent='';
@@ -1051,6 +1060,8 @@ window.openEditModal=function(id){
   const setDate=(id,val)=>{const el=document.getElementById(id);if(el&&val){el.value=val;el.setAttribute('value',val);}};
   setDate('f-dob', c.dob);
   setDate('f-contractdate', c.contractDate);
+  setDate('f-lastservice', c.lastServiceDate || c.contractDate);
+  const _ck=document.getElementById('f-sms-consent'); if(_ck) _ck.checked = !!(c.smsConsent && c.smsConsent.marketing);
   setDate('f-startdate', c.startDate||today());
   setDate('f-id-expiry', c.idExpiry);
   setDate('f-insurance-exp', c.insuranceExp);
@@ -1132,6 +1143,14 @@ window.saveClient=async function(){
     phone:document.getElementById('f-phone').value.trim(),
     phoneE164:toE164(document.getElementById('f-phone').value),
     dob:document.getElementById('f-dob')?.value || existing.dob || '',
+    lastServiceDate:document.getElementById('f-lastservice')?.value || existing.lastServiceDate || contractDate || '',
+    smsConsent:(()=>{
+      const on = !!document.getElementById('f-sms-consent')?.checked;
+      const prev = existing.smsConsent || null;
+      if(on && prev && prev.marketing) return prev;                                  // conserva la fecha original del consentimiento
+      if(on) return { marketing:true, date:new Date().toISOString(), source:'admin' };
+      return { marketing:false, date:(prev&&prev.date)||null, source:(prev&&prev.source)||'admin' };
+    })(),
     address:document.getElementById('f-address')?.value.trim() || existing.address || '',
     city:document.getElementById('f-city')?.value.trim() || existing.city || '',
     state:document.getElementById('f-state')?.value.trim() || existing.state || '',
@@ -1456,25 +1475,55 @@ function getBirthdayClients() {
   });
 }
 
-// Service reminder: contractDate exactly 3, 6, 9, 12 months ago (±1 day window)
+// Fecha base del servicio: el ultimo servicio real; si nunca ha venido, la venta (sale ya servido)
+function serviceBaseDate(c) { return c.lastServiceDate || c.contractDate || ''; }
+function monthsSinceService(c) {
+  const base = serviceBaseDate(c);
+  if(!base) return 0;
+  return Math.round((new Date(today()+'T12:00:00') - new Date(base+'T12:00:00')) / (86400000*30));
+}
+// Recordatorio de servicio: >= 90 dias desde el ultimo servicio.
+// Persiste hasta que se registre el servicio (antes solo aparecia el dia exacto 90/180/270 y se perdia).
 function getServiceReminderClients() {
   const todayD = new Date(today()+'T12:00:00');
   return clients.filter(c => {
-    if(!c.contractDate) return false;
-    const start = new Date(c.contractDate+'T12:00:00');
-    const diffDays = Math.round((todayD - start)/86400000);
-    // Check every 90-day interval (3mo, 6mo, 9mo, 12mo...)
-    return diffDays > 0 && diffDays % 90 === 0;
+    const base = serviceBaseDate(c);
+    if(!base) return false;
+    return Math.round((todayD - new Date(base+'T12:00:00'))/86400000) >= 90;
   });
 }
+
+// Consentimiento de marketing (TCPA): cumpleanos y servicio son marketing, no transaccional.
+function marketingOk(c) {
+  if(c.smsConsent && c.smsConsent.marketing) return true;
+  return confirm(`⚠️ ${c.name} NO tiene consentimiento de marketing por escrito.\n\nLos mensajes de cumpleaños y servicio se consideran marketing bajo la ley TCPA. Enviarlos sin consentimiento firmado tiene riesgo legal ($500–$1,500 por mensaje).\n\n¿Enviar de todos modos?`);
+}
+
+window.autoFillService = function() {
+  const cd = document.getElementById('f-contractdate');
+  const ls = document.getElementById('f-lastservice');
+  if(cd && ls && cd.value && !ls.value) ls.value = cd.value;
+};
+
+// Reinicia el contador de servicio
+window.markServiced = async function(id) {
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  if(!confirm(`¿Registrar que ${c.name} trajo su ${c.year} ${c.make} ${c.model} a servicio HOY?\n\nEl contador se reinicia y el próximo recordatorio será en 3 meses.`)) return;
+  try {
+    await updateDoc(doc(db,'clients',id), { lastServiceDate: today(), updatedAt: new Date().toISOString() });
+    alert('✅ Servicio registrado. Próximo recordatorio en 3 meses.');
+  } catch(e) { alert('Error al registrar: ' + e.message); }
+};
 
 window.sendServiceMsg = function(id) {
   const c = clients.find(x => x.id === id);
   if(!c) return;
+  if(!marketingOk(c)) return;
   const lang = c.lang || 'es';
   const nombre = c.name.split(' ')[0];
   const carro = `${c.year} ${c.make} ${c.model}`;
-  const months = c.contractDate ? Math.round((new Date(today()+'T12:00:00') - new Date(c.contractDate+'T12:00:00')) / (86400000*30)) : 3;
+  const months = monthsSinceService(c) || 3;
   let msg;
   if(lang === 'en'){
     msg = `Hi ${nombre}! 🚗🔧 Legacy Motors Garage LLC here.\n\nIt's been ${months} months since you got your ${carro} — time for a quick check-up!\n\nAs our valued customer, we're happy to offer you a FREE general inspection. Come by and let us make sure everything is running perfectly for you.\n\n📍 Visit us anytime — no appointment needed!\n📞 (559) 540-5145\n\nWe appreciate your trust! 😊\n— Legacy Motors Garage LLC`;
@@ -1488,6 +1537,7 @@ window.sendServiceMsg = function(id) {
 window.sendBirthdayMsg = function(id) {
   const c = clients.find(x => x.id === id);
   if(!c) return;
+  if(!marketingOk(c)) return;
   const lang = c.lang || 'es';
   let msg;
   if(lang === 'en'){
@@ -1544,13 +1594,18 @@ function renderTodayBox() {
     html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#00bcd4;margin-bottom:10px;">🔧 RECORDATORIO DE SERVICIO</div>`;
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">';
     serviceClients.forEach(c => {
-      const months = Math.round((new Date(today()+'T12:00:00') - new Date(c.contractDate+'T12:00:00')) / (86400000*30));
+      const months = monthsSinceService(c);
+      const nunca = !c.lastServiceDate;
       html += `<div style="background:rgba(0,188,212,0.08);border:1px solid rgba(0,188,212,0.3);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
         <div>
           <div style="font-weight:600;font-size:15px;">${c.name}</div>
-          <div style="font-size:12px;color:#00bcd4;margin-top:2px;">🔧 ${months} meses · ${c.year} ${c.make} ${c.model}</div>
+          <div style="font-size:12px;color:#00bcd4;margin-top:2px;">🔧 ${months} meses sin servicio · ${c.year} ${c.make} ${c.model}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px;">desde ${nunca?'la venta':'su último servicio'}</div>
         </div>
-        <button onclick="sendServiceMsg('${c.id}')" style="background:#00bcd4;color:#000;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">💬 Servicio</button>
+        <div style="display:flex;flex-direction:column;gap:6px;flex:none;">
+          <button onclick="sendServiceMsg('${c.id}')" style="background:#00bcd4;color:#000;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">💬 Servicio</button>
+          <button onclick="markServiced('${c.id}')" style="background:transparent;color:#00bcd4;border:1px solid #00bcd4;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">✅ Ya vino</button>
+        </div>
       </div>`;
     });
     html += '</div>';
