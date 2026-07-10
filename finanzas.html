@@ -541,7 +541,7 @@ window.onDeptChange = function(){
   const dept=document.getElementById('e-dept').value;
   const cat=document.getElementById('e-cat');
   cat.innerHTML=(EXP_CATS[dept]||[]).map(c=>`<option>${c}</option>`).join('');
-  document.getElementById('e-car-row').style.display = dept==='dealer' ? 'block':'none';
+  document.getElementById('e-car-row').style.display = (dept==='dealer'||dept==='parts') ? 'block':'none';
 };
 window.previewReceipt = function(){
   const f=document.getElementById('e-receipt').files[0]; const box=document.getElementById('e-receipt-preview');
