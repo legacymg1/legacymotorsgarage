@@ -193,6 +193,17 @@
 <body>
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a></nav>
 
+<!-- AUDITORIA DE SALDOS (temporal) -->
+<div class="modal-overlay" id="audit-modal">
+  <div class="modal" style="max-width:1000px;width:100%;max-height:88vh;overflow-y:auto;">
+    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="modal-title">🔍 Auditoría de Saldos</div>
+      <button onclick="closeModal('audit-modal')" style="background:transparent;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div id="audit-body" style="padding:4px 2px;"></div>
+  </div>
+</div>
+
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-box">
@@ -216,6 +227,8 @@
     </div>
     <div class="header-right">
       <span class="sync-status" id="sync-status">● En línea</span>
+      <button onclick="downloadBackup()" id="backup-btn" title="Descarga toda la base a tu computadora" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;">💾 Respaldo</button>
+      <button onclick="auditBalances()" id="audit-btn" style="background:#8b1a1a;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">🔍 Auditar Saldos</button>
       <button class="logout-btn" onclick="adminLogout()">Salir</button>
     </div>
   </header>
@@ -1460,6 +1473,122 @@ window.sendWhatsApp=function(){
 };
 
 document.getElementById('wa-text').addEventListener('input',function(){document.getElementById('wa-preview').textContent=this.value;});
+
+// ============ RESPALDO ============
+// Descarga TODA la base a tu computadora. Los datos no pasan por ningun servidor ajeno.
+window.downloadBackup = async function() {
+  const btn = document.getElementById('backup-btn');
+  const orig = btn.textContent; btn.textContent = 'Respaldando...'; btn.disabled = true;
+  try {
+    const inv  = await getDocs(collection(db, 'inventory'));
+    const subs = await getDocs(collection(db, 'subscriptions'));
+    const withConsents = [];
+    for(const c of clients) {
+      let consents = [];
+      try { consents = (await getDocs(collection(db,'clients',c.id,'consents'))).docs.map(d=>({id:d.id,...d.data()})); } catch(e){}
+      withConsents.push({ ...c, _consents: consents });
+    }
+    const data = {
+      exportedAt: new Date().toISOString(),
+      exportedBy: (auth.currentUser && auth.currentUser.email) || 'desconocido',
+      schemaNote: 'Respaldo completo de Legacy DMS. clients incluye subcoleccion _consents.',
+      clients: withConsents,
+      inventory: inv.docs.map(d=>({id:d.id,...d.data()})),
+      subscriptions: subs.docs.map(d=>({id:d.id,...d.data()}))
+    };
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `legacy-dms-respaldo-${today()}.json`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    alert(`✅ Respaldo descargado.\n\n${withConsents.length} clientes · ${inv.size} vehiculos · ${subs.size} suscripciones\n\nGuardalo en un lugar seguro: contiene datos personales de tus clientes.`);
+  } catch(e) { alert('Error al respaldar: ' + e.message); }
+  btn.textContent = orig; btn.disabled = false;
+};
+
+// ============ AUDITORIA DE SALDOS ============
+// Solo LEE. Nada se guarda, nada sale de este navegador.
+// Saldo real = (pago x numero de pagos del contrato) - lo que ha pagado.
+// Saldo mostrado = precio del vehiculo - (enganche + lo que ha pagado)   <-- ignora el interes
+window.auditBalances = function() {
+  const rows = [];
+  let totalRiesgo = 0, criticos = 0, cerca = 0;
+
+  clients.forEach(c => {
+    if((c.freq||'') === 'cash') return;                 // contado: no financia, no aplica
+    const numPay  = (c.schedule||[]).length;
+    const weekly  = Number(c.weekly)||0;
+    if(!numPay || !weekly) return;
+
+    const pagos     = (c.payments||[]);
+    const pagado    = pagos.reduce((s,p)=>s+Number(p.amount||0),0);
+    const totalReal = weekly * numPay;                  // total de pagos del contrato
+    const saldoReal = Math.max(0, totalReal - pagado);
+    const saldoMostrado = calcBalance(c);               // la formula actual
+    const diff = saldoReal - saldoMostrado;
+
+    // ¿En que pago la formula actual llega a cero?
+    const puntoFalso = weekly > 0 ? Math.ceil((Number(c.total||0) - Number(c.down||0)) / weekly) : 0;
+    const parciales = pagos.filter(p => p.schedDate && Number(p.amount) < weekly - 0.01).length;
+
+    let estado, orden;
+    if(saldoMostrado <= 0 && saldoReal > 0.5) { estado = '🔴 CRÍTICO'; orden = 0; criticos++; }
+    else if(puntoFalso && pagos.length >= puntoFalso - 3) { estado = '🟠 CERCA'; orden = 1; cerca++; }
+    else { estado = '✅'; orden = 2; }
+
+    totalRiesgo += diff;
+    rows.push({ nombre:c.name, carro:`${c.year} ${c.make} ${c.model}`, hechos:pagos.length, numPay,
+                saldoMostrado, saldoReal, diff, estado, orden, parciales, puntoFalso });
+  });
+
+  rows.sort((a,b) => a.orden - b.orden || b.diff - a.diff);
+
+  const cell = 'padding:9px 10px;border-bottom:1px solid var(--border);font-size:13px;';
+  let html = `
+    <div style="background:rgba(255,59,59,0.08);border:1px solid var(--red);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:15px;font-weight:700;color:var(--red);margin-bottom:8px;">Dinero no contabilizado: ${formatMoney(totalRiesgo)}</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6;">
+        Diferencia entre lo que dice el contrato y lo que muestra el sistema, sumando ${rows.length} cliente(s) a plazos.<br>
+        <strong style="color:var(--red);">${criticos}</strong> en estado crítico (el sistema ya los da por pagados) ·
+        <strong style="color:#ff9500;">${cerca}</strong> a menos de 3 pagos de llegar ahí.
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;">
+      🔒 Este reporte se calcula en tu navegador. Ningún dato sale de esta pantalla.
+    </div>
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;">
+        <th style="${cell}">Cliente</th><th style="${cell}">Pagos</th>
+        <th style="${cell}">Saldo que muestra</th><th style="${cell}">Saldo real</th>
+        <th style="${cell}">Diferencia</th><th style="${cell}">Parciales</th><th style="${cell}">Estado</th>
+      </tr></thead><tbody>`;
+
+  if(!rows.length) html += `<tr><td colspan="7" style="${cell}color:var(--muted);">No hay clientes a plazos.</td></tr>`;
+  rows.forEach(r => {
+    const bg = r.orden===0 ? 'background:rgba(255,59,59,0.07);' : r.orden===1 ? 'background:rgba(255,149,0,0.06);' : '';
+    html += `<tr style="${bg}">
+      <td style="${cell}"><div style="font-weight:600;">${r.nombre}</div><div style="font-size:11px;color:var(--muted);">${r.carro}</div></td>
+      <td style="${cell}">${r.hechos} / ${r.numPay}<div style="font-size:10px;color:var(--muted);">falso pago #${r.puntoFalso}</div></td>
+      <td style="${cell}color:var(--muted);">${formatMoney(r.saldoMostrado)}</td>
+      <td style="${cell}color:var(--gold);font-weight:600;">${formatMoney(r.saldoReal)}</td>
+      <td style="${cell}color:var(--red);font-weight:700;">${formatMoney(r.diff)}</td>
+      <td style="${cell}">${r.parciales ? '⚠️ ' + r.parciales : '—'}</td>
+      <td style="${cell}white-space:nowrap;">${r.estado}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:16px;line-height:1.6;border-top:1px solid var(--border);padding-top:14px;">
+      <strong style="color:var(--text);">Cómo leerlo.</strong> "Saldo real" = pago × número de pagos del contrato, menos lo abonado.
+      "Saldo que muestra" es la fórmula actual, que resta del precio del vehículo e ignora el cargo por financiamiento.<br>
+      <strong style="color:var(--text);">Parciales</strong> = abonos menores a la mensualidad que el sistema contó como mensualidad completa.<br>
+      <strong style="color:var(--text);">Falso pago #N</strong> = el pago en el que el sistema declarará el carro liquidado por error.
+    </div>`;
+
+  document.getElementById('audit-body').innerHTML = html;
+  document.getElementById('audit-modal').classList.add('active');
+};
 
 // TODAY BOX
 function getBirthdayClients() {
