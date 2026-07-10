@@ -152,22 +152,9 @@
     <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
   </div>
 
-  <div class="summary">
-    <div class="stat">
-      <div class="stat-label">📅 Gasto recurrente</div>
-      <div><div class="stat-value gold" id="s-monthly">$0</div><div class="stat-foot">por mes (estimado)</div></div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">⏰ Próxima renovación</div>
-      <div><div class="stat-value" id="s-next">—</div><div class="stat-foot" id="s-next-foot">nada pendiente</div></div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">🧾 Subscripciones</div>
-      <div><div class="stat-value" id="s-count">0</div><div class="stat-foot">activas</div></div>
-    </div>
-  </div>
+  <div id="trial-alert"></div>
 
-  <div class="summary" style="margin-top:4px;">
+  <div class="summary">
     <div class="stat"><div class="stat-label">🚗 Dealer · este mes</div><div><div class="stat-value" id="g-dealer">$0</div><div class="stat-foot">en gastos</div></div></div>
     <div class="stat"><div class="stat-label">🔧 Partes · este mes</div><div><div class="stat-value" id="g-parts">$0</div><div class="stat-foot">en gastos</div></div></div>
     <div class="stat"><div class="stat-label">📦 eBay · este mes</div><div><div class="stat-value" id="g-ebay">$0</div><div class="stat-foot">en gastos</div></div></div>
@@ -179,8 +166,8 @@
   </div>
   <div class="list" id="exp-list"></div>
 
-  <div class="section-head" style="margin-top:28px;">
-    <div class="section-title">Subscripciones y gastos recurrentes</div>
+  <div class="section-head" style="margin-top:32px;">
+    <div class="section-title" style="font-size:15px;color:var(--muted);">Recurrentes y pruebas gratis</div>
     <button class="btn-add" onclick="openSub()">＋ Agregar</button>
   </div>
   <div class="list" id="sub-list"></div>
@@ -219,6 +206,10 @@
         </select>
       </div>
     </div>
+    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:14px;font-size:14px;color:var(--text);line-height:1.4;">
+      <input type="checkbox" id="f-trial" style="width:18px;height:18px;margin-top:1px;flex:none;">
+      <span>🎁 Es prueba gratis — avísame 1 día antes de que termine<br><span style="font-size:12px;color:var(--muted);">La fecha de arriba es cuando termina la prueba.</span></span>
+    </label>
     <div class="field"><label>Nota (opcional)</label><input id="f-note" placeholder="Ej. Plan Blaze, tarjeta terminada en 1234"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeSub()">Cancelar</button>
@@ -237,7 +228,7 @@
       <button class="btn btn-primary" onclick="openMov('contribution')" style="flex:1;">＋ Aportación</button>
       <button class="btn btn-ghost" onclick="openMov('draw')" style="flex:1;">－ Retiro</button>
     </div>
-    <button class="btn btn-ghost" onclick="openSplit('contribution')" style="width:100%;margin-top:8px;">⚡ Aportación 50/50 (los dos meten igual)</button>
+    <button class="btn btn-ghost" onclick="openSplit('contribution')" style="width:100%;margin-top:8px;">⚡ Aportación 50/50</button>
     <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:12px;line-height:1.5;">Aportación = dinero que un socio METE (no es ganancia). Retiro = lo que SACA. El saldo es lo que el negocio le debe a cada quién.</div>
   </div>
 </div>
@@ -582,27 +573,39 @@ function daysUntil(d){ if(!d) return null; const t=new Date(d+'T12:00:00'); cons
 function fmtDate(d){ if(!d) return '—'; return new Date(d+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'short'}); }
 function catIcon(c){ const m={'Software / SaaS':'💻','Procesador de pagos':'💳','Dominio / Web':'🌐','Publicidad':'📣','Seguros':'🛡️','Renta / Local':'🏢','Servicios (luz, internet)':'⚡'}; return m[c]||'🧾'; }
 
+// ---------- AVISO DE PRUEBAS GRATIS ----------
+function renderTrialAlert(){
+  const box=document.getElementById('trial-alert'); if(!box) return;
+  const soon = subs.filter(s=>s.isTrial && s.nextDue)
+                   .map(s=>({s, d:daysUntil(s.nextDue)}))
+                   .filter(x=>x.d!==null && x.d<=1)
+                   .sort((a,b)=>a.d-b.d);
+  if(!soon.length){ box.innerHTML=''; return; }
+  box.innerHTML = soon.map(x=>{
+    const when = x.d<0 ? 'ya terminó' : x.d===0 ? 'termina HOY' : 'termina MAÑANA';
+    return `<div style="background:rgba(255,107,107,0.1);border:1px solid #ff6b6b;border-radius:12px;padding:14px 16px;margin-bottom:12px;">
+      <div style="font-weight:700;color:#ff6b6b;">🎁 Prueba gratis: ${x.s.name} ${when}</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5;">Si no la cancelas, te empiezan a cobrar ${money2(x.s.amount)} ${intervalLabel(x.s.interval)}. Cancélala, o si la vas a conservar quítale la palomita de "prueba".</div>
+    </div>`;
+  }).join('');
+}
+
 // ---------- RENDER ----------
 window.render = function(){
   const list=[...subs].sort((a,b)=>(a.nextDue||'9999').localeCompare(b.nextDue||'9999'));
-  const monthly=subs.reduce((s,x)=>s+toMonthly(x),0);
-  document.getElementById('s-monthly').textContent=money(monthly);
-  document.getElementById('s-count').textContent=subs.length;
-  const next=list.find(s=>s.nextDue);
-  if(next){ const d=daysUntil(next.nextDue); document.getElementById('s-next').textContent=fmtDate(next.nextDue);
-    document.getElementById('s-next-foot').textContent = next.name + (d!=null?` · en ${d}d`:''); }
-  else { document.getElementById('s-next').textContent='—'; document.getElementById('s-next-foot').textContent='nada pendiente'; }
+  renderTrialAlert();
 
   const el=document.getElementById('sub-list');
   if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ic">🧾</div><div class="empty-title">Aún no hay gastos</div><div class="empty-sub">Agrega tus costos recurrentes (Google Cloud, Valor, dominio…) y nunca más te sorprenderá un cobro.</div></div>'; return; }
   el.innerHTML=list.map(s=>{
     const d=daysUntil(s.nextDue);
     const chip = d==null?'' : d<0?`<span class="chip due-soon">vencido</span>` : d<=7?`<span class="chip due-week">en ${d}d</span>` : '';
+    const trialChip = s.isTrial ? `<span class="chip" style="background:rgba(255,107,107,0.15);color:#ff6b6b;">🎁 prueba</span>` : '';
     return `<div class="row" onclick="openSub('${s.id}')">
-      <div class="row-ic">${catIcon(s.category)}</div>
+      <div class="row-ic">${s.isTrial?'🎁':catIcon(s.category)}</div>
       <div class="row-main">
         <div class="row-name">${s.name||'(sin nombre)'}</div>
-        <div class="row-meta"><span class="chip">${s.category||'Otro'}</span><span>Renueva ${fmtDate(s.nextDue)}</span>${chip}</div>
+        <div class="row-meta"><span class="chip">${s.category||'Otro'}</span><span>${s.isTrial?'Termina':'Renueva'} ${fmtDate(s.nextDue)}</span>${trialChip}${chip}</div>
       </div>
       <div class="row-amt"><div class="row-amt-val">${money2(s.amount)}</div><div class="row-amt-int">${intervalLabel(s.interval)}</div></div>
     </div>`;
@@ -620,6 +623,7 @@ window.openSub = function(id){
   document.getElementById('f-next').value = s?.nextDue||'';
   document.getElementById('f-category').value = s?.category||'Software / SaaS';
   document.getElementById('f-note').value = s?.note||'';
+  document.getElementById('f-trial').checked = !!(s && s.isTrial);
   document.getElementById('del-btn').style.display = s?'block':'none';
   document.getElementById('sheet-overlay').classList.add('open');
 };
@@ -638,6 +642,7 @@ window.saveSub = async function(){
     interval: document.getElementById('f-interval').value,
     nextDue: document.getElementById('f-next').value||'',
     category: document.getElementById('f-category').value,
+    isTrial: document.getElementById('f-trial').checked,
     note: document.getElementById('f-note').value.trim(),
     active: true,
     createdAt: existing.createdAt || Date.now(),
