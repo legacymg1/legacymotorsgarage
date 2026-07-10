@@ -490,6 +490,7 @@
     </div>
     <div style="font-family:var(--font-display);font-size:16px;color:var(--muted);margin-top:16px;">HISTORIAL</div>
     <div class="payment-history" id="pay-history"></div>
+    <button type="button" onclick="resendLastReceipt()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:10px;">📩 Reenviar recibo del último pago</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('pay-modal')">Cancelar</button>
       <button class="btn-save" onclick="confirmPayment()">CONFIRMAR</button>
@@ -1474,7 +1475,8 @@ window.confirmPayment = async function(){
   _savingPayment = false;
 
   const enviar = (msg) => {
-    waPhone = c.phone.replace(/\D/g,'');
+    if(!msg){ alert('No se pudo generar el mensaje. Puedes reenviarlo con "📩 Reenviar recibo del último pago".'); return; }
+    waPhone = (c.phone||'').replace(/\D/g,'');
     document.getElementById('wa-preview').textContent = msg;
     document.getElementById('wa-text').value = msg;
     document.getElementById('wa-modal').classList.add('active');
@@ -1582,6 +1584,21 @@ function getOverdueMsg(c, days) {
     .replace(/{saldo}/g, formatMoney(calcBalance(c)))
     .replace(/{dias}/g, days);
 }
+
+window.resendLastReceipt = function(){
+  const c = clients.find(x=>x.id===payingId);
+  if(!c){ alert('Abre el pago de un cliente primero (botón 💵).'); return; }
+  const pays = c.payments||[];
+  if(!pays.length){ alert('Este cliente todavía no tiene pagos registrados.'); return; }
+  const last = pays[pays.length-1];
+  const msg = isPaidOff(c) ? getPaidOffMsg(c) : getThanksMsg(c, getNextPayDate(c), last && last.amount);
+  if(!msg){ alert('No se pudo generar el mensaje.'); return; }
+  waPhone = (c.phone||'').replace(/\D/g,'');
+  document.getElementById('wa-preview').textContent = msg;
+  document.getElementById('wa-text').value = msg;
+  closeModal('pay-modal');
+  document.getElementById('wa-modal').classList.add('active');
+};
 
 function getThanksMsg(c, nextPayDate, paidAmount) {
   const lang = c.lang || 'es';
