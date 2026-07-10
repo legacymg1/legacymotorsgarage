@@ -237,7 +237,26 @@
       <button class="btn btn-primary" onclick="openMov('contribution')" style="flex:1;">＋ Aportación</button>
       <button class="btn btn-ghost" onclick="openMov('draw')" style="flex:1;">－ Retiro</button>
     </div>
+    <button class="btn btn-ghost" onclick="openSplit('contribution')" style="width:100%;margin-top:8px;">⚡ Aportación 50/50 (los dos meten igual)</button>
     <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:12px;line-height:1.5;">Aportación = dinero que un socio METE (no es ganancia). Retiro = lo que SACA. El saldo es lo que el negocio le debe a cada quién.</div>
+  </div>
+</div>
+
+<!-- 50/50 -->
+<div class="overlay" id="split-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title" id="split-title">Aportación 50/50</div><button class="close" onclick="closeSplit()">✕</button></div>
+    <div class="field"><label>Total entre los dos ($)</label><input id="sp-total" type="number" inputmode="decimal" placeholder="0.00"></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;" id="sp-preview"></div>
+    <div class="row2">
+      <div class="field"><label>Bolsa</label><select id="sp-dept"><option value="dealer">🚗 Dealer</option><option value="parts">🔧 Partes</option><option value="ebay">📦 eBay</option></select></div>
+      <div class="field"><label>Método</label><select id="sp-method"><option value="cash">💵 Efectivo</option><option value="terminal">💳 Terminal</option><option value="ach">🏦 ACH</option><option value="zelle">📲 Zelle/Otro</option></select></div>
+    </div>
+    <div class="field"><label>Nota (opcional)</label><input id="sp-note" placeholder="Ej. para comprar carros"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeSplit()">Cancelar</button>
+      <button class="btn btn-primary" id="sp-save" onclick="saveSplit()">Guardar 50/50</button>
+    </div>
   </div>
 </div>
 
@@ -283,8 +302,12 @@
     <div id="cierre-block" style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
       <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Cerrar corte y repartir</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Anota cuánto se lleva cada quién. Se registra como retiro (sale de la caja) y marca el reinicio: el próximo corte arranca desde aquí.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+        <input id="reparto-total" type="number" inputmode="decimal" placeholder="Total a repartir $" style="flex:2;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px;color:var(--text);font-size:13px;">
+        <button class="btn btn-ghost" onclick="split5050()" style="flex:1;min-width:88px;">⚡ 50/50</button>
+      </div>
       <div id="reparto-rows"></div>
-      <button class="btn btn-ghost" onclick="addReparto()" style="width:100%;margin-bottom:10px;">＋ Agregar retiro</button>
+      <button class="btn btn-ghost" onclick="addReparto()" style="width:100%;margin-bottom:10px;">＋ Agregar retiro manual</button>
       <button class="btn btn-primary" id="cierre-save" onclick="confirmCierre()" style="width:100%;">Cerrar corte</button>
     </div>
     <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:14px;line-height:1.5;">Se calcula del libro contable, en vivo. Los pagos migrados (antes del campo "método") aparecen como "sin especificar".</div>
@@ -373,7 +396,8 @@ function toJpeg(file){
     img.src=url;
   });
 }
-const STAFF_EMAILS = ['ev@legacymotorsgarage.com'];
+const STAFF_EMAILS = ['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];
+const PARTNERS = ['Enrique','Iván García'];   // 50/50 siempre
 
 let subs = [];
 let txns = [];
@@ -637,6 +661,7 @@ document.getElementById('exp-overlay').addEventListener('click',e=>{ if(e.target
 document.getElementById('corte-overlay').addEventListener('click',e=>{ if(e.target.id==='corte-overlay') closeCorte(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
+document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.target.id==='split-overlay') closeSplit(); });
 
 // ---------- CORTE DE CAJA (solo lectura del libro) ----------
 const INCOME_TYPES = ['payment','down','cash_sale'];
@@ -739,6 +764,13 @@ function renderReparto(){
     </div>`).join('');
 }
 window.addReparto = function(){ repartoRows.push({nombre:'',monto:'',dept:'dealer'}); renderReparto(); };
+window.split5050 = function(){
+  const total=Number(document.getElementById('reparto-total').value);
+  if(!total||total<=0){ alert('Escribe el total a repartir'); return; }
+  const mitad=Math.round(total*100/2)/100;   // mitad exacta en centavos
+  repartoRows = PARTNERS.map(nombre=>({ nombre, monto:mitad, dept:'dealer' }));
+  renderReparto();
+};
 window.confirmCierre = async function(){
   const retiros = repartoRows.filter(r=>Number(r.monto)>0 && (r.nombre||'').trim());
   const totalReparto = retiros.reduce((s,r)=>s+Number(r.monto),0);
@@ -793,6 +825,39 @@ function renderSocios(){
     '</tbody></table>';
 }
 
+let _splitType='contribution';
+window.openSplit = function(type){
+  _splitType=type;
+  document.getElementById('split-title').textContent = type==='contribution' ? 'Aportación 50/50' : 'Retiro 50/50';
+  document.getElementById('sp-total').value='';
+  document.getElementById('sp-preview').textContent='Se divide igual entre '+PARTNERS.join(' y ')+'.';
+  document.getElementById('sp-dept').value='dealer';
+  document.getElementById('sp-method').value='cash';
+  document.getElementById('sp-note').value='';
+  document.getElementById('split-overlay').classList.add('open');
+};
+window.closeSplit = function(){ document.getElementById('split-overlay').classList.remove('open'); };
+window.saveSplit = async function(){
+  const total=Number(document.getElementById('sp-total').value);
+  if(!total||total<=0){ alert('Pon el total'); return; }
+  const btn=document.getElementById('sp-save'); btn.disabled=true; btn.textContent='Guardando…';
+  const halfCents=Math.round(total*100/2);
+  const dept=document.getElementById('sp-dept').value, method=document.getElementById('sp-method').value;
+  const note=document.getElementById('sp-note').value.trim(), day=new Date().toISOString().slice(0,10), now=new Date().toISOString();
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
+  try{
+    for(const person of PARTNERS){
+      const id=(_splitType==='contribution'?'contrib_':'draw_')+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+      await setDoc(doc(db,'transactions',id), {
+        entryId:id, type:_splitType, dept, amountCents:halfCents, method, date:day, person, note,
+        createdAt:now, createdBy:who, source:'finanzas'
+      });
+    }
+    closeSplit(); renderSocios();
+    alert('✅ Registrado 50/50: '+PARTNERS.map(pp=>pp+' '+centsToUSD(halfCents)).join(' · '));
+  }catch(e){ alert('Error: '+e.message); }
+  btn.disabled=false; btn.textContent='Guardar 50/50';
+};
 let _movType='contribution';
 window.openMov = function(type){
   _movType = type;
