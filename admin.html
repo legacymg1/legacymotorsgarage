@@ -700,6 +700,13 @@ window.calcCCOA = function() {
   }
 };
 
+// "1", "01", "001", "0001" apuntan al MISMO carro. Comparamos por numero, no por texto.
+function invNumEq(a, b){
+  const x = parseInt(String(a).replace(/\D/g,''), 10);
+  const y = parseInt(String(b).replace(/\D/g,''), 10);
+  return !isNaN(x) && !isNaN(y) && x === y;
+}
+
 window.lookupInventory = function(invNum) {
   const status = document.getElementById('inv-lookup-status');
   if(!invNum || invNum.length < 1) { if(status) status.textContent = ''; return; }
@@ -708,12 +715,13 @@ window.lookupInventory = function(invNum) {
   // We need to fetch from Firebase inventory collection
   import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js').then(({getFirestore, collection, query, where, getDocs}) => {
     const db2 = getFirestore();
-    getDocs(query(collection(db2,'inventory'), where('inventoryNum','==',invNum))).then(snap => {
-      if(snap.empty) {
+    getDocs(collection(db2,'inventory')).then(snap => {
+      const match = snap.docs.find(d => invNumEq(d.data().inventoryNum, invNum));
+      if(!match) {
         if(status) status.textContent = '❌ No encontrado';
         return;
       }
-      const car = snap.docs[0].data();
+      const car = match.data();
       // Auto-fill car fields
       if(document.getElementById('f-year')) document.getElementById('f-year').value = car.year || '';
       if(document.getElementById('f-make')) document.getElementById('f-make').value = car.make || '';
@@ -1197,9 +1205,10 @@ window.saveClient=async function(){
   const invNum = document.getElementById('f-inventory-num')?.value.trim();
   if(invNum){
     try {
-      const invSnap = await getDocs(query(collection(db,'inventory'),where('inventoryNum','==',invNum)));
-      if(!invSnap.empty){
-        await setDoc(doc(db,'inventory',invSnap.docs[0].id),{...invSnap.docs[0].data(),status:'sold'});
+      const invSnap = await getDocs(collection(db,'inventory'));
+      const match = invSnap.docs.find(d => invNumEq(d.data().inventoryNum, invNum));
+      if(match){
+        await setDoc(doc(db,'inventory',match.id),{...match.data(),status:'sold'});
       }
     } catch(invErr){ console.log('Inventory update skipped:', invErr); }
   }
@@ -1273,9 +1282,10 @@ window.deleteClient=async function(id){
       await deleteDoc(doc(db,'clients',id));
       // Restore inventory car to available
       if(c.vehicleInventoryNum){
-        const invSnap = await getDocs(query(collection(db,'inventory'),where('inventoryNum','==',c.vehicleInventoryNum)));
-        if(!invSnap.empty){
-          await setDoc(doc(db,'inventory',invSnap.docs[0].id),{...invSnap.docs[0].data(),status:'available'});
+        const invSnap = await getDocs(collection(db,'inventory'));
+        const match = invSnap.docs.find(d => invNumEq(d.data().inventoryNum, c.vehicleInventoryNum));
+        if(match){
+          await setDoc(doc(db,'inventory',match.id),{...match.data(),status:'available'});
         }
       }
     }catch(e){alert('Error: '+e.message);}
