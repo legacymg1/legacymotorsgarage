@@ -260,6 +260,9 @@
     <div class="stat-card"><div class="stat-label">Al corriente</div><div class="stat-value sv-green" id="stat-ok">0</div></div>
   </div>
 
+  <div class="sec-head" onclick="toggleSection('fin-summary-box','fin-arrow')"><span>Finanzas</span><span id="fin-arrow" class="sec-arrow">▾</span></div>
+<div id="fin-summary-box"></div>
+
   <!-- TODAY BOX -->
 <div id="today-box" style="display:none;margin:0 24px 16px;background:var(--card);border:1px solid var(--gold);border-radius:14px;overflow:hidden;">
   <div style="background:linear-gradient(135deg,var(--gold3),var(--gold));padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
@@ -270,9 +273,6 @@
   </div>
   <div id="today-list" style="padding:16px 20px;"></div>
 </div>
-
-<div class="sec-head" onclick="toggleSection('fin-summary-box','fin-arrow')"><span>Finanzas</span><span id="fin-arrow" class="sec-arrow">▾</span></div>
-<div id="fin-summary-box"></div>
 
 <div class="search-wrap">
     <div style="display:flex;gap:10px;align-items:center;">
