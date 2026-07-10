@@ -229,6 +229,7 @@
       <span class="sync-status" id="sync-status">● En línea</span>
       <button onclick="downloadBackup()" id="backup-btn" title="Descarga toda la base a tu computadora" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;">💾 Respaldo</button>
       <button onclick="auditBalances()" id="audit-btn" style="background:#8b1a1a;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">🔍 Auditar Saldos</button>
+      <button onclick="migrateLedger()" id="migrate-btn" style="background:#1a5e8b;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">📒 Migrar al Libro</button>
       <button class="logout-btn" onclick="adminLogout()">Salir</button>
     </div>
   </header>
@@ -1638,6 +1639,96 @@ window.downloadBackup = async function() {
     setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
     alert(`✅ Respaldo descargado a tu carpeta de Descargas.\n\n${resumen}\n\nMuevelo a tu carpeta de respaldos. Contiene datos personales: guardalo seguro.`);
   } catch(e) { alert('Error al respaldar: ' + e.message); }
+  btn.textContent = orig; btn.disabled = false;
+};
+
+// ============ MIGRACION AL LIBRO CONTABLE (Etapa 2, una vez) ============
+// Convierte pagos y enganches viejos en renglones del libro. Idempotente: id fijo por
+// renglon, se puede correr varias veces sin duplicar. No re-crea los que ya existen.
+window.migrateLedger = async function() {
+  if(!confirm('Migrar TODO el historial (pagos + enganches) al libro contable?\n\nEs seguro correrlo varias veces: no duplica. Al terminar te muestro si todo cuadra al centavo.')) return;
+  const btn = document.getElementById('migrate-btn');
+  const orig = btn.textContent; btn.textContent = 'Migrando...'; btn.disabled = true;
+  const who = (auth.currentUser && auth.currentUser.email) || '';
+  try {
+    const existing = new Set((await getDocs(collection(db,'transactions'))).docs.map(d=>d.id));
+    let created = 0, skipped = 0;
+
+    for(const c of clients) {
+      const esCash = (c.freq||'') === 'cash';
+
+      // Enganche (ingreso, NO cuenta como pago de mensualidad)
+      const downCents = Math.round((Number(c.down)||0) * 100);
+      if(!esCash && downCents > 0) {
+        const id = 'down_' + c.id;
+        if(existing.has(id)) { skipped++; }
+        else {
+          await setDoc(doc(db,'transactions',id), {
+            entryId:id, type:'down', dept:'dealer', clientId:c.id, clientName:c.name||'',
+            amountCents:downCents, method:'', date:(c.contractDate||c.startDate||''),
+            createdAt:new Date().toISOString(), createdBy:who,
+            note:'Enganche importado', source:'migration'
+          });
+          created++;
+        }
+      }
+
+      // Venta de contado (ingreso completo)
+      if(esCash) {
+        const totalCents = Math.round((Number(c.total)||0) * 100);
+        if(totalCents > 0) {
+          const id = 'cash_' + c.id;
+          if(existing.has(id)) { skipped++; }
+          else {
+            await setDoc(doc(db,'transactions',id), {
+              entryId:id, type:'cash_sale', dept:'dealer', clientId:c.id, clientName:c.name||'',
+              amountCents:totalCents, method:'', date:(c.contractDate||c.startDate||''),
+              createdAt:new Date().toISOString(), createdBy:who,
+              note:'Venta de contado importada', source:'migration'
+            });
+            created++;
+          }
+        }
+      }
+
+      // Mensualidades
+      const pays = c.payments || [];
+      for(let i=0; i<pays.length; i++) {
+        const pmt = pays[i];
+        const id = pmt.entryId || ('mig_' + c.id + '_' + i);
+        if(existing.has(id)) { skipped++; continue; }
+        await setDoc(doc(db,'transactions',id), {
+          entryId:id, type:'payment', dept:'dealer', clientId:c.id, clientName:c.name||'',
+          amountCents:Math.round((Number(pmt.amount)||0) * 100),
+          method:pmt.method||'', date:pmt.date||'', schedDate:pmt.schedDate||'',
+          createdAt:pmt.createdAt || new Date().toISOString(),
+          createdBy:pmt.createdBy || who,
+          note:pmt.entryId ? '' : 'Importado antes del libro',
+          source:pmt.entryId ? 'admin' : 'migration'
+        });
+        created++;
+      }
+    }
+
+    // ---- VERIFICACION: el libro vs el sistema viejo, al centavo ----
+    const ledger = (await getDocs(collection(db,'transactions'))).docs.map(d=>d.data());
+    const porCliente = {};
+    ledger.filter(x=>x.type==='payment').forEach(x=>{
+      porCliente[x.clientId] = (porCliente[x.clientId]||0) + (x.amountCents||0);
+    });
+    let descuadres = 0, detalle = [];
+    clients.forEach(c=>{
+      if((c.freq||'')==='cash') return;
+      const viejoCents = Math.round((c.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0) * 100);
+      const libroCents = porCliente[c.id] || 0;
+      if(viejoCents !== libroCents) { descuadres++; detalle.push(`${c.name}: sistema ${formatMoney(viejoCents/100)} vs libro ${formatMoney(libroCents/100)}`); }
+    });
+
+    const msg = descuadres === 0
+      ? `✅ MIGRACIÓN COMPLETA Y CUADRADA\n\n${created} renglón(es) nuevo(s), ${skipped} ya existían.\n\nLos pagos del libro coinciden al centavo con el sistema en TODOS los clientes.`
+      : `⚠️ Migrados ${created}, pero hay ${descuadres} descuadre(s):\n\n${detalle.slice(0,8).join('\n')}`;
+    alert(msg);
+  } catch(e) { alert('Error en la migración: ' + e.message); }
   btn.textContent = orig; btn.disabled = false;
 };
 
