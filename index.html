@@ -14681,6 +14681,7 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 const STAFF_EMAILS=['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];
+const OWNER_EMAIL='ev@legacymotorsgarage.com';
 let isAdmin=false;
 let cars=[];
 let editingCarId=null;
@@ -14702,11 +14703,13 @@ window.addEventListener('scroll',()=>{
 
 window.toggleMenu = function(){document.getElementById('mobile-menu').classList.toggle('open');}
 
-window.setAdmin = function(on){
-  isAdmin=on;
-  document.body.classList.toggle('admin-on', on);
-  if(on){document.getElementById('admin-bar').classList.add('on');const b=document.getElementById('add-car-btn');if(b)b.style.display='block';}
-  else{document.getElementById('admin-bar').classList.remove('on');const b=document.getElementById('add-car-btn');if(b)b.style.display='none';}
+window.setAdmin = function(on, owner){
+  isAdmin = on && !!owner;                              // EDITAR = solo el dueño
+  document.body.classList.toggle('admin-on', !!on);    // navegar/ver = cualquier staff
+  const ab=document.getElementById('admin-bar');
+  const b=document.getElementById('add-car-btn');
+  if(isAdmin){ if(ab)ab.classList.add('on'); if(b)b.style.display='block'; }
+  else { if(ab)ab.classList.remove('on'); if(b)b.style.display='none'; }
   if(typeof renderCars==='function')renderCars();
 }
 window.adminLogout = function(){ signOut(auth); };
@@ -14728,10 +14731,10 @@ onAuthStateChanged(auth, (user)=>{
   if(isStaff && user.emailVerified){
     const m=document.getElementById('admin-login-modal'); if(m) m.style.display='none';
     const err=document.getElementById('admin-login-error'); if(err) err.textContent='';
-    setAdmin(true);
+    setAdmin(true, (user.email||'').toLowerCase()===OWNER_EMAIL);
   } else {
     if(isStaff && !user.emailVerified){ const err=document.getElementById('admin-login-error'); if(err) err.textContent='Verifica tu correo (entra al panel admin para reenviar el link).'; }
-    setAdmin(false);
+    setAdmin(false, false);
   }
 });
 
