@@ -1526,9 +1526,9 @@ window.sendServiceMsg = function(id) {
   const months = monthsSinceService(c) || 3;
   let msg;
   if(lang === 'en'){
-    msg = `Hi ${nombre}! 🚗🔧 Legacy Motors Garage LLC here.\n\nIt's been ${months} months since you got your ${carro} — time for a quick check-up!\n\nAs our valued customer, we're happy to offer you a FREE general inspection so everything keeps running perfectly for you.\n\n📅 Reply to this message or call us to schedule your appointment — we'll confirm the day and time for you.\n📞 (559) 540-5145\n\nWe appreciate your trust! 😊\n— Legacy Motors Garage LLC`;
+    msg = `Hi ${nombre}! 🚗🔧 Legacy Motors Garage LLC here.\n\nIt's been ${months} months since you got your ${carro} — time for a quick check-up!\n\nAs our valued customer, we're happy to offer you a FREE general inspection so everything keeps running perfectly for you.\n\n📅 Call us or reply to this message to schedule your appointment.\n📞 (559) 540-5145\n\nWe appreciate your trust! 😊\n— Legacy Motors Garage LLC`;
   } else {
-    msg = `Hola ${nombre}! 🚗🔧 Le saluda Legacy Motors Garage LLC.\n\nYa han pasado ${months} meses desde que se llevó su ${carro} — ¡es tiempo de un chequeo rápido!\n\nComo cliente valioso, le ofrecemos una REVISIÓN GENERAL GRATUITA para que todo siga en perfectas condiciones.\n\n📅 Responda a este mensaje o llámenos para agendar su cita — nosotros le confirmamos el día y la hora.\n📞 (559) 540-5145\n\n¡Gracias por su confianza! 😊\n— Legacy Motors Garage LLC`;
+    msg = `Hola ${nombre}! 🚗🔧 Le saluda Legacy Motors Garage LLC.\n\nYa han pasado ${months} meses desde que se llevó su ${carro} — ¡es tiempo de un chequeo rápido!\n\nComo cliente valioso, le ofrecemos una REVISIÓN GENERAL GRATUITA para que todo siga en perfectas condiciones.\n\n📅 Llámenos o responda a este mensaje para agendar su cita.\n📞 (559) 540-5145\n\n¡Gracias por su confianza! 😊\n— Legacy Motors Garage LLC`;
   }
   const phone = c.phone.replace(/\D/g,'');
   const a = document.createElement('a'); a.href = `sms:${phone}?body=${encodeURIComponent(msg)}`; a.click();
