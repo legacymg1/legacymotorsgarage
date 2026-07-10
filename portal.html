@@ -283,7 +283,7 @@ onAuthStateChanged(auth, async (user)=>{
     showLoginError('');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='block';
-    renderPortal(); updateInsuranceDisplay(); updateIDDisplay();
+    renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay();
     try{ await updateDoc(doc(db,'clients',currentClient.id), { lastLogin: new Date().toISOString() }); }catch(e){}
   }catch(e){ showLoginError('Error de conexión. Intenta de nuevo.'); }
 });
@@ -581,6 +581,50 @@ function renderPortal() {
       </div>
     </div>
 
+    <!-- SMS CONSENT (TCPA) -->
+    <div class="insurance-section" id="sms-section" style="margin-top:16px;">
+      <div class="insurance-header">
+        <div class="insurance-title">💬 Mensajes de Texto</div>
+        <span id="sms-badge" class="insurance-badge"></span>
+      </div>
+
+      <div style="font-size:14px;color:var(--muted);line-height:1.5;">
+        Recordatorios de servicio, felicitaciones de cumpleaños y ofertas especiales al
+        <strong style="color:var(--white);">${c.phone || ''}</strong>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;margin-bottom:14px;">
+        <em>Service reminders, birthday greetings and special offers.</em>
+      </div>
+
+      <details style="margin-bottom:14px;">
+        <summary style="cursor:pointer;font-size:12px;color:var(--gold);letter-spacing:0.5px;">Ver términos completos / View full terms</summary>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px;border-left:2px solid var(--border);padding-left:12px;">
+          <p style="margin:0 0 8px;"><strong>Frecuencia / Frequency:</strong> Normalmente menos de 6 mensajes al mes. <em>Typically fewer than 6 messages per month.</em></p>
+          <p style="margin:0 0 8px;"><strong>Costo / Cost:</strong> Pueden aplicar tarifas de mensajes y datos de su compañía telefónica. Legacy Motors Garage LLC no le cobra por estos mensajes. <em>Message and data rates may apply. We do not charge you for these messages.</em></p>
+          <p style="margin:0 0 8px;"><strong>Cancelar / Opt out:</strong> Responda <strong>STOP</strong> a cualquier mensaje para dejar de recibirlos. Responda <strong>HELP</strong> para ayuda, o llame al (559) 540-5145. <em>Reply STOP to cancel. Reply HELP for help.</em></p>
+          <p style="margin:0 0 8px;"><strong>Revocación / Revocation:</strong> Puede revocar este consentimiento en cualquier momento, aquí mismo o respondiendo STOP. <em>You may revoke this consent at any time, here or by replying STOP.</em></p>
+          <p style="margin:0 0 8px;"><strong>Entrega / Delivery:</strong> Los proveedores de telefonía móvil no son responsables por mensajes retrasados o no entregados. <em>Carriers are not liable for delayed or undelivered messages.</em></p>
+          <p style="margin:0;"><strong>Privacidad / Privacy:</strong> No venderemos ni compartiremos su número con terceros para el marketing de ellos. <em>We will not sell or share your number with third parties for their marketing.</em></p>
+        </div>
+      </details>
+
+      <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;background:rgba(232,182,74,0.06);border:1px solid var(--border);border-radius:12px;padding:14px;">
+        <input type="checkbox" id="sms-opt" style="width:20px;height:20px;margin-top:2px;flex:none;cursor:pointer;">
+        <span style="font-size:13px;line-height:1.5;color:var(--white);">
+          <strong>Sí, acepto</strong> recibir mensajes de texto de marketing y recordatorios de Legacy Motors Garage LLC al número de arriba, incluyendo mensajes enviados mediante un sistema automático de marcación o voz pregrabada.<br>
+          <span style="color:var(--muted);font-size:12px;"><em>Yes, I agree to receive marketing and reminder text messages, including messages sent using an automatic telephone dialing system or prerecorded voice.</em></span>
+        </span>
+      </label>
+
+      <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.55;">
+        ⚖️ Este consentimiento <strong style="color:var(--white);">no es requisito</strong> para comprar un vehículo ni para obtener crédito. Seguirá recibiendo los avisos de su cuenta y sus pagos aunque no acepte.<br>
+        <em>This consent is not required to purchase a vehicle or obtain credit. You will still receive account and payment messages.</em>
+      </div>
+
+      <button class="ins-btn" onclick="saveSmsConsent()">Guardar / Save</button>
+      <div class="ins-success" id="sms-success" style="display:none;"></div>
+    </div>
+
     <!-- CONTACT -->
     <button class="contact-btn" onclick="window.open('https://wa.me/${waNum}?text=${encodeURIComponent(`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`)}')" >
       📱 Contactar a Legacy Motors Garage
@@ -600,6 +644,51 @@ function renderPortal() {
     ${schedHTML}
   `;
 }
+
+// ---- CONSENTIMIENTO SMS (TCPA) ----
+const SMS_CONSENT_VERSION = 'sms-consent-v1';
+
+function updateSmsDisplay() {
+  const badge = document.getElementById('sms-badge');
+  if(!badge || !currentClient) return;
+  const on = !!(currentClient.smsConsent && currentClient.smsConsent.marketing);
+  badge.textContent = on ? 'ACTIVADO' : 'DESACTIVADO';
+  badge.className = 'insurance-badge ' + (on ? 'ins-active' : 'ins-none');
+  const cb = document.getElementById('sms-opt');
+  if(cb) cb.checked = on;
+}
+
+window.saveSmsConsent = async function() {
+  if(!currentClient) return;
+  const on = !!document.getElementById('sms-opt').checked;
+  const now = new Date().toISOString();
+  const phoneE164 = (auth.currentUser && auth.currentUser.phoneNumber) || currentClient.phoneE164 || '';
+  const state = { marketing: on, date: now, source: 'portal', phoneE164, version: SMS_CONSENT_VERSION };
+  const box = document.getElementById('sms-success');
+  try {
+    // 1) Bitacora inmutable: cada decision queda registrada para siempre (append-only).
+    await setDoc(doc(db, 'clients', currentClient.id, 'consents', String(Date.now())), {
+      ...state,
+      action: on ? 'opt_in' : 'opt_out',
+      userAgent: String(navigator.userAgent || '').slice(0, 300),
+      language: navigator.language || ''
+    });
+    // 2) Estado actual (derivado de la bitacora) para lecturas rapidas.
+    await updateDoc(doc(db, 'clients', currentClient.id), { smsConsent: state });
+    currentClient.smsConsent = state;
+    updateSmsDisplay();
+    box.textContent = on
+      ? '✓ Guardado. Recibirá recordatorios y felicitaciones. ¡Gracias!'
+      : '✓ Guardado. No recibirá mensajes de marketing.';
+    box.style.color = 'var(--green)';
+    box.style.display = 'block';
+    setTimeout(() => { box.style.display = 'none'; }, 5000);
+  } catch(e) {
+    box.textContent = 'Error al guardar: ' + e.message;
+    box.style.color = 'var(--red)';
+    box.style.display = 'block';
+  }
+};
 </script>
 </body>
 </html>
