@@ -110,7 +110,6 @@
 
   /* Rol VISOR (socio): solo ve clientes, no edita */
   body.role-viewer .fab,
-  body.role-viewer [data-action="pay"],
   body.role-viewer [data-action="edit"],
   body.role-viewer [data-action="delete"],
   body.role-viewer #backup-btn,
@@ -200,7 +199,7 @@
 .sort-btn.active{background:var(--gold) !important;color:var(--navy3) !important;}
 
 /* FINANCIAL SUMMARY */
-.fin-summary{background:linear-gradient(135deg,var(--dark2),var(--card));border:1px solid var(--gold3);border-radius:16px;padding:24px 28px;margin:24px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px;}
+.fin-summary{background:linear-gradient(135deg,var(--dark2),var(--card));border:1px solid var(--gold3);border-radius:16px;padding:24px 28px;margin:10px 24px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px;}
 .fs-item{text-align:center;padding:0 16px;border-right:1px solid var(--border);}
 .fs-item:last-child{border-right:none;}
 .fs-label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:8px;}
@@ -271,6 +270,9 @@
   </div>
   <div id="today-list" style="padding:16px 20px;"></div>
 </div>
+
+<div class="sec-head" onclick="toggleSection('fin-summary-box','fin-arrow')"><span>Finanzas</span><span id="fin-arrow" class="sec-arrow">▾</span></div>
+<div id="fin-summary-box"></div>
 
 <div class="search-wrap">
     <div style="display:flex;gap:10px;align-items:center;">
@@ -585,7 +587,7 @@ window.toggleSection = function(id, arrowId){
 function applyCollapse(id, arrowId){
   try{ if(localStorage.getItem('col_'+id)==='1'){ const el=document.getElementById(id); if(el) el.style.display='none'; const ar=document.getElementById(arrowId); if(ar) ar.textContent='▸'; } }catch(e){}
 }
-window.addEventListener('DOMContentLoaded', ()=>{ applyCollapse('stats-bar','stats-arrow'); applyCollapse('today-list','today-arrow'); });
+window.addEventListener('DOMContentLoaded', ()=>{ applyCollapse('stats-bar','stats-arrow'); applyCollapse('today-list','today-arrow'); applyCollapse('fin-summary-box','fin-arrow'); });
 
 window.openPassModal = function(){
   ['pw-current','pw-new','pw-new2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -1138,7 +1140,8 @@ window.renderAll = function() {
   }
   html+='</div>';
 
-  // Financial summary - always show in both views
+  // Financial summary - se pinta ARRIBA, en su propio contenedor
+  let finHTML = '';
   if(clients.length > 0) {
     const now2 = new Date();
     const endOfMonth2 = new Date(now2.getFullYear(), now2.getMonth()+1, 0);
@@ -1162,7 +1165,7 @@ window.renderAll = function() {
     },0);
     const totalWeekly2 = clients.reduce((s,c)=>s+Number(c.weekly||0),0);
     const activeClients2 = clients.filter(c=>calcBalance(c)>0).length;
-    html += `<div class="fin-summary">
+    finHTML = `<div class="fin-summary">
       <div class="fs-item"><div class="fs-label">Restante Este Mes</div><div class="fs-value" style="color:var(--green);">${formatMoney(restanteMes2)}</div><div class="fs-sub">${pagosRestantes2} pagos pendientes</div></div>
       <div class="fs-item"><div class="fs-label">Ingresos / Mes</div><div class="fs-value">${formatMoney(Math.round(totalMonthly2))}</div><div class="fs-sub">Estimado mensual</div></div>
       <div class="fs-item"><div class="fs-label">Total Por Cobrar</div><div class="fs-value">${formatMoney(totalBalance2)}</div><div class="fs-sub">${activeClients2} clientes activos</div></div>
@@ -1170,6 +1173,8 @@ window.renderAll = function() {
       <div class="fs-item"><div class="fs-label">Cartera Total</div><div class="fs-value">${clients.length}</div><div class="fs-sub">Clientes totales</div></div>
     </div>`;
   }
+  const finBox = document.getElementById('fin-summary-box');
+  if(finBox) finBox.innerHTML = finHTML;
 
   main.innerHTML=html;
 };
