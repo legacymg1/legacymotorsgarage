@@ -147,7 +147,10 @@
 
   <h1 class="page">Finanzas</h1>
   <div class="page-sub">Gastos, ingresos y cortes de caja del negocio — en un solo lugar.</div>
-  <div style="margin:0 0 20px;"><button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button></div>
+  <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
+    <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
+  </div>
 
   <div class="summary">
     <div class="stat">
@@ -222,6 +225,42 @@
       <button class="btn btn-primary" id="save-btn" onclick="saveSub()">Guardar</button>
     </div>
     <button class="del-link" id="del-btn" style="display:none;" onclick="deleteSub()">Eliminar este gasto</button>
+  </div>
+</div>
+
+<!-- CUENTAS DE SOCIOS -->
+<div class="overlay" id="socios-overlay">
+  <div class="sheet" style="max-width:560px;">
+    <div class="sheet-head"><div class="sheet-title">👥 Cuentas de socios</div><button class="close" onclick="closeSocios()">✕</button></div>
+    <div id="socios-body"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="btn btn-primary" onclick="openMov('contribution')" style="flex:1;">＋ Aportación</button>
+      <button class="btn btn-ghost" onclick="openMov('draw')" style="flex:1;">－ Retiro</button>
+    </div>
+    <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:12px;line-height:1.5;">Aportación = dinero que un socio METE (no es ganancia). Retiro = lo que SACA. El saldo es lo que el negocio le debe a cada quién.</div>
+  </div>
+</div>
+
+<!-- MOVIMIENTO DE SOCIO -->
+<div class="overlay" id="mov-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title" id="mov-title">Aportación</div><button class="close" onclick="closeMov()">✕</button></div>
+    <div class="row2">
+      <div class="field"><label>Socio</label><input id="m-person" placeholder="Nombre"></div>
+      <div class="field"><label>Monto ($)</label><input id="m-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Bolsa</label><select id="m-dept"><option value="dealer">🚗 Dealer</option><option value="parts">🔧 Partes</option><option value="ebay">📦 eBay</option></select></div>
+      <div class="field"><label>Método</label><select id="m-method"><option value="cash">💵 Efectivo</option><option value="terminal">💳 Terminal</option><option value="ach">🏦 ACH</option><option value="zelle">📲 Zelle/Otro</option></select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Fecha</label><input id="m-date" type="date"></div>
+      <div class="field"><label>Nota (opcional)</label><input id="m-note" placeholder="Ej. para comprar carros"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeMov()">Cancelar</button>
+      <button class="btn btn-primary" id="mov-save" onclick="saveMov()">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -596,6 +635,8 @@ window.deleteSub = async function(){
 document.getElementById('sheet-overlay').addEventListener('click',e=>{ if(e.target.id==='sheet-overlay') closeSub(); });
 document.getElementById('exp-overlay').addEventListener('click',e=>{ if(e.target.id==='exp-overlay') closeExp(); });
 document.getElementById('corte-overlay').addEventListener('click',e=>{ if(e.target.id==='corte-overlay') closeCorte(); });
+document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
+document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
 
 // ---------- CORTE DE CAJA (solo lectura del libro) ----------
 const INCOME_TYPES = ['payment','down','cash_sale'];
@@ -632,14 +673,15 @@ window.renderCorte = function(){
     ? (lastClosing() ? 'Desde el último cierre ('+fmtDate((lastClosing().closedAt||'').slice(0,10))+')' : 'Desde el principio')
     : (from&&to ? fmtDate(from)+' → '+fmtDate(to) : '');
   const byMethod={}, byDept={}, byWho={};
-  let totIn=0, totOut=0;
+  let totIn=0, totOut=0, opIn=0, opOut=0, capIn=0, capOut=0;
   const bump=(m,k,i,o)=>{ if(!m[k])m[k]={in:0,out:0}; m[k].in+=i; m[k].out+=o; };
   txns.filter(inRange).forEach(t=>{
     const amt=Number(t.amountCents)||0; let inc=0,out=0;
-    if(INCOME_TYPES.includes(t.type)) inc=amt;
-    else if(t.type==='expense') out=amt;
-    else if(t.type==='draw') out=amt;                // retiro / reparto: sale de la caja
-    else if(t.type==='expense_reversal') out=-amt;   // reversa: el dinero regresa
+    if(INCOME_TYPES.includes(t.type)){ inc=amt; opIn+=amt; }        // ingreso operativo
+    else if(t.type==='expense'){ out=amt; opOut+=amt; }             // gasto operativo
+    else if(t.type==='expense_reversal'){ out=-amt; opOut-=amt; }   // reversa
+    else if(t.type==='contribution'){ inc=amt; capIn+=amt; }        // aportacion (capital, NO ganancia)
+    else if(t.type==='draw'){ out=amt; capOut+=amt; }               // retiro (capital)
     else return;
     totIn+=inc; totOut+=out;
     bump(byMethod, t.method||'', inc, out);
@@ -662,7 +704,12 @@ window.renderCorte = function(){
     <div style="flex:1;background:var(--surface2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">Entró</div><div style="font-size:18px;font-weight:700;color:#3ecf8e;">${centsToUSD(totIn)}</div></div>
     <div style="flex:1;background:var(--surface2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">Salió</div><div style="font-size:18px;font-weight:700;color:#ff6b6b;">${centsToUSD(totOut)}</div></div>
     <div style="flex:1;background:var(--surface2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">Neto</div><div style="font-size:18px;font-weight:700;color:${net>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(net)}</div></div>
-  </div>`;
+  </div>
+  <div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:14px;text-align:center;">
+    <div style="font-size:11px;color:var(--muted);">📈 GANANCIA OPERATIVA (ingresos − gastos, sin contar dinero de socios)</div>
+    <div style="font-size:24px;font-weight:800;color:${(opIn-opOut)>=0?'#3ecf8e':'#ff6b6b'};margin-top:2px;">${centsToUSD(opIn-opOut)}</div>
+  </div>
+  ${(capIn||capOut)?`<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:14px;">👥 Movimiento de socios en el periodo — aportaron <b style="color:#3ecf8e;">${centsToUSD(capIn)}</b> · retiraron <b style="color:#ff6b6b;">${centsToUSD(capOut)}</b></div>`:''}`;
 
   const table=(title,rowsHtml)=>`<div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:6px 0 4px;">${title}</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><thead><tr style="color:var(--faint);font-size:11px;text-transform:uppercase;">
@@ -723,6 +770,60 @@ window.confirmCierre = async function(){
     corteQuick('sincelast');
   }catch(e){ alert('Error al cerrar: '+e.message); }
   btn.disabled=false; btn.textContent='Cerrar corte';
+};
+
+// ---------- CUENTAS DE SOCIOS ----------
+window.openSocios = function(){ renderSocios(); document.getElementById('socios-overlay').classList.add('open'); };
+window.closeSocios = function(){ document.getElementById('socios-overlay').classList.remove('open'); };
+function renderSocios(){
+  const byPerson={};
+  txns.forEach(t=>{
+    if(t.type!=='contribution' && t.type!=='draw') return;
+    const p=((t.person||'').trim())||'—';
+    if(!byPerson[p]) byPerson[p]={in:0,out:0};
+    if(t.type==='contribution') byPerson[p].in += Number(t.amountCents)||0;
+    else byPerson[p].out += Number(t.amountCents)||0;
+  });
+  const box=document.getElementById('socios-body');
+  const keys=Object.keys(byPerson).sort();
+  if(!keys.length){ box.innerHTML='<div class="empty"><div class="empty-ic">👥</div><div class="empty-title">Sin movimientos de socios</div><div class="empty-sub">Registra una aportación (lo que meten) o un retiro (lo que sacan). El saldo te dice qué le debe el negocio a cada quién.</div></div>'; return; }
+  const cell='padding:9px 8px;border-bottom:1px solid var(--border);font-size:14px;';
+  box.innerHTML='<table style="width:100%;border-collapse:collapse;"><thead><tr style="color:var(--faint);font-size:11px;text-transform:uppercase;"><th style="'+cell+'text-align:left;">Socio</th><th style="'+cell+'text-align:right;">Aportó</th><th style="'+cell+'text-align:right;">Retiró</th><th style="'+cell+'text-align:right;">Saldo</th></tr></thead><tbody>'+
+    keys.map(p=>{ const b=byPerson[p]; const net=b.in-b.out; return '<tr><td style="'+cell+'">'+p+'</td><td style="'+cell+'text-align:right;color:#3ecf8e;">'+centsToUSD(b.in)+'</td><td style="'+cell+'text-align:right;color:#ff6b6b;">'+centsToUSD(b.out)+'</td><td style="'+cell+'text-align:right;font-weight:700;color:'+(net>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(net)+'</td></tr>'; }).join('')+
+    '</tbody></table>';
+}
+
+let _movType='contribution';
+window.openMov = function(type){
+  _movType = type;
+  document.getElementById('mov-title').textContent = type==='contribution' ? 'Aportación (mete dinero)' : 'Retiro (saca dinero)';
+  document.getElementById('m-person').value='';
+  document.getElementById('m-amount').value='';
+  document.getElementById('m-dept').value='dealer';
+  document.getElementById('m-method').value='cash';
+  document.getElementById('m-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('m-note').value='';
+  document.getElementById('mov-overlay').classList.add('open');
+};
+window.closeMov = function(){ document.getElementById('mov-overlay').classList.remove('open'); };
+window.saveMov = async function(){
+  const person=document.getElementById('m-person').value.trim();
+  const amount=Number(document.getElementById('m-amount').value);
+  if(!person){ alert('¿Quién? Pon el nombre del socio'); return; }
+  if(!amount||amount<=0){ alert('Pon el monto'); return; }
+  const btn=document.getElementById('mov-save'); btn.disabled=true; btn.textContent='Guardando…';
+  const id=(_movType==='contribution'?'contrib_':'draw_')+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  try{
+    await setDoc(doc(db,'transactions',id), {
+      entryId:id, type:_movType, dept:document.getElementById('m-dept').value,
+      amountCents:Math.round(amount*100), method:document.getElementById('m-method').value,
+      date:document.getElementById('m-date').value, person,
+      note:document.getElementById('m-note').value.trim(),
+      createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
+    });
+    closeMov(); renderSocios();
+  }catch(e){ alert('Error: '+e.message); }
+  btn.disabled=false; btn.textContent='Guardar';
 };
 </script>
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a></nav>
