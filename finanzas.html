@@ -230,6 +230,10 @@
       <button class="btn btn-ghost" onclick="openMov('draw')" style="flex:1;">－ Retiro</button>
     </div>
     <button class="btn btn-ghost" onclick="openSplit('contribution')" style="width:100%;margin-top:8px;">⚡ Aportación 50/50</button>
+    <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;">
+      <button class="btn btn-ghost" onclick="openTransfer()" style="width:100%;">↔ Traspaso entre bolsas</button>
+      <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:6px;line-height:1.4;">Cuando una bolsa cubre a otra (ej. Dealer paga los $560 que le faltaron a Partes).</div>
+    </div>
     <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:12px;line-height:1.5;">Aportación = dinero que un socio METE (no es ganancia). Retiro = lo que SACA. El saldo es lo que el negocio le debe a cada quién.</div>
   </div>
 </div>
@@ -272,6 +276,28 @@
       <button class="btn btn-ghost" onclick="closeMov()">Cancelar</button>
       <button class="btn btn-primary" id="mov-save" onclick="saveMov()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- TRASPASO ENTRE BOLSAS -->
+<div class="overlay" id="transfer-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title">↔ Traspaso entre bolsas</div><button class="close" onclick="closeTransfer()">✕</button></div>
+    <div class="row2">
+      <div class="field"><label>De (sale)</label><select id="tr-from"><option value="dealer">🚗 Dealer</option><option value="parts">🔧 Partes</option><option value="ebay">📦 eBay</option></select></div>
+      <div class="field"><label>A (recibe)</label><select id="tr-to"><option value="parts">🔧 Partes</option><option value="dealer">🚗 Dealer</option><option value="ebay">📦 eBay</option></select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Monto ($)</label><input id="tr-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
+      <div class="field"><label>Fecha</label><input id="tr-date" type="date"></div>
+    </div>
+    <div class="field"><label>Método</label><select id="tr-method"><option value="cash">💵 Efectivo</option><option value="terminal">💳 Terminal</option><option value="ach">🏦 ACH</option><option value="zelle">📲 Zelle/Otro</option></select></div>
+    <div class="field"><label>Nota (opcional)</label><input id="tr-note" placeholder="Ej. Dealer cubre lo que faltó en Partes"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeTransfer()">Cancelar</button>
+      <button class="btn btn-primary" id="tr-save" onclick="saveTransfer()">Guardar traspaso</button>
+    </div>
+    <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;line-height:1.5;">Queda registrado en las dos bolsas: sale de una, entra en la otra. No cuenta como ganancia.</div>
   </div>
 </div>
 
@@ -704,6 +730,7 @@ document.getElementById('exp-overlay').addEventListener('click',e=>{ if(e.target
 document.getElementById('corte-overlay').addEventListener('click',e=>{ if(e.target.id==='corte-overlay') closeCorte(); });
 document.getElementById('pnl-overlay').addEventListener('click',e=>{ if(e.target.id==='pnl-overlay') closePnl(); });
 document.getElementById('inc-overlay').addEventListener('click',e=>{ if(e.target.id==='inc-overlay') closeInc(); });
+document.getElementById('transfer-overlay').addEventListener('click',e=>{ if(e.target.id==='transfer-overlay') closeTransfer(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
 document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.target.id==='split-overlay') closeSplit(); });
@@ -921,17 +948,29 @@ window.saveInc = async function(){
 // ---------- BOLSAS POR CORTE (Dealer/Partes/eBay) ----------
 let _bolsaOpen = {};
 window.toggleBolsa = function(dept){ _bolsaOpen[dept]=!_bolsaOpen[dept]; renderBolsas(); };
+const DEPT_NAME={dealer:'Dealer',parts:'Partes',ebay:'eBay'};
+function txDesc(t){
+  if(t.type==='payment') return 'Pago · '+(t.clientName||'cliente');
+  if(t.type==='down') return 'Enganche · '+(t.clientName||'cliente');
+  if(t.type==='cash_sale') return 'Venta contado · '+(t.clientName||'cliente');
+  if(t.type==='income') return (t.category||'Ingreso')+(t.source_name?' · '+t.source_name:'');
+  if(t.type==='expense') return (t.category||'Gasto')+(t.vendor?' · '+t.vendor:'')+(t.carLabel?' · '+t.carLabel:'');
+  if(t.type==='expense_reversal') return 'Reversa de gasto';
+  if(t.type==='transfer') return t.dir==='in' ? ('↔ Traspaso desde '+(DEPT_NAME[t.fromDept]||t.fromDept)) : ('↔ Traspaso a '+(DEPT_NAME[t.toDept]||t.toDept));
+  return t.category||t.type;
+}
 function renderBolsas(){
   const box=document.getElementById('bolsa-cards'); if(!box) return;
   const lc=lastClosing(); const since=lc?(lc.closedAt||''):'';
   const inCut = t => (t.createdAt||'') > since;
-  const D={dealer:{in:0,out:0}, parts:{in:0,out:0}, ebay:{in:0,out:0}};
+  const D={dealer:{in:0,out:0,tin:0,tout:0,items:[]}, parts:{in:0,out:0,tin:0,tout:0,items:[]}, ebay:{in:0,out:0,tin:0,tout:0,items:[]}};
   txns.filter(inCut).forEach(t=>{
     const amt=Number(t.amountCents)||0;
     const dept = D[t.dept] ? t.dept : 'dealer';
-    if(INCOME_TYPES.includes(t.type)){ const k=(t.type==='income'&&D[t.dept])?t.dept:'dealer'; D[k].in+=amt; }
-    else if(t.type==='expense'){ D[dept].out+=amt; }
-    else if(t.type==='expense_reversal'){ D[dept].out-=amt; }
+    if(INCOME_TYPES.includes(t.type)){ const k=(t.type==='income'&&D[t.dept])?t.dept:'dealer'; D[k].in+=amt; D[k].items.push(t); }
+    else if(t.type==='expense'){ D[dept].out+=amt; D[dept].items.push(t); }
+    else if(t.type==='expense_reversal'){ D[dept].out-=amt; D[dept].items.push(t); }
+    else if(t.type==='transfer'){ if(t.dir==='in') D[dept].tin+=amt; else D[dept].tout+=amt; D[dept].items.push(t); }
   });
   const cash={dealer:0,parts:0,ebay:0};
   txns.forEach(t=>{
@@ -941,21 +980,40 @@ function renderBolsas(){
     if(INCOME_TYPES.includes(t.type)||t.type==='contribution'){ const k=(t.type==='income'&&cash[t.dept]!==undefined)?t.dept:'dealer'; cash[k]+=amt; }
     else if(t.type==='expense'||t.type==='draw') cash[dept]-=amt;
     else if(t.type==='expense_reversal') cash[dept]+=amt;
+    else if(t.type==='transfer'){ if(t.dir==='in') cash[dept]+=amt; else cash[dept]-=amt; }
   });
   const META=[['dealer','🚗 Dealer'],['parts','🔧 Partes'],['ebay','📦 eBay']];
   box.innerHTML = META.map(([k,name])=>{
     const d=D[k], net=d.in-d.out, op=!!_bolsaOpen[k];
+    let detail='';
+    if(op){
+      const rows = d.items.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(it=>{
+        const a=Number(it.amountCents)||0;
+        let sign='−', color='#ff6b6b';
+        if(INCOME_TYPES.includes(it.type) || (it.type==='transfer'&&it.dir==='in') || it.type==='expense_reversal'){ sign='+'; color='#3ecf8e'; }
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:13px;"><span style="color:var(--muted);">${txDesc(it)} · ${fmtDate(it.date)}</span><span style="color:${color};white-space:nowrap;">${sign}${centsToUSD(a)}</span></div>`;
+      }).join('') || '<div style="font-size:12px;color:var(--faint);padding:4px 0;">Sin movimientos en este corte.</div>';
+      const hasT = d.tin||d.tout;
+      const transLine = hasT ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">↔ Traspasos</span><span>${d.tin?('<span style=\'color:#3ecf8e\'>+'+centsToUSD(d.tin)+'</span>'):''}${(d.tin&&d.tout)?' / ':''}${d.tout?('<span style=\'color:#ff6b6b\'>−'+centsToUSD(d.tout)+'</span>'):''}</span></div>` : '';
+      const neto = net + d.tin - d.tout;
+      detail = `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin-bottom:4px;">Desglose</div>
+        ${rows}
+        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;font-size:14px;">
+          <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(d.in)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Egresos</span><span style="color:#ff6b6b;">${centsToUSD(d.out)}</span></div>
+          ${transLine}
+          <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">💵 En caja (acumulado)</span><span>${centsToUSD(cash[k])}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);font-size:15px;"><span style="font-weight:700;">${hasT?'Neto (con traspasos)':'Total'}</span><span style="font-weight:800;color:${neto>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(neto)}</span></div>
+        </div>
+      </div>`;
+    }
     return `<div onclick="toggleBolsa('${k}')" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-weight:600;">${name} · este corte</span>
         <span style="font-weight:800;color:${net>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(net)} <span style="color:var(--faint);font-size:12px;">${op?'▾':'▸'}</span></span>
       </div>
-      ${op?`<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;font-size:14px;">
-        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(d.in)}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Egresos</span><span style="color:#ff6b6b;">${centsToUSD(d.out)}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">💵 En caja (acumulado)</span><span>${centsToUSD(cash[k])}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);"><span style="font-weight:700;">Total</span><span style="font-weight:800;color:${net>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(net)}</span></div>
-      </div>`:''}
+      ${detail}
     </div>`;
   }).join('');
   const gt=document.getElementById('gran-total'); if(!gt) return;
@@ -1073,6 +1131,36 @@ window.saveSplit = async function(){
     alert('✅ Registrado 50/50: '+PARTNERS.map(pp=>pp+' '+centsToUSD(halfCents)).join(' · '));
   }catch(e){ alert('Error: '+e.message); }
   btn.disabled=false; btn.textContent='Guardar 50/50';
+};
+window.openTransfer = function(){
+  document.getElementById('tr-from').value='dealer';
+  document.getElementById('tr-to').value='parts';
+  document.getElementById('tr-amount').value='';
+  document.getElementById('tr-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('tr-method').value='cash';
+  document.getElementById('tr-note').value='';
+  closeSocios();
+  document.getElementById('transfer-overlay').classList.add('open');
+};
+window.closeTransfer = function(){ document.getElementById('transfer-overlay').classList.remove('open'); };
+window.saveTransfer = async function(){
+  const from=document.getElementById('tr-from').value, to=document.getElementById('tr-to').value;
+  if(from===to){ alert('Elige dos bolsas distintas'); return; }
+  const amount=Number(document.getElementById('tr-amount').value);
+  if(!amount||amount<=0){ alert('Pon el monto'); return; }
+  const method=document.getElementById('tr-method').value;
+  const note=document.getElementById('tr-note').value.trim();
+  const date=document.getElementById('tr-date').value||new Date().toISOString().slice(0,10);
+  const btn=document.getElementById('tr-save'); btn.disabled=true; btn.textContent='Guardando…';
+  const tid='trf_'+Date.now(); const now=new Date().toISOString();
+  const who=(auth.currentUser&&auth.currentUser.email)||''; const cents=Math.round(amount*100);
+  try{
+    await setDoc(doc(db,'transactions',tid+'_out'),{ entryId:tid+'_out', type:'transfer', dir:'out', dept:from, toDept:to, amountCents:cents, method, date, note, transferId:tid, createdAt:now, createdBy:who, source:'finanzas' });
+    await setDoc(doc(db,'transactions',tid+'_in'),{ entryId:tid+'_in', type:'transfer', dir:'in', dept:to, fromDept:from, amountCents:cents, method, date, note, transferId:tid, createdAt:now, createdBy:who, source:'finanzas' });
+    closeTransfer();
+    alert('✅ Traspaso: '+(DEPT_NAME[from]||from)+' → '+(DEPT_NAME[to]||to)+' '+centsToUSD(cents));
+  }catch(e){ alert('Error: '+e.message); }
+  btn.disabled=false; btn.textContent='Guardar traspaso';
 };
 let _movType='contribution';
 window.openMov = function(type){
