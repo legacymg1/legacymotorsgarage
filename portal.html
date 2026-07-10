@@ -132,25 +132,31 @@
 
 <!-- LOGIN -->
 <div id="login-screen">
-  <div class="login-box">
+  <div class="login-box" style="position:relative;">
+    <button id="login-lang-toggle" onclick="toggleLoginLang()" style="position:absolute;top:14px;right:14px;background:transparent;border:1px solid #2a3242;color:#8a93a6;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;">EN</button>
     <img src="logo.png" class="login-logo" onerror="this.style.display='none'">
     <div class="login-tagline">Drive Your Legacy</div>
-    <div class="login-title">Consulta tu cuenta</div>
+    <div class="login-title" id="lg-title">Consulta tu cuenta</div>
     <div id="step-phone">
-      <label class="fl">Número de Teléfono</label>
+      <label class="fl" id="lg-phone-label">Número de Teléfono</label>
       <input class="fi" type="tel" id="l-phone" placeholder="555 555 5555" onkeydown="if(event.key==='Enter')sendCode()">
+      <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;margin:12px 0 4px;text-align:left;">
+        <input type="checkbox" id="l-keep" checked style="width:17px;height:17px;margin-top:1px;flex:none;cursor:pointer;">
+        <span style="font-size:12px;color:#c3cad6;line-height:1.4;" id="lg-keep-label">Mantener sesión iniciada en este teléfono</span>
+      </label>
+      <div style="font-size:10.5px;color:#6d7688;margin:0 0 12px 26px;text-align:left;line-height:1.4;" id="lg-keep-hint">Desactívalo si es un teléfono prestado o compartido.</div>
       <button class="login-btn" id="send-code-btn" onclick="sendCode()">ENVIAR CÓDIGO</button>
-      <div style="font-size:11px;color:#8a93a6;margin-top:10px;">Te enviaremos un código por mensaje de texto (SMS).</div>
+      <div style="font-size:11px;color:#8a93a6;margin-top:10px;" id="lg-sms-hint">Te enviaremos un código por mensaje de texto (SMS).</div>
     </div>
     <div id="step-code" style="display:none;">
-      <label class="fl">Código que recibiste por SMS</label>
-      <input class="fi" type="tel" inputmode="numeric" id="l-code" placeholder="123456" onkeydown="if(event.key==='Enter')verifyCode()">
+      <label class="fl" id="lg-code-label">Código que recibiste por SMS</label>
+      <input class="fi" type="tel" inputmode="numeric" id="l-code" autocomplete="one-time-code" placeholder="123456" onkeydown="if(event.key==='Enter')verifyCode()">
       <button class="login-btn" id="verify-code-btn" onclick="verifyCode()">VERIFICAR</button>
-      <button onclick="backToPhone()" style="background:transparent;border:none;color:#8a93a6;font-size:12px;cursor:pointer;margin-top:10px;">← Cambiar número</button>
+      <button onclick="backToPhone()" id="lg-back-btn" style="background:transparent;border:none;color:#8a93a6;font-size:12px;cursor:pointer;margin-top:10px;">← Cambiar número</button>
     </div>
     <div class="login-error" id="l-error"></div>
     <div id="recaptcha-container"></div>
-    <div class="login-footer">¿Necesitas ayuda? / Need help?<br><a href="sms:+15595405145">Mándanos un mensaje / Text us</a> · <a href="tel:+15595405145">(559) 540-5145</a></div>
+    <div class="login-footer" id="lg-footer"></div>
   </div>
 </div>
 
@@ -174,7 +180,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, getDocs, query, where, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 // Convert any picked image (including iPhone HEIC) to a web-friendly JPEG via canvas.
 // Runs on the phone where the browser can decode HEIC; if a browser can't decode
@@ -257,7 +263,22 @@ const I18N = {
     contactBtn:'💬 Mandarnos un mensaje',
     myVehicle:'Mi Vehículo', vehicle:'Vehículo', totalPrice:'Precio total', downPayment:'Enganche',
     paymentLabel:'Pago', totalPaid:'Total pagado', remaining:'Saldo restante',
-    contactMsg:(c)=>`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`
+    contactMsg:(c)=>`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`,
+    lgTitle:'Consulta tu cuenta', lgPhoneLabel:'Número de Teléfono',
+    lgKeep:'Mantener sesión iniciada en este teléfono',
+    lgKeepHint:'Desactívalo si es un teléfono prestado o compartido.',
+    lgSend:'ENVIAR CÓDIGO', lgSending:'ENVIANDO...',
+    lgSmsHint:'Te enviaremos un código por mensaje de texto (SMS).',
+    lgCodeLabel:'Código que recibiste por SMS', lgVerify:'VERIFICAR', lgVerifying:'VERIFICANDO...',
+    lgBack:'← Cambiar número',
+    lgFooter:'¿Necesitas ayuda?', lgTextUs:'Mándanos un mensaje',
+    errPhone:'Escribe un número de 10 dígitos', errCodeEmpty:'Escribe el código que recibiste por SMS',
+    errCodeBad:'Código incorrecto. Intenta de nuevo.',
+    errTooMany:'Demasiados intentos. Espera unos minutos.',
+    errBadPhone:'Número inválido. Escribe 10 dígitos.',
+    errSendFail:'No se pudo enviar el código. Revisa el número e intenta de nuevo.',
+    errNoAccount:'No encontramos una cuenta con ese número. Contáctanos para ayudarte.',
+    errConn:'Error de conexión. Intenta de nuevo.'
   },
   en: {
     logout:'Sign Out', hi:'Hi', balanceLabel:'Remaining balance', paidWord:'paid',
@@ -299,7 +320,22 @@ const I18N = {
     contactBtn:'💬 Text us',
     myVehicle:'My Vehicle', vehicle:'Vehicle', totalPrice:'Total price', downPayment:'Down payment',
     paymentLabel:'Payment', totalPaid:'Total paid', remaining:'Remaining balance',
-    contactMsg:(c)=>`Hello Legacy Motors Garage, this is ${c.name}. I have a question about my account (${c.year} ${c.make} ${c.model})`
+    contactMsg:(c)=>`Hello Legacy Motors Garage, this is ${c.name}. I have a question about my account (${c.year} ${c.make} ${c.model})`,
+    lgTitle:'Check your account', lgPhoneLabel:'Phone Number',
+    lgKeep:'Keep me signed in on this phone',
+    lgKeepHint:'Turn this off if this is a shared or borrowed phone.',
+    lgSend:'SEND CODE', lgSending:'SENDING...',
+    lgSmsHint:"We'll text you a verification code (SMS).",
+    lgCodeLabel:'Code you received by SMS', lgVerify:'VERIFY', lgVerifying:'VERIFYING...',
+    lgBack:'← Change number',
+    lgFooter:'Need help?', lgTextUs:'Text us',
+    errPhone:'Enter a 10-digit phone number', errCodeEmpty:'Enter the code you received by SMS',
+    errCodeBad:'Incorrect code. Please try again.',
+    errTooMany:'Too many attempts. Please wait a few minutes.',
+    errBadPhone:'Invalid number. Enter 10 digits.',
+    errSendFail:"We couldn't send the code. Check the number and try again.",
+    errNoAccount:"We couldn't find an account with that number. Please contact us.",
+    errConn:'Connection error. Please try again.'
   }
 };
 let L = 'es';
@@ -310,10 +346,39 @@ function setLang(lang){
   document.documentElement.lang = L;
   const lb = document.getElementById('logout-btn'); if(lb) lb.textContent = t('logout');
   const tg = document.getElementById('lang-toggle'); if(tg) tg.textContent = (L === 'es') ? 'EN' : 'ES';
+  paintLogin();
 }
+
+// Pantalla de login: no sabemos quien es, asi que arranca en el idioma del telefono.
+function paintLogin(){
+  const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  set('lg-title', t('lgTitle'));
+  set('lg-phone-label', t('lgPhoneLabel'));
+  set('lg-keep-label', t('lgKeep'));
+  set('lg-keep-hint', t('lgKeepHint'));
+  set('lg-sms-hint', t('lgSmsHint'));
+  set('lg-code-label', t('lgCodeLabel'));
+  set('lg-back-btn', t('lgBack'));
+  const s = document.getElementById('send-code-btn'); if(s && !s.disabled) s.textContent = t('lgSend');
+  const v = document.getElementById('verify-code-btn'); if(v && !v.disabled) v.textContent = t('lgVerify');
+  const lt = document.getElementById('login-lang-toggle'); if(lt) lt.textContent = (L === 'es') ? 'EN' : 'ES';
+  const f = document.getElementById('lg-footer');
+  if(f) f.innerHTML = `${t('lgFooter')}<br><a href="sms:+15595405145">${t('lgTextUs')}</a> · <a href="tel:+15595405145">(559) 540-5145</a>`;
+}
+
+window.toggleLoginLang = function(){
+  const next = (L === 'es') ? 'en' : 'es';
+  localStorage.setItem('lmg_lang_pref', next);
+  setLang(next);
+};
+
+// Idioma inicial: lo que el cliente eligio antes, si no el del telefono.
+setLang(localStorage.getItem('lmg_lang_pref') || (String(navigator.language||'').toLowerCase().startsWith('en') ? 'en' : 'es'));
+document.addEventListener('DOMContentLoaded', paintLogin);
 
 window.toggleLang = function(){
   setLang(L === 'es' ? 'en' : 'es');
+  localStorage.setItem('lmg_lang_pref', L);
   if(currentClient) localStorage.setItem('lmg_lang_' + currentClient.id, L);
   renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay();
 };
@@ -349,9 +414,12 @@ window.sendCode = async function(){
   let e164='';
   if(digits.length===10) e164='+1'+digits;
   else if(digits.length===11 && digits[0]==='1') e164='+'+digits;
-  else { showLoginError('Escribe un número de 10 dígitos'); return; }
-  const btn=document.getElementById('send-code-btn'); btn.disabled=true; btn.textContent='ENVIANDO...';
+  else { showLoginError(t('errPhone')); return; }
+  const btn=document.getElementById('send-code-btn'); btn.disabled=true; btn.textContent=t('lgSending');
   try{
+    // "Mantener sesion" = la sesion sobrevive al cerrar el navegador. Si no, muere al cerrarlo.
+    const keep = document.getElementById('l-keep') ? document.getElementById('l-keep').checked : true;
+    await setPersistence(auth, keep ? browserLocalPersistence : browserSessionPersistence);
     if(!window._recaptcha){ window._recaptcha = new RecaptchaVerifier(auth, 'recaptcha-container', {size:'invisible'}); }
     confirmationResult = await signInWithPhoneNumber(auth, e164, window._recaptcha);
     document.getElementById('step-phone').style.display='none';
@@ -359,26 +427,26 @@ window.sendCode = async function(){
     const cf=document.getElementById('l-code'); if(cf) cf.focus();
   }catch(err){
     const code = err.code || '';
-    showLoginError(code === 'auth/too-many-requests' ? 'Demasiados intentos. Espera unos minutos.'
-      : code === 'auth/invalid-phone-number' ? 'Número inválido. Escribe 10 dígitos.'
-      : 'No se pudo enviar el código. Revisa el número e intenta de nuevo.');
+    showLoginError(code === 'auth/too-many-requests' ? t('errTooMany')
+      : code === 'auth/invalid-phone-number' ? t('errBadPhone')
+      : t('errSendFail'));
     try{ if(window._recaptcha){ window._recaptcha.clear(); window._recaptcha=null; } }catch(_){}
   }
-  btn.disabled=false; btn.textContent='ENVIAR CÓDIGO';
+  btn.disabled=false; btn.textContent=t('lgSend');
 };
 
 window.verifyCode = async function(){
   const code = String(document.getElementById('l-code').value||'').trim();
   showLoginError('');
-  if(!code || !confirmationResult){ showLoginError('Escribe el código que recibiste por SMS'); return; }
-  const btn=document.getElementById('verify-code-btn'); btn.disabled=true; btn.textContent='VERIFICANDO...';
+  if(!code || !confirmationResult){ showLoginError(t('errCodeEmpty')); return; }
+  const btn=document.getElementById('verify-code-btn'); btn.disabled=true; btn.textContent=t('lgVerifying');
   try{
     await confirmationResult.confirm(code);
     // onAuthStateChanged carga el portal
   }catch(err){
-    showLoginError('Código incorrecto. Intenta de nuevo.');
+    showLoginError(t('errCodeBad'));
   }
-  btn.disabled=false; btn.textContent='VERIFICAR';
+  btn.disabled=false; btn.textContent=t('lgVerify');
 };
 
 // Al verificar el SMS cargamos SOLO su expediente (las reglas solo permiten el que coincide con su teléfono)
@@ -390,7 +458,7 @@ onAuthStateChanged(auth, async (user)=>{
   }
   try{
     const qs = await getDocs(query(collection(db,'clients'), where('phoneE164','==', user.phoneNumber)));
-    if(qs.empty){ showLoginError('No encontramos una cuenta con ese número. Contáctanos para ayudarte.'); await signOut(auth); return; }
+    if(qs.empty){ showLoginError(t('errNoAccount')); await signOut(auth); return; }
     currentClient = { id: qs.docs[0].id, ...qs.docs[0].data() };
     setLang(localStorage.getItem('lmg_lang_' + currentClient.id) || (currentClient.lang === 'en' ? 'en' : 'es'));
     showLoginError('');
@@ -398,7 +466,7 @@ onAuthStateChanged(auth, async (user)=>{
     document.getElementById('app').style.display='block';
     renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); maybeAskConsent();
     try{ await updateDoc(doc(db,'clients',currentClient.id), { lastLogin: new Date().toISOString() }); }catch(e){}
-  }catch(e){ showLoginError('Error de conexión. Intenta de nuevo.'); }
+  }catch(e){ showLoginError(t('errConn')); }
 });
 
 function updateInsuranceDisplay() {
