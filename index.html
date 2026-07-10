@@ -282,11 +282,12 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://legacymotorsgarage.com/logo.png">
+<style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on #floating-bar{display:none!important;}body.admin-on{padding-bottom:62px;}</style>
 </head>
 <body>
 
 <div class="admin-bar" id="admin-bar">
-  <div style="display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;"><a href="admin.html" style="text-decoration:none;border-radius:12px;padding:8px 15px;font-size:13.5px;font-weight:600;white-space:nowrap;flex-shrink:0;background:rgba(255,255,255,0.05);color:#aab2c0;border:1px solid rgba(255,255,255,0.08);">👥 Clientes</a><a href="index.html" style="text-decoration:none;border-radius:12px;padding:8px 15px;font-size:13.5px;font-weight:600;white-space:nowrap;flex-shrink:0;background:rgba(240,192,64,0.16);color:#f0c040;border:1px solid transparent;">🚗 Inventario</a><a href="finanzas.html" style="text-decoration:none;border-radius:12px;padding:8px 15px;font-size:13.5px;font-weight:600;white-space:nowrap;flex-shrink:0;background:rgba(255,255,255,0.05);color:#aab2c0;border:1px solid rgba(255,255,255,0.08);">💰 Finanzas</a></div>
+  <span style="color:var(--gold);font-size:11px;letter-spacing:2px;">ADMIN MODE ACTIVE</span>
   <button onclick="adminLogout()" style="background:var(--cream2);color:var(--black);border:none;padding:5px 16px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;">EXIT</button>
 </div>
 
@@ -14700,6 +14701,7 @@ window.toggleMenu = function(){document.getElementById('mobile-menu').classList.
 
 window.setAdmin = function(on){
   isAdmin=on;
+  document.body.classList.toggle('admin-on', on);
   if(on){document.getElementById('admin-bar').classList.add('on');const b=document.getElementById('add-car-btn');if(b)b.style.display='block';}
   else{document.getElementById('admin-bar').classList.remove('on');const b=document.getElementById('add-car-btn');if(b)b.style.display='none';}
   if(typeof renderCars==='function')renderCars();
@@ -15047,6 +15049,7 @@ renderCars();
 </script>
 
 
+<nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a></nav>
 </body>
 </html></body>
 </html>

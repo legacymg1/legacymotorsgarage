@@ -188,6 +188,7 @@
 .fs-value{font-family:var(--font-display);font-size:26px;color:var(--gold2);}
 .fs-sub{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:1px;}
 </style>
+<style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:62px;}</style>
 </head>
 <body>
 
@@ -217,7 +218,6 @@
       <button class="logout-btn" onclick="adminLogout()">Salir</button>
     </div>
   </header>
-  <div style="max-width:1100px;margin:0 auto;padding:14px 24px 0;display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;"><a href="admin.html" style="text-decoration:none;border-radius:12px;padding:8px 15px;font-size:13.5px;font-weight:600;white-space:nowrap;flex-shrink:0;background:rgba(240,192,64,0.16);color:#f0c040;border:1px solid transparent;">👥 Clientes</a><a href="index.html" style="text-decoration:none;border-radius:12px;padding:8px 15px;font-size:13.5px;font-weight:600;white-space:nowrap;flex-shrink:0;background:rgba(255,255,255,0.05);color:#aab2c0;border:1px solid rgba(255,255,255,0.08);">🚗 Inventario</a><a href="finanzas.html" style="text-decoration:none;border-radius:12px;padding:8px 15px;font-size:13.5px;font-weight:600;white-space:nowrap;flex-shrink:0;background:rgba(255,255,255,0.05);color:#aab2c0;border:1px solid rgba(255,255,255,0.08);">💰 Finanzas</a></div>
 
   <div class="stats-bar">
     <div class="stat-card"><div class="stat-label">Clientes</div><div class="stat-value sv-gold" id="stat-total">0</div></div>
@@ -518,7 +518,7 @@ onAuthStateChanged(auth, async (user) => {
   const loginScreen = document.getElementById('login-screen');
   const appEl = document.getElementById('app');
   const errEl = document.getElementById('login-error');
-  if(!user){ loginScreen.style.display='flex'; appEl.style.display='none'; return; }
+  if(!user){ document.body.classList.remove('admin-on'); loginScreen.style.display='flex'; appEl.style.display='none'; return; }
   const email = (user.email||'').toLowerCase();
   if(!STAFF_EMAILS.includes(email)){ errEl.textContent = 'Esta cuenta no está autorizada.'; await signOut(auth); return; }
   if(!user.emailVerified){
@@ -529,6 +529,7 @@ onAuthStateChanged(auth, async (user) => {
   errEl.textContent = '';
   loginScreen.style.display='none';
   appEl.style.display='block';
+  document.body.classList.add('admin-on');
   if(!_listeningStarted){ _listeningStarted = true; startListening(); }
 });
 
@@ -1904,5 +1905,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
 
 // v3.5 - immediate tap/click handler for Pago/SMS/Edit buttons
 </script>
+<nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a></nav>
 </body>
 </html>
