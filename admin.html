@@ -1449,6 +1449,7 @@ window.confirmPayment = async function(){
       tx.set(doc(db, 'transactions', entryId), {
         entryId,
         type: 'payment',
+        dept: 'dealer',
         clientId: fresh.id,
         clientName: fresh.name || '',
         amountCents: Math.round(amount * 100),      // dinero en centavos, entero

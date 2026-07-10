@@ -148,6 +148,7 @@
   <h1 class="page">Finanzas</h1>
   <div class="page-sub">Gastos, ingresos y cortes de caja del negocio — en un solo lugar.</div>
   <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn-add" onclick="openPnl()" style="font-size:15px;">📊 Resultados</button>
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
     <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
   </div>
@@ -161,8 +162,11 @@
   </div>
 
   <div class="section-head">
-    <div class="section-title">Gastos del negocio</div>
-    <button class="btn-add" onclick="openExp()">＋ Registrar gasto</button>
+    <div class="section-title">Movimientos del negocio</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-add" onclick="openInc()">＋ Ingreso</button>
+      <button class="btn-add" onclick="openExp()">＋ Gasto</button>
+    </div>
   </div>
   <div class="list" id="exp-list"></div>
 
@@ -270,6 +274,45 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeMov()">Cancelar</button>
       <button class="btn btn-primary" id="mov-save" onclick="saveMov()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ESTADO DE RESULTADOS -->
+<div class="overlay" id="pnl-overlay">
+  <div class="sheet" style="max-width:680px;">
+    <div class="sheet-head"><div class="sheet-title">📊 Estado de resultados</div><button class="close" onclick="closePnl()">✕</button></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+      <button class="btn btn-ghost" onclick="pnlMonthShift(-1)" style="padding:8px 14px;">‹</button>
+      <button class="btn btn-ghost" id="pnl-month-btn" onclick="pnlThisMonth()" style="flex:1;">Este mes</button>
+      <button class="btn btn-ghost" onclick="pnlMonthShift(1)" style="padding:8px 14px;">›</button>
+    </div>
+    <button class="btn btn-ghost" onclick="pnlSinceCut()" style="width:100%;margin-bottom:14px;">↺ Desde el último corte</button>
+    <div id="pnl-body"></div>
+    <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:12px;line-height:1.5;">Base efectivo (dinero recibido y gastado). Las aportaciones y retiros de socios NO cuentan como ganancia.</div>
+  </div>
+</div>
+
+<!-- REGISTRAR INGRESO -->
+<div class="overlay" id="inc-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title">Registrar ingreso</div><button class="close" onclick="closeInc()">✕</button></div>
+    <div class="row2">
+      <div class="field"><label>Monto ($)</label><input id="i-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
+      <div class="field"><label>Fecha</label><input id="i-date" type="date"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Cuenta / Bolsa</label><select id="i-dept" onchange="onIncDeptChange()"><option value="dealer">🚗 Dealer</option><option value="parts">🔧 Partes</option><option value="ebay">📦 eBay</option></select></div>
+      <div class="field"><label>Categoría</label><select id="i-cat"></select></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Método</label><select id="i-method"><option value="cash">💵 Efectivo</option><option value="terminal">💳 Terminal</option><option value="ach">🏦 ACH</option><option value="zelle">📲 Zelle/Otro</option></select></div>
+      <div class="field"><label>Origen (opcional)</label><input id="i-source" placeholder="De quién / de dónde"></div>
+    </div>
+    <div class="field"><label>Nota (opcional)</label><input id="i-note" placeholder="Detalle del ingreso"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeInc()">Cancelar</button>
+      <button class="btn btn-primary" id="inc-save" onclick="saveInc()">Guardar ingreso</button>
     </div>
   </div>
 </div>
@@ -537,9 +580,9 @@ window.reverseExp = async function(id){
 };
 
 function renderExpenses(){
-  const exps=txns.filter(t=>t.type==='expense');
   const reversed=new Set(txns.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
-  const active=exps.filter(e=>!reversed.has(e.entryId||e.id));
+  const exps=txns.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id));
+  const active=exps;
   const ym=new Date().toISOString().slice(0,7);
   const byDept={dealer:0,parts:0,ebay:0};
   active.forEach(e=>{ if((e.date||'').slice(0,7)===ym) byDept[e.dept]=(byDept[e.dept]||0)+(Number(e.amountCents)||0); });
@@ -548,18 +591,24 @@ function renderExpenses(){
   document.getElementById('g-ebay').textContent=centsToUSD(byDept.ebay);
 
   const el=document.getElementById('exp-list');
-  const list=[...active].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,40);
-  if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ic">🧾</div><div class="empty-title">Aún no hay gastos</div><div class="empty-sub">Registra cada gasto con su recibo. Si lo ligas a un carro, sabrás cuánto te cuesta ese auto.</div></div>'; return; }
-  el.innerHTML=list.map(e=>{
+  const incomes=txns.filter(t=>t.type==='income');
+  const movs=[...active.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
+              .sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,50);
+  if(!movs.length){ el.innerHTML='<div class="empty"><div class="empty-ic">🧾</div><div class="empty-title">Aún no hay movimientos</div><div class="empty-sub">Registra ingresos y gastos. Si ligas un gasto a un carro, sabrás cuánto te cuesta ese auto.</div></div>'; return; }
+  el.innerHTML=movs.map(e=>{
+    const inc = e._kind==='inc';
     const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);text-decoration:none;font-size:12px;">📎 recibo</a>`:'';
     const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
+    const who = e.vendor || e.source_name || '';
+    const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(e.amountCents)}`;
+    const act = inc ? '' : `<span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩ reversar</span>`;
     return `<div class="row">
-      <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:'🧾'}</div>
+      <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:(inc?'💵':'🧾')}</div>
       <div class="row-main">
-        <div class="row-name">${e.category||'Gasto'}${e.vendor?' · '+e.vendor:''}</div>
+        <div class="row-name">${e.category||(inc?'Ingreso':'Gasto')}${who?' · '+who:''}</div>
         <div class="row-meta"><span class="chip">${(DEPT_LABEL[e.dept]||'').replace(/^\S+\s/,'')||e.dept}</span><span>${fmtDate(e.date)}</span>${car}${rec}</div>
       </div>
-      <div class="row-amt"><div class="row-amt-val">-${centsToUSD(e.amountCents)}</div><div class="row-amt-int"><span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩ reversar</span></div></div>
+      <div class="row-amt"><div class="row-amt-val" style="${inc?'color:#3ecf8e;':''}">${amt}</div><div class="row-amt-int">${act}</div></div>
     </div>`;
   }).join('');
 }
@@ -664,12 +713,14 @@ window.deleteSub = async function(){
 document.getElementById('sheet-overlay').addEventListener('click',e=>{ if(e.target.id==='sheet-overlay') closeSub(); });
 document.getElementById('exp-overlay').addEventListener('click',e=>{ if(e.target.id==='exp-overlay') closeExp(); });
 document.getElementById('corte-overlay').addEventListener('click',e=>{ if(e.target.id==='corte-overlay') closeCorte(); });
+document.getElementById('pnl-overlay').addEventListener('click',e=>{ if(e.target.id==='pnl-overlay') closePnl(); });
+document.getElementById('inc-overlay').addEventListener('click',e=>{ if(e.target.id==='inc-overlay') closeInc(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
 document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.target.id==='split-overlay') closeSplit(); });
 
 // ---------- CORTE DE CAJA (solo lectura del libro) ----------
-const INCOME_TYPES = ['payment','down','cash_sale'];
+const INCOME_TYPES = ['payment','down','cash_sale','income'];
 const METHOD_ROW = [['cash','💵 Efectivo'],['terminal','💳 Terminal'],['ach','🏦 ACH'],['zelle','📲 Zelle/Otro'],['','— Sin especificar']];
 let _corteSince = null;   // si esta puesto, el corte filtra por createdAt >= este timestamp (desde el ultimo cierre)
 function lastClosing(){
@@ -715,7 +766,7 @@ window.renderCorte = function(){
     else return;
     totIn+=inc; totOut+=out;
     bump(byMethod, t.method||'', inc, out);
-    bump(byDept, t.dept||'—', inc, out);
+    bump(byDept, t.dept || (INCOME_TYPES.includes(t.type)?'dealer':'—'), inc, out);
     bump(byWho, t.createdBy||'—', inc, out);
   });
   const cashNet=(byMethod['cash']?byMethod['cash'].in-byMethod['cash'].out:0);
@@ -830,6 +881,102 @@ function renderSocios(){
     '</tbody></table>';
 }
 
+const INCOME_CATS = {
+  dealer: ['Venta de contado','Enganche','Otro ingreso'],
+  parts:  ['Venta de parte','Venta en mostrador','Envío cobrado','Otro'],
+  ebay:   ['Venta eBay','Reembolso recibido','Otro']
+};
+window.onIncDeptChange = function(){
+  const d=document.getElementById('i-dept').value;
+  document.getElementById('i-cat').innerHTML=(INCOME_CATS[d]||[]).map(c=>`<option>${c}</option>`).join('');
+};
+window.openInc = function(){
+  document.getElementById('i-amount').value='';
+  document.getElementById('i-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('i-dept').value='parts'; onIncDeptChange();
+  document.getElementById('i-method').value='cash';
+  document.getElementById('i-source').value=''; document.getElementById('i-note').value='';
+  document.getElementById('inc-overlay').classList.add('open');
+};
+window.closeInc = function(){ document.getElementById('inc-overlay').classList.remove('open'); };
+window.saveInc = async function(){
+  const amount=Number(document.getElementById('i-amount').value);
+  if(!amount||amount<=0){ alert('Pon el monto'); return; }
+  const date=document.getElementById('i-date').value; if(!date){ alert('Pon la fecha'); return; }
+  const btn=document.getElementById('inc-save'); btn.disabled=true; btn.textContent='Guardando…';
+  const id='inc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  try{
+    await setDoc(doc(db,'transactions',id),{
+      entryId:id, type:'income', dept:document.getElementById('i-dept').value,
+      category:document.getElementById('i-cat').value, amountCents:Math.round(amount*100),
+      method:document.getElementById('i-method').value, date,
+      source_name:document.getElementById('i-source').value.trim(),
+      note:document.getElementById('i-note').value.trim(),
+      createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
+    });
+    closeInc();
+  }catch(e){ alert('Error: '+e.message); }
+  btn.disabled=false; btn.textContent='Guardar ingreso';
+};
+
+// ---------- ESTADO DE RESULTADOS ----------
+let _pnlMonth = new Date().toISOString().slice(0,7);
+let _pnlMode = 'month';
+const PNL_DEPTS = [['dealer','🚗 Dealer'],['parts','🔧 Partes'],['ebay','📦 eBay']];
+window.openPnl = function(){ _pnlMode='month'; _pnlMonth=new Date().toISOString().slice(0,7); renderPnl(); document.getElementById('pnl-overlay').classList.add('open'); };
+window.closePnl = function(){ document.getElementById('pnl-overlay').classList.remove('open'); };
+window.pnlThisMonth = function(){ _pnlMode='month'; _pnlMonth=new Date().toISOString().slice(0,7); renderPnl(); };
+window.pnlMonthShift = function(delta){
+  _pnlMode='month';
+  const y=+_pnlMonth.slice(0,4), m=+_pnlMonth.slice(5,7);
+  _pnlMonth=new Date(y, m-1+delta, 1).toISOString().slice(0,7);
+  renderPnl();
+};
+window.pnlSinceCut = function(){ _pnlMode='sincecut'; renderPnl(); };
+function renderPnl(){
+  const body=document.getElementById('pnl-body'); if(!body) return;
+  let inRange, label;
+  if(_pnlMode==='sincecut'){
+    const lc=lastClosing(); const since=lc?(lc.closedAt||''):'';
+    inRange=t=>(t.createdAt||'')>since;
+    label = lc ? ('Desde el último corte · '+fmtDate((lc.closedAt||'').slice(0,10))) : 'Desde el principio';
+  } else {
+    inRange=t=>(t.date||'').slice(0,7)===_pnlMonth;
+    const nm=new Date(+_pnlMonth.slice(0,4), +_pnlMonth.slice(5,7)-1, 1).toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+    label = nm.charAt(0).toUpperCase()+nm.slice(1);
+    const btn=document.getElementById('pnl-month-btn'); if(btn) btn.textContent=label;
+  }
+  const D={dealer:{in:0,out:0,cap:0,draw:0}, parts:{in:0,out:0,cap:0,draw:0}, ebay:{in:0,out:0,cap:0,draw:0}};
+  txns.filter(inRange).forEach(t=>{
+    const amt=Number(t.amountCents)||0;
+    const dept = D[t.dept] ? t.dept : 'dealer';
+    if(INCOME_TYPES.includes(t.type)){ const k=(t.type==='income' && D[t.dept])?t.dept:'dealer'; D[k].in+=amt; }
+    else if(t.type==='expense'){ D[dept].out+=amt; }
+    else if(t.type==='expense_reversal'){ D[dept].out-=amt; }
+    else if(t.type==='contribution'){ D[dept].cap+=amt; }
+    else if(t.type==='draw'){ D[dept].draw+=amt; }
+  });
+  let totIn=0, totOut=0;
+  let html=`<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:14px;">${label}</div>`;
+  PNL_DEPTS.forEach(([k,name])=>{
+    const d=D[k]; const gan=d.in-d.out; totIn+=d.in; totOut+=d.out;
+    html+=`<div style="background:var(--surface2);border-radius:14px;padding:16px;margin-bottom:12px;">
+      <div style="font-size:15px;font-weight:700;margin-bottom:10px;">${name}</div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(d.in)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Gastos</span><span style="color:#ff6b6b;">${centsToUSD(d.out)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:16px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--border);"><span style="font-weight:700;">Ganancia</span><span style="font-weight:800;color:${gan>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(gan)}</span></div>
+      ${(d.cap||d.draw)?`<div style="font-size:11px;color:var(--faint);margin-top:8px;">Socios: aportaron ${centsToUSD(d.cap)} · retiraron ${centsToUSD(d.draw)}</div>`:''}
+    </div>`;
+  });
+  const totGan=totIn-totOut;
+  html+=`<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:14px;padding:16px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px;">📊 TOTAL · las 3 bolsas</div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(totIn)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Gastos</span><span style="color:#ff6b6b;">${centsToUSD(totOut)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:18px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--border);"><span style="font-weight:800;">GANANCIA</span><span style="font-weight:800;color:${totGan>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(totGan)}</span></div>
+  </div>`;
+  body.innerHTML=html;
+}
 let _splitType='contribution';
 window.openSplit = function(type){
   _splitType=type;
