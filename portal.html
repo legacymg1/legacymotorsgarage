@@ -125,6 +125,43 @@
 </head>
 <body>
 
+<!-- PRIMER INGRESO: consentimiento SMS -->
+<div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.92);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;max-width:520px;width:100%;padding:28px;margin:auto;">
+    <div style="font-size:34px;text-align:center;margin-bottom:8px;">💬</div>
+    <div style="font-family:var(--font-display);font-size:24px;color:var(--white);text-align:center;font-weight:300;">Mensajes de Texto</div>
+    <div style="font-size:13px;color:var(--muted);text-align:center;margin-top:4px;"><em>Text Message Preferences</em></div>
+
+    <div style="font-size:14px;color:var(--muted);line-height:1.55;margin-top:20px;">
+      ¿Desea recibir <strong style="color:var(--white);">recordatorios de servicio, felicitaciones de cumpleaños y ofertas especiales</strong> por mensaje de texto al <strong style="color:var(--white);" id="consent-modal-phone"></strong>?
+    </div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px;">
+      <em>Would you like to receive service reminders, birthday greetings and special offers by text message at the number above?</em>
+    </div>
+
+    <details style="margin-top:16px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--gold);">Ver términos completos / View full terms</summary>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px;border-left:2px solid var(--border);padding-left:12px;">
+        <p style="margin:0 0 8px;">Al aceptar, autoriza a Legacy Motors Garage LLC a enviarle mensajes de texto de marketing y recordatorios al número indicado, <strong>incluyendo mensajes enviados mediante un sistema automático de marcación o voz pregrabada</strong>.</p>
+        <p style="margin:0 0 8px;"><strong>Frecuencia:</strong> normalmente menos de 6 mensajes al mes. <strong>Costo:</strong> pueden aplicar tarifas de su compañía telefónica; nosotros no le cobramos.</p>
+        <p style="margin:0 0 8px;"><strong>Cancelar:</strong> responda <strong>STOP</strong> a cualquier mensaje, o desactívelo en su portal. Responda <strong>HELP</strong> para ayuda, o llame al (559) 540-5145.</p>
+        <p style="margin:0;"><strong>Privacidad:</strong> no venderemos ni compartiremos su número con terceros para el marketing de ellos.</p>
+      </div>
+    </details>
+
+    <div style="background:rgba(232,182,74,0.07);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:16px;font-size:12px;color:var(--muted);line-height:1.55;">
+      ⚖️ Este consentimiento <strong style="color:var(--white);">no es requisito</strong> para comprar un vehículo ni para obtener crédito. Diga que no y <strong style="color:var(--white);">nada cambia</strong>: seguirá recibiendo los avisos de su cuenta y sus pagos.<br>
+      <em style="font-size:11px;">This consent is not required to purchase a vehicle or obtain credit.</em>
+    </div>
+
+    <button onclick="answerConsent(true)" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:15px;font-family:var(--font-display);font-size:18px;cursor:pointer;margin-top:18px;">Sí, acepto / Yes, I agree</button>
+    <button onclick="answerConsent(false)" style="width:100%;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-top:10px;">No, gracias / No, thanks</button>
+
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.5;">Puede cambiar esta preferencia en cualquier momento desde su portal.<br><em>You can change this anytime in your portal.</em></div>
+    <div id="consent-modal-err" style="display:none;color:var(--red);font-size:12px;text-align:center;margin-top:10px;"></div>
+  </div>
+</div>
+
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-box">
@@ -283,7 +320,7 @@ onAuthStateChanged(auth, async (user)=>{
     showLoginError('');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='block';
-    renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay();
+    renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); maybeAskConsent();
     try{ await updateDoc(doc(db,'clients',currentClient.id), { lastLogin: new Date().toISOString() }); }catch(e){}
   }catch(e){ showLoginError('Error de conexión. Intenta de nuevo.'); }
 });
@@ -658,37 +695,61 @@ function updateSmsDisplay() {
   if(cb) cb.checked = on;
 }
 
-window.saveSmsConsent = async function() {
-  if(!currentClient) return;
-  const on = !!document.getElementById('sms-opt').checked;
+// Escribe UNA decision: renglon inmutable en la bitacora + estado actual derivado.
+async function writeConsent(on, origin) {
   const now = new Date().toISOString();
   const phoneE164 = (auth.currentUser && auth.currentUser.phoneNumber) || currentClient.phoneE164 || '';
   const state = { marketing: on, date: now, source: 'portal', phoneE164, version: SMS_CONSENT_VERSION };
+  await setDoc(doc(db, 'clients', currentClient.id, 'consents', String(Date.now())), {
+    ...state,
+    action: on ? 'opt_in' : 'opt_out',
+    origin,
+    userAgent: String(navigator.userAgent || '').slice(0, 300),
+    language: navigator.language || ''
+  });
+  await updateDoc(doc(db, 'clients', currentClient.id), { smsConsent: state });
+  currentClient.smsConsent = state;
+  updateSmsDisplay();
+}
+
+// Solo pregunta si NUNCA ha contestado. Un "no" tambien cuenta como respuesta: no se vuelve a preguntar.
+function maybeAskConsent() {
+  if(!currentClient) return;
+  const sc = currentClient.smsConsent;
+  if(sc && sc.date) return;
+  const ph = document.getElementById('consent-modal-phone');
+  if(ph) ph.textContent = currentClient.phone || currentClient.phoneE164 || '';
+  const m = document.getElementById('consent-modal');
+  if(m) m.style.display = 'flex';
+}
+
+window.answerConsent = async function(accept) {
+  const err = document.getElementById('consent-modal-err');
+  try {
+    await writeConsent(!!accept, 'portal_first_login');
+    document.getElementById('consent-modal').style.display = 'none';
+  } catch(e) {
+    err.textContent = 'No se pudo guardar: ' + e.message;
+    err.style.display = 'block';
+  }
+};
+
+window.saveSmsConsent = async function() {
+  const on = !!document.getElementById('sms-opt').checked;
   const box = document.getElementById('sms-success');
   try {
-    // 1) Bitacora inmutable: cada decision queda registrada para siempre (append-only).
-    await setDoc(doc(db, 'clients', currentClient.id, 'consents', String(Date.now())), {
-      ...state,
-      action: on ? 'opt_in' : 'opt_out',
-      userAgent: String(navigator.userAgent || '').slice(0, 300),
-      language: navigator.language || ''
-    });
-    // 2) Estado actual (derivado de la bitacora) para lecturas rapidas.
-    await updateDoc(doc(db, 'clients', currentClient.id), { smsConsent: state });
-    currentClient.smsConsent = state;
-    updateSmsDisplay();
+    await writeConsent(on, 'settings_card');
     box.textContent = on
       ? '✓ Guardado. Recibirá recordatorios y felicitaciones. ¡Gracias!'
       : '✓ Guardado. No recibirá mensajes de marketing.';
     box.style.color = 'var(--green)';
-    box.style.display = 'block';
-    setTimeout(() => { box.style.display = 'none'; }, 5000);
   } catch(e) {
     box.textContent = 'Error al guardar: ' + e.message;
     box.style.color = 'var(--red)';
-    box.style.display = 'block';
   }
+  box.style.display = 'block';
+  setTimeout(() => { box.style.display = 'none'; }, 5000);
 };
-</script>
+</script></script>
 </body>
 </html>
