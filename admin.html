@@ -1371,19 +1371,36 @@ window.saveClient=async function(){
 window.deleteClient=async function(id){
   const c=clients.find(x=>x.id===id);
   if(!c) return;
-  if(confirm(`¿Eliminar a ${c.name}?`)){
-    try{
-      await deleteDoc(doc(db,'clients',id));
-      // Restore inventory car to available
-      if(c.vehicleInventoryNum){
-        const invSnap = await getDocs(collection(db,'inventory'));
-        const match = invSnap.docs.find(d => invNumEq(d.data().inventoryNum, c.vehicleInventoryNum));
-        if(match){
-          await setDoc(doc(db,'inventory',match.id),{...match.data(),status:'available'});
+  if(!confirm(`¿Eliminar a ${c.name}?`)) return;
+  // Si tiene movimientos en el libro, ofrecer ANULARLOS (para clientes de prueba)
+  let voidLedger=false;
+  try{
+    const txSnap = await getDocs(query(collection(db,'transactions'), where('clientId','==',id)));
+    if(!txSnap.empty){
+      voidLedger = confirm(`Este cliente tiene ${txSnap.size} movimiento(s) en el libro contable.\n\n¿Era un cliente de PRUEBA (dinero falso)?\n\n• Aceptar = ANULAR ese dinero (deja de contar en finanzas).\n• Cancelar = conservar el historial (cliente real).`);
+      if(voidLedger){
+        const who=(auth.currentUser&&auth.currentUser.email)||'';
+        for(const d of txSnap.docs){
+          const tx=d.data();
+          const vid='void_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+          await setDoc(doc(db,'transactions',vid), {
+            entryId:vid, type:'void', voidOf:(tx.entryId||d.id), refType:(tx.type||''), refDept:(tx.dept||''),
+            amountCents:Number(tx.amountCents)||0, clientId:id, clientName:(tx.clientName||c.name||''),
+            note:'Anulado: cliente de prueba', createdAt:new Date().toISOString(), createdBy:who, source:'admin'
+          });
         }
       }
-    }catch(e){alert('Error: '+e.message);}
-  }
+    }
+  }catch(e){ console.log('anular libro omitido', e); }
+  try{
+    await deleteDoc(doc(db,'clients',id));
+    if(c.vehicleInventoryNum){
+      const invSnap = await getDocs(collection(db,'inventory'));
+      const match = invSnap.docs.find(d => invNumEq(d.data().inventoryNum, c.vehicleInventoryNum));
+      if(match){ await setDoc(doc(db,'inventory',match.id),{...match.data(),status:'available'}); }
+    }
+    alert(voidLedger ? '✅ Cliente eliminado y su dinero de prueba anulado (ya no cuenta en finanzas).' : '✅ Cliente eliminado.');
+  }catch(e){alert('Error: '+e.message);}
 };
 
 // ---- PAYMENTS ----

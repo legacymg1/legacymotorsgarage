@@ -509,6 +509,11 @@ const EXP_CATS = {
 const DEPT_LABEL = { dealer:'🚗 Dealer', parts:'🔧 Partes', ebay:'📦 eBay' };
 const METHOD_LABEL = { cash:'💵 Efectivo', terminal:'💳 Terminal', ach:'🏦 ACH', zelle:'📲 Zelle/Otro' };
 const centsToUSD = c => '$'+(Number(c||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+// Movimientos VIVOS: excluye los anulados (type='void') y sus originales.
+function liveTxns(){
+  const voided=new Set(txns.filter(t=>t.type==='void').map(v=>v.voidOf));
+  return txns.filter(t=>t.type!=='void' && !voided.has(t.entryId||t.id));
+}
 
 async function loadInventory(){
   try{ const snap=await getDocs(collection(db,'inventory')); inventory=snap.docs.map(d=>({id:d.id,...d.data()})); populateCarPicker(); }
@@ -602,11 +607,12 @@ window.reverseExp = async function(id){
 };
 
 function renderExpenses(){
-  const reversed=new Set(txns.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
-  const exps=txns.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id));
+  const LT=liveTxns();
+  const reversed=new Set(LT.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
+  const exps=LT.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id));
   const active=exps;
   const el=document.getElementById('exp-list');
-  const incomes=txns.filter(t=>t.type==='income');
+  const incomes=LT.filter(t=>t.type==='income');
   const movs=[...active.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
               .sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,50);
   if(!movs.length){ el.innerHTML='<div class="empty"><div class="empty-ic">🧾</div><div class="empty-title">Aún no hay movimientos</div><div class="empty-sub">Registra ingresos y gastos. Si ligas un gasto a un carro, sabrás cuánto te cuesta ese auto.</div></div>'; return; }
@@ -772,7 +778,7 @@ window.renderCorte = function(){
   const byMethod={}, byDept={}, byWho={};
   let totIn=0, totOut=0, opIn=0, opOut=0, capIn=0, capOut=0;
   const bump=(m,k,i,o)=>{ if(!m[k])m[k]={in:0,out:0}; m[k].in+=i; m[k].out+=o; };
-  txns.filter(inRange).forEach(t=>{
+  liveTxns().filter(inRange).forEach(t=>{
     const amt=Number(t.amountCents)||0; let inc=0,out=0;
     if(INCOME_TYPES.includes(t.type)){ inc=amt; opIn+=amt; }        // ingreso operativo
     else if(t.type==='expense'){ out=amt; opOut+=amt; }             // gasto operativo
@@ -788,7 +794,7 @@ window.renderCorte = function(){
   const cashNet=(byMethod['cash']?byMethod['cash'].in-byMethod['cash'].out:0);
   // Efectivo en caja AHORA (acumulado de todos los tiempos) — incluye lo que quedó de cortes previos
   let cashOnHand=0;
-  txns.forEach(function(tt){
+  liveTxns().forEach(function(tt){
     if((tt.method||'')!=='cash') return;
     const a=Number(tt.amountCents)||0;
     if(INCOME_TYPES.includes(tt.type)||tt.type==='contribution') cashOnHand+=a;
@@ -891,7 +897,7 @@ window.openSocios = function(){ renderSocios(); document.getElementById('socios-
 window.closeSocios = function(){ document.getElementById('socios-overlay').classList.remove('open'); };
 function renderSocios(){
   const byPerson={};
-  txns.forEach(t=>{
+  liveTxns().forEach(t=>{
     if(t.type!=='contribution' && t.type!=='draw') return;
     const p=((t.person||'').trim())||'—';
     if(!byPerson[p]) byPerson[p]={in:0,out:0};
@@ -963,8 +969,9 @@ function renderBolsas(){
   const box=document.getElementById('bolsa-cards'); if(!box) return;
   const lc=lastClosing(); const since=lc?(lc.closedAt||''):'';
   const inCut = t => (t.createdAt||'') > since;
+  const LT = liveTxns();
   const D={dealer:{in:0,out:0,tin:0,tout:0,items:[]}, parts:{in:0,out:0,tin:0,tout:0,items:[]}, ebay:{in:0,out:0,tin:0,tout:0,items:[]}};
-  txns.filter(inCut).forEach(t=>{
+  LT.filter(inCut).forEach(t=>{
     const amt=Number(t.amountCents)||0;
     const dept = D[t.dept] ? t.dept : 'dealer';
     if(INCOME_TYPES.includes(t.type)){ const k=(t.type==='income'&&D[t.dept])?t.dept:'dealer'; D[k].in+=amt; D[k].items.push(t); }
@@ -973,7 +980,7 @@ function renderBolsas(){
     else if(t.type==='transfer'){ if(t.dir==='in') D[dept].tin+=amt; else D[dept].tout+=amt; D[dept].items.push(t); }
   });
   const cash={dealer:0,parts:0,ebay:0};
-  txns.forEach(t=>{
+  LT.forEach(t=>{
     if((t.method||'')!=='cash') return;
     const amt=Number(t.amountCents)||0;
     const dept = cash[t.dept]!==undefined ? t.dept : 'dealer';
@@ -1069,7 +1076,7 @@ function renderPnl(){
     const btn=document.getElementById('pnl-month-btn'); if(btn) btn.textContent=label;
   }
   const D={dealer:{in:0,out:0,cap:0,draw:0}, parts:{in:0,out:0,cap:0,draw:0}, ebay:{in:0,out:0,cap:0,draw:0}};
-  txns.filter(inRange).forEach(t=>{
+  liveTxns().filter(inRange).forEach(t=>{
     const amt=Number(t.amountCents)||0;
     const dept = D[t.dept] ? t.dept : 'dealer';
     if(INCOME_TYPES.includes(t.type)){ const k=(t.type==='income' && D[t.dept])?t.dept:'dealer'; D[k].in+=amt; }
