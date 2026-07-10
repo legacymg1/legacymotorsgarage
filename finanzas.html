@@ -525,9 +525,12 @@ let privateClients = [];
 // Movimientos de Legacy: vivos, excluyendo ventas privadas.
 function legacyTxns(){ return liveTxns().filter(t=>!(t.clientId && privateIds.has(t.clientId))); }
 
-async function loadInventory(){
-  try{ const snap=await getDocs(collection(db,'inventory')); inventory=snap.docs.map(d=>({id:d.id,...d.data()})); populateCarPicker(); }
-  catch(e){ console.log('inv load', e); }
+function loadInventory(){
+  // En vivo: si agregas un carro, aparece solo en el selector de gastos.
+  onSnapshot(collection(db,'inventory'), function(snap){
+    inventory=snap.docs.map(d=>({id:d.id,...d.data()}));
+    populateCarPicker();
+  }, function(e){ console.log('inv load', e); });
 }
 function populateCarPicker(){
   const sel=document.getElementById('e-car'); if(!sel) return;
