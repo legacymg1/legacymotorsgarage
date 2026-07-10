@@ -779,7 +779,7 @@ function startListening() {
     document.getElementById('sync-status').textContent = '● En línea';
     document.getElementById('sync-status').className = 'sync-status';
     if(window.renderAll) window.renderAll();
-    if(window.renderTodayBox) window.renderTodayBox();
+    renderTodayBox();
     checkStartupOverdue();
   }, () => {
     document.getElementById('sync-status').textContent = '● Sin conexión';
