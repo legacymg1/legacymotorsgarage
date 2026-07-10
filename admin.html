@@ -232,7 +232,6 @@
   <div style="background:linear-gradient(135deg,var(--gold3),var(--gold));padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
     <div style="font-family:var(--font-display);font-size:20px;color:var(--navy3);letter-spacing:1px;">📅 PAGOS DE HOY</div>
     <div style="display:flex;gap:8px;">
-      <button onclick="purgePasswords()" id="purge-btn" style="background:#8b1a1a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">🔒 BORRAR CONTRASEÑAS</button>
       <button onclick="exportCalendar()" style="background:var(--navy3);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">📆 EXPORTAR CALENDARIO</button>
     </div>
   </div>
@@ -470,7 +469,7 @@
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, updateDoc, deleteField, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, updateDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -1461,19 +1460,6 @@ window.sendWhatsApp=function(){
 };
 
 document.getElementById('wa-text').addEventListener('input',function(){document.getElementById('wa-preview').textContent=this.value;});
-
-// Limpieza unica: elimina las contrasenas en texto plano (el portal ya usa SMS).
-window.purgePasswords = async function() {
-  const conPass = clients.filter(c => c.portalPass);
-  if(!conPass.length) { alert('✅ No hay contraseñas guardadas. Nada que borrar.'); return; }
-  if(!confirm(`Se van a BORRAR permanentemente ${conPass.length} contraseña(s) en texto plano de la base de datos.\n\nEl portal ya no las usa (los clientes entran con código SMS). Esta acción no se puede deshacer.\n\n¿Continuar?`)) return;
-  let ok = 0, fail = 0;
-  for(const c of conPass) {
-    try { await updateDoc(doc(db,'clients',c.id), { portalPass: deleteField() }); ok++; }
-    catch(e) { console.error(c.id, e); fail++; }
-  }
-  alert(`🔒 ${ok} contraseña(s) borrada(s).${fail ? ' ' + fail + ' fallaron.' : ''}`);
-};
 
 // TODAY BOX
 function getBirthdayClients() {
