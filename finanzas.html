@@ -155,26 +155,23 @@
 
   <div id="trial-alert"></div>
 
-  <div class="summary">
-    <div class="stat"><div class="stat-label">🚗 Dealer · este mes</div><div><div class="stat-value" id="g-dealer">$0</div><div class="stat-foot">en gastos</div></div></div>
-    <div class="stat"><div class="stat-label">🔧 Partes · este mes</div><div><div class="stat-value" id="g-parts">$0</div><div class="stat-foot">en gastos</div></div></div>
-    <div class="stat"><div class="stat-label">📦 eBay · este mes</div><div><div class="stat-value" id="g-ebay">$0</div><div class="stat-foot">en gastos</div></div></div>
-  </div>
+  <div id="bolsa-cards"></div>
+  <div id="gran-total"></div>
 
-  <div class="section-head">
-    <div class="section-title">Movimientos del negocio</div>
-    <div style="display:flex;gap:8px;">
+  <div class="section-head" style="margin-top:22px;">
+    <div class="section-title" style="font-size:14px;color:var(--muted);">Recurrentes y pruebas gratis</div>
+    <button class="btn-add" onclick="openSub()">＋ Agregar</button>
+  </div>
+  <div class="list" id="sub-list"></div>
+
+  <div class="section-head" style="margin-top:30px;cursor:pointer;" onclick="toggleMovs()">
+    <div class="section-title">Movimientos del negocio <span id="movs-arrow" style="font-size:13px;color:var(--muted);">▾</span></div>
+    <div style="display:flex;gap:8px;" onclick="event.stopPropagation()">
       <button class="btn-add" onclick="openInc()">＋ Ingreso</button>
       <button class="btn-add" onclick="openExp()">＋ Gasto</button>
     </div>
   </div>
   <div class="list" id="exp-list"></div>
-
-  <div class="section-head" style="margin-top:32px;">
-    <div class="section-title" style="font-size:15px;color:var(--muted);">Recurrentes y pruebas gratis</div>
-    <button class="btn-add" onclick="openSub()">＋ Agregar</button>
-  </div>
-  <div class="list" id="sub-list"></div>
 </div>
 
 <!-- ADD/EDIT SHEET -->
@@ -473,7 +470,7 @@ function startListening(){
   }, err=>{ console.log('subs listen error', err); });
   onSnapshot(collection(db,'transactions'), snap=>{
     txns = snap.docs.map(d=>({id:d.id,...d.data()}));
-    renderExpenses();
+    renderExpenses(); renderBolsas(); applyMovsCollapse();
   }, err=>{ console.log('txns listen error', err); });
   loadInventory();
 }
@@ -583,13 +580,6 @@ function renderExpenses(){
   const reversed=new Set(txns.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
   const exps=txns.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id));
   const active=exps;
-  const ym=new Date().toISOString().slice(0,7);
-  const byDept={dealer:0,parts:0,ebay:0};
-  active.forEach(e=>{ if((e.date||'').slice(0,7)===ym) byDept[e.dept]=(byDept[e.dept]||0)+(Number(e.amountCents)||0); });
-  document.getElementById('g-dealer').textContent=centsToUSD(byDept.dealer);
-  document.getElementById('g-parts').textContent=centsToUSD(byDept.parts);
-  document.getElementById('g-ebay').textContent=centsToUSD(byDept.ebay);
-
   const el=document.getElementById('exp-list');
   const incomes=txns.filter(t=>t.type==='income');
   const movs=[...active.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
@@ -928,6 +918,71 @@ window.saveInc = async function(){
   }catch(e){ alert('Error: '+e.message); }
   btn.disabled=false; btn.textContent='Guardar ingreso';
 };
+
+// ---------- BOLSAS POR CORTE (Dealer/Partes/eBay) ----------
+let _bolsaOpen = {};
+window.toggleBolsa = function(dept){ _bolsaOpen[dept]=!_bolsaOpen[dept]; renderBolsas(); };
+function renderBolsas(){
+  const box=document.getElementById('bolsa-cards'); if(!box) return;
+  const lc=lastClosing(); const since=lc?(lc.closedAt||''):'';
+  const inCut = t => (t.createdAt||'') > since;
+  const D={dealer:{in:0,out:0}, parts:{in:0,out:0}, ebay:{in:0,out:0}};
+  txns.filter(inCut).forEach(t=>{
+    const amt=Number(t.amountCents)||0;
+    const dept = D[t.dept] ? t.dept : 'dealer';
+    if(INCOME_TYPES.includes(t.type)){ const k=(t.type==='income'&&D[t.dept])?t.dept:'dealer'; D[k].in+=amt; }
+    else if(t.type==='expense'){ D[dept].out+=amt; }
+    else if(t.type==='expense_reversal'){ D[dept].out-=amt; }
+  });
+  const cash={dealer:0,parts:0,ebay:0};
+  txns.forEach(t=>{
+    if((t.method||'')!=='cash') return;
+    const amt=Number(t.amountCents)||0;
+    const dept = cash[t.dept]!==undefined ? t.dept : 'dealer';
+    if(INCOME_TYPES.includes(t.type)||t.type==='contribution'){ const k=(t.type==='income'&&cash[t.dept]!==undefined)?t.dept:'dealer'; cash[k]+=amt; }
+    else if(t.type==='expense'||t.type==='draw') cash[dept]-=amt;
+    else if(t.type==='expense_reversal') cash[dept]+=amt;
+  });
+  const META=[['dealer','🚗 Dealer'],['parts','🔧 Partes'],['ebay','📦 eBay']];
+  box.innerHTML = META.map(([k,name])=>{
+    const d=D[k], net=d.in-d.out, op=!!_bolsaOpen[k];
+    return `<div onclick="toggleBolsa('${k}')" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:600;">${name} · este corte</span>
+        <span style="font-weight:800;color:${net>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(net)} <span style="color:var(--faint);font-size:12px;">${op?'▾':'▸'}</span></span>
+      </div>
+      ${op?`<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;font-size:14px;">
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(d.in)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Egresos</span><span style="color:#ff6b6b;">${centsToUSD(d.out)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">💵 En caja (acumulado)</span><span>${centsToUSD(cash[k])}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);"><span style="font-weight:700;">Total</span><span style="font-weight:800;color:${net>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(net)}</span></div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+  const gt=document.getElementById('gran-total'); if(!gt) return;
+  const tin=D.dealer.in+D.parts.in+D.ebay.in, tout=D.dealer.out+D.parts.out+D.ebay.out, tnet=tin-tout;
+  const tcash=cash.dealer+cash.parts+cash.ebay;
+  gt.innerHTML=`<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:14px;padding:14px 16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:700;">GRAN TOTAL · este corte</span>
+      <span style="font-weight:800;font-size:17px;color:${tnet>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(tnet)}</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:5px;">Ingresos ${centsToUSD(tin)} · Egresos ${centsToUSD(tout)} · 💵 En caja ${centsToUSD(tcash)}</div>
+  </div>`;
+}
+window.toggleMovs = function(){
+  const el=document.getElementById('exp-list'); if(!el) return;
+  const show = el.style.display==='none';
+  el.style.display = show ? '' : 'none';
+  const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent = show?'▾':'▸';
+  try{ localStorage.setItem('lmg_movs_col', show?'0':'1'); }catch(e){}
+};
+function applyMovsCollapse(){
+  try{ const c=localStorage.getItem('lmg_movs_col')==='1';
+    const el=document.getElementById('exp-list'); if(el) el.style.display=c?'none':'';
+    const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent=c?'▸':'▾';
+  }catch(e){}
+}
 
 // ---------- ESTADO DE RESULTADOS ----------
 let _pnlMonth = new Date().toISOString().slice(0,7);
