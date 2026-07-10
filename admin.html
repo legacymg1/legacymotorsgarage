@@ -152,7 +152,18 @@
   ::-webkit-scrollbar-track { background: var(--navy3); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+  .sec-head { display:flex; align-items:center; justify-content:space-between; padding:14px 24px 0; cursor:pointer; user-select:none; }
+  .sec-head > span:first-child { font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); font-weight:600; }
+  .sec-arrow { color:var(--muted); font-size:12px; }
   @media (max-width: 600px) {
+    header { height:auto; min-height:54px; padding:8px 12px; flex-wrap:wrap; row-gap:6px; }
+    .header-logo-text { font-size:15px; }
+    .header-logo img { height:30px; }
+    .sync-status { display:none; }
+    .btn-lbl { display:none; }
+    .header-right { gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .header-right button { padding:7px 10px !important; margin-right:0 !important; font-size:13px !important; }
+    .sec-head { padding:12px 16px 0; }
     .stats-bar { gap: 8px; padding: 16px; }
     main { padding: 0 16px 80px; }
     .search-wrap { padding: 0 16px 12px; }
@@ -227,13 +238,14 @@
     </div>
     <div class="header-right">
       <span class="sync-status" id="sync-status">● En línea</span>
-      <button onclick="downloadBackup()" id="backup-btn" title="Descarga toda la base a tu computadora" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;">💾 Respaldo</button>
-      <button onclick="auditBalances()" id="audit-btn" style="background:#8b1a1a;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">🔍 Auditar Saldos</button>
-      <button onclick="openPassModal()" title="Cambiar contraseña" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;">🔑 Contraseña</button>
+      <button onclick="downloadBackup()" id="backup-btn" title="Descarga toda la base a tu computadora" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;">💾<span class="btn-lbl"> Respaldo</span></button>
+      <button onclick="auditBalances()" id="audit-btn" style="background:#8b1a1a;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">🔍<span class="btn-lbl"> Auditar</span></button>
+      <button onclick="openPassModal()" title="Cambiar contraseña" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;">🔑<span class="btn-lbl"> Contraseña</span></button>
       <button class="logout-btn" onclick="adminLogout()">Salir</button>
     </div>
   </header>
 
+  <div class="sec-head" onclick="toggleSection('stats-bar','stats-arrow')"><span>Resumen</span><span id="stats-arrow" class="sec-arrow">▾</span></div>
   <div class="stats-bar">
     <div class="stat-card"><div class="stat-label">Clientes</div><div class="stat-value sv-gold" id="stat-total">0</div></div>
     <div class="stat-card"><div class="stat-label">Vencidos</div><div class="stat-value sv-red" id="stat-overdue">0</div></div>
@@ -244,7 +256,7 @@
   <!-- TODAY BOX -->
 <div id="today-box" style="display:none;margin:0 24px 16px;background:var(--card);border:1px solid var(--gold);border-radius:14px;overflow:hidden;">
   <div style="background:linear-gradient(135deg,var(--gold3),var(--gold));padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
-    <div style="font-family:var(--font-display);font-size:20px;color:var(--navy3);letter-spacing:1px;">📅 PAGOS DE HOY</div>
+    <div onclick="toggleSection('today-list','today-arrow')" style="font-family:var(--font-display);font-size:20px;color:var(--navy3);letter-spacing:1px;cursor:pointer;display:flex;align-items:center;gap:8px;">📅 PAGOS DE HOY <span id="today-arrow" style="font-size:14px;">▾</span></div>
     <div style="display:flex;gap:8px;">
       <button onclick="exportCalendar()" style="background:var(--navy3);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">📆 EXPORTAR CALENDARIO</button>
     </div>
@@ -553,6 +565,18 @@ window.adminLogin = async function() {
 };
 
 window.adminLogout = function() { signOut(auth); };
+
+window.toggleSection = function(id, arrowId){
+  const el=document.getElementById(id); if(!el) return;
+  const show = el.style.display==='none';
+  el.style.display = show ? '' : 'none';
+  const ar=document.getElementById(arrowId); if(ar) ar.textContent = show ? '▾' : '▸';
+  try{ localStorage.setItem('col_'+id, show ? '0':'1'); }catch(e){}
+};
+function applyCollapse(id, arrowId){
+  try{ if(localStorage.getItem('col_'+id)==='1'){ const el=document.getElementById(id); if(el) el.style.display='none'; const ar=document.getElementById(arrowId); if(ar) ar.textContent='▸'; } }catch(e){}
+}
+window.addEventListener('DOMContentLoaded', ()=>{ applyCollapse('stats-bar','stats-arrow'); applyCollapse('today-list','today-arrow'); });
 
 window.openPassModal = function(){
   ['pw-current','pw-new','pw-new2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
