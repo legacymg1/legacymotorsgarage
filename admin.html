@@ -608,9 +608,26 @@ function getPaidCount(c) { return (c.payments||[]).filter(p=>p.schedDate).length
 function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0); }
 function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
 function isPaidOff(c) {
+  if(c.settled === true) return true;              // hecho grabado: alguien lo declaro liquidado
   const totalPay = c.numPay || (c.schedule||[]).length || 0;
   return calcBalance(c) <= 0 || (totalPay > 0 && getPaidCount(c) >= totalPay);
 }
+
+// Declara un contrato liquidado. Queda con fecha y con quien lo hizo.
+window.markSettled = async function(id) {
+  const c = clients.find(x => x.id === id);
+  if(!c) return;
+  if(!confirm(`¿Declarar LIQUIDADO el contrato de ${c.name} (${c.year} ${c.make} ${c.model})?\n\nQuedará registrado con la fecha de hoy y tu correo. Dejará de aparecer en cobranza y en la auditoría.`)) return;
+  try {
+    await updateDoc(doc(db,'clients',id), {
+      settled: true,
+      settledAt: new Date().toISOString(),
+      settledBy: (auth.currentUser && auth.currentUser.email) || 'desconocido'
+    });
+    alert('✅ Registrado como liquidado.');
+    auditBalances();
+  } catch(e) { alert('Error: ' + e.message); }
+};
 function getNextPayDate(c) {
   if (isPaidOff(c)) return null;
   const s=c.schedule||[];
@@ -1515,6 +1532,7 @@ window.auditBalances = function() {
   const rows = [];
   let totalRiesgo = 0, criticos = 0, cerca = 0;
 
+  const liquidados = [];
   clients.forEach(c => {
     if((c.freq||'') === 'cash') return;                 // contado: no financia, no aplica
     const numPay  = (c.schedule||[]).length;
@@ -1522,6 +1540,12 @@ window.auditBalances = function() {
     if(!numPay || !weekly) return;
 
     const pagos     = (c.payments||[]);
+    // Ya liquidados: declarados a mano, o que completaron todas sus mensualidades.
+    if(c.settled === true || pagos.length >= numPay) {
+      liquidados.push({ nombre:c.name, carro:`${c.year} ${c.make} ${c.model}`,
+                        via: c.settled === true ? 'declarado' : 'completó los ' + numPay + ' pagos' });
+      return;
+    }
     const pagado    = pagos.reduce((s,p)=>s+Number(p.amount||0),0);
     const totalReal = weekly * numPay;                  // total de pagos del contrato
     const saldoReal = Math.max(0, totalReal - pagado);
@@ -1538,7 +1562,7 @@ window.auditBalances = function() {
     else { estado = '✅'; orden = 2; }
 
     totalRiesgo += diff;
-    rows.push({ nombre:c.name, carro:`${c.year} ${c.make} ${c.model}`, hechos:pagos.length, numPay,
+    rows.push({ id:c.id, nombre:c.name, carro:`${c.year} ${c.make} ${c.model}`, hechos:pagos.length, numPay,
                 saldoMostrado, saldoReal, diff, estado, orden, parciales, puntoFalso });
   });
 
@@ -1549,7 +1573,8 @@ window.auditBalances = function() {
     <div style="background:rgba(255,59,59,0.08);border:1px solid var(--red);border-radius:12px;padding:16px;margin-bottom:16px;">
       <div style="font-size:15px;font-weight:700;color:var(--red);margin-bottom:8px;">Dinero no contabilizado: ${formatMoney(totalRiesgo)}</div>
       <div style="font-size:13px;color:var(--muted);line-height:1.6;">
-        Diferencia entre lo que dice el contrato y lo que muestra el sistema, sumando ${rows.length} cliente(s) a plazos.<br>
+        Diferencia entre lo que dice el contrato y lo que muestra el sistema, sumando ${rows.length} cliente(s) a plazos <strong>activos</strong>.<br>
+        ${liquidados.length} ya liquidado(s), excluidos del cálculo.<br>
         <strong style="color:var(--red);">${criticos}</strong> en estado crítico (el sistema ya los da por pagados) ·
         <strong style="color:#ff9500;">${cerca}</strong> a menos de 3 pagos de llegar ahí.
       </div>
@@ -1562,10 +1587,10 @@ window.auditBalances = function() {
       <thead><tr style="text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;">
         <th style="${cell}">Cliente</th><th style="${cell}">Pagos</th>
         <th style="${cell}">Saldo que muestra</th><th style="${cell}">Saldo real</th>
-        <th style="${cell}">Diferencia</th><th style="${cell}">Parciales</th><th style="${cell}">Estado</th>
+        <th style="${cell}">Diferencia</th><th style="${cell}">Parciales</th><th style="${cell}">Estado</th><th style="${cell}"></th>
       </tr></thead><tbody>`;
 
-  if(!rows.length) html += `<tr><td colspan="7" style="${cell}color:var(--muted);">No hay clientes a plazos.</td></tr>`;
+  if(!rows.length) html += `<tr><td colspan="8" style="${cell}color:var(--muted);">No hay clientes a plazos activos.</td></tr>`;
   rows.forEach(r => {
     const bg = r.orden===0 ? 'background:rgba(255,59,59,0.07);' : r.orden===1 ? 'background:rgba(255,149,0,0.06);' : '';
     html += `<tr style="${bg}">
@@ -1576,6 +1601,7 @@ window.auditBalances = function() {
       <td style="${cell}color:var(--red);font-weight:700;">${formatMoney(r.diff)}</td>
       <td style="${cell}">${r.parciales ? '⚠️ ' + r.parciales : '—'}</td>
       <td style="${cell}white-space:nowrap;">${r.estado}</td>
+      <td style="${cell}">${r.orden===0 ? `<button onclick="markSettled('${r.id}')" style="background:var(--green);color:#000;border:none;border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Ya liquidó</button>` : ''}</td>
     </tr>`;
   });
   html += `</tbody></table></div>
@@ -1585,6 +1611,15 @@ window.auditBalances = function() {
       <strong style="color:var(--text);">Parciales</strong> = abonos menores a la mensualidad que el sistema contó como mensualidad completa.<br>
       <strong style="color:var(--text);">Falso pago #N</strong> = el pago en el que el sistema declarará el carro liquidado por error.
     </div>`;
+
+  if(liquidados.length) {
+    html += `<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green);margin-bottom:10px;">✅ Liquidados — excluidos de la auditoría</div>`;
+    liquidados.forEach(l => {
+      html += `<div style="font-size:13px;color:var(--muted);padding:5px 0;">${l.nombre} <span style="opacity:0.6;">· ${l.carro} · ${l.via}</span></div>`;
+    });
+    html += `</div>`;
+  }
 
   document.getElementById('audit-body').innerHTML = html;
   document.getElementById('audit-modal').classList.add('active');
