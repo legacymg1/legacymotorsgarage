@@ -1454,6 +1454,10 @@ window.confirmPayment = async function(){
   const c = clients.find(x => x.id === payingId);
   if(!c){ alert('Cliente no encontrado'); return; }
 
+  // Detector de duplicados: mismo monto + misma fecha para el mismo cliente
+  const dup = (c.payments||[]).find(pp => Math.abs((Number(pp.amount)||0)-amount)<0.01 && pp.date===date);
+  if(dup && !confirm(`⚠️ Ya hay un pago de ${formatMoney(amount)} con fecha ${formatDate(date)} para ${c.name}.\n\n¿Registrar OTRO de todos modos?\n\n(Esto evita duplicar cuando capturas tus notas.)`)){ return; }
+
   _savingPayment = true;
   // Llave unica: si la misma peticion se repite, el pago no se duplica.
   const entryId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
