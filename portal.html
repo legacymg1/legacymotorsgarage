@@ -125,41 +125,9 @@
 </head>
 <body>
 
-<!-- PRIMER INGRESO: consentimiento SMS -->
-<div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.92);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;max-width:520px;width:100%;padding:28px;margin:auto;">
-    <div style="font-size:34px;text-align:center;margin-bottom:8px;">💬</div>
-    <div style="font-family:var(--font-display);font-size:24px;color:var(--white);text-align:center;font-weight:300;">Mensajes de Texto</div>
-    <div style="font-size:13px;color:var(--muted);text-align:center;margin-top:4px;"><em>Text Message Preferences</em></div>
-
-    <div style="font-size:14px;color:var(--muted);line-height:1.55;margin-top:20px;">
-      ¿Desea recibir <strong style="color:var(--white);">recordatorios de servicio, felicitaciones de cumpleaños y ofertas especiales</strong> por mensaje de texto al <strong style="color:var(--white);" id="consent-modal-phone"></strong>?
-    </div>
-    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-top:8px;">
-      <em>Would you like to receive service reminders, birthday greetings and special offers by text message at the number above?</em>
-    </div>
-
-    <details style="margin-top:16px;">
-      <summary style="cursor:pointer;font-size:12px;color:var(--gold);">Ver términos completos / View full terms</summary>
-      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px;border-left:2px solid var(--border);padding-left:12px;">
-        <p style="margin:0 0 8px;">Al aceptar, autoriza a Legacy Motors Garage LLC a enviarle mensajes de texto de marketing y recordatorios al número indicado, <strong>incluyendo mensajes enviados mediante un sistema automático de marcación o voz pregrabada</strong>.</p>
-        <p style="margin:0 0 8px;"><strong>Frecuencia:</strong> normalmente menos de 6 mensajes al mes. <strong>Costo:</strong> pueden aplicar tarifas de su compañía telefónica; nosotros no le cobramos.</p>
-        <p style="margin:0 0 8px;"><strong>Cancelar:</strong> responda <strong>STOP</strong> a cualquier mensaje, o desactívelo en su portal. Responda <strong>HELP</strong> para ayuda, o llame al (559) 540-5145.</p>
-        <p style="margin:0;"><strong>Privacidad:</strong> no venderemos ni compartiremos su número con terceros para el marketing de ellos.</p>
-      </div>
-    </details>
-
-    <div style="background:rgba(232,182,74,0.07);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:16px;font-size:12px;color:var(--muted);line-height:1.55;">
-      ⚖️ Este consentimiento <strong style="color:var(--white);">no es requisito</strong> para comprar un vehículo ni para obtener crédito. Diga que no y <strong style="color:var(--white);">nada cambia</strong>: seguirá recibiendo los avisos de su cuenta y sus pagos.<br>
-      <em style="font-size:11px;">This consent is not required to purchase a vehicle or obtain credit.</em>
-    </div>
-
-    <button onclick="answerConsent(true)" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:15px;font-family:var(--font-display);font-size:18px;cursor:pointer;margin-top:18px;">Sí, acepto / Yes, I agree</button>
-    <button onclick="answerConsent(false)" style="width:100%;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-top:10px;">No, gracias / No, thanks</button>
-
-    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.5;">Puede cambiar esta preferencia en cualquier momento desde su portal.<br><em>You can change this anytime in your portal.</em></div>
-    <div id="consent-modal-err" style="display:none;color:var(--red);font-size:12px;text-align:center;margin-top:10px;"></div>
-  </div>
+<!-- PRIMER INGRESO: bloquea el portal hasta que conteste -->
+<div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.94);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+  <div id="consent-modal-box" style="background:var(--card);border:1px solid var(--border);border-radius:20px;max-width:520px;width:100%;padding:28px;margin:auto;"></div>
 </div>
 
 <!-- LOGIN -->
@@ -193,7 +161,10 @@
       <img src="logo.png" onerror="this.style.display='none'">
       <div class="hlogo-text">Legacy Motors Garage</div>
     </div>
-    <button class="logout-btn" onclick="doLogout()">Salir</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="lang-toggle" onclick="toggleLang()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;">EN</button>
+      <button class="logout-btn" id="logout-btn" onclick="doLogout()">Salir</button>
+    </div>
   </header>
 
   <div class="page" id="portal-content"></div>
@@ -243,6 +214,110 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 let currentClient = null;
+
+// ============ IDIOMA / LANGUAGE ============
+const I18N = {
+  es: {
+    logout:'Salir', hi:'Hola', balanceLabel:'Saldo pendiente', paidWord:'pagado',
+    of:'de', paymentsWord:'pagos',
+    overdueLabel:'⚠️ Pago Vencido', soonLabel:'⏰ Pago Próximo', currentLabel:'✅ Al Corriente',
+    pastDue:(n)=>`Venció hace ${n} día${n!==1?'s':''}`, dueToday:'Vence HOY',
+    dueIn:(n)=>`Vence en ${n} día${n!==1?'s':''}`, nextIn:(n)=>`Próximo pago en ${n} día${n!==1?'s':''}`,
+    freq:{weekly:'pago semanal', biweekly:'pago quincenal', monthly:'pago mensual'},
+    scheduleTitle:'Calendario de Pagos', paymentNum:'Pago',
+    pending:'Pendiente', paidBadge:'✓ Pagado', overdueBadge:'Vencido', nextBadge:'Próximo',
+    insTitle:'🛡️ Seguro', insNone:'⚠️ SIN SEGURO', insExpired:'🔴 VENCIDO',
+    insSoon:(d)=>`⚠️ VENCE EN ${d}D`, insActive:'✅ ACTIVO',
+    insNoRecord:'No tenemos registro de su seguro.', insPleaseUpdate:'Por favor actualice su información.',
+    policyWord:'Póliza', expiresWord:'Vence', viewPolicyPhoto:'📄 Ver foto de póliza',
+    insFormTitle:'Actualizar Seguro', insCompany:'Aseguradora', policyNumber:'Número de Póliza',
+    expDate:'Fecha de Vencimiento', insPhoto:'Foto de Póliza', insBtn:'Actualizar Seguro',
+    insSaved:'✓ Seguro actualizado', insSavedPhoto:'✓ Seguro e imagen actualizados',
+    insNeedPolicy:'Por favor ingrese el número de póliza', uploading:'Subiendo foto...',
+    idTitle:'🪪 Identificación', idNone:'⚠️ SIN ID', idOnFile:'✅ ID EN ARCHIVO',
+    idNoRecord:'No tenemos su identificación en archivo. Por favor actualice.',
+    idEdit:'✏️ Editar ID', idFormTitle:'Actualizar ID', idTypeSel:'Tipo de ID...',
+    idNumber:'Número de ID', idPhoto:'📸 Foto del ID', idBtn:'Actualizar ID',
+    idSaved:'✓ ID actualizado', viewIdPhoto:'📷 Ver foto de ID',
+    idDL:"Licencia de Manejo", idPassport:'Pasaporte', idMatricula:'Matrícula Consular',
+    idState:'State ID', idOther:'Otro',
+    smsTitle:'💬 Mensajes de Texto', smsOn:'ACTIVADO', smsOff:'DESACTIVADO',
+    smsDesc:'Recordatorios de servicio, felicitaciones de cumpleaños y ofertas especiales al',
+    smsAgree:'<strong>Sí, acepto</strong> recibir mensajes de texto de marketing y recordatorios de Legacy Motors Garage LLC al número de arriba, incluyendo mensajes enviados mediante un sistema automático de marcación o voz pregrabada.',
+    smsFreq:'Normalmente menos de 6 mensajes al mes. Pueden aplicar tarifas de su compañía telefónica.',
+    smsStop:'Responda <strong>STOP</strong> a cualquier mensaje para cancelar, o desactívelo aquí.',
+    smsNotRequired:'Este consentimiento <strong>no es requisito</strong> para comprar un vehículo ni para obtener crédito. Seguirá recibiendo los avisos de su cuenta y sus pagos.',
+    smsFullTerms:'Ver términos completos y política de privacidad',
+    save:'Guardar', smsSavedYes:'✓ Guardado. Recibirá recordatorios y felicitaciones. ¡Gracias!',
+    smsSavedNo:'✓ Guardado. No recibirá mensajes de marketing.', errSave:'No se pudo guardar: ',
+    modalQuestion:'¿Desea recibir <strong>recordatorios de servicio, felicitaciones de cumpleaños y ofertas especiales</strong> por mensaje de texto al',
+    modalYes:'Sí, acepto', modalNo:'No, gracias',
+    modalLater:'Puede cambiar esta preferencia cuando quiera desde su portal.',
+    modalNoChange:'Diga que no y <strong>nada cambia</strong>: seguirá recibiendo los avisos de su cuenta y sus pagos.',
+    contactBtn:'📱 Contactar a Legacy Motors Garage',
+    myVehicle:'Mi Vehículo', vehicle:'Vehículo', totalPrice:'Precio total', downPayment:'Enganche',
+    paymentLabel:'Pago', totalPaid:'Total pagado', remaining:'Saldo restante',
+    waMsg:(c)=>`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`
+  },
+  en: {
+    logout:'Sign Out', hi:'Hi', balanceLabel:'Remaining balance', paidWord:'paid',
+    of:'of', paymentsWord:'payments',
+    overdueLabel:'⚠️ Payment Overdue', soonLabel:'⏰ Payment Due Soon', currentLabel:'✅ Up to Date',
+    pastDue:(n)=>`${n} day${n!==1?'s':''} past due`, dueToday:'Due TODAY',
+    dueIn:(n)=>`Due in ${n} day${n!==1?'s':''}`, nextIn:(n)=>`Next payment in ${n} day${n!==1?'s':''}`,
+    freq:{weekly:'weekly payment', biweekly:'biweekly payment', monthly:'monthly payment'},
+    scheduleTitle:'Payment Schedule', paymentNum:'Payment',
+    pending:'Pending', paidBadge:'✓ Paid', overdueBadge:'Overdue', nextBadge:'Next',
+    insTitle:'🛡️ Insurance', insNone:'⚠️ NO INSURANCE', insExpired:'🔴 EXPIRED',
+    insSoon:(d)=>`⚠️ EXPIRES IN ${d}D`, insActive:'✅ ACTIVE',
+    insNoRecord:'We have no insurance on file for you.', insPleaseUpdate:'Please update your information.',
+    policyWord:'Policy', expiresWord:'Expires', viewPolicyPhoto:'📄 View insurance photo',
+    insFormTitle:'Update Insurance', insCompany:'Insurance Company', policyNumber:'Policy Number',
+    expDate:'Expiration Date', insPhoto:'Insurance Photo', insBtn:'Update Insurance',
+    insSaved:'✓ Insurance updated', insSavedPhoto:'✓ Insurance and photo updated',
+    insNeedPolicy:'Please enter the policy number', uploading:'Uploading photo...',
+    idTitle:'🪪 ID', idNone:'⚠️ NO ID', idOnFile:'✅ ID ON FILE',
+    idNoRecord:"We don't have your ID on file. Please update.",
+    idEdit:'✏️ Edit ID', idFormTitle:'Update ID', idTypeSel:'ID Type...',
+    idNumber:'ID Number', idPhoto:'📸 ID Photo', idBtn:'Update ID',
+    idSaved:'✓ ID updated', viewIdPhoto:'📷 View ID photo',
+    idDL:"Driver's License", idPassport:'Passport', idMatricula:'Matricula Consular',
+    idState:'State ID', idOther:'Other',
+    smsTitle:'💬 Text Messages', smsOn:'ON', smsOff:'OFF',
+    smsDesc:'Service reminders, birthday greetings and special offers at',
+    smsAgree:'<strong>Yes, I agree</strong> to receive marketing and reminder text messages from Legacy Motors Garage LLC at the number above, including messages sent using an automatic telephone dialing system or prerecorded voice.',
+    smsFreq:'Typically fewer than 6 messages per month. Message and data rates may apply.',
+    smsStop:'Reply <strong>STOP</strong> to any message to cancel, or turn it off here.',
+    smsNotRequired:'This consent is <strong>not required</strong> to purchase a vehicle or to obtain credit. You will still receive messages about your account and payments.',
+    smsFullTerms:'View full terms and privacy policy',
+    save:'Save', smsSavedYes:'✓ Saved. You will receive reminders and greetings. Thank you!',
+    smsSavedNo:'✓ Saved. You will not receive marketing messages.', errSave:'Could not save: ',
+    modalQuestion:'Would you like to receive <strong>service reminders, birthday greetings and special offers</strong> by text message at',
+    modalYes:'Yes, I agree', modalNo:'No, thanks',
+    modalLater:'You can change this preference anytime in your portal.',
+    modalNoChange:'Say no and <strong>nothing changes</strong>: you will still receive messages about your account and payments.',
+    contactBtn:'📱 Contact Legacy Motors Garage',
+    myVehicle:'My Vehicle', vehicle:'Vehicle', totalPrice:'Total price', downPayment:'Down payment',
+    paymentLabel:'Payment', totalPaid:'Total paid', remaining:'Remaining balance',
+    waMsg:(c)=>`Hello Legacy Motors Garage, this is ${c.name}. I have a question about my account (${c.year} ${c.make} ${c.model})`
+  }
+};
+let L = 'es';
+function t(k){ const v = (I18N[L] && I18N[L][k]); return v !== undefined ? v : (I18N.es[k] !== undefined ? I18N.es[k] : k); }
+
+function setLang(lang){
+  L = (lang === 'en') ? 'en' : 'es';
+  document.documentElement.lang = L;
+  const lb = document.getElementById('logout-btn'); if(lb) lb.textContent = t('logout');
+  const tg = document.getElementById('lang-toggle'); if(tg) tg.textContent = (L === 'es') ? 'EN' : 'ES';
+}
+
+window.toggleLang = function(){
+  setLang(L === 'es' ? 'en' : 'es');
+  if(currentClient) localStorage.setItem('lmg_lang_' + currentClient.id, L);
+  renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay();
+};
+
 
 function normalizePhone(p) { return p.replace(/\D/g,''); }
 function today() { return new Date().toISOString().split('T')[0]; }
@@ -317,6 +392,7 @@ onAuthStateChanged(auth, async (user)=>{
     const qs = await getDocs(query(collection(db,'clients'), where('phoneE164','==', user.phoneNumber)));
     if(qs.empty){ showLoginError('No encontramos una cuenta con ese número. Contáctanos para ayudarte.'); await signOut(auth); return; }
     currentClient = { id: qs.docs[0].id, ...qs.docs[0].data() };
+    setLang(localStorage.getItem('lmg_lang_' + currentClient.id) || (currentClient.lang === 'en' ? 'en' : 'es'));
     showLoginError('');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='block';
@@ -336,28 +412,28 @@ function updateInsuranceDisplay() {
   const todayStr = today();
   if(!c.insurance) {
     badge.className='insurance-badge ins-none';
-    badge.textContent='⚠️ SIN SEGURO';
-    current.textContent='No tenemos registro de su seguro.';
-    expEl.textContent='Por favor actualice su información.';
+    badge.textContent=t('insNone');
+    current.textContent=t('insNoRecord');
+    expEl.textContent=t('insPleaseUpdate');
   } else {
     const daysLeft = c.insuranceExp ? Math.round((new Date(c.insuranceExp+'T00:00:00')-new Date(todayStr+'T00:00:00'))/86400000) : 999;
     if(daysLeft < 0) {
       badge.className='insurance-badge ins-expired';
-      badge.textContent='🔴 VENCIDO';
+      badge.textContent=t('insExpired');
     } else if(daysLeft <= 30) {
       badge.className='insurance-badge ins-soon';
-      badge.textContent=`⚠️ VENCE EN ${daysLeft}D`;
+      badge.textContent=t('insSoon')(daysLeft);
     } else {
       badge.className='insurance-badge ins-active';
-      badge.textContent='✅ ACTIVO';
+      badge.textContent=t('insActive');
     }
-    current.textContent=`${c.insuranceCompany||''}${c.insurance?' · Póliza: '+c.insurance:''}`;
+    current.textContent=`${c.insuranceCompany||''}${c.insurance?' · '+t('policyWord')+': '+c.insurance:''}`;
     // Show photo if exists
     const preview = document.getElementById('ins-photo-preview');
     if(preview && c.insurancePhotoURL) {
-      preview.innerHTML = `<a href="${c.insurancePhotoURL}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 12px;font-size:12px;text-decoration:none;">📄 Ver foto de póliza / View insurance photo</a>`;
+      preview.innerHTML = `<a href="${c.insurancePhotoURL}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 12px;font-size:12px;text-decoration:none;">${t('viewPolicyPhoto')}</a>`;
     }
-    expEl.textContent=c.insuranceExp?`Vence: ${formatDate(c.insuranceExp)}`:'';
+    expEl.textContent=c.insuranceExp?`${t('expiresWord')}: ${formatDate(c.insuranceExp)}`:'';
     // Pre-fill form
     if(document.getElementById('ins-company')) document.getElementById('ins-company').value = c.insuranceCompany||'';
     if(document.getElementById('ins-number')) document.getElementById('ins-number').value = c.insurance||'';
@@ -399,15 +475,16 @@ window.updateID = async function() {
     await updateDoc(doc(db,'clients',currentClient.id), { idType, idNumber, idPhotoURL });
     currentClient = { ...currentClient, idType, idNumber, idPhotoURL };
     
+    document.getElementById('id-success').textContent = t('idSaved');
     document.getElementById('id-success').style.display='block';
     document.getElementById('id-edit-form').style.display='none';
-    document.getElementById('id-edit-btn').textContent='✏️ Editar / Edit ID';
+    document.getElementById('id-edit-btn').textContent=t('idEdit');
     updateIDDisplay();
     setTimeout(()=>{ document.getElementById('id-success').style.display='none'; }, 3000);
   } catch(e) {
     alert('Error: ' + e.message);
   }
-  if(btn) { btn.textContent = 'Actualizar ID / Update ID'; btn.disabled = false; }
+  if(btn) { btn.textContent = t('idBtn'); btn.disabled = false; }
 };
 
 function updateIDDisplay() {
@@ -419,11 +496,11 @@ function updateIDDisplay() {
   
   if(!c.idNumber) {
     badge.className='insurance-badge ins-none';
-    badge.textContent='⚠️ SIN ID';
-    current.textContent='No tenemos su identificación en archivo. Por favor actualice. / We don\'t have your ID on file. Please update.';
+    badge.textContent=t('idNone');
+    current.textContent=t('idNoRecord');
   } else {
     badge.className='insurance-badge ins-active';
-    badge.textContent='✅ ID EN ARCHIVO';
+    badge.textContent=t('idOnFile');
     current.textContent=(c.idType||'')+' · '+c.idNumber;
     // Pre-fill form with existing data
     if(document.getElementById('portal-id-type')) document.getElementById('portal-id-type').value = c.idType||'';
@@ -431,7 +508,7 @@ function updateIDDisplay() {
   }
   if(preview) {
     if(c.idPhotoURL) {
-      preview.innerHTML = '<a href="'+c.idPhotoURL+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 12px;font-size:12px;text-decoration:none;">📷 Ver foto de ID / View ID photo</a>';
+      preview.innerHTML = '<a href="'+c.idPhotoURL+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 12px;font-size:12px;text-decoration:none;">'+t('viewIdPhoto')+'</a>';
     } else {
       preview.innerHTML = '';
     }
@@ -442,7 +519,7 @@ window.updateInsurance = async function() {
   const company = document.getElementById('ins-company').value.trim();
   const number = document.getElementById('ins-number').value.trim();
   const expDate = document.getElementById('ins-exp-date').value;
-  if(!number) { alert('Por favor ingresa el número de póliza / Please enter policy number'); return; }
+  if(!number) { alert(t('insNeedPolicy')); return; }
   
   const btn = document.querySelector('.ins-btn');
   btn.textContent = 'Guardando...';
@@ -454,7 +531,7 @@ window.updateInsurance = async function() {
     // Upload photo if selected
     const photoFile = document.getElementById('ins-photo').files[0];
     if(photoFile) {
-      btn.textContent = 'Subiendo foto...';
+      btn.textContent = t('uploading');
       const storage = getStorage();
       const _insf = await toJpeg(photoFile);
       const photoRef = ref(storage, `insurance/${currentClient.id}/${Date.now()}_${_insf.name}`);
@@ -465,7 +542,7 @@ window.updateInsurance = async function() {
     await updateDoc(doc(db,'clients',currentClient.id), { insurance: number, insuranceCompany: company, insuranceExp: expDate, insurancePhotoURL: photoURL });
     currentClient = {...currentClient, insurance: number, insuranceCompany: company, insuranceExp: expDate, insurancePhotoURL: photoURL};
     document.getElementById('ins-success').style.display='block';
-    document.getElementById('ins-success').textContent = photoFile ? '✓ Seguro e imagen actualizados / Insurance and photo updated' : '✓ Seguro actualizado / Insurance updated';
+    document.getElementById('ins-success').textContent = photoFile ? t('insSavedPhoto') : t('insSaved');
     updateInsuranceDisplay();
       updateIDDisplay();
     setTimeout(()=>{ document.getElementById('ins-success').style.display='none'; }, 4000);
@@ -504,31 +581,32 @@ function renderPortal() {
   // Next pay card content
   let npcLabel, npcDays;
   if(status==='overdue'){
-    npcLabel='⚠️ Pago Vencido';
-    npcDays=`Venció hace ${Math.abs(days)} día${Math.abs(days)!==1?'s':''}`;
+    npcLabel=t('overdueLabel');
+    npcDays=t('pastDue')(Math.abs(days));
   } else if(status==='soon'){
-    npcLabel='⏰ Pago Próximo';
-    npcDays=days===0?'Vence HOY':`Vence en ${days} día${days!==1?'s':''}`;
+    npcLabel=t('soonLabel');
+    npcDays=days===0?t('dueToday'):t('dueIn')(days);
   } else {
-    npcLabel='✅ Al Corriente';
-    npcDays=`Próximo pago en ${days} días`;
+    npcLabel=t('currentLabel');
+    npcDays=t('nextIn')(days);
   }
+  const freqLabel = t('freq')[c.freq||'weekly'] || t('freq').weekly;
 
   // WhatsApp number (use dealership number)
-  const waNum = '15592345678'; // ← Cambia al número de tu negocio
+  const waNum = '15595405145';
 
   // Build schedule list
   let schedHTML = '';
   if(c.schedule&&c.schedule.length){
-    schedHTML = `<div class="section-title">Calendario de Pagos</div>`;
+    schedHTML = `<div class="section-title">${t('scheduleTitle')}</div>`;
     c.schedule.forEach((d,i)=>{
-      let badgeCls='pb-pending', badgeLabel='Pendiente';
-      if(paidDates.has(d)){badgeCls='pb-paid';badgeLabel='✓ Pagado';}
-      else if(d===nextPay&&d<todayStr){badgeCls='pb-overdue';badgeLabel='Vencido';}
-      else if(d===nextPay){badgeCls='pb-next';badgeLabel='Próximo';}
+      let badgeCls='pb-pending', badgeLabel=t('pending');
+      if(paidDates.has(d)){badgeCls='pb-paid';badgeLabel=t('paidBadge');}
+      else if(d===nextPay&&d<todayStr){badgeCls='pb-overdue';badgeLabel=t('overdueBadge');}
+      else if(d===nextPay){badgeCls='pb-next';badgeLabel=t('nextBadge');}
       schedHTML+=`<div class="pay-item">
         <div class="pay-item-left">
-          <div class="pay-num">Pago #${i+1}</div>
+          <div class="pay-num">${t('paymentNum')} #${i+1}</div>
           <div class="pay-date-text">${formatDate(d)}</div>
         </div>
         <span class="pay-badge ${badgeCls}">${badgeLabel}</span>
@@ -539,15 +617,15 @@ function renderPortal() {
   document.getElementById('portal-content').innerHTML = `
     <!-- WELCOME -->
     <div class="welcome-card">
-      <div class="welcome-name">Hola, ${c.name.split(' ')[0]} 👋</div>
+      <div class="welcome-name">${t('hi')}, ${c.name.split(' ')[0]} 👋</div>
       <div class="welcome-car">${c.year} ${c.make} ${c.model}</div>
       <div class="balance-amount">${formatMoney(balance)}</div>
-      <div class="balance-label">Saldo pendiente</div>
+      <div class="balance-label">${t('balanceLabel')}</div>
       <div class="progress-section">
         <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
         <div class="progress-info">
-          <span>${formatMoney(paid)} pagado</span>
-          <span>${paidCount} de ${totalPay} pagos · ${progress}%</span>
+          <span>${formatMoney(paid)} ${t('paidWord')}</span>
+          <span>${paidCount} ${t('of')} ${totalPay} ${t('paymentsWord')} · ${progress}%</span>
         </div>
       </div>
     </div>
@@ -561,121 +639,98 @@ function renderPortal() {
       </div>
       <div class="npc-amount">
         <div class="npc-amount-value">${formatMoney(c.weekly)}</div>
-        <div class="npc-amount-label">pago semanal</div>
+        <div class="npc-amount-label">${freqLabel}</div>
       </div>
     </div>
 
     <!-- INSURANCE -->
     <div class="insurance-section" id="insurance-section">
       <div class="insurance-header">
-        <div class="insurance-title">🛡️ Seguro / Insurance</div>
+        <div class="insurance-title">${t('insTitle')}</div>
         <span class="insurance-badge" id="ins-badge"></span>
       </div>
       <div id="ins-current" style="font-size:14px;color:var(--muted);margin-bottom:4px;"></div>
       <div id="ins-exp" style="font-size:13px;color:var(--muted);"></div>
       <div class="ins-form">
-        <div class="ins-form-title">Actualizar Seguro / Update Insurance</div>
-        <input class="fi" id="ins-company" placeholder="Aseguradora / Insurance Company" style="margin-bottom:10px;">
-        <input class="fi" id="ins-number" placeholder="Número de Póliza / Policy Number" style="margin-bottom:10px;">
-        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Fecha Vencimiento / Expiration Date</label>
+        <div class="ins-form-title">${t('insFormTitle')}</div>
+        <input class="fi" id="ins-company" placeholder="${t('insCompany')}" style="margin-bottom:10px;">
+        <input class="fi" id="ins-number" placeholder="${t('policyNumber')}" style="margin-bottom:10px;">
+        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('expDate')}</label>
         <input class="fi" id="ins-exp-date" type="date" style="margin-bottom:10px;">
         <div style="margin-bottom:10px;">
-          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Foto de Póliza / Insurance Photo</label>
+          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('insPhoto')}</label>
           <input type="file" id="ins-photo" accept="image/*,application/pdf" style="width:100%;background:var(--navy2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
           <div id="ins-photo-preview" style="margin-top:8px;"></div>
         </div>
-        <button class="ins-btn" onclick="updateInsurance()">Actualizar Seguro / Update Insurance</button>
-        <div class="ins-success" id="ins-success" style="display:none;">✓ Seguro actualizado correctamente</div>
+        <button class="ins-btn" onclick="updateInsurance()">${t('insBtn')}</button>
+        <div class="ins-success" id="ins-success" style="display:none;"></div>
       </div>
     </div>
 
     <!-- ID SECTION -->
     <div class="insurance-section" id="id-section" style="margin-top:16px;">
       <div class="insurance-header">
-        <div class="insurance-title">🪪 Identificación / ID</div>
+        <div class="insurance-title">${t('idTitle')}</div>
         <span id="id-badge" class="insurance-badge"></span>
       </div>
       <div id="id-current" style="font-size:14px;color:var(--muted);margin-bottom:4px;"></div>
       <div style="margin-top:10px;">
-        <button onclick="toggleIDForm()" id="id-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;width:100%;">✏️ Editar / Edit ID</button>
+        <button onclick="toggleIDForm()" id="id-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;width:100%;">${t('idEdit')}</button>
       </div>
       <div class="ins-form" id="id-edit-form" style="display:none;margin-top:12px;">
-        <div class="ins-form-title">Actualizar ID / Update ID</div>
+        <div class="ins-form-title">${t('idFormTitle')}</div>
         <select class="fi" id="portal-id-type" style="margin-bottom:10px;">
-          <option value="">Tipo de ID / ID Type...</option>
-          <option value="Driver's License">Driver's License / Lic. de Manejo</option>
-          <option value="Passport">Passport / Pasaporte</option>
-          <option value="Matricula Consular">Matrícula Consular</option>
-          <option value="State ID">State ID</option>
-          <option value="Other">Other / Otro</option>
+          <option value="">${t('idTypeSel')}</option>
+          <option value="Driver's License">${t('idDL')}</option>
+          <option value="Passport">${t('idPassport')}</option>
+          <option value="Matricula Consular">${t('idMatricula')}</option>
+          <option value="State ID">${t('idState')}</option>
+          <option value="Other">${t('idOther')}</option>
         </select>
-        <input class="fi" id="portal-id-number" placeholder="Número de ID / ID Number" style="margin-bottom:10px;">
-        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">📸 Foto del ID / ID Photo</label>
+        <input class="fi" id="portal-id-number" placeholder="${t('idNumber')}" style="margin-bottom:10px;">
+        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('idPhoto')}</label>
         <input type="file" class="fi" id="portal-id-photo" accept="image/*" style="margin-bottom:10px;padding:8px;cursor:pointer;">
         <div id="portal-id-preview" style="margin-bottom:10px;"></div>
-        <button class="ins-btn" onclick="updateID()">Actualizar ID / Update ID</button>
-        <div class="ins-success" id="id-success" style="display:none;">✓ ID actualizado correctamente</div>
+        <button class="ins-btn" onclick="updateID()">${t('idBtn')}</button>
+        <div class="ins-success" id="id-success" style="display:none;"></div>
       </div>
     </div>
 
     <!-- SMS CONSENT (TCPA) -->
     <div class="insurance-section" id="sms-section" style="margin-top:16px;">
       <div class="insurance-header">
-        <div class="insurance-title">💬 Mensajes de Texto</div>
+        <div class="insurance-title">${t('smsTitle')}</div>
         <span id="sms-badge" class="insurance-badge"></span>
       </div>
-
-      <div style="font-size:14px;color:var(--muted);line-height:1.5;">
-        Recordatorios de servicio, felicitaciones de cumpleaños y ofertas especiales al
-        <strong style="color:var(--white);">${c.phone || ''}</strong>
+      <div style="font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:14px;">
+        ${t('smsDesc')} <strong style="color:var(--white);">${c.phone || ''}</strong>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px;margin-bottom:14px;">
-        <em>Service reminders, birthday greetings and special offers.</em>
-      </div>
-
-      <details style="margin-bottom:14px;">
-        <summary style="cursor:pointer;font-size:12px;color:var(--gold);letter-spacing:0.5px;">Ver términos completos / View full terms</summary>
-        <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px;border-left:2px solid var(--border);padding-left:12px;">
-          <p style="margin:0 0 8px;"><strong>Frecuencia / Frequency:</strong> Normalmente menos de 6 mensajes al mes. <em>Typically fewer than 6 messages per month.</em></p>
-          <p style="margin:0 0 8px;"><strong>Costo / Cost:</strong> Pueden aplicar tarifas de mensajes y datos de su compañía telefónica. Legacy Motors Garage LLC no le cobra por estos mensajes. <em>Message and data rates may apply. We do not charge you for these messages.</em></p>
-          <p style="margin:0 0 8px;"><strong>Cancelar / Opt out:</strong> Responda <strong>STOP</strong> a cualquier mensaje para dejar de recibirlos. Responda <strong>HELP</strong> para ayuda, o llame al (559) 540-5145. <em>Reply STOP to cancel. Reply HELP for help.</em></p>
-          <p style="margin:0 0 8px;"><strong>Revocación / Revocation:</strong> Puede revocar este consentimiento en cualquier momento, aquí mismo o respondiendo STOP. <em>You may revoke this consent at any time, here or by replying STOP.</em></p>
-          <p style="margin:0 0 8px;"><strong>Entrega / Delivery:</strong> Los proveedores de telefonía móvil no son responsables por mensajes retrasados o no entregados. <em>Carriers are not liable for delayed or undelivered messages.</em></p>
-          <p style="margin:0;"><strong>Privacidad / Privacy:</strong> No venderemos ni compartiremos su número con terceros para el marketing de ellos. <em>We will not sell or share your number with third parties for their marketing.</em></p>
-        </div>
-      </details>
-
       <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;background:rgba(232,182,74,0.06);border:1px solid var(--border);border-radius:12px;padding:14px;">
         <input type="checkbox" id="sms-opt" style="width:20px;height:20px;margin-top:2px;flex:none;cursor:pointer;">
-        <span style="font-size:13px;line-height:1.5;color:var(--white);">
-          <strong>Sí, acepto</strong> recibir mensajes de texto de marketing y recordatorios de Legacy Motors Garage LLC al número de arriba, incluyendo mensajes enviados mediante un sistema automático de marcación o voz pregrabada.<br>
-          <span style="color:var(--muted);font-size:12px;"><em>Yes, I agree to receive marketing and reminder text messages, including messages sent using an automatic telephone dialing system or prerecorded voice.</em></span>
-        </span>
+        <span style="font-size:13px;line-height:1.5;color:var(--white);">${t('smsAgree')}</span>
       </label>
-
       <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.55;">
-        ⚖️ Este consentimiento <strong style="color:var(--white);">no es requisito</strong> para comprar un vehículo ni para obtener crédito. Seguirá recibiendo los avisos de su cuenta y sus pagos aunque no acepte.<br>
-        <em>This consent is not required to purchase a vehicle or obtain credit. You will still receive account and payment messages.</em>
+        ${t('smsFreq')} ${t('smsStop')}<br><br>⚖️ ${t('smsNotRequired')}
       </div>
-
-      <button class="ins-btn" onclick="saveSmsConsent()">Guardar / Save</button>
+      <a href="sms-terms.html" target="_blank" style="display:inline-block;font-size:12px;color:var(--gold);margin-top:10px;">${t('smsFullTerms')}</a>
+      <button class="ins-btn" onclick="saveSmsConsent()">${t('save')}</button>
       <div class="ins-success" id="sms-success" style="display:none;"></div>
     </div>
 
     <!-- CONTACT -->
-    <button class="contact-btn" onclick="window.open('https://wa.me/${waNum}?text=${encodeURIComponent(`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`)}')" >
-      📱 Contactar a Legacy Motors Garage
+    <button class="contact-btn" onclick="window.open('https://wa.me/${waNum}?text=${encodeURIComponent(t('waMsg')(c))}')" >
+      ${t('contactBtn')}
     </button>
 
     <!-- CAR INFO -->
-    <div class="section-title">Mi Vehículo</div>
+    <div class="section-title">${t('myVehicle')}</div>
     <div class="info-card">
-      <div class="info-row"><span class="ir-label">Vehículo</span><span class="ir-value">${c.year} ${c.make} ${c.model}</span></div>
-      <div class="info-row"><span class="ir-label">Precio total</span><span class="ir-value">${formatMoney(c.total)}</span></div>
-      <div class="info-row"><span class="ir-label">Down payment</span><span class="ir-value">${formatMoney(c.down)}</span></div>
-      <div class="info-row"><span class="ir-label">Pago semanal</span><span class="ir-value">${formatMoney(c.weekly)}</span></div>
-      <div class="info-row"><span class="ir-label">Total pagado</span><span class="ir-value" style="color:var(--green)">${formatMoney(paid)}</span></div>
-      <div class="info-row"><span class="ir-label">Saldo restante</span><span class="ir-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
+      <div class="info-row"><span class="ir-label">${t('vehicle')}</span><span class="ir-value">${c.year} ${c.make} ${c.model}</span></div>
+      <div class="info-row"><span class="ir-label">${t('totalPrice')}</span><span class="ir-value">${formatMoney(c.total)}</span></div>
+      <div class="info-row"><span class="ir-label">${t('downPayment')}</span><span class="ir-value">${formatMoney(c.down)}</span></div>
+      <div class="info-row"><span class="ir-label">${t('paymentLabel')}</span><span class="ir-value">${formatMoney(c.weekly)}</span></div>
+      <div class="info-row"><span class="ir-label">${t('totalPaid')}</span><span class="ir-value" style="color:var(--green)">${formatMoney(paid)}</span></div>
+      <div class="info-row"><span class="ir-label">${t('remaining')}</span><span class="ir-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
     </div>
 
     ${schedHTML}
@@ -689,7 +744,7 @@ function updateSmsDisplay() {
   const badge = document.getElementById('sms-badge');
   if(!badge || !currentClient) return;
   const on = !!(currentClient.smsConsent && currentClient.smsConsent.marketing);
-  badge.textContent = on ? 'ACTIVADO' : 'DESACTIVADO';
+  badge.textContent = on ? t('smsOn') : t('smsOff');
   badge.className = 'insurance-badge ' + (on ? 'ins-active' : 'ins-none');
   const cb = document.getElementById('sms-opt');
   if(cb) cb.checked = on;
@@ -717,19 +772,37 @@ function maybeAskConsent() {
   if(!currentClient) return;
   const sc = currentClient.smsConsent;
   if(sc && sc.date) return;
-  const ph = document.getElementById('consent-modal-phone');
-  if(ph) ph.textContent = currentClient.phone || currentClient.phoneE164 || '';
-  const m = document.getElementById('consent-modal');
-  if(m) m.style.display = 'flex';
+  const phone = currentClient.phone || currentClient.phoneE164 || '';
+  const title = t('smsTitle').replace('💬 ', '');
+  document.getElementById('consent-modal-box').innerHTML = `
+    <div style="font-size:36px;text-align:center;margin-bottom:10px;">💬</div>
+    <div style="font-family:var(--font-display);font-size:24px;color:var(--white);text-align:center;font-weight:300;">${title}</div>
+    <div style="font-size:15px;color:var(--muted);line-height:1.55;margin-top:20px;">
+      ${t('modalQuestion')} <strong style="color:var(--white);">${phone}</strong>?
+    </div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:16px;">${t('smsAgree')}</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:10px;">${t('smsFreq')} ${t('smsStop')}</div>
+    <div style="background:rgba(232,182,74,0.07);border:1px solid var(--border);border-radius:12px;padding:13px;margin-top:16px;font-size:12px;color:var(--muted);line-height:1.6;">
+      ⚖️ ${t('smsNotRequired')}<br><br>${t('modalNoChange')}
+    </div>
+    <a href="sms-terms.html" target="_blank" style="display:block;text-align:center;font-size:12px;color:var(--gold);margin-top:14px;">${t('smsFullTerms')}</a>
+    <button onclick="answerConsent(true)" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:15px;font-family:var(--font-display);font-size:18px;cursor:pointer;margin-top:18px;">${t('modalYes')}</button>
+    <button onclick="answerConsent(false)" style="width:100%;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-top:10px;">${t('modalNo')}</button>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.5;">${t('modalLater')}</div>
+    <div id="consent-modal-err" style="display:none;color:var(--red);font-size:12px;text-align:center;margin-top:10px;"></div>
+  `;
+  document.getElementById('consent-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';   // no puede seguir sin contestar
 }
 
 window.answerConsent = async function(accept) {
-  const err = document.getElementById('consent-modal-err');
   try {
     await writeConsent(!!accept, 'portal_first_login');
     document.getElementById('consent-modal').style.display = 'none';
+    document.body.style.overflow = '';
   } catch(e) {
-    err.textContent = 'No se pudo guardar: ' + e.message;
+    const err = document.getElementById('consent-modal-err');
+    err.textContent = t('errSave') + e.message;
     err.style.display = 'block';
   }
 };
@@ -739,12 +812,10 @@ window.saveSmsConsent = async function() {
   const box = document.getElementById('sms-success');
   try {
     await writeConsent(on, 'settings_card');
-    box.textContent = on
-      ? '✓ Guardado. Recibirá recordatorios y felicitaciones. ¡Gracias!'
-      : '✓ Guardado. No recibirá mensajes de marketing.';
+    box.textContent = on ? t('smsSavedYes') : t('smsSavedNo');
     box.style.color = 'var(--green)';
   } catch(e) {
-    box.textContent = 'Error al guardar: ' + e.message;
+    box.textContent = t('errSave') + e.message;
     box.style.color = 'var(--red)';
   }
   box.style.display = 'block';
