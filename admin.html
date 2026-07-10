@@ -457,6 +457,14 @@
     <div id="pay-client-info" style="margin-bottom:16px;font-size:14px;line-height:1.8;"></div>
     <div class="form-group"><label class="form-label">Monto ($)</label><input class="form-input" id="pay-amount" type="number"></div>
     <div class="form-group"><label class="form-label">Fecha de Pago</label><input class="form-input" id="pay-date" type="date"></div>
+    <div class="form-group"><label class="form-label">Método de Pago</label>
+      <select class="form-input" id="pay-method">
+        <option value="cash">💵 Efectivo</option>
+        <option value="terminal">💳 Tarjeta / Terminal</option>
+        <option value="ach">🏦 ACH / Transferencia</option>
+        <option value="zelle">📲 Zelle / Otro</option>
+      </select>
+    </div>
     <div style="font-family:var(--font-display);font-size:16px;color:var(--muted);margin-top:16px;">HISTORIAL</div>
     <div class="payment-history" id="pay-history"></div>
     <div class="modal-actions">
@@ -1310,6 +1318,7 @@ window.confirmPayment = async function(){
   if(_savingPayment) return;                                  // doble clic: se ignora
   const amount = Number(document.getElementById('pay-amount').value);
   const date   = document.getElementById('pay-date').value;
+  const method = document.getElementById('pay-method') ? document.getElementById('pay-method').value : 'cash';
   if(!amount || amount <= 0){ alert('Ingresa el monto'); return; }
   if(!date){ alert('Ingresa la fecha del pago'); return; }
   const c = clients.find(x => x.id === payingId);
@@ -1329,13 +1338,30 @@ window.confirmPayment = async function(){
       const fresh    = { id: c.id, ...snap.data() };          // datos frescos, no la copia en memoria
       const payments = [...(fresh.payments || [])];
       if(payments.some(p => p.entryId === entryId)) return fresh;   // ya estaba registrado
-      payments.push({
-        entryId, amount, date,
-        schedDate: getNextPayDate(fresh),
-        createdAt: new Date().toISOString(),
-        createdBy: (auth.currentUser && auth.currentUser.email) || ''
+      const nowISO   = new Date().toISOString();
+      const whoEmail = (auth.currentUser && auth.currentUser.email) || '';
+      const entry = { entryId, amount, date, method, schedDate: getNextPayDate(fresh), createdAt: nowISO, createdBy: whoEmail };
+      payments.push(entry);
+
+      // ETAPA 1 — doble escritura: el libro contable inmutable, en paralelo al sistema viejo.
+      // El id del renglon = entryId -> misma peticion nunca crea dos renglones (idempotente).
+      // set (no update) porque el doc no existe aun; queda atado a la MISMA transaccion atomica.
+      tx.set(doc(db, 'transactions', entryId), {
+        entryId,
+        type: 'payment',
+        clientId: fresh.id,
+        clientName: fresh.name || '',
+        amountCents: Math.round(amount * 100),      // dinero en centavos, entero
+        method,
+        date,                                       // fecha del pago (la que capturas)
+        schedDate: entry.schedDate,
+        createdAt: nowISO,                          // sello real de cuando se registro
+        createdBy: whoEmail,                        // corte por socio se basa en esto
+        note: '',
+        source: 'admin'
       });
-      tx.update(ref, { payments });                           // solo toca 'payments'
+
+      tx.update(ref, { payments });                 // sistema viejo, intacto
       return { ...fresh, payments };
     });
     closeModal('pay-modal');
