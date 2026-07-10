@@ -229,6 +229,7 @@
       <span class="sync-status" id="sync-status">● En línea</span>
       <button onclick="downloadBackup()" id="backup-btn" title="Descarga toda la base a tu computadora" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;">💾 Respaldo</button>
       <button onclick="auditBalances()" id="audit-btn" style="background:#8b1a1a;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">🔍 Auditar Saldos</button>
+      <button onclick="openPassModal()" title="Cambiar contraseña" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px;">🔑 Contraseña</button>
       <button class="logout-btn" onclick="adminLogout()">Salir</button>
     </div>
   </header>
@@ -487,12 +488,27 @@
   </div>
 </div>
 
+<!-- CAMBIAR CONTRASEÑA -->
+<div class="modal-overlay" id="pass-modal">
+  <div class="modal">
+    <div class="modal-title">🔑 Cambiar Contraseña</div>
+    <div class="form-group"><label class="form-label">Contraseña actual</label><input class="form-input" id="pw-current" type="password" autocomplete="current-password"></div>
+    <div class="form-group"><label class="form-label">Nueva contraseña</label><input class="form-input" id="pw-new" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></div>
+    <div class="form-group"><label class="form-label">Repite la nueva contraseña</label><input class="form-input" id="pw-new2" type="password" autocomplete="new-password"></div>
+    <div id="pw-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:6px;"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('pass-modal')">Cancelar</button>
+      <button class="btn-save" id="pw-save" onclick="changePassword()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, updateDoc, runTransaction, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
@@ -537,6 +553,39 @@ window.adminLogin = async function() {
 };
 
 window.adminLogout = function() { signOut(auth); };
+
+window.openPassModal = function(){
+  ['pw-current','pw-new','pw-new2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('pw-err').textContent='';
+  document.getElementById('pass-modal').classList.add('active');
+};
+window.changePassword = async function(){
+  const cur=document.getElementById('pw-current').value;
+  const nw =document.getElementById('pw-new').value;
+  const nw2=document.getElementById('pw-new2').value;
+  const err=document.getElementById('pw-err'); err.textContent='';
+  if(!cur||!nw||!nw2){ err.textContent='Llena todos los campos'; return; }
+  if(nw.length<6){ err.textContent='La nueva debe tener al menos 6 caracteres'; return; }
+  if(nw!==nw2){ err.textContent='Las contraseñas nuevas no coinciden'; return; }
+  if(nw===cur){ err.textContent='La nueva debe ser distinta a la actual'; return; }
+  const btn=document.getElementById('pw-save'); btn.disabled=true; btn.textContent='Guardando...';
+  try{
+    const user=auth.currentUser;
+    const cred=EmailAuthProvider.credential(user.email, cur);
+    await reauthenticateWithCredential(user, cred);   // confirma que es el dueño
+    await updatePassword(user, nw);
+    closeModal('pass-modal');
+    alert('✅ Contraseña actualizada. Úsala la próxima vez que entres.');
+  }catch(e){
+    const c=e.code||'';
+    err.textContent = (c==='auth/wrong-password'||c==='auth/invalid-credential') ? 'La contraseña actual no es correcta'
+      : c==='auth/weak-password' ? 'La nueva es muy débil (mínimo 6 caracteres)'
+      : c==='auth/too-many-requests' ? 'Demasiados intentos. Espera un momento.'
+      : c==='auth/requires-recent-login' ? 'Por seguridad, cierra sesión, vuelve a entrar y reintenta.'
+      : 'Error: '+(e.message||c);
+  }
+  btn.disabled=false; btn.textContent='Guardar';
+};
 
 window.resendVerification = async function() {
   try { await sendEmailVerification(auth.currentUser); alert('Te enviamos un correo de verificación. Revisa tu bandeja (y spam), haz clic en el enlace y vuelve a entrar.'); }
