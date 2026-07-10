@@ -163,7 +163,19 @@
     </div>
   </div>
 
+  <div class="summary" style="margin-top:4px;">
+    <div class="stat"><div class="stat-label">🚗 Dealer · este mes</div><div><div class="stat-value" id="g-dealer">$0</div><div class="stat-foot">en gastos</div></div></div>
+    <div class="stat"><div class="stat-label">🔧 Partes · este mes</div><div><div class="stat-value" id="g-parts">$0</div><div class="stat-foot">en gastos</div></div></div>
+    <div class="stat"><div class="stat-label">📦 eBay · este mes</div><div><div class="stat-value" id="g-ebay">$0</div><div class="stat-foot">en gastos</div></div></div>
+  </div>
+
   <div class="section-head">
+    <div class="section-title">Gastos del negocio</div>
+    <button class="btn-add" onclick="openExp()">＋ Registrar gasto</button>
+  </div>
+  <div class="list" id="exp-list"></div>
+
+  <div class="section-head" style="margin-top:28px;">
     <div class="section-title">Subscripciones y gastos recurrentes</div>
     <button class="btn-add" onclick="openSub()">＋ Agregar</button>
   </div>
@@ -212,9 +224,53 @@
   </div>
 </div>
 
+<!-- EXPENSE SHEET -->
+<div class="overlay" id="exp-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title">Registrar gasto</div><button class="close" onclick="closeExp()">✕</button></div>
+    <div class="row2">
+      <div class="field"><label>Monto ($)</label><input id="e-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
+      <div class="field"><label>Fecha</label><input id="e-date" type="date"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Cuenta / Bolsa</label>
+        <select id="e-dept" onchange="onDeptChange()">
+          <option value="dealer">🚗 Dealer</option>
+          <option value="parts">🔧 Partes</option>
+          <option value="ebay">📦 eBay</option>
+        </select>
+      </div>
+      <div class="field"><label>Categoría</label><select id="e-cat"></select></div>
+    </div>
+    <div class="field" id="e-car-row"><label>Carro (opcional — para saber cuánto cuesta)</label><select id="e-car"></select></div>
+    <div class="row2">
+      <div class="field"><label>Método de pago</label>
+        <select id="e-method">
+          <option value="cash">💵 Efectivo</option>
+          <option value="terminal">💳 Tarjeta / Terminal</option>
+          <option value="ach">🏦 ACH / Transferencia</option>
+          <option value="zelle">📲 Zelle / Otro</option>
+        </select>
+      </div>
+      <div class="field"><label>Proveedor (opcional)</label><input id="e-vendor" placeholder="A quién le pagaste"></div>
+    </div>
+    <div class="field"><label>📸 Foto del recibo (opcional)</label>
+      <input type="file" id="e-receipt" accept="image/*" capture="environment" onchange="previewReceipt()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
+      <div id="e-receipt-preview" style="margin-top:8px;"></div>
+    </div>
+    <div class="field"><label>Nota (opcional)</label><input id="e-note" placeholder="Detalle del gasto"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeExp()">Cancelar</button>
+      <button class="btn btn-primary" id="exp-save" onclick="saveExp()">Guardar gasto</button>
+    </div>
+    <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;line-height:1.5;">El libro es permanente: un gasto no se edita ni se borra. Si te equivocas, se reversa (queda constancia).</div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -228,9 +284,33 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
+
+// Convierte cualquier foto (incluida HEIC del iPhone) a JPEG en el telefono.
+function toJpeg(file){
+  return new Promise(function(resolve){
+    if(!file || (file.type && file.type.indexOf('image/')!==0 && !/\.(heic|heif)$/i.test(file.name||''))){ resolve(file); return; }
+    var url=URL.createObjectURL(file), img=new Image();
+    img.onload=function(){
+      try{
+        var maxW=1600, w=img.naturalWidth, h=img.naturalHeight;
+        if(!w||!h){ URL.revokeObjectURL(url); resolve(file); return; }
+        if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        cv.toBlob(function(b){ URL.revokeObjectURL(url); if(!b){resolve(file);return;}
+          resolve(new File([b],(file.name||'recibo').replace(/\.(heic|heif|png)$/i,'')+'.jpg',{type:'image/jpeg'})); }, 'image/jpeg', 0.85);
+      }catch(e){ URL.revokeObjectURL(url); resolve(file); }
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); resolve(file); };
+    img.src=url;
+  });
+}
 const STAFF_EMAILS = ['ev@legacymotorsgarage.com'];
 
 let subs = [];
+let txns = [];
+let inventory = [];
 let editingId = null;
 let _listening = false;
 
@@ -266,6 +346,140 @@ function startListening(){
     subs = snap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>s.active!==false);
     render();
   }, err=>{ console.log('subs listen error', err); });
+  onSnapshot(collection(db,'transactions'), snap=>{
+    txns = snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderExpenses();
+  }, err=>{ console.log('txns listen error', err); });
+  loadInventory();
+}
+
+// ---------- GASTOS (LIBRO) ----------
+const EXP_CATS = {
+  dealer: ['Compra de vehículo','Reparación / Reacondicionamiento','Partes para reparación','Transporte / Traída','DMV / Título / Registración','Publicidad','Comisión del procesador','Suministros','Renta / Local','Servicios (luz, internet)','Gasolina','Otro'],
+  parts:  ['Compra de parte / inventario','Envío / Freight','Suministros','Renta / Local','Servicios','Gasolina','Otro'],
+  ebay:   ['Sueldos','Compra de parte','Envío / Freight','Comisión eBay / PayPal','Devolución / Reembolso','Suministros','Otro']
+};
+const DEPT_LABEL = { dealer:'🚗 Dealer', parts:'🔧 Partes', ebay:'📦 eBay' };
+const METHOD_LABEL = { cash:'💵 Efectivo', terminal:'💳 Terminal', ach:'🏦 ACH', zelle:'📲 Zelle/Otro' };
+const centsToUSD = c => '$'+(Number(c||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+async function loadInventory(){
+  try{ const snap=await getDocs(collection(db,'inventory')); inventory=snap.docs.map(d=>({id:d.id,...d.data()})); populateCarPicker(); }
+  catch(e){ console.log('inv load', e); }
+}
+function populateCarPicker(){
+  const sel=document.getElementById('e-car'); if(!sel) return;
+  const opts=['<option value="">— Ninguno (gasto general) —</option>'];
+  [...inventory].sort((a,b)=>(parseInt(a.inventoryNum)||0)-(parseInt(b.inventoryNum)||0)).forEach(c=>{
+    opts.push(`<option value="${c.id}">#${c.inventoryNum||'?'} · ${c.year||''} ${c.make||''} ${c.model||''}</option>`);
+  });
+  sel.innerHTML=opts.join('');
+}
+window.onDeptChange = function(){
+  const dept=document.getElementById('e-dept').value;
+  const cat=document.getElementById('e-cat');
+  cat.innerHTML=(EXP_CATS[dept]||[]).map(c=>`<option>${c}</option>`).join('');
+  document.getElementById('e-car-row').style.display = dept==='dealer' ? 'block':'none';
+};
+window.previewReceipt = function(){
+  const f=document.getElementById('e-receipt').files[0]; const box=document.getElementById('e-receipt-preview');
+  if(!f){ box.innerHTML=''; return; }
+  box.innerHTML=`<div style="font-size:12px;color:var(--muted);">📎 ${f.name}</div>`;
+};
+window.openExp = function(){
+  document.getElementById('e-amount').value='';
+  document.getElementById('e-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('e-dept').value='dealer';
+  onDeptChange();
+  document.getElementById('e-method').value='cash';
+  document.getElementById('e-vendor').value='';
+  document.getElementById('e-note').value='';
+  document.getElementById('e-receipt').value='';
+  document.getElementById('e-receipt-preview').innerHTML='';
+  document.getElementById('exp-overlay').classList.add('open');
+};
+window.closeExp = function(){ document.getElementById('exp-overlay').classList.remove('open'); };
+
+window.saveExp = async function(){
+  const amount=Number(document.getElementById('e-amount').value);
+  if(!amount||amount<=0){ alert('Pon el monto'); return; }
+  const date=document.getElementById('e-date').value;
+  if(!date){ alert('Pon la fecha'); return; }
+  const dept=document.getElementById('e-dept').value;
+  const category=document.getElementById('e-cat').value;
+  const method=document.getElementById('e-method').value;
+  const vendor=document.getElementById('e-vendor').value.trim();
+  const note=document.getElementById('e-note').value.trim();
+  const carSel=document.getElementById('e-car');
+  const carId=(dept==='dealer' && carSel)?carSel.value:'';
+  const carLabel=carId?(carSel.options[carSel.selectedIndex]?.text||''):'';
+  const btn=document.getElementById('exp-save'); btn.disabled=true; btn.textContent='Guardando…';
+  const id='exp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  try{
+    let receiptURL='';
+    const file=document.getElementById('e-receipt').files[0];
+    if(file){
+      btn.textContent='Subiendo recibo…';
+      const jpg=await toJpeg(file);
+      const r=ref(storage,'receipts/'+id+'/'+Date.now()+'_'+(jpg.name||'recibo.jpg'));
+      await uploadBytes(r,jpg);
+      receiptURL=await getDownloadURL(r);
+    }
+    await setDoc(doc(db,'transactions',id), {
+      entryId:id, type:'expense', dept, category,
+      amountCents:Math.round(amount*100),
+      method, date, vendor, carId, carLabel, receiptURL, note,
+      createdAt:new Date().toISOString(),
+      createdBy:(auth.currentUser&&auth.currentUser.email)||'',
+      source:'finanzas'
+    });
+    closeExp();
+  }catch(e){ alert('Error al guardar: '+e.message); }
+  btn.disabled=false; btn.textContent='Guardar gasto';
+};
+
+window.reverseExp = async function(id){
+  const e=txns.find(x=>x.id===id); if(!e) return;
+  if(!confirm(`¿Reversar este gasto de ${centsToUSD(e.amountCents)}?\n\nNo se borra: se agrega un renglón que lo cancela y ambos quedan en el libro.`)) return;
+  const rid='rev_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  try{
+    await setDoc(doc(db,'transactions',rid), {
+      entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id,
+      dept:e.dept, category:e.category, amountCents:Number(e.amountCents)||0,
+      method:e.method||'', date:new Date().toISOString().slice(0,10),
+      vendor:e.vendor||'', carId:e.carId||'', carLabel:e.carLabel||'',
+      note:'Reversa de gasto', createdAt:new Date().toISOString(),
+      createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
+    });
+  }catch(err){ alert('Error: '+err.message); }
+};
+
+function renderExpenses(){
+  const exps=txns.filter(t=>t.type==='expense');
+  const reversed=new Set(txns.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
+  const active=exps.filter(e=>!reversed.has(e.entryId||e.id));
+  const ym=new Date().toISOString().slice(0,7);
+  const byDept={dealer:0,parts:0,ebay:0};
+  active.forEach(e=>{ if((e.date||'').slice(0,7)===ym) byDept[e.dept]=(byDept[e.dept]||0)+(Number(e.amountCents)||0); });
+  document.getElementById('g-dealer').textContent=centsToUSD(byDept.dealer);
+  document.getElementById('g-parts').textContent=centsToUSD(byDept.parts);
+  document.getElementById('g-ebay').textContent=centsToUSD(byDept.ebay);
+
+  const el=document.getElementById('exp-list');
+  const list=[...active].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,40);
+  if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ic">🧾</div><div class="empty-title">Aún no hay gastos</div><div class="empty-sub">Registra cada gasto con su recibo. Si lo ligas a un carro, sabrás cuánto te cuesta ese auto.</div></div>'; return; }
+  el.innerHTML=list.map(e=>{
+    const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);text-decoration:none;font-size:12px;">📎 recibo</a>`:'';
+    const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
+    return `<div class="row">
+      <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:'🧾'}</div>
+      <div class="row-main">
+        <div class="row-name">${e.category||'Gasto'}${e.vendor?' · '+e.vendor:''}</div>
+        <div class="row-meta"><span class="chip">${(DEPT_LABEL[e.dept]||'').replace(/^\S+\s/,'')||e.dept}</span><span>${fmtDate(e.date)}</span>${car}${rec}</div>
+      </div>
+      <div class="row-amt"><div class="row-amt-val">-${centsToUSD(e.amountCents)}</div><div class="row-amt-int"><span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩ reversar</span></div></div>
+    </div>`;
+  }).join('');
 }
 
 // ---------- HELPERS ----------
