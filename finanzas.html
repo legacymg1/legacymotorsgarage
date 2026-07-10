@@ -157,6 +157,7 @@
 
   <div id="bolsa-cards"></div>
   <div id="gran-total"></div>
+  <div id="privadas-section"></div>
 
   <div class="section-head" style="margin-top:22px;">
     <div class="section-title" style="font-size:14px;color:var(--muted);">Recurrentes y pruebas gratis</div>
@@ -495,8 +496,13 @@ function startListening(){
   }, err=>{ console.log('subs listen error', err); });
   onSnapshot(collection(db,'transactions'), snap=>{
     txns = snap.docs.map(d=>({id:d.id,...d.data()}));
-    renderExpenses(); renderBolsas(); applyMovsCollapse();
+    renderExpenses(); renderBolsas(); applyMovsCollapse(); renderPrivadas();
   }, err=>{ console.log('txns listen error', err); });
+  onSnapshot(collection(db,'clients'), snap=>{
+    privateClients = snap.docs.filter(d=>d.data().private===true).map(d=>({id:d.id,...d.data()}));
+    privateIds = new Set(privateClients.map(c=>c.id));
+    renderBolsas(); renderPrivadas(); renderExpenses();
+  }, err=>{ console.log('clients listen error', err); });
   loadInventory();
 }
 
@@ -514,6 +520,10 @@ function liveTxns(){
   const voided=new Set(txns.filter(t=>t.type==='void').map(v=>v.voidOf));
   return txns.filter(t=>t.type!=='void' && !voided.has(t.entryId||t.id));
 }
+let privateIds = new Set();
+let privateClients = [];
+// Movimientos de Legacy: vivos, excluyendo ventas privadas.
+function legacyTxns(){ return liveTxns().filter(t=>!(t.clientId && privateIds.has(t.clientId))); }
 
 async function loadInventory(){
   try{ const snap=await getDocs(collection(db,'inventory')); inventory=snap.docs.map(d=>({id:d.id,...d.data()})); populateCarPicker(); }
@@ -607,7 +617,7 @@ window.reverseExp = async function(id){
 };
 
 function renderExpenses(){
-  const LT=liveTxns();
+  const LT=legacyTxns();
   const reversed=new Set(LT.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
   const exps=LT.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id));
   const active=exps;
@@ -778,7 +788,7 @@ window.renderCorte = function(){
   const byMethod={}, byDept={}, byWho={};
   let totIn=0, totOut=0, opIn=0, opOut=0, capIn=0, capOut=0;
   const bump=(m,k,i,o)=>{ if(!m[k])m[k]={in:0,out:0}; m[k].in+=i; m[k].out+=o; };
-  liveTxns().filter(inRange).forEach(t=>{
+  legacyTxns().filter(inRange).forEach(t=>{
     const amt=Number(t.amountCents)||0; let inc=0,out=0;
     if(INCOME_TYPES.includes(t.type)){ inc=amt; opIn+=amt; }        // ingreso operativo
     else if(t.type==='expense'){ out=amt; opOut+=amt; }             // gasto operativo
@@ -794,7 +804,7 @@ window.renderCorte = function(){
   const cashNet=(byMethod['cash']?byMethod['cash'].in-byMethod['cash'].out:0);
   // Efectivo en caja AHORA (acumulado de todos los tiempos) — incluye lo que quedó de cortes previos
   let cashOnHand=0;
-  liveTxns().forEach(function(tt){
+  legacyTxns().forEach(function(tt){
     if((tt.method||'')!=='cash') return;
     const a=Number(tt.amountCents)||0;
     if(INCOME_TYPES.includes(tt.type)||tt.type==='contribution') cashOnHand+=a;
@@ -897,7 +907,7 @@ window.openSocios = function(){ renderSocios(); document.getElementById('socios-
 window.closeSocios = function(){ document.getElementById('socios-overlay').classList.remove('open'); };
 function renderSocios(){
   const byPerson={};
-  liveTxns().forEach(t=>{
+  legacyTxns().forEach(t=>{
     if(t.type!=='contribution' && t.type!=='draw') return;
     const p=((t.person||'').trim())||'—';
     if(!byPerson[p]) byPerson[p]={in:0,out:0};
@@ -969,7 +979,7 @@ function renderBolsas(){
   const box=document.getElementById('bolsa-cards'); if(!box) return;
   const lc=lastClosing(); const since=lc?(lc.closedAt||''):'';
   const inCut = t => (t.createdAt||'') > since;
-  const LT = liveTxns();
+  const LT = legacyTxns();
   const D={dealer:{in:0,out:0,tin:0,tout:0,items:[]}, parts:{in:0,out:0,tin:0,tout:0,items:[]}, ebay:{in:0,out:0,tin:0,tout:0,items:[]}};
   LT.filter(inCut).forEach(t=>{
     const amt=Number(t.amountCents)||0;
@@ -1048,6 +1058,27 @@ function applyMovsCollapse(){
   }catch(e){}
 }
 
+// ---------- VENTAS PRIVADAS (fuera de Legacy) ----------
+function renderPrivadas(){
+  const box=document.getElementById('privadas-section'); if(!box) return;
+  if(!privateClients.length){ box.innerHTML=''; return; }
+  const live=liveTxns();
+  const INCOME=['payment','down','cash_sale','income'];
+  let total=0;
+  const rows=privateClients.map(c=>{
+    const paid=live.filter(t=>t.clientId===c.id && INCOME.includes(t.type)).reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+    total+=paid;
+    return {name:c.name||'(sin nombre)', car:`${c.year||''} ${c.make||''} ${c.model||''}`.trim(), paid};
+  }).sort((a,b)=>b.paid-a.paid);
+  box.innerHTML=`
+    <div class="section-head" style="margin-top:22px;"><div class="section-title" style="font-size:14px;color:var(--muted);">🔒 Ventas privadas (fuera de Legacy)</div></div>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:14px 16px;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Estas ventas NO cuentan en los números ni impuestos de Legacy. Bórralas del CRM cuando se liquiden.</div>
+      ${rows.map(r=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:14px;"><span>${r.name}<span style="color:var(--faint);font-size:12px;">${r.car?' · '+r.car:''}</span></span><span style="color:var(--muted);white-space:nowrap;">${centsToUSD(r.paid)} cobrado</span></div>`).join('')}
+      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:8px;padding-top:8px;font-weight:700;"><span>Total privadas</span><span>${centsToUSD(total)}</span></div>
+    </div>`;
+}
+
 // ---------- ESTADO DE RESULTADOS ----------
 let _pnlMonth = new Date().toISOString().slice(0,7);
 let _pnlMode = 'month';
@@ -1076,7 +1107,7 @@ function renderPnl(){
     const btn=document.getElementById('pnl-month-btn'); if(btn) btn.textContent=label;
   }
   const D={dealer:{in:0,out:0,cap:0,draw:0}, parts:{in:0,out:0,cap:0,draw:0}, ebay:{in:0,out:0,cap:0,draw:0}};
-  liveTxns().filter(inRange).forEach(t=>{
+  legacyTxns().filter(inRange).forEach(t=>{
     const amt=Number(t.amountCents)||0;
     const dept = D[t.dept] ? t.dept : 'dealer';
     if(INCOME_TYPES.includes(t.type)){ const k=(t.type==='income' && D[t.dept])?t.dept:'dealer'; D[k].in+=amt; }

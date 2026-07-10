@@ -311,6 +311,12 @@
       <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="f-name" placeholder="Juan García"></div>
       <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="f-phone" placeholder="555 555 5555" type="tel"></div>
     </div>
+    <div class="form-group" style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:14px;line-height:1.4;">
+        <input type="checkbox" id="f-private" style="width:18px;height:18px;margin-top:1px;flex:none;">
+        <span>🔒 <b>Venta privada / pre-Legacy</b><br><span style="font-size:12px;color:var(--muted);">NO cuenta en los números ni impuestos de Legacy. Se lleva aparte en Finanzas.</span></span>
+      </label>
+    </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha de Nacimiento</label><input class="form-input" id="f-dob" type="date"></div>
       <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="f-address" placeholder="123 Main St"></div>
@@ -1191,6 +1197,7 @@ window.openAddModal=function(){
   document.getElementById('modal-title').textContent='NUEVO CLIENTE';
   ['name','phone','make','model','year','total','down','weekly','notes','dob','contractdate','lastservice','vin','miles','address','city','zip','id-number'].forEach(f=>{const el=document.getElementById('f-'+f);if(el)el.value='';});
   const _c=document.getElementById('f-sms-consent'); if(_c) _c.checked=false;
+  const _pv2=document.getElementById('f-private'); if(_pv2) _pv2.checked=false;
   document.getElementById('f-startdate').value=today();
   document.getElementById('f-numpay').value='';
   document.getElementById('f-hint').textContent='';
@@ -1219,6 +1226,7 @@ window.openEditModal=function(id){
   // Date inputs need special handling
   const setDate=(id,val)=>{const el=document.getElementById(id);if(el&&val){el.value=val;el.setAttribute('value',val);}};
   setDate('f-dob', c.dob);
+  const _pv=document.getElementById('f-private'); if(_pv) _pv.checked=!!c.private;
   setDate('f-contractdate', c.contractDate);
   setDate('f-lastservice', c.lastServiceDate || c.contractDate);
   const _ck=document.getElementById('f-sms-consent'); if(_ck) _ck.checked = !!(c.smsConsent && c.smsConsent.marketing);
@@ -1312,6 +1320,7 @@ window.saveClient=async function(){
     phone:document.getElementById('f-phone').value.trim(),
     phoneE164:toE164(document.getElementById('f-phone').value),
     dob:document.getElementById('f-dob')?.value || existing.dob || '',
+    private: document.getElementById('f-private')?.checked || false,
     lastServiceDate:document.getElementById('f-lastservice')?.value || existing.lastServiceDate || contractDate || '',
     smsConsent:(()=>{
       const on = !!document.getElementById('f-sms-consent')?.checked;
