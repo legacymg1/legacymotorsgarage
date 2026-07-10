@@ -148,7 +148,7 @@
   <h1 class="page">Finanzas</h1>
   <div class="page-sub">Gastos, ingresos y cortes de caja del negocio — en un solo lugar.</div>
   <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn-add" onclick="openPnl()" style="font-size:15px;">📊 Resultados</button>
+    <button class="btn-add" onclick="openPnl()" style="font-size:15px;">📊 Resultados del mes</button>
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
     <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
   </div>
@@ -278,13 +278,12 @@
 <!-- ESTADO DE RESULTADOS -->
 <div class="overlay" id="pnl-overlay">
   <div class="sheet" style="max-width:680px;">
-    <div class="sheet-head"><div class="sheet-title">📊 Estado de resultados</div><button class="close" onclick="closePnl()">✕</button></div>
+    <div class="sheet-head"><div class="sheet-title">📊 Resultados del mes</div><button class="close" onclick="closePnl()">✕</button></div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
       <button class="btn btn-ghost" onclick="pnlMonthShift(-1)" style="padding:8px 14px;">‹</button>
       <button class="btn btn-ghost" id="pnl-month-btn" onclick="pnlThisMonth()" style="flex:1;">Este mes</button>
       <button class="btn btn-ghost" onclick="pnlMonthShift(1)" style="padding:8px 14px;">›</button>
     </div>
-    <button class="btn btn-ghost" onclick="pnlSinceCut()" style="width:100%;margin-bottom:14px;">↺ Desde el último corte</button>
     <div id="pnl-body"></div>
     <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:12px;line-height:1.5;">Base efectivo (dinero recibido y gastado). Las aportaciones y retiros de socios NO cuentan como ganancia.</div>
   </div>
