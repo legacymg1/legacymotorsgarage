@@ -232,6 +232,7 @@
   <div style="background:linear-gradient(135deg,var(--gold3),var(--gold));padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
     <div style="font-family:var(--font-display);font-size:20px;color:var(--navy3);letter-spacing:1px;">📅 PAGOS DE HOY</div>
     <div style="display:flex;gap:8px;">
+      <button onclick="purgePasswords()" id="purge-btn" style="background:#8b1a1a;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">🔒 BORRAR CONTRASEÑAS</button>
       <button onclick="exportCalendar()" style="background:var(--navy3);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">📆 EXPORTAR CALENDARIO</button>
     </div>
   </div>
@@ -330,7 +331,6 @@
           <span style="color:var(--muted);font-size:12px;">El cliente autorizó <b>por escrito</b> recibir mensajes de cumpleaños, servicio y promociones. No es obligatorio para el crédito.</span></span>
         </label>
       </div>
-      <div class="form-group"><label class="form-label">Contraseña Portal</label><input class="form-input" id="f-pass" placeholder="Crea una contraseña"></div>
       <div class="form-group"><label class="form-label">Año del Carro</label><input class="form-input" id="f-year" placeholder="2019" type="number"></div>
     </div>
     <div class="form-row">
@@ -470,7 +470,7 @@
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, updateDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, updateDoc, deleteField, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -1028,7 +1028,7 @@ window.toggleSchedule=function(id){const el=document.getElementById('sched-'+id)
 window.openAddModal=function(){
   editingId=null;
   document.getElementById('modal-title').textContent='NUEVO CLIENTE';
-  ['name','phone','pass','make','model','year','total','down','weekly','notes','dob','contractdate','lastservice','vin','miles','address','city','zip','id-number'].forEach(f=>{const el=document.getElementById('f-'+f);if(el)el.value='';});
+  ['name','phone','make','model','year','total','down','weekly','notes','dob','contractdate','lastservice','vin','miles','address','city','zip','id-number'].forEach(f=>{const el=document.getElementById('f-'+f);if(el)el.value='';});
   const _c=document.getElementById('f-sms-consent'); if(_c) _c.checked=false;
   document.getElementById('f-startdate').value=today();
   document.getElementById('f-numpay').value='';
@@ -1044,7 +1044,6 @@ window.openEditModal=function(id){
   // Basic fields
   document.getElementById('f-name').value=c.name||'';
   document.getElementById('f-phone').value=c.phone||'';
-  document.getElementById('f-pass').value=c.portalPass||'';
   document.getElementById('f-make').value=c.make||'';
   document.getElementById('f-model').value=c.model||'';
   document.getElementById('f-year').value=c.year||'';
@@ -1155,7 +1154,6 @@ window.saveClient=async function(){
     city:document.getElementById('f-city')?.value.trim() || existing.city || '',
     state:document.getElementById('f-state')?.value.trim() || existing.state || '',
     zip:document.getElementById('f-zip')?.value.trim() || existing.zip || '',
-    portalPass:document.getElementById('f-pass').value.trim(),
     make:document.getElementById('f-make').value.trim(),
     model:document.getElementById('f-model').value.trim(),
     year:document.getElementById('f-year').value,
@@ -1463,6 +1461,19 @@ window.sendWhatsApp=function(){
 };
 
 document.getElementById('wa-text').addEventListener('input',function(){document.getElementById('wa-preview').textContent=this.value;});
+
+// Limpieza unica: elimina las contrasenas en texto plano (el portal ya usa SMS).
+window.purgePasswords = async function() {
+  const conPass = clients.filter(c => c.portalPass);
+  if(!conPass.length) { alert('✅ No hay contraseñas guardadas. Nada que borrar.'); return; }
+  if(!confirm(`Se van a BORRAR permanentemente ${conPass.length} contraseña(s) en texto plano de la base de datos.\n\nEl portal ya no las usa (los clientes entran con código SMS). Esta acción no se puede deshacer.\n\n¿Continuar?`)) return;
+  let ok = 0, fail = 0;
+  for(const c of conPass) {
+    try { await updateDoc(doc(db,'clients',c.id), { portalPass: deleteField() }); ok++; }
+    catch(e) { console.error(c.id, e); fail++; }
+  }
+  alert(`🔒 ${ok} contraseña(s) borrada(s).${fail ? ' ' + fail + ' fallaron.' : ''}`);
+};
 
 // TODAY BOX
 function getBirthdayClients() {
