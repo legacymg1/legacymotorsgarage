@@ -482,7 +482,7 @@
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, updateDoc, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, updateDoc, runTransaction, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -605,12 +605,29 @@ function generateSchedule(startDate, num, freq) {
 }
 function getPaidDates(c) { return new Set((c.payments||[]).map(p=>p.schedDate).filter(Boolean)); }
 function getPaidCount(c) { return (c.payments||[]).filter(p=>p.schedDate).length; }
-function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0); }
-function calcBalance(c) { return Math.max(0,Number(c.total)-calcPaid(c)); }
+// ===== DINERO: una sola definicion, la del contrato =====
+// El cliente NO paga el precio del vehiculo. Paga el TOTAL DE PAGOS, que incluye
+// el cargo por financiamiento. Ignorarlo era regalarle el interes.
+function totalOfPayments(c) {
+  if((c.freq||'') === 'cash') return Number(c.total)||0;
+  if(Number(c.totalOfPayments) > 0) return Number(c.totalOfPayments);   // congelado al firmar
+  return (Number(c.weekly)||0) * ((c.schedule||[]).length);             // contratos viejos
+}
+// Abonado = las mensualidades. El enganche ya viene descontado del monto financiado.
+function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0); }
+function calcBalance(c) {
+  if(c.settled === true) return 0;
+  if((c.freq||'') === 'cash') return 0;
+  return Math.max(0, totalOfPayments(c) - calcPaid(c));
+}
 function isPaidOff(c) {
-  if(c.settled === true) return true;              // hecho grabado: alguien lo declaro liquidado
-  const totalPay = c.numPay || (c.schedule||[]).length || 0;
-  return calcBalance(c) <= 0 || (totalPay > 0 && getPaidCount(c) >= totalPay);
+  if(c.settled === true) return true;              // hecho grabado, gana sobre cualquier calculo
+  if((c.freq||'') === 'cash') return true;
+  // TRANSICION: contratos firmados antes de este arreglo (sin totalOfPayments congelado)
+  // que ya completaron todas sus mensualidades. Se apaga sola al volver a guardar al cliente.
+  // Declaralos liquidados desde la auditoria para convertir esta inferencia en un hecho.
+  if(!Number(c.totalOfPayments) && (c.schedule||[]).length > 0 && getPaidCount(c) >= (c.schedule||[]).length) return true;
+  return calcBalance(c) <= 0.005;                  // un abono parcial ya NO cierra una mensualidad
 }
 
 // Declara un contrato liquidado. Queda con fecha y con quien lo hizo.
@@ -647,7 +664,12 @@ function getStatus(c) {
   if(d<=soonDays) return 'soon';
   return 'ok';
 }
-function calcProgress(c) { const t=Number(c.total); if(!t) return 0; return Math.min(100,Math.round(calcPaid(c)/t*100)); }
+function calcProgress(c) {
+  if(c.settled === true) return 100;
+  const t = totalOfPayments(c);
+  if(!t) return 0;
+  return Math.min(100, Math.round(calcPaid(c)/t*100));
+}
 
 window.calcCCOA = function() {
   const price = parseFloat(document.getElementById('f-total')?.value) || 0;
@@ -1139,8 +1161,16 @@ window.saveClient=async function(){
   const id=editingId||('c_'+Date.now());
   const existing=editingId?clients.find(x=>x.id===editingId):{};
 
+  // Los terminos se congelan al firmar. El contrato es la verdad; el sistema no los recalcula.
+  const _price  = Number(document.getElementById('f-total').value)||0;
+  const _down   = Number(document.getElementById('f-down').value)||0;
+  const _weekly = Number(document.getElementById('f-weekly').value)||0;
+  const _amountFinanced  = Math.max(0, _price + 70 - _down);
+
   const freq=document.getElementById('f-freq')?document.getElementById('f-freq').value:'weekly';
   const lang=document.getElementById('f-lang')?document.getElementById('f-lang').value:'es';
+  const _totalOfPayments = freq === 'cash' ? 0 : Math.round(_weekly * numPay * 100)/100;
+  const _financeCharge   = freq === 'cash' ? 0 : Math.max(0, Math.round((_totalOfPayments - _amountFinanced)*100)/100);
   const contractDate=document.getElementById('f-contractdate')?.value || existing.contractDate || '';
 
   // ID photo
@@ -1190,7 +1220,11 @@ window.saveClient=async function(){
     miles:document.getElementById('f-miles')?.value.trim() || existing.miles || '',
     total:Number(document.getElementById('f-total').value)||0,
     down:Number(document.getElementById('f-down').value)||0,
-    weekly:Number(document.getElementById('f-weekly').value)||0,
+    weekly:_weekly,
+    numPay,
+    amountFinanced:_amountFinanced,
+    totalOfPayments:_totalOfPayments,
+    financeCharge:_financeCharge,
     freq,
     lang,
     contractDate,
@@ -1215,7 +1249,8 @@ window.saveClient=async function(){
 
   try{
     console.log('Saving client data:', JSON.stringify(data).slice(0,200));
-    await setDoc(doc(db,'clients',id),data);
+    // merge:true -> ya no borra insuranceCompany, insurancePhotoURL, lastLogin, settled...
+    await setDoc(doc(db,'clients',id), data, { merge: true });
     console.log('Saved successfully!');
     closeModal('add-modal');
   }catch(e){console.error('Save error:',e);alert('Error guardando: '+e.message);}
@@ -1269,41 +1304,61 @@ window.openPayModal=function(id){
   document.getElementById('pay-modal').classList.add('active');
 };
 
-window.confirmPayment=async function(){
-  const amount=Number(document.getElementById('pay-amount').value);
-  const date=document.getElementById('pay-date').value;
-  if(!amount||amount<=0){alert('Ingresa el monto');return;}
-  const c=clients.find(x=>x.id===payingId);
-  const schedDate=getNextPayDate(c);
-  const payments=[...(c.payments||[]),{amount,date,schedDate}];
-  const updatedClient={...c,payments};
-  try{
-    await setDoc(doc(db,'clients',c.id),updatedClient);
+let _savingPayment = false;
+
+window.confirmPayment = async function(){
+  if(_savingPayment) return;                                  // doble clic: se ignora
+  const amount = Number(document.getElementById('pay-amount').value);
+  const date   = document.getElementById('pay-date').value;
+  if(!amount || amount <= 0){ alert('Ingresa el monto'); return; }
+  if(!date){ alert('Ingresa la fecha del pago'); return; }
+  const c = clients.find(x => x.id === payingId);
+  if(!c){ alert('Cliente no encontrado'); return; }
+
+  _savingPayment = true;
+  // Llave unica: si la misma peticion se repite, el pago no se duplica.
+  const entryId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+  let updated = null;
+  try {
+    // Transaccion: lee del servidor y escribe como una sola operacion indivisible.
+    // Si tu socio registra un pago al mismo tiempo, Firestore reintenta y entran los DOS.
+    updated = await runTransaction(db, async (tx) => {
+      const ref  = doc(db, 'clients', c.id);
+      const snap = await tx.get(ref);
+      if(!snap.exists()) throw new Error('El cliente ya no existe');
+      const fresh    = { id: c.id, ...snap.data() };          // datos frescos, no la copia en memoria
+      const payments = [...(fresh.payments || [])];
+      if(payments.some(p => p.entryId === entryId)) return fresh;   // ya estaba registrado
+      payments.push({
+        entryId, amount, date,
+        schedDate: getNextPayDate(fresh),
+        createdAt: new Date().toISOString(),
+        createdBy: (auth.currentUser && auth.currentUser.email) || ''
+      });
+      tx.update(ref, { payments });                           // solo toca 'payments'
+      return { ...fresh, payments };
+    });
     closeModal('pay-modal');
-    // Check if fully paid
-    const newBalance=Math.max(0,Number(c.total)-(payments.reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0)));
-    const remainingPayments=(c.schedule||[]).filter(d=>!new Set(payments.map(p=>p.schedDate).filter(Boolean)).has(d));
-    if(newBalance<=0||remainingPayments.length===0){
-      // Paid off!
-      const msg=getPaidOffMsg(c);
-      if(confirm('🎊 ¡Auto pagado completamente! ¿Enviar mensaje de felicidades al cliente?')){
-        waPhone=c.phone.replace(/\D/g,'');
-        document.getElementById('wa-preview').textContent=msg;
-        document.getElementById('wa-text').value=msg;
-        document.getElementById('wa-modal').classList.add('active');
-      }
-    } else {
-      // Regular thanks message
-      const nextPay=getNextPayDate(updatedClient);
-      const msg=getThanksMsg(updatedClient,nextPay,amount);
-      if(confirm('💬 ¿Enviar mensaje de agradecimiento al cliente?')){
-        waPhone=c.phone.replace(/\D/g,'');
-        document.getElementById('wa-preview').textContent=msg;
-        document.getElementById('wa-text').value=msg;
-        document.getElementById('wa-modal').classList.add('active');
-      }
-    }
-  }catch(e){alert('Error: '+e.message);}
+  } catch(e) {
+    alert('Error al registrar el pago: ' + e.message);
+    _savingPayment = false;
+    return;
+  }
+  _savingPayment = false;
+
+  const enviar = (msg) => {
+    waPhone = c.phone.replace(/\D/g,'');
+    document.getElementById('wa-preview').textContent = msg;
+    document.getElementById('wa-text').value = msg;
+    document.getElementById('wa-modal').classList.add('active');
+  };
+
+  if(isPaidOff(updated)){
+    if(confirm('🎊 ¡Auto pagado completamente! ¿Enviar mensaje de felicidades al cliente?')) enviar(getPaidOffMsg(updated));
+  } else {
+    const nextPay = getNextPayDate(updated);
+    if(confirm('💬 ¿Enviar mensaje de agradecimiento al cliente?')) enviar(getThanksMsg(updated, nextPay, amount));
+  }
 };
 
 // ---- WHATSAPP ----
@@ -1542,7 +1597,8 @@ window.auditBalances = function() {
     const pagos     = (c.payments||[]);
     // Ya liquidados: declarados a mano, o que completaron todas sus mensualidades.
     if(c.settled === true || pagos.length >= numPay) {
-      liquidados.push({ nombre:c.name, carro:`${c.year} ${c.make} ${c.model}`,
+      liquidados.push({ id:c.id, nombre:c.name, carro:`${c.year} ${c.make} ${c.model}`,
+                        declarado: c.settled === true,
                         via: c.settled === true ? 'declarado' : 'completó los ' + numPay + ' pagos' });
       return;
     }
@@ -1614,9 +1670,15 @@ window.auditBalances = function() {
 
   if(liquidados.length) {
     html += `<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
-      <div style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green);margin-bottom:10px;">✅ Liquidados — excluidos de la auditoría</div>`;
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green);margin-bottom:6px;">✅ Liquidados — excluidos de la auditoría</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Los que dicen <em>"completó los N pagos"</em> están <strong>deducidos</strong>, no grabados. Decláralos para que quede constancia con fecha y nombre.</div>`;
     liquidados.forEach(l => {
-      html += `<div style="font-size:13px;color:var(--muted);padding:5px 0;">${l.nombre} <span style="opacity:0.6;">· ${l.carro} · ${l.via}</span></div>`;
+      html += `<div style="font-size:13px;color:var(--muted);padding:7px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border);">
+        <div>${l.nombre} <span style="opacity:0.6;">· ${l.carro} · ${l.via}</span></div>
+        ${l.declarado
+          ? '<span style="color:var(--green);font-size:11px;white-space:nowrap;">✅ declarado</span>'
+          : `<button onclick="markSettled('${l.id}')" style="background:transparent;color:var(--green);border:1px solid var(--green);border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Declarar liquidado</button>`}
+      </div>`;
     });
     html += `</div>`;
   }

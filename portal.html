@@ -261,7 +261,7 @@ const I18N = {
     modalLater:'Puede cambiar esta preferencia cuando quiera desde su portal.',
     modalNoChange:'Diga que no y <strong>nada cambia</strong>: seguirá recibiendo los avisos de su cuenta y sus pagos.',
     contactBtn:'💬 Mandarnos un mensaje',
-    myVehicle:'Mi Vehículo', vehicle:'Vehículo', totalPrice:'Precio total', downPayment:'Enganche',
+    myVehicle:'Mi Vehículo', vehicle:'Vehículo', totalPrice:'Precio del vehículo', totalOfPay:'Total de pagos (contrato)', downPayment:'Enganche',
     paymentLabel:'Pago', totalPaid:'Total pagado', remaining:'Saldo restante',
     contactMsg:(c)=>`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`,
     lgTitle:'Consulta tu cuenta', lgPhoneLabel:'Número de Teléfono',
@@ -318,7 +318,7 @@ const I18N = {
     modalLater:'You can change this preference anytime in your portal.',
     modalNoChange:'Say no and <strong>nothing changes</strong>: you will still receive messages about your account and payments.',
     contactBtn:'💬 Text us',
-    myVehicle:'My Vehicle', vehicle:'Vehicle', totalPrice:'Total price', downPayment:'Down payment',
+    myVehicle:'My Vehicle', vehicle:'Vehicle', totalPrice:'Vehicle price', totalOfPay:'Total of payments (contract)', downPayment:'Down payment',
     paymentLabel:'Payment', totalPaid:'Total paid', remaining:'Remaining balance',
     contactMsg:(c)=>`Hello Legacy Motors Garage, this is ${c.name}. I have a question about my account (${c.year} ${c.make} ${c.model})`,
     lgTitle:'Check your account', lgPhoneLabel:'Phone Number',
@@ -393,9 +393,28 @@ function daysUntil(dateStr) { if(!dateStr) return 999; const now=new Date(); now
 function getPaidDates(c) { return new Set((c.payments||[]).map(p=>p.schedDate).filter(Boolean)); }
 function getNextPayDate(c) { const s=c.schedule||[]; const pd=getPaidDates(c); for(const d of s){if(!pd.has(d))return d;} return s[s.length-1]||null; }
 function getPaidCount(c) { return (c.payments||[]).filter(p=>p.schedDate).length; }
-function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+Number(p.amount),0)+Number(c.down||0); }
-function calcBalance(c) { if(c.settled === true) return 0; return Math.max(0,Number(c.total)-calcPaid(c)); }
-function calcProgress(c) { if(c.settled === true) return 100; const t=Number(c.total); if(!t) return 0; return Math.min(100,Math.round(calcPaid(c)/t*100)); }
+// Misma definicion que el CRM y que el contrato. Un solo numero para todos.
+function totalOfPayments(c) {
+  if((c.freq||'') === 'cash') return Number(c.total)||0;
+  if(Number(c.totalOfPayments) > 0) return Number(c.totalOfPayments);
+  return (Number(c.weekly)||0) * ((c.schedule||[]).length);
+}
+function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0); }
+function isLegacyPaidOff(c) {   // misma red de seguridad que el CRM
+  return !Number(c.totalOfPayments) && (c.schedule||[]).length > 0
+      && (c.payments||[]).filter(p=>p.schedDate).length >= (c.schedule||[]).length;
+}
+function calcBalance(c) {
+  if(c.settled === true || isLegacyPaidOff(c)) return 0;
+  if((c.freq||'') === 'cash') return 0;
+  return Math.max(0, totalOfPayments(c) - calcPaid(c));
+}
+function calcProgress(c) {
+  if(c.settled === true || isLegacyPaidOff(c)) return 100;
+  const tp = totalOfPayments(c);
+  if(!tp) return 0;
+  return Math.min(100, Math.round(calcPaid(c)/tp*100));
+}
 function getStatus(c) { const n=getNextPayDate(c); if(!n) return 'ok'; const d=daysUntil(n); if(d<0) return 'overdue'; if(d<=3) return 'soon'; return 'ok'; }
 
 let confirmationResult = null;
@@ -794,6 +813,7 @@ function renderPortal() {
     <div class="info-card">
       <div class="info-row"><span class="ir-label">${t('vehicle')}</span><span class="ir-value">${c.year} ${c.make} ${c.model}</span></div>
       <div class="info-row"><span class="ir-label">${t('totalPrice')}</span><span class="ir-value">${formatMoney(c.total)}</span></div>
+      <div class="info-row"><span class="ir-label">${t('totalOfPay')}</span><span class="ir-value">${formatMoney(totalOfPayments(c))}</span></div>
       <div class="info-row"><span class="ir-label">${t('downPayment')}</span><span class="ir-value">${formatMoney(c.down)}</span></div>
       <div class="info-row"><span class="ir-label">${t('paymentLabel')}</span><span class="ir-value">${formatMoney(c.weekly)}</span></div>
       <div class="info-row"><span class="ir-label">${t('totalPaid')}</span><span class="ir-value" style="color:var(--green)">${formatMoney(paid)}</span></div>
