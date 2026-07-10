@@ -1568,13 +1568,39 @@ window.downloadBackup = async function() {
       inventory: inv.docs.map(d=>({id:d.id,...d.data()})),
       subscriptions: subs.docs.map(d=>({id:d.id,...d.data()}))
     };
-    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    const json = JSON.stringify(data, null, 2);
+    const filename = `legacy-dms-respaldo-${today()}.json`;
+    const resumen = `${withConsents.length} clientes · ${inv.size} vehiculos · ${subs.size} suscripciones`;
+
+    // Si el navegador lo permite (Chrome/Edge en computadora): abre selector de carpeta
+    // y RECUERDA la carpeta (el 'id' hace que la proxima vez arranque en la misma).
+    if(window.showSaveFilePicker){
+      try {
+        const handle = await window.showSaveFilePicker({
+          id: 'legacy-crm-respaldo',
+          suggestedName: filename,
+          types: [{ description: 'Respaldo Legacy DMS', accept: {'application/json':['.json']} }]
+        });
+        const w = await handle.createWritable();
+        await w.write(json);
+        await w.close();
+        alert(`✅ Respaldo guardado.\n\n${resumen}\n\nLa proxima vez se abrira en la misma carpeta. Contiene datos personales: guardalo seguro.`);
+        btn.textContent = orig; btn.disabled = false;
+        return;
+      } catch(err) {
+        if(err.name === 'AbortError'){ btn.textContent = orig; btn.disabled = false; return; } // cancelado
+        // cualquier otro problema: cae al metodo normal de descarga
+      }
+    }
+
+    // Metodo normal (Safari, iPhone): va a Descargas
+    const blob = new Blob([json], {type:'application/json'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `legacy-dms-respaldo-${today()}.json`;
+    a.download = filename;
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-    alert(`✅ Respaldo descargado.\n\n${withConsents.length} clientes · ${inv.size} vehiculos · ${subs.size} suscripciones\n\nGuardalo en un lugar seguro: contiene datos personales de tus clientes.`);
+    alert(`✅ Respaldo descargado a tu carpeta de Descargas.\n\n${resumen}\n\nMuevelo a tu carpeta de respaldos. Contiene datos personales: guardalo seguro.`);
   } catch(e) { alert('Error al respaldar: ' + e.message); }
   btn.textContent = orig; btn.disabled = false;
 };
