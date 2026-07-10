@@ -150,7 +150,7 @@
     </div>
     <div class="login-error" id="l-error"></div>
     <div id="recaptcha-container"></div>
-    <div class="login-footer">¿Necesitas ayuda? <a href="https://wa.me/15592345678">Contáctanos</a></div>
+    <div class="login-footer">¿Necesitas ayuda? / Need help?<br><a href="sms:+15595405145">Mándanos un mensaje / Text us</a> · <a href="tel:+15595405145">(559) 540-5145</a></div>
   </div>
 </div>
 
@@ -254,10 +254,10 @@ const I18N = {
     modalYes:'Sí, acepto', modalNo:'No, gracias',
     modalLater:'Puede cambiar esta preferencia cuando quiera desde su portal.',
     modalNoChange:'Diga que no y <strong>nada cambia</strong>: seguirá recibiendo los avisos de su cuenta y sus pagos.',
-    contactBtn:'📱 Contactar a Legacy Motors Garage',
+    contactBtn:'💬 Mandarnos un mensaje',
     myVehicle:'Mi Vehículo', vehicle:'Vehículo', totalPrice:'Precio total', downPayment:'Enganche',
     paymentLabel:'Pago', totalPaid:'Total pagado', remaining:'Saldo restante',
-    waMsg:(c)=>`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`
+    contactMsg:(c)=>`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`
   },
   en: {
     logout:'Sign Out', hi:'Hi', balanceLabel:'Remaining balance', paidWord:'paid',
@@ -296,10 +296,10 @@ const I18N = {
     modalYes:'Yes, I agree', modalNo:'No, thanks',
     modalLater:'You can change this preference anytime in your portal.',
     modalNoChange:'Say no and <strong>nothing changes</strong>: you will still receive messages about your account and payments.',
-    contactBtn:'📱 Contact Legacy Motors Garage',
+    contactBtn:'💬 Text us',
     myVehicle:'My Vehicle', vehicle:'Vehicle', totalPrice:'Total price', downPayment:'Down payment',
     paymentLabel:'Payment', totalPaid:'Total paid', remaining:'Remaining balance',
-    waMsg:(c)=>`Hello Legacy Motors Garage, this is ${c.name}. I have a question about my account (${c.year} ${c.make} ${c.model})`
+    contactMsg:(c)=>`Hello Legacy Motors Garage, this is ${c.name}. I have a question about my account (${c.year} ${c.make} ${c.model})`
   }
 };
 let L = 'es';
@@ -592,8 +592,7 @@ function renderPortal() {
   }
   const freqLabel = t('freq')[c.freq||'weekly'] || t('freq').weekly;
 
-  // WhatsApp number (use dealership number)
-  const waNum = '15595405145';
+  const dealerPhone = '+15595405145';
 
   // Build schedule list
   let schedHTML = '';
@@ -718,7 +717,7 @@ function renderPortal() {
     </div>
 
     <!-- CONTACT -->
-    <button class="contact-btn" onclick="window.open('https://wa.me/${waNum}?text=${encodeURIComponent(t('waMsg')(c))}')" >
+    <button class="contact-btn" onclick="location.href='sms:${dealerPhone}?body=${encodeURIComponent(t('contactMsg')(c))}'">
       ${t('contactBtn')}
     </button>
 
