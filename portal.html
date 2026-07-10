@@ -246,7 +246,10 @@ window.sendCode = async function(){
     document.getElementById('step-code').style.display='block';
     const cf=document.getElementById('l-code'); if(cf) cf.focus();
   }catch(err){
-    showLoginError('No se pudo enviar — código: ' + (err.code || err.message));
+    const code = err.code || '';
+    showLoginError(code === 'auth/too-many-requests' ? 'Demasiados intentos. Espera unos minutos.'
+      : code === 'auth/invalid-phone-number' ? 'Número inválido. Escribe 10 dígitos.'
+      : 'No se pudo enviar el código. Revisa el número e intenta de nuevo.');
     try{ if(window._recaptcha){ window._recaptcha.clear(); window._recaptcha=null; } }catch(_){}
   }
   btn.disabled=false; btn.textContent='ENVIAR CÓDIGO';
