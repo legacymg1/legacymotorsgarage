@@ -232,7 +232,6 @@
   <div style="background:linear-gradient(135deg,var(--gold3),var(--gold));padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
     <div style="font-family:var(--font-display);font-size:20px;color:var(--navy3);letter-spacing:1px;">📅 PAGOS DE HOY</div>
     <div style="display:flex;gap:8px;">
-      <button onclick="sendDayMessages()" style="background:var(--navy3);color:var(--gold);border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">💬 ENVIAR SMS A TODOS</button>
       <button onclick="exportCalendar()" style="background:var(--navy3);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">📆 EXPORTAR CALENDARIO</button>
     </div>
   </div>
@@ -839,13 +838,6 @@ window.renderAll = function() {
 
   const overdueC=filtered.filter(c=>getStatus(c)==='overdue');
   let html='';
-  if(overdueC.length){
-    html+=`<div class="section-title">⚠️ Pagos Vencidos</div>`;
-    overdueC.forEach(c=>{
-      const days=Math.abs(daysUntil(getNextPayDate(c)));
-      html+=`<div class="alert-banner"><div class="alert-info"><div class="alert-name">${c.name}</div><div class="alert-detail">Vencido hace ${days} día${days!==1?'s':''} · ${c.make} ${c.model} · Adeuda ${formatMoney(calcBalance(c))}</div></div><button class="btn-msg" onclick="openWhatsApp('${c.id}','overdue')">📱 Avisar</button></div>`;
-    });
-  }
 
   const isListView = currentView === 'list';
   html+=`<div class="section-title">Todos los Clientes</div><div class="${isListView ? 'client-list' : 'clients-grid'}" style="${isListView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
@@ -1581,7 +1573,10 @@ function renderTodayBox() {
   }
 
   if (todayClients.length) {
-    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;">Pagan Hoy — ${new Date().toLocaleDateString('es-MX',{weekday:'long',month:'long',day:'numeric'})}</div>`;
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Pagan Hoy — ${new Date().toLocaleDateString('es-MX',{weekday:'long',month:'long',day:'numeric'})}</div>
+      <button onclick="sendTodayMessages()" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:7px 13px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">💬 Enviar a todos (${todayClients.length})</button>
+    </div>`;
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">';
     todayClients.forEach(c => {
       html += `<div style="background:var(--navy2);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
@@ -1600,7 +1595,10 @@ function renderTodayBox() {
   }
 
   if (overdueClients.length) {
-    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:10px;">⚠️ Pagos Vencidos</div>`;
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--red);">⚠️ Pagos Vencidos</div>
+      <button onclick="sendOverdueMessages()" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">💬 Enviar a todos (${overdueClients.length})</button>
+    </div>`;
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">';
     overdueClients.forEach(c => {
       const days = Math.abs(daysUntil(getNextPayDate(c)));
@@ -1609,8 +1607,10 @@ function renderTodayBox() {
           <div style="font-weight:600;font-size:15px;">${c.name}</div>
           <div style="font-size:12px;color:#ff8080;margin-top:2px;">${c.year} ${c.make} ${c.model} · ${days}d vencido</div>
         </div>
-        <div style="text-align:right;">
+        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
           <div style="font-family:var(--font-display);font-size:20px;color:var(--red);">${formatMoney(c.weekly)}</div>
+          <div style="font-size:10px;color:#ff8080;text-transform:uppercase;letter-spacing:1px;">Adeuda ${formatMoney(calcBalance(c))}</div>
+          <button onclick="openWhatsApp('${c.id}','overdue')" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">💬 SMS</button>
         </div>
       </div>`;
     });
@@ -1621,50 +1621,47 @@ function renderTodayBox() {
 }
 
 // SEND SMS TO ALL TODAY
-window.sendDayMessages = function() {
-  const todayStr = today();
-  const todayClients = clients.filter(c => getNextPayDate(c) === todayStr);
-  const overdueClients = clients.filter(c => {
-    const n = getNextPayDate(c);
-    return n && n < todayStr;
-  });
-
-  if (!todayClients.length && !overdueClients.length) {
-    alert('No hay clientes que pagan hoy ni vencidos.');
-    return;
-  }
-
-  let allMessages = [];
-
-  todayClients.forEach(c => {
-    const lang = c.lang || 'es';
-    let msg;
-    if(lang === 'en'){
-      msg = `Hi ${c.name.split(' ')[0]}! 😊 Legacy Motors Garage LLC here.\n\nFriendly reminder that today is your payment day! Your payment of ${formatMoney(c.weekly)} for your ${c.year} ${c.make} ${c.model} is due today.\n\nRemaining balance: ${formatMoney(calcBalance(c))}\n\nThank you so much for your reliability! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
-    } else {
-      msg = `Hola ${c.name.split(' ')[0]}! 😊 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que hoy es su día de pago de ${formatMoney(c.weekly)} por su ${c.year} ${c.make} ${c.model}.\n\nSaldo restante: ${formatMoney(calcBalance(c))}\n\n¡Gracias por su puntualidad, lo apreciamos mucho! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
-    }
-    allMessages.push({ phone: c.phone.replace(/\D/g,''), msg, name: c.name });
-  });
-
-  overdueClients.forEach(c => {
-    const days = Math.abs(daysUntil(getNextPayDate(c)));
-    const msg = getOverdueMsg(c, days);
-    allMessages.push({ phone: c.phone.replace(/\D/g,''), msg, name: c.name });
-  });
-
+// ---- Enviar SMS masivo, separado por grupo ----
+function _sendBatch(allMessages) {
   let i = 0;
-  function sendNext() {
+  (function sendNext() {
     if (i >= allMessages.length) {
       alert(`✅ Se abrieron ${allMessages.length} mensaje${allMessages.length!==1?'s':''} para enviar.`);
       return;
     }
     const { phone, msg } = allMessages[i];
-    const _a2=document.createElement('a');_a2.href=`sms:${phone}?body=${encodeURIComponent(msg)}`;_a2.click();
+    const a = document.createElement('a');
+    a.href = `sms:${phone}?body=${encodeURIComponent(msg)}`;
+    a.click();
     i++;
     setTimeout(sendNext, 1500);
+  })();
+}
+
+function _todayMsg(c) {
+  const lang = c.lang || 'es';
+  const nombre = c.name.split(' ')[0];
+  const carro = `${c.year} ${c.make} ${c.model}`;
+  if (lang === 'en') {
+    return `Hi ${nombre}! 😊 Legacy Motors Garage LLC here.\n\nFriendly reminder that today is your payment day! Your payment of ${formatMoney(c.weekly)} for your ${carro} is due today.\n\nRemaining balance: ${formatMoney(calcBalance(c))}\n\nThank you so much for your reliability! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
-  sendNext();
+  return `Hola ${nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que hoy es su día de pago de ${formatMoney(c.weekly)} por su ${carro}.\n\nSaldo restante: ${formatMoney(calcBalance(c))}\n\n¡Gracias por su puntualidad, lo apreciamos mucho! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+}
+
+window.sendTodayMessages = function() {
+  const todayStr = today();
+  const list = clients.filter(c => getNextPayDate(c) === todayStr);
+  if (!list.length) { alert('No hay clientes que paguen hoy.'); return; }
+  if (!confirm(`¿Enviar recordatorio amable a ${list.length} cliente(s) que pagan HOY?`)) return;
+  _sendBatch(list.map(c => ({ phone: c.phone.replace(/\D/g,''), msg: _todayMsg(c) })));
+};
+
+window.sendOverdueMessages = function() {
+  const todayStr = today();
+  const list = clients.filter(c => { const n = getNextPayDate(c); return n && n < todayStr; });
+  if (!list.length) { alert('No hay clientes vencidos.'); return; }
+  if (!confirm(`¿Enviar aviso de cobranza a ${list.length} cliente(s) VENCIDO(s)?`)) return;
+  _sendBatch(list.map(c => ({ phone: c.phone.replace(/\D/g,''), msg: getOverdueMsg(c, Math.abs(daysUntil(getNextPayDate(c)))) })));
 };
 
 // EXPORT CALENDAR .ICS
