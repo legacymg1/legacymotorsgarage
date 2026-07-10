@@ -716,6 +716,9 @@ function calcBalance(c) {
   if((c.freq||'') === 'cash') return 0;
   return Math.max(0, totalOfPayments(c) - calcPaid(c));
 }
+// Lo que debe pagar AHORA = lo menor entre su mensualidad y su saldo.
+// Si pagó de más, el saldo bajó, así que la última mensualidad se reduce sola.
+function dueNow(c){ const w=Number(c.weekly)||0; const b=calcBalance(c); return Math.max(0, Math.min(w, b)); }
 function isPaidOff(c) {
   if(c.settled === true) return true;              // hecho grabado, gana sobre cualquier calculo
   if((c.freq||'') === 'cash') return true;
@@ -1951,9 +1954,9 @@ window.sendFriendlyTodayMsg = function(id) {
   const carro = `${c.year} ${c.make} ${c.model}`;
   let msg;
   if(lang === 'en'){
-    msg = `Hi ${nombre}! 😊 Legacy Motors Garage LLC here.\n\nFriendly reminder that today is your payment day! Your payment of ${formatMoney(c.weekly)} for your ${carro} is due today.\n\nRemaining balance: ${formatMoney(calcBalance(c))}\n\nThank you so much for your reliability! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    msg = `Hi ${nombre}! 😊 Legacy Motors Garage LLC here.\n\nFriendly reminder that today is your payment day! Your payment of ${formatMoney(dueNow(c))} for your ${carro} is due today.\n\nRemaining balance: ${formatMoney(calcBalance(c))}\n\nThank you so much for your reliability! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   } else {
-    msg = `Hola ${nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que hoy es su día de pago de ${formatMoney(c.weekly)} por su ${carro}.\n\nSaldo restante: ${formatMoney(calcBalance(c))}\n\n¡Gracias por su puntualidad, lo apreciamos mucho! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    msg = `Hola ${nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que hoy es su día de pago de ${formatMoney(dueNow(c))} por su ${carro}.\n\nSaldo restante: ${formatMoney(calcBalance(c))}\n\n¡Gracias por su puntualidad, lo apreciamos mucho! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
   const phone = c.phone.replace(/\D/g,'');
   const a = document.createElement('a'); a.href = `sms:${phone}?body=${encodeURIComponent(msg)}`; a.click();
@@ -2033,8 +2036,8 @@ function renderTodayBox() {
           <div style="font-size:12px;color:var(--muted);margin-top:2px;">${c.year} ${c.make} ${c.model}</div>
         </div>
         <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-          <div style="font-family:var(--font-display);font-size:20px;color:var(--green);">${formatMoney(c.weekly)}</div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">${c.freq==='monthly'?'Mensual':c.freq==='biweekly'?'Quincenal':'Semanal'}</div>
+          <div style="font-family:var(--font-display);font-size:20px;color:var(--green);">${formatMoney(dueNow(c))}</div>
+          <div style="font-size:10px;color:${dueNow(c)<(Number(c.weekly)||0)?'var(--gold)':'var(--muted)'};text-transform:uppercase;letter-spacing:1px;">${dueNow(c)<(Number(c.weekly)||0)?'Último pago':(c.freq==='monthly'?'Mensual':c.freq==='biweekly'?'Quincenal':'Semanal')}</div>
           <button onclick="sendFriendlyTodayMsg('${c.id}')" style="background:var(--green);color:#000;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">💬 SMS</button>
         </div>
       </div>`;
@@ -2091,9 +2094,9 @@ function _todayMsg(c) {
   const nombre = c.name.split(' ')[0];
   const carro = `${c.year} ${c.make} ${c.model}`;
   if (lang === 'en') {
-    return `Hi ${nombre}! 😊 Legacy Motors Garage LLC here.\n\nFriendly reminder that today is your payment day! Your payment of ${formatMoney(c.weekly)} for your ${carro} is due today.\n\nRemaining balance: ${formatMoney(calcBalance(c))}\n\nThank you so much for your reliability! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    return `Hi ${nombre}! 😊 Legacy Motors Garage LLC here.\n\nFriendly reminder that today is your payment day! Your payment of ${formatMoney(dueNow(c))} for your ${carro} is due today.\n\nRemaining balance: ${formatMoney(calcBalance(c))}\n\nThank you so much for your reliability! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
-  return `Hola ${nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que hoy es su día de pago de ${formatMoney(c.weekly)} por su ${carro}.\n\nSaldo restante: ${formatMoney(calcBalance(c))}\n\n¡Gracias por su puntualidad, lo apreciamos mucho! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+  return `Hola ${nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que hoy es su día de pago de ${formatMoney(dueNow(c))} por su ${carro}.\n\nSaldo restante: ${formatMoney(calcBalance(c))}\n\n¡Gracias por su puntualidad, lo apreciamos mucho! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
 }
 
 window.sendTodayMessages = function() {

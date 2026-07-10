@@ -409,6 +409,7 @@ function calcBalance(c) {
   if((c.freq||'') === 'cash') return 0;
   return Math.max(0, totalOfPayments(c) - calcPaid(c));
 }
+function dueNow(c){ const w=Number(c.weekly)||0; const b=calcBalance(c); return Math.max(0, Math.min(w, b)); }
 function calcProgress(c) {
   if(c.settled === true || isLegacyPaidOff(c)) return 100;
   const tp = totalOfPayments(c);
@@ -724,8 +725,8 @@ function renderPortal() {
         <div class="npc-days ${status}">${npcDays}</div>
       </div>
       <div class="npc-amount">
-        <div class="npc-amount-value">${formatMoney(c.weekly)}</div>
-        <div class="npc-amount-label">${freqLabel}</div>
+        <div class="npc-amount-value">${formatMoney(dueNow(c))}</div>
+        <div class="npc-amount-label">${dueNow(c)<(Number(c.weekly)||0)?(L==='en'?'last payment':'último pago'):freqLabel}</div>
       </div>
     </div>
 
