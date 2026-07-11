@@ -139,7 +139,7 @@
     <div class="login-title" id="lg-title">Consulta tu cuenta</div>
     <div id="step-phone">
       <label class="fl" id="lg-phone-label">Número de Teléfono</label>
-      <input class="fi" type="tel" id="l-phone" placeholder="555 555 5555" onkeydown="if(event.key==='Enter')sendCode()">
+      <input class="fi" type="tel" inputmode="tel" id="l-phone" placeholder="(555) 555-5555" oninput="formatPhone(this)" onkeydown="if(event.key==='Enter')sendCode()">
       <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;margin:12px 0 4px;text-align:left;">
         <input type="checkbox" id="l-keep" checked style="width:17px;height:17px;margin-top:1px;flex:none;cursor:pointer;">
         <span style="font-size:12px;color:#c3cad6;line-height:1.4;" id="lg-keep-label">Mantener sesión iniciada en este teléfono</span>
@@ -428,6 +428,17 @@ window.backToPhone = function(){
   showLoginError('');
 };
 
+window.formatPhone=function(el){
+  let d=(el.value||'').replace(/[^0-9]/g,'');
+  if(d.length===11 && d[0]==='1') d=d.slice(1);
+  d=d.slice(0,10);
+  let out;
+  if(d.length>6) out='('+d.slice(0,3)+') '+d.slice(3,6)+'-'+d.slice(6);
+  else if(d.length>3) out='('+d.slice(0,3)+') '+d.slice(3);
+  else if(d.length>0) out='('+d;
+  else out='';
+  el.value=out;
+};
 window.sendCode = async function(){
   const digits = String(document.getElementById('l-phone').value||'').replace(/\D/g,'');
   showLoginError('');
