@@ -577,7 +577,7 @@
         <select class="form-input" id="appt-lang"><option value="es">🇲🇽 Español</option><option value="en">🇺🇸 English</option></select>
       </div>
     </div>
-    <div class="form-group"><label class="form-label">Carro(s) que trae</label><input class="form-input" id="appt-car" placeholder="2019 Kia Forte" style="text-transform:capitalize;"><div style="font-size:11px;color:var(--muted);margin-top:3px;">Si trae más de un carro, sepáralos con coma. (Se prellena con su carro si es cliente registrado.)</div></div>
+    <div class="form-group"><label class="form-label">Carro(s) que trae</label><input class="form-input" id="appt-car" list="appt-car-list" placeholder="2019 Kia Forte" style="text-transform:capitalize;"><datalist id="appt-car-list"></datalist><div style="font-size:11px;color:var(--muted);margin-top:3px;">Si trae más de un carro, sepáralos con coma. (Se prellena con su carro si es cliente registrado.)</div></div>
     <div class="form-group"><label class="form-label">VIN (opcional)</label><input class="form-input" id="appt-vin" placeholder="Últimos dígitos o completo" oninput="this.value=this.value.toUpperCase()"></div>
     <div class="form-group"><label class="form-label">Servicios (puedes agregar varios)</label>
       <div id="appt-service-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
@@ -878,6 +878,29 @@ function calcProgress(c) {
   if(!t) return 0;
   return Math.min(100, Math.round(calcPaid(c)/t*100));
 }
+// ===== VEHÍCULOS: varios carros por cliente, identificados por VIN =====
+function clientVehicles(c){
+  const list=[]; const seen=new Set();
+  const pl=[c.year,c.make,c.model].filter(Boolean).join(' ');
+  const pvin=(c.vin||'').toUpperCase();
+  if(pl||pvin){ list.push({vin:pvin, label:(pl||('VIN …'+pvin.slice(-6))), color:c.color||'', primary:true, lastServiceDate:c.lastServiceDate||''}); if(pvin) seen.add(pvin); }
+  (c.vehicles||[]).forEach(v=>{
+    const k=(v.vin||'').toUpperCase();
+    if(k && seen.has(k)) return; if(k) seen.add(k);
+    list.push({vin:k, label:(v.label||[v.year,v.make,v.model].filter(Boolean).join(' ')||('VIN …'+k.slice(-6))), color:v.color||'', lastServiceDate:v.lastServiceDate||''});
+  });
+  return list;
+}
+async function addVehicleToClient(clientId, veh){
+  const c=clients.find(x=>x.id===clientId); if(!c) return;
+  const vin=(veh.vin||'').toUpperCase().trim();
+  const label=(veh.label||'').trim();
+  if(!vin && !label) return;
+  const dup = clientVehicles(c).some(x=> (vin && (x.vin||'').toUpperCase()===vin) || (!vin && label && (x.label||'').toLowerCase()===label.toLowerCase()) );
+  if(dup) return;
+  const arr=(c.vehicles||[]).concat([{ vin, label, lastServiceDate: today(), addedAt: new Date().toISOString() }]);
+  try{ await updateDoc(doc(db,'clients',clientId), {vehicles:arr}); }catch(e){ console.warn('addVehicle', e); }
+}
 
 window.calcCCOA = function() {
   const price = parseFloat(document.getElementById('f-total')?.value) || 0;
@@ -1105,7 +1128,7 @@ window.filterApptClients = function(){
   let items=clients.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(terms.length){
     items=items.filter(c=>{
-      const hay=((c.name||'')+' '+(c.phone||'')+' '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.color||'')+' '+(c.vin||'')).toLowerCase();
+      const hay=((c.name||'')+' '+(c.phone||'')+' '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.color||'')+' '+(c.vin||'')+' '+(c.vehicles||[]).map(v=>(v.label||'')+' '+(v.vin||'')).join(' ')).toLowerCase();
       return terms.every(t=>hay.includes(t));
     });
   }
@@ -1149,13 +1172,16 @@ window.openApptModal = function(clientId){
 window.onApptClientChange = function(){
   const v=document.getElementById('appt-client').value;
   const walk=document.getElementById('appt-walkin');
-  if(v==='__walkin__'){ walk.style.display='block'; return; }
+  const dl=document.getElementById('appt-car-list');
+  if(v==='__walkin__'){ walk.style.display='block'; if(dl) dl.innerHTML=''; return; }
   walk.style.display='none';
   const c=clients.find(x=>x.id===v);
   if(c){
-    document.getElementById('appt-car').value=[c.year,c.make,c.model,c.color].filter(Boolean).join(' ');
-    document.getElementById('appt-vin').value=c.vin||'';
-  }
+    const vs=clientVehicles(c);
+    if(dl) dl.innerHTML=vs.map(x=>`<option value="${(x.label||'').replace(/"/g,'&quot;')}">`).join('');
+    document.getElementById('appt-car').value = vs.length ? vs[0].label : [c.year,c.make,c.model,c.color].filter(Boolean).join(' ');
+    document.getElementById('appt-vin').value = (vs[0]&&vs[0].vin) || c.vin || '';
+  } else if(dl){ dl.innerHTML=''; }
 };
 window.saveAppt = async function(){
   const v=document.getElementById('appt-client').value;
@@ -1166,20 +1192,38 @@ window.saveAppt = async function(){
   const note=document.getElementById('appt-note').value.trim();
   if(!services.length){ alert('Agrega al menos un servicio.'); return; }
   if(!date){ alert('Elige la fecha.'); return; }
+  const carLabel=titleCase((document.getElementById('appt-car').value||'').trim());
+  const vin=(document.getElementById('appt-vin').value||'').trim().toUpperCase();
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
   let clientId='', clientName='', phone='', lang='es';
   if(v==='__walkin__'){
     clientName=titleCase((document.getElementById('appt-name').value||'').trim());
     phone=(document.getElementById('appt-phone').value||'').trim();
     lang=document.getElementById('appt-lang').value;
     if(!clientName||!phone){ alert('Escribe nombre y teléfono.'); return; }
+    // Buscar si ya existe por teléfono; si no, crear cliente de SERVICIO automáticamente
+    const e164=toE164(phone);
+    const match = e164 ? clients.find(c=>c.phoneE164===e164) : null;
+    if(match){
+      clientId=match.id; clientName=match.name||clientName; lang=match.lang||lang;
+      if(carLabel||vin) await addVehicleToClient(clientId, {vin, label:carLabel});
+    } else {
+      clientId='c_'+Date.now();
+      const newC={ name:clientName, phone, phoneE164:e164, lang, kind:'service',
+        vehicles: (carLabel||vin)?[{vin, label:carLabel, lastServiceDate:today(), addedAt:new Date().toISOString()}]:[],
+        make:'', model:'', year:'', color:'', vin:'', weekly:0, numPay:0, total:0, down:0,
+        totalOfPayments:0, financeCharge:0, amountFinanced:0, freq:'', schedule:[], settled:false,
+        lastServiceDate:today(), smsConsent:{marketing:false,date:null,source:'service'},
+        createdAt:new Date().toISOString(), createdBy:who, payments:[] };
+      try{ await setDoc(doc(db,'clients',clientId), newC); }
+      catch(e){ console.warn('crear cliente servicio', e); alert('Nota: no se pudo guardar el cliente automáticamente ('+e.message+'). La cita sí se guardará.'); }
+    }
   } else {
     const c=clients.find(x=>x.id===v);
     if(!c){ alert('Selecciona un cliente.'); return; }
     clientId=c.id; clientName=c.name; phone=c.phone||''; lang=c.lang||'es';
+    if(carLabel||vin) await addVehicleToClient(clientId, {vin, label:carLabel});
   }
-  const carLabel=titleCase((document.getElementById('appt-car').value||'').trim());
-  const vin=(document.getElementById('appt-vin').value||'').trim().toUpperCase();
-  const who=(auth.currentUser&&auth.currentUser.email)||'';
   const existing=document.getElementById('appt-id').value;
   const id=existing || ('appt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7));
   const prior=appointments.find(x=>x.id===id)||{};
@@ -1645,6 +1689,7 @@ window.renderAll = function() {
         <div class="card-body">
           <div class="car-info">${c.year} ${c.make} ${c.model}</div>
           ${c.vin?`<div style="font-size:11px;color:var(--muted);letter-spacing:0.5px;margin:-4px 0 8px;">VIN: ${c.vin}</div>`:''}
+          ${(clientVehicles(c).length>1)?`<div style="font-size:11px;color:var(--gold);margin:-2px 0 8px;">🚗 ${clientVehicles(c).length} carros: ${clientVehicles(c).map(x=>x.label).join(' · ')}</div>`:''}
           ${(function(){
             var ins=c.insurance;var exp=c.insuranceExp||'';
             if(!ins) return '<div style="font-size:11px;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">⚠️ Sin seguro</div>';
@@ -1691,7 +1736,7 @@ window.renderAll = function() {
     archive.forEach(c=>{
       const serv = c.kind==='service';
       const abadge = serv ? `<span style="font-size:10px;background:rgba(33,150,243,0.15);color:#64b5f6;border:1px solid #2196F3;border-radius:5px;padding:2px 7px;">🔧 Servicio</span>` : `<span style="font-size:10px;background:rgba(0,200,83,0.12);color:var(--green);border:1px solid var(--green);border-radius:5px;padding:2px 7px;">✅ Liquidado</span>`;
-      const acar = [c.year,c.make,c.model].filter(Boolean).join(' ');
+      const acar = clientVehicles(c).map(x=>x.label).join(' · ');
       html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
         <div style="min-width:170px;flex:1;">
           <div style="font-weight:600;font-size:14px;">${c.name} ${abadge} ${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
