@@ -1247,6 +1247,17 @@ const SERVICE_CATALOG=[
   {es:'Afinación',en:'Tune-up'},
   {es:'Batería',en:'Battery'},
   {es:'Diagnóstico',en:'Diagnostic'},
+  {es:'Colocación de faros',en:'Headlight installation'},
+  {es:'Calaveras / luces traseras',en:'Tail light service'},
+  {es:'Bujías',en:'Spark plugs'},
+  {es:'Filtro de aire',en:'Air filter'},
+  {es:'Suspensión',en:'Suspension'},
+  {es:'Amortiguadores',en:'Shocks / struts'},
+  {es:'Aire acondicionado',en:'A/C service'},
+  {es:'Balanceo',en:'Wheel balancing'},
+  {es:'Llantas nuevas',en:'New tires'},
+  {es:'Radiador',en:'Radiator'},
+  {es:'Limpiaparabrisas',en:'Wiper blades'},
   {es:'Anticongelante',en:'Coolant service'},
   {es:'Transmisión',en:'Transmission service'},
   {es:'Revisión general',en:'General inspection'},
@@ -1289,28 +1300,31 @@ function apptServiceList(a){
 }
 function apptTypeI18n(type,lang){
   if(lang!=='en') return type;
-  const map={'cambio de aceite':'oil change','servicio general':'general service','revisión / diagnóstico':'inspection / diagnostic','reparación':'repair','rotación de llantas':'tire rotation','frenos':'brake service'};
+  const map={'cambio de aceite':'oil change','rotación de llantas':'tire rotation','frenos':'brake service','alineación':'wheel alignment','afinación':'tune-up','batería':'battery','diagnóstico':'diagnostic','colocación de faros':'headlight installation','faros':'headlights','calaveras / luces traseras':'tail light service','calaveras':'tail lights','bujías':'spark plugs','filtro de aire':'air filter','suspensión':'suspension','amortiguadores':'shocks / struts','aire acondicionado':'a/c service','balanceo':'wheel balancing','llantas nuevas':'new tires','radiador':'radiator','limpiaparabrisas':'wiper blades','anticongelante':'coolant service','transmisión':'transmission service','revisión general':'general inspection','instalación de accesorios':'accessory installation','servicio general':'general service','revisión / diagnóstico':'inspection / diagnostic','reparación':'repair'};
   return map[(type||'').toLowerCase()]||type;
 }
+const PORTAL_URL='https://legacymotorsgarage.com/portal.html';
+function portalTag(lang){ return (lang==='en'?'\n\n📲 Your portal (appointment, service & texts):\n':'\n\n📲 Tu portal (cita, servicio y mensajes):\n')+PORTAL_URL; }
 function apptMsg(a,kind){
   const nombre=(a.clientName||'').split(' ')[0];
   const lang=a.lang||'es';
   const hora=a.time?(lang==='en'?' at '+appt12h(a.time):' a las '+appt12h(a.time)):'';
-  const svcs=apptServiceList(a).map(s=>'• '+(lang==='en'?(s.en||s.es):(s.es||s.en)));
+  const svcs=apptServiceList(a).map(s=>{
+    let label = lang==='en' ? (s.en||s.es) : (s.es||s.en);
+    if(lang==='en' && (!s.en || s.en===s.es)) label = apptTypeI18n(s.es,'en');
+    return '• '+label;
+  });
   svcs.push(lang==='en'?'• Complimentary inspection — no charge':'• Inspección de cortesía — sin costo');
   const svcBlock=svcs.join('\n');
   const car=a.carLabel?('\n🚗 '+a.carLabel):'';
   const fecha=apptFmtLong(a.date,lang);
+  const portal=(lang==='en'?'\n\n📲 View or change your appointment in your portal:\n':'\n\n📲 Ve o cambia tu cita en tu portal:\n')+PORTAL_URL;
   if(lang==='en'){
-    if(kind==='reminder'){
-      return `Dear ${nombre},\n\nA gentle reminder of your service appointment tomorrow at Legacy Motors Garage.\n\n📅 ${fecha}${hora}${car}\n\nScheduled services:\n${svcBlock}\n\nOur team will have everything ready for you. If you'd like to make any changes, simply reply to this message and we'll gladly assist.\n\nWarm regards,\nLegacy Motors Garage\n📞 (559) 540-5145`;
-    }
-    return `Dear ${nombre},\n\nIt is our pleasure to confirm your service appointment at Legacy Motors Garage.\n\n📅 ${fecha}${hora}${car}\n\nScheduled services:\n${svcBlock}\n\nOur team will take great care of your vehicle. Should you wish to make any changes, simply reply to this message.\n\nWarm regards,\nLegacy Motors Garage\n21122 Ave 152, Porterville, CA\n📞 (559) 540-5145`;
+    if(kind==='reminder') return `Hi ${nombre} 👋\n\nJust a reminder — your appointment at Legacy Motors Garage is tomorrow:\n\n📅 ${fecha}${hora}${car}\n\nWhat we'll do:\n${svcBlock}${portal}\n\nSee you then! Reply here if you need anything.\nLegacy Motors Garage · (559) 540-5145`;
+    return `Hi ${nombre} 👋\n\nYour appointment at Legacy Motors Garage is all set:\n\n📅 ${fecha}${hora}${car}\n\nWhat we'll do:\n${svcBlock}${portal}\n\nReply here anytime. See you then!\nLegacy Motors Garage · (559) 540-5145`;
   }
-  if(kind==='reminder'){
-    return `Estimado/a ${nombre}:\n\nLe recordamos con gusto su cita de servicio para mañana en Legacy Motors Garage.\n\n📅 ${fecha}${hora}${car}\n\nServicios programados:\n${svcBlock}\n\nNuestro equipo tendrá todo listo para atenderle. Si desea hacer algún ajuste, solo responda a este mensaje y con gusto le ayudamos.\n\nCon aprecio,\nLegacy Motors Garage\n📞 (559) 540-5145`;
-  }
-  return `Estimado/a ${nombre}:\n\nEs un gusto confirmar su cita de servicio en Legacy Motors Garage.\n\n📅 ${fecha}${hora}${car}\n\nServicios programados:\n${svcBlock}\n\nCuidaremos su vehículo con el mayor esmero. Si desea hacer algún ajuste, solo responda a este mensaje.\n\nCon aprecio,\nLegacy Motors Garage\n21122 Ave 152, Porterville, CA\n📞 (559) 540-5145`;
+  if(kind==='reminder') return `Hola ${nombre} 👋\n\nSolo un recordatorio — mañana es tu cita en Legacy Motors Garage:\n\n📅 ${fecha}${hora}${car}\n\nLo que haremos:\n${svcBlock}${portal}\n\n¡Aquí te esperamos! Responde aquí si necesitas algo.\nLegacy Motors Garage · (559) 540-5145`;
+  return `Hola ${nombre} 👋\n\n¡Tu cita en Legacy Motors Garage quedó lista!\n\n📅 ${fecha}${hora}${car}\n\nLo que haremos:\n${svcBlock}${portal}\n\nResponde aquí cuando quieras. ¡Te esperamos!\nLegacy Motors Garage · (559) 540-5145`;
 }
 async function sendApptSms(a,kind){
   const phone=(a.phone||'').replace(/\D/g,'');
@@ -2305,7 +2319,7 @@ window.openInsuranceSMS=function(id){
     msg=`Hola ${nombre}! 🛡️ Le saluda Legacy Motors Garage LLC.\n\nNos importa mucho su seguridad y bienestar en el camino. Notamos que el seguro de su ${carro}${c.insurance?' (Póliza: '+c.insurance+')':''} está vencido o no tenemos registro en su archivo.\n\nQueremos asegurarnos de que siempre esté protegido/a. Por favor actualice su información de seguro y envíenos copia de su tarjeta de seguro a la brevedad.\n\n¡Estamos aquí para ayudarle! 😊\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
   const phone=c.phone.replace(/\D/g,'');
-  const smsLink=`sms:${phone}?body=${encodeURIComponent(msg)}`;
+  const smsLink=`sms:${phone}?body=${encodeURIComponent(msg+portalTag(lang))}`;
   // Use <a> click instead of location.href so we don't navigate away
   const a=document.createElement('a'); a.href=smsLink; a.click();
 };
@@ -2355,7 +2369,7 @@ window.openWhatsApp=function(id,status){
 
 window.sendWhatsApp=function(){
   const msg=document.getElementById('wa-text').value;
-  const _a1=document.createElement('a');_a1.href=`sms:${waPhone}?body=${encodeURIComponent(msg)}`;_a1.click();
+  const _a1=document.createElement('a');_a1.href=`sms:${waPhone}?body=${encodeURIComponent(msg+portalTag(lang))}`;_a1.click();
   closeModal('wa-modal');
 };
 
@@ -2595,7 +2609,7 @@ window.sendServiceMsg = function(id) {
     msg = `Hola ${nombre}! 🚗🔧 Le saluda Legacy Motors Garage LLC.\n\nYa han pasado ${months} meses desde que se llevó su ${carro} — ¡es tiempo de un chequeo rápido!\n\nComo cliente valioso, le ofrecemos una REVISIÓN GENERAL GRATUITA para que todo siga en perfectas condiciones.\n\n📅 Llámenos o responda a este mensaje para agendar su cita.\n📞 (559) 540-5145\n\n¡Gracias por su confianza! 😊\n— Legacy Motors Garage LLC`;
   }
   const phone = c.phone.replace(/\D/g,'');
-  const a = document.createElement('a'); a.href = `sms:${phone}?body=${encodeURIComponent(msg)}`; a.click();
+  const a = document.createElement('a'); a.href = `sms:${phone}?body=${encodeURIComponent(msg+portalTag(lang))}`; a.click();
 };
 
 window.sendBirthdayMsg = function(id) {
@@ -2610,7 +2624,7 @@ window.sendBirthdayMsg = function(id) {
     msg = `¡Feliz Cumpleaños ${c.name.split(' ')[0]}! 🎂🎉\n\nTodo el equipo de Legacy Motors Garage LLC le desea un maravilloso día lleno de alegría y felicidad.\n\n¡Gracias por su confianza — es un placer servirle! 🚗✨\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
   const phone = c.phone.replace(/\D/g,'');
-  const _a2=document.createElement('a');_a2.href=`sms:${phone}?body=${encodeURIComponent(msg)}`;_a2.click();
+  const _a2=document.createElement('a');_a2.href=`sms:${phone}?body=${encodeURIComponent(msg+portalTag(lang))}`;_a2.click();
 };
 
 // Send individual friendly payment-day reminder to a single client
@@ -2627,7 +2641,7 @@ window.sendFriendlyTodayMsg = function(id) {
     msg = `Hola ${nombre}! 😊 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con cariño que hoy es su día de pago de ${formatMoney(dueNow(c))} por su ${carro}.\n\nSaldo restante: ${formatMoney(calcBalance(c))}\n\n¡Gracias por su puntualidad, lo apreciamos mucho! 🙏\n\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
   const phone = c.phone.replace(/\D/g,'');
-  const a = document.createElement('a'); a.href = `sms:${phone}?body=${encodeURIComponent(msg)}`; a.click();
+  const a = document.createElement('a'); a.href = `sms:${phone}?body=${encodeURIComponent(msg+portalTag(lang))}`; a.click();
 };
 
 function renderTodayBox() {
