@@ -280,6 +280,20 @@
   </div>
 </div>
 
+<!-- ASIGNAR CARRO A UN GASTO -->
+<div class="overlay" id="assigncar-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title">🔗 Asignar carro al gasto</div><button class="close" onclick="closeAssignCar()">✕</button></div>
+    <div id="ac-info" style="font-size:13px;color:var(--muted);margin-bottom:12px;"></div>
+    <div class="field"><label>Carro</label><select id="ac-car"></select></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeAssignCar()">Cancelar</button>
+      <button class="btn btn-primary" id="ac-save" onclick="saveAssignCar()">Guardar</button>
+    </div>
+    <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;">Solo cambia a qué carro pertenece el gasto. El monto y la fecha no se tocan.</div>
+  </div>
+</div>
+
 <!-- TRASPASO ENTRE BOLSAS -->
 <div class="overlay" id="transfer-overlay">
   <div class="sheet">
@@ -416,7 +430,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -635,7 +649,7 @@ function renderExpenses(){
     const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
     const who = e.vendor || e.source_name || '';
     const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(e.amountCents)}`;
-    const act = inc ? '' : `<span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩ reversar</span>`;
+    const act = inc ? '' : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`;
     return `<div class="row">
       <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:(inc?'💵':'🧾')}</div>
       <div class="row-main">
@@ -750,6 +764,7 @@ document.getElementById('corte-overlay').addEventListener('click',e=>{ if(e.targ
 document.getElementById('pnl-overlay').addEventListener('click',e=>{ if(e.target.id==='pnl-overlay') closePnl(); });
 document.getElementById('inc-overlay').addEventListener('click',e=>{ if(e.target.id==='inc-overlay') closeInc(); });
 document.getElementById('transfer-overlay').addEventListener('click',e=>{ if(e.target.id==='transfer-overlay') closeTransfer(); });
+document.getElementById('assigncar-overlay').addEventListener('click',e=>{ if(e.target.id==='assigncar-overlay') closeAssignCar(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
 document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.target.id==='split-overlay') closeSplit(); });
@@ -944,6 +959,34 @@ window.openInc = function(){
   document.getElementById('inc-overlay').classList.add('open');
 };
 window.closeInc = function(){ document.getElementById('inc-overlay').classList.remove('open'); };
+
+let _assignTxId=null;
+window.openAssignCar=function(txId){
+  _assignTxId=txId;
+  const tx=txns.find(x=>x.id===txId);
+  document.getElementById('ac-info').textContent = tx ? ((tx.category||'Gasto')+' · '+centsToUSD(tx.amountCents)) : '';
+  const sel=document.getElementById('ac-car');
+  const opts=['<option value="">— Ninguno —</option>'];
+  [...inventory].sort((a,b)=>(parseInt(a.inventoryNum)||0)-(parseInt(b.inventoryNum)||0)).forEach(c=>{
+    const selred = (tx && tx.carId===c.id) ? ' selected' : '';
+    opts.push(`<option value="${c.id}"${selred}>#${c.inventoryNum||'?'} · ${c.year||''} ${c.make||''} ${c.model||''}</option>`);
+  });
+  sel.innerHTML=opts.join('');
+  document.getElementById('assigncar-overlay').classList.add('open');
+};
+window.closeAssignCar=function(){ document.getElementById('assigncar-overlay').classList.remove('open'); };
+window.saveAssignCar=async function(){
+  if(!_assignTxId) return;
+  const sel=document.getElementById('ac-car');
+  const carId=sel.value;
+  const carLabel=carId?(sel.options[sel.selectedIndex].text.replace(/^#\S+ · /,'').trim()):'';
+  const btn=document.getElementById('ac-save'); btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    await updateDoc(doc(db,'transactions',_assignTxId), { carId, carLabel });
+    closeAssignCar();
+  }catch(e){ alert('Error: '+e.message+'\n\n(¿Publicaste la regla nueva de transactions?)'); }
+  btn.disabled=false; btn.textContent='Guardar';
+};
 window.saveInc = async function(){
   const amount=Number(document.getElementById('i-amount').value);
   if(!amount||amount<=0){ alert('Pon el monto'); return; }
