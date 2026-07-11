@@ -710,36 +710,16 @@ function renderPortal() {
     });
   }
 
-  document.getElementById('portal-content').innerHTML = `
-    <!-- SALUDO + VEHÍCULO -->
-    <div class="welcome-card">
-      <div class="welcome-name">${t('hi')}, ${c.name.split(' ')[0]} 👋</div>
-      <div style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold2);">${t('myVehicle')}</div>
-      <div style="font-size:19px;color:var(--white);margin-top:3px;font-weight:500;">${[c.make,c.color].filter(Boolean).join(' · ') || c.model || ''}</div>
-      ${c.vin ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;letter-spacing:0.5px;">VIN: ${c.vin}</div>` : ''}
-    </div>
-
-    <!-- PRÓXIMO PAGO / VENCIDO -->
-    <div class="next-pay-card ${status}">
-      <div>
-        <div class="npc-label ${status}">${npcLabel}</div>
-        <div class="npc-date">${formatDate(nextPay)}</div>
-        <div class="npc-days ${status}">${npcDays}</div>
-      </div>
-      <div class="npc-amount">
-        <div class="npc-amount-value">${formatMoney(dueNow(c))}</div>
-        <div class="npc-amount-label">${dueNow(c)<(Number(c.weekly)||0)?(L==='en'?'last payment':'último pago'):freqLabel}</div>
-      </div>
-    </div>
-
-    <!-- SEGURO (colapsable) -->
-    <div class="insurance-section" id="insurance-section">
+  const insComplete = !!c.insurance;
+  const idComplete = !!(c.idNumber);
+  const insSectionHTML = `
+    <div class="insurance-section" id="insurance-section" style="margin-top:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span style="font-weight:600;font-size:15px;">${t('insTitle')}</span>
           <span class="insurance-badge" id="ins-badge"></span>
         </div>
-        <button onclick="toggleInsForm()" id="ins-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">✏️ ${t('idEdit').replace('✏️ ','')}</button>
+        <button onclick="toggleInsForm()" id="ins-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">✏️</button>
       </div>
       <div id="ins-current" style="font-size:13px;color:var(--muted);margin-top:6px;"></div>
       <div id="ins-exp" style="font-size:12px;color:var(--muted);"></div>
@@ -755,16 +735,15 @@ function renderPortal() {
         <div id="ins-photo-preview" style="margin:8px 0;"></div>
         <button class="ins-btn" onclick="updateInsurance()">${t('insBtn')}</button>
       </div>
-    </div>
-
-    <!-- IDENTIFICACIÓN (colapsable) -->
+    </div>`;
+  const idSectionHTML = `
     <div class="insurance-section" id="id-section" style="margin-top:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span style="font-weight:600;font-size:15px;">${t('idTitle')}</span>
           <span id="id-badge" class="insurance-badge"></span>
         </div>
-        <button onclick="toggleIDForm()" id="id-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">✏️ ${t('idEdit').replace('✏️ ','')}</button>
+        <button onclick="toggleIDForm()" id="id-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">✏️</button>
       </div>
       <div id="id-current" style="font-size:13px;color:var(--muted);margin-top:6px;"></div>
       <div class="ins-success" id="id-success" style="display:none;"></div>
@@ -784,7 +763,42 @@ function renderPortal() {
         <div id="portal-id-preview" style="margin-bottom:10px;"></div>
         <button class="ins-btn" onclick="updateID()">${t('idBtn')}</button>
       </div>
+    </div>`;
+
+  document.getElementById('portal-content').innerHTML = `
+    <!-- SALUDO + VEHÍCULO + SALDO -->
+    <div class="welcome-card">
+      <div class="welcome-name">${t('hi')}, ${c.name.split(' ')[0]} 👋</div>
+      <div style="margin-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold2);">${t('myVehicle')}</div>
+      <div style="font-size:17px;color:var(--white);margin-top:2px;font-weight:500;">${[c.make,c.color].filter(Boolean).join(' · ') || c.model || ''}</div>
+      ${c.vin ? `<div style="font-size:12px;color:var(--muted);margin-top:2px;letter-spacing:0.5px;">VIN: ${c.vin}</div>` : ''}
+      <div class="balance-amount" style="margin-top:18px;">${formatMoney(balance)}</div>
+      <div class="balance-label">${t('balanceLabel')}</div>
+      <div class="progress-section">
+        <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
+        <div class="progress-info">
+          <span>${formatMoney(paid)} ${t('paidWord')}</span>
+          <span>${paidCount} ${t('of')} ${totalPay} ${t('paymentsWord')} · ${progress}%</span>
+        </div>
+      </div>
     </div>
+
+    <!-- PRÓXIMO PAGO / VENCIDO -->
+    <div class="next-pay-card ${status}">
+      <div>
+        <div class="npc-label ${status}">${npcLabel}</div>
+        <div class="npc-date">${formatDate(nextPay)}</div>
+        <div class="npc-days ${status}">${npcDays}</div>
+      </div>
+      <div class="npc-amount">
+        <div class="npc-amount-value">${formatMoney(dueNow(c))}</div>
+        <div class="npc-amount-label">${dueNow(c)<(Number(c.weekly)||0)?(L==='en'?'last payment':'último pago'):freqLabel}</div>
+      </div>
+    </div>
+
+    <!-- Seguro/ID PENDIENTES arriba -->
+    ${!insComplete ? insSectionHTML : ''}
+    ${!idComplete ? idSectionHTML : ''}
 
     <!-- CALENDARIO DE PAGOS + RESUMEN -->
     <div class="info-card" style="margin-top:16px;">
@@ -799,7 +813,11 @@ function renderPortal() {
       ${scheduleItems ? `<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:6px;">${scheduleItems}</div>` : ''}
     </div>
 
-    <!-- MENSAJES DE TEXTO (discreto, colapsable) -->
+    <!-- Seguro/ID COMPLETADOS abajo (minimizados) -->
+    ${insComplete ? insSectionHTML : ''}
+    ${idComplete ? idSectionHTML : ''}
+
+    <!-- MENSAJES DE TEXTO (discreto) -->
     <div class="insurance-section" id="sms-section" style="margin-top:16px;padding:16px 20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div style="display:flex;align-items:center;gap:8px;">
