@@ -997,7 +997,11 @@ window.renderAll = function() {
   document.getElementById('stat-soon').textContent=soon;
   document.getElementById('stat-ok').textContent=ok;
 
-  let filtered=clients.filter(c=>(c.name+c.phone+c.make+c.model+c.year+(c.vin||'')).toLowerCase().includes(search));
+  const searchTerms = search.trim().split(/\s+/).filter(Boolean);
+  let filtered=clients.filter(c=>{
+    const hay=(c.name+' '+c.phone+' '+c.make+' '+c.model+' '+c.year+' '+(c.vin||'')).toLowerCase();
+    return searchTerms.every(term=>hay.includes(term));
+  });
   
   // Apply sort
   if(currentSort==='next'){
