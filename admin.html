@@ -1227,7 +1227,7 @@ window.saveAppt = async function(){
   const existing=document.getElementById('appt-id').value;
   const id=existing || ('appt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7));
   const prior=appointments.find(x=>x.id===id)||{};
-  const data={ clientId, clientName, phone, lang, carLabel, vin, type, services, date, time, note, status:'scheduled',
+  const data={ clientId, clientName, phone, phoneE164: toE164(phone), lang, carLabel, vin, type, services, date, time, note, status:'scheduled',
     confirmSent: existing?(prior.confirmSent||false):false, reminderSent: existing?(prior.reminderSent||false):false,
     createdBy: prior.createdBy||who, createdAt: prior.createdAt||new Date().toISOString(), updatedBy:who, updatedAt:new Date().toISOString() };
   try{
