@@ -277,7 +277,7 @@
 
 <div class="search-wrap">
     <div style="display:flex;gap:10px;align-items:center;">
-      <input class="search-input" placeholder="🔍 Buscar cliente o carro..." id="search-box" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="flex:1;">
+      <input class="search-input" placeholder="🔍 Buscar cliente, carro o VIN..." id="search-box" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="flex:1;">
       <div style="display:flex;gap:6px;align-items:center;">
         <button id="sort-next" class="sort-btn" onclick="setSort('next')" style="background:var(--gold);color:var(--navy3);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">💰 PRÓXIMO</button>
         <button id="sort-date" class="sort-btn" onclick="setSort('date')" style="background:var(--border);color:var(--muted);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">📅 FECHA</button>
@@ -984,7 +984,7 @@ window.renderAll = function() {
   document.getElementById('stat-soon').textContent=soon;
   document.getElementById('stat-ok').textContent=ok;
 
-  let filtered=clients.filter(c=>(c.name+c.phone+c.make+c.model+c.year).toLowerCase().includes(search));
+  let filtered=clients.filter(c=>(c.name+c.phone+c.make+c.model+c.year+(c.vin||'')).toLowerCase().includes(search));
   
   // Apply sort
   if(currentSort==='next'){
@@ -1038,7 +1038,7 @@ window.renderAll = function() {
       const dayLabel=days<0?` (${Math.abs(days)}d)`:days===0?' HOY':days<=7?` (${days}d)`:'';
       html+=`<div class="client-list-item ${status}">
         <div class="cli-name">${c.name}${c.private?' <span title="Venta privada">🔒</span>':''}</div>
-        <div class="cli-car">${c.year} ${c.make} ${c.model}</div>
+        <div class="cli-car">${c.year} ${c.make} ${c.model}${c.vin?' · …'+c.vin.slice(-6):''}</div>
         <div class="cli-phone">${c.phone}</div>
         <div class="cli-next" style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</div>
         <div style="font-size:13px;color:var(--cream2);font-weight:500;">${formatMoney(c.weekly)}</div>
@@ -1118,6 +1118,7 @@ window.renderAll = function() {
         </div>${badge}</div>
         <div class="card-body">
           <div class="car-info">${c.year} ${c.make} ${c.model}</div>
+          ${c.vin?`<div style="font-size:11px;color:var(--muted);letter-spacing:0.5px;margin:-4px 0 8px;">VIN: ${c.vin}</div>`:''}
           ${(function(){
             var ins=c.insurance;var exp=c.insuranceExp||'';
             if(!ins) return '<div style="font-size:11px;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">⚠️ Sin seguro</div>';
