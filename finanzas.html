@@ -159,9 +159,9 @@
   <div id="gran-total"></div>
   <div id="privadas-section"></div>
 
-  <div class="section-head" style="margin-top:22px;">
-    <div class="section-title" style="font-size:14px;color:var(--muted);">Recurrentes y pruebas gratis</div>
-    <button class="btn-add" onclick="openSub()">＋ Agregar</button>
+  <div class="section-head" style="margin-top:22px;cursor:pointer;" onclick="toggleSubs()">
+    <div class="section-title" style="font-size:14px;color:var(--muted);">Recurrentes y pruebas gratis <span id="subs-arrow" style="font-size:12px;">▾</span></div>
+    <button class="btn-add" onclick="event.stopPropagation();openSub()">＋ Agregar</button>
   </div>
   <div class="list" id="sub-list"></div>
 
@@ -506,7 +506,7 @@ onAuthStateChanged(auth,(user)=>{
 function startListening(){
   onSnapshot(collection(db,'subscriptions'), snap=>{
     subs = snap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>s.active!==false);
-    render();
+    render(); applySubsCollapse();
   }, err=>{ console.log('subs listen error', err); });
   onSnapshot(collection(db,'transactions'), snap=>{
     txns = snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -1103,6 +1103,19 @@ function applyMovsCollapse(){
   try{ const c=localStorage.getItem('lmg_movs_col')==='1';
     const el=document.getElementById('exp-list'); if(el) el.style.display=c?'none':'';
     const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent=c?'▸':'▾';
+  }catch(e){}
+}
+window.toggleSubs = function(){
+  const el=document.getElementById('sub-list'); if(!el) return;
+  const show = el.style.display==='none';
+  el.style.display = show ? '' : 'none';
+  const ar=document.getElementById('subs-arrow'); if(ar) ar.textContent = show?'▾':'▸';
+  try{ localStorage.setItem('lmg_subs_col', show?'0':'1'); }catch(e){}
+};
+function applySubsCollapse(){
+  try{ const c=localStorage.getItem('lmg_subs_col')==='1';
+    const el=document.getElementById('sub-list'); if(el) el.style.display=c?'none':'';
+    const ar=document.getElementById('subs-arrow'); if(ar) ar.textContent=c?'▸':'▾';
   }catch(e){}
 }
 
