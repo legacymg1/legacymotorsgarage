@@ -852,6 +852,19 @@ window.calcFinancing = function(changedField) {
   let numPay = parseInt(document.getElementById('f-numpay')?.value) || 0;
   let weekly = parseFloat(document.getElementById('f-weekly')?.value) || 0;
 
+  // Modo 'load' (al abrir editar): mostrar el resumen con los valores GUARDADOS, sin recalcular ni pisar nada.
+  if(changedField === 'load'){
+    const dpp = freq==='monthly'?30.44:freq==='biweekly'?14:7;
+    const mo = (numPay*dpp)/30.44;
+    const fc = Math.max(0, baseFinanced*0.20*(mo/6));
+    const tot = baseFinanced + fc;
+    const fmt = n => '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const set=(id,v)=>{const el=document.getElementById(id); if(el) el.textContent=fmt(v);};
+    set('fs-today',paidToday); set('fs-base',baseFinanced); set('fs-financed',tot); set('fs-charge',fc); set('fs-total-pay',weekly);
+    window.calcHint();
+    return;
+  }
+
   // Calculate months from numPay + freq
   function monthsFromPay(n, f) {
     if(f === 'monthly') return n;
@@ -1265,7 +1278,7 @@ window.openEditModal=function(id){
   const idPrev=document.getElementById('f-id-preview');
   if(idPrev&&c.idPhotoURL) idPrev.innerHTML='<a href="'+c.idPhotoURL+'" target="_blank" style="font-size:12px;color:var(--green);">📷 Ver foto de ID</a>';
   else if(idPrev) idPrev.innerHTML='';
-  calcFinancing();
+  calcFinancing('load');
   document.getElementById('add-modal').classList.add('active');
 };
 
