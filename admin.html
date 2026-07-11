@@ -626,7 +626,7 @@
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, updateDoc, runTransaction, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, updateDoc, runTransaction, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -1232,6 +1232,7 @@ window.saveAppt = async function(){
     createdBy: prior.createdBy||who, createdAt: prior.createdAt||new Date().toISOString(), updatedBy:who, updatedAt:new Date().toISOString() };
   try{
     await setDoc(doc(db,'appointments',id), data);
+    if(time){ try{ await setDoc(doc(db,'availability',date), { taken: arrayUnion(time) }, {merge:true}); }catch(e){} }
     closeModal('appt-modal');
     if(!existing && phone && confirm('Cita guardada ✅\n\n¿Enviar confirmación por SMS ahora?')){
       sendApptSms({id, ...data}, 'confirm');
@@ -1321,7 +1322,7 @@ async function sendApptSms(a,kind){
 window.sendApptConfirm=function(id){ const a=appointments.find(x=>x.id===id); if(a) sendApptSms(a,'confirm'); };
 window.sendApptReminder=function(id){ const a=appointments.find(x=>x.id===id); if(a) sendApptSms(a,'reminder'); };
 window.markApptDone=async function(id){ if(!confirm('¿Marcar esta cita como completada?')) return; try{ await updateDoc(doc(db,'appointments',id),{status:'done'}); }catch(e){ alert(e.message);} };
-window.cancelAppt=async function(id){ if(!confirm('¿Cancelar / eliminar esta cita?')) return; try{ await deleteDoc(doc(db,'appointments',id)); }catch(e){ alert(e.message);} };
+window.cancelAppt=async function(id){ const a=appointments.find(x=>x.id===id); if(!confirm('¿Cancelar / eliminar esta cita?')) return; try{ await deleteDoc(doc(db,'appointments',id)); if(a&&a.date&&a.time){ try{ await updateDoc(doc(db,'availability',a.date), {taken: arrayRemove(a.time)}); }catch(e){} } }catch(e){ alert(e.message);} };
 window.editAppt=function(id){
   const a=appointments.find(x=>x.id===id); if(!a) return;
   openApptModal(a.clientId||'');
