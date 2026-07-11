@@ -1017,8 +1017,8 @@ function txDesc(t){
   if(t.type==='payment') return 'Pago · '+(t.clientName||'cliente');
   if(t.type==='down') return 'Enganche · '+(t.clientName||'cliente');
   if(t.type==='cash_sale') return 'Venta contado · '+(t.clientName||'cliente');
-  if(t.type==='income') return (t.category||'Ingreso')+(t.source_name?' · '+t.source_name:'');
-  if(t.type==='expense') return (t.category||'Gasto')+(t.vendor?' · '+t.vendor:'')+(t.carLabel?' · '+t.carLabel:'');
+  if(t.type==='income') return (t.note||t.category||'Ingreso')+(t.source_name?' · '+t.source_name:'');
+  if(t.type==='expense') return (t.note||t.category||'Gasto')+(t.vendor?' · '+t.vendor:'')+(t.carLabel?' · '+t.carLabel:'');
   if(t.type==='expense_reversal') return 'Reversa de gasto';
   if(t.type==='transfer') return t.dir==='in' ? ('↔ Traspaso desde '+(DEPT_NAME[t.fromDept]||t.fromDept)) : ('↔ Traspaso a '+(DEPT_NAME[t.toDept]||t.toDept));
   return t.category||t.type;
