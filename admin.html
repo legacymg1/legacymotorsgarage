@@ -160,9 +160,10 @@
   ::-webkit-scrollbar-track { background: var(--navy3); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-  .sec-head { display:flex; align-items:center; justify-content:space-between; padding:14px 24px 0; cursor:pointer; user-select:none; }
-  .sec-head > span:first-child { font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); font-weight:600; }
-  .sec-arrow { color:var(--muted); font-size:12px; }
+  .sec-head { display:flex; align-items:center; justify-content:space-between; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:13px 18px; margin:12px 24px; cursor:pointer; user-select:none; transition:border-color .15s; }
+  .sec-head:hover { border-color:var(--gold); }
+  .sec-head > span:first-child { font-size:12px; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); font-weight:700; }
+  .sec-arrow { color:var(--gold); font-size:18px; line-height:1; }
   @media (max-width: 600px) {
     header { height:auto; min-height:54px; padding:8px 12px; flex-wrap:wrap; row-gap:6px; }
     .header-logo-text { font-size:15px; }
@@ -171,7 +172,7 @@
     .btn-lbl { display:none; }
     .header-right { gap:6px; flex-wrap:wrap; justify-content:flex-end; }
     .header-right button { padding:7px 10px !important; margin-right:0 !important; font-size:13px !important; }
-    .sec-head { padding:12px 16px 0; }
+    .sec-head { padding:12px 16px; margin:10px 16px; }
     .stats-bar { gap: 8px; padding: 16px; }
     main { padding: 0 16px 80px; }
     .search-wrap { padding: 0 16px 12px; }
@@ -267,9 +268,10 @@
   <!-- TODAY BOX -->
 <div id="today-box" style="display:none;margin:0 24px 16px;background:var(--card);border:1px solid var(--gold);border-radius:14px;overflow:hidden;">
   <div style="background:linear-gradient(135deg,var(--gold3),var(--gold));padding:12px 20px;display:flex;align-items:center;justify-content:space-between;">
-    <div onclick="toggleSection('today-list','today-arrow')" style="font-family:var(--font-display);font-size:20px;color:var(--navy3);letter-spacing:1px;cursor:pointer;display:flex;align-items:center;gap:8px;">📅 PAGOS DE HOY <span id="today-arrow" style="font-size:14px;">▾</span></div>
-    <div style="display:flex;gap:8px;">
+    <div onclick="toggleSection('today-list','today-arrow')" style="font-family:var(--font-display);font-size:20px;color:var(--navy3);letter-spacing:1px;cursor:pointer;">📅 PAGOS DE HOY</div>
+    <div style="display:flex;gap:14px;align-items:center;">
       <button onclick="exportCalendar()" style="background:var(--navy3);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;">📆 EXPORTAR CALENDARIO</button>
+      <span id="today-arrow" onclick="toggleSection('today-list','today-arrow')" style="font-size:18px;color:var(--navy3);cursor:pointer;line-height:1;">▾</span>
     </div>
   </div>
   <div id="today-list" style="padding:16px 20px;"></div>
