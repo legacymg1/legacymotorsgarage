@@ -148,7 +148,7 @@
   <h1 class="page">Finanzas</h1>
   <div class="page-sub">Gastos, ingresos y cortes de caja del negocio — en un solo lugar.</div>
   <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn-add" onclick="openPnl()" style="font-size:15px;">📊 Resultados del mes</button>
+    <button class="btn-add" onclick="openPnl()" style="font-size:15px;">📊 Resultados</button>
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
     <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
   </div>
@@ -319,11 +319,15 @@
 <!-- ESTADO DE RESULTADOS -->
 <div class="overlay" id="pnl-overlay">
   <div class="sheet" style="max-width:680px;">
-    <div class="sheet-head"><div class="sheet-title">📊 Resultados del mes</div><button class="close" onclick="closePnl()">✕</button></div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-      <button class="btn btn-ghost" onclick="pnlMonthShift(-1)" style="padding:8px 14px;">‹</button>
-      <button class="btn btn-ghost" id="pnl-month-btn" onclick="pnlThisMonth()" style="flex:1;">Este mes</button>
-      <button class="btn btn-ghost" onclick="pnlMonthShift(1)" style="padding:8px 14px;">›</button>
+    <div class="sheet-head"><div class="sheet-title">📊 Resultados</div><button class="close" onclick="closePnl()">✕</button></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-ghost" id="pnl-mode-month" onclick="pnlSetMode('month')" style="flex:1;">Mes</button>
+      <button class="btn btn-ghost" id="pnl-mode-year" onclick="pnlSetMode('year')" style="flex:1;">Año</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+      <button class="btn btn-ghost" onclick="pnlShift(-1)" style="padding:8px 14px;">‹</button>
+      <button class="btn btn-ghost" id="pnl-period-btn" style="flex:1;pointer-events:none;">—</button>
+      <button class="btn btn-ghost" onclick="pnlShift(1)" style="padding:8px 14px;">›</button>
     </div>
     <div id="pnl-body"></div>
     <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:12px;line-height:1.5;">Base efectivo (dinero recibido y gastado). Las aportaciones y retiros de socios NO cuentan como ganancia.</div>
@@ -1142,31 +1146,32 @@ function renderPrivadas(){
 
 // ---------- ESTADO DE RESULTADOS ----------
 let _pnlMonth = new Date().toISOString().slice(0,7);
+let _pnlYear = new Date().getFullYear();
 let _pnlMode = 'month';
 const PNL_DEPTS = [['dealer','🚗 Dealer'],['parts','🔧 Partes'],['ebay','📦 eBay']];
-window.openPnl = function(){ _pnlMode='month'; _pnlMonth=new Date().toISOString().slice(0,7); renderPnl(); document.getElementById('pnl-overlay').classList.add('open'); };
+window.openPnl = function(){ _pnlMode='month'; _pnlMonth=new Date().toISOString().slice(0,7); _pnlYear=new Date().getFullYear(); renderPnl(); document.getElementById('pnl-overlay').classList.add('open'); };
 window.closePnl = function(){ document.getElementById('pnl-overlay').classList.remove('open'); };
-window.pnlThisMonth = function(){ _pnlMode='month'; _pnlMonth=new Date().toISOString().slice(0,7); renderPnl(); };
-window.pnlMonthShift = function(delta){
-  _pnlMode='month';
-  const y=+_pnlMonth.slice(0,4), m=+_pnlMonth.slice(5,7);
-  _pnlMonth=new Date(y, m-1+delta, 1).toISOString().slice(0,7);
+window.pnlSetMode = function(m){ _pnlMode=m; if(m==='month') _pnlMonth=new Date().toISOString().slice(0,7); else _pnlYear=new Date().getFullYear(); renderPnl(); };
+window.pnlShift = function(delta){
+  if(_pnlMode==='year'){ _pnlYear += delta; }
+  else { const y=+_pnlMonth.slice(0,4), m=+_pnlMonth.slice(5,7); _pnlMonth=new Date(y, m-1+delta, 1).toISOString().slice(0,7); }
   renderPnl();
 };
-window.pnlSinceCut = function(){ _pnlMode='sincecut'; renderPnl(); };
 function renderPnl(){
   const body=document.getElementById('pnl-body'); if(!body) return;
+  const mb=document.getElementById('pnl-mode-month'), yb=document.getElementById('pnl-mode-year');
+  if(mb) mb.style.opacity=_pnlMode==='month'?'1':'0.45';
+  if(yb) yb.style.opacity=_pnlMode==='year'?'1':'0.45';
   let inRange, label;
-  if(_pnlMode==='sincecut'){
-    const lc=lastClosing(); const since=lc?(lc.closedAt||''):'';
-    inRange=t=>(t.createdAt||'')>since;
-    label = lc ? ('Desde el último corte · '+fmtDate((lc.closedAt||'').slice(0,10))) : 'Desde el principio';
+  if(_pnlMode==='year'){
+    inRange=t=>(t.date||'').slice(0,4)===String(_pnlYear);
+    label='Año '+_pnlYear;
   } else {
     inRange=t=>(t.date||'').slice(0,7)===_pnlMonth;
     const nm=new Date(+_pnlMonth.slice(0,4), +_pnlMonth.slice(5,7)-1, 1).toLocaleDateString('es-MX',{month:'long',year:'numeric'});
     label = nm.charAt(0).toUpperCase()+nm.slice(1);
-    const btn=document.getElementById('pnl-month-btn'); if(btn) btn.textContent=label;
   }
+  const pb=document.getElementById('pnl-period-btn'); if(pb) pb.textContent=label;
   const D={dealer:{in:0,out:0,cap:0,draw:0}, parts:{in:0,out:0,cap:0,draw:0}, ebay:{in:0,out:0,cap:0,draw:0}};
   legacyTxns().filter(inRange).forEach(t=>{
     const amt=Number(t.amountCents)||0;
