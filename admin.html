@@ -563,7 +563,11 @@
   <div class="modal">
     <div class="modal-title">📅 AGENDAR CITA</div>
     <div class="form-group"><label class="form-label">Cliente</label>
-      <select class="form-input" id="appt-client" onchange="onApptClientChange()"></select>
+      <div style="position:relative;">
+        <input class="form-input" id="appt-client-search" placeholder="🔍 Busca por nombre, carro o VIN..." autocomplete="off" oninput="filterApptClients()" onfocus="filterApptClients()" onblur="setTimeout(()=>{const b=document.getElementById('appt-client-results');if(b)b.style.display='none';},200)">
+        <input type="hidden" id="appt-client">
+        <div id="appt-client-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--navy2);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:240px;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,0.5);"></div>
+      </div>
     </div>
     <div id="appt-walkin" style="display:none;">
       <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="appt-name" style="text-transform:capitalize;"></div>
@@ -1061,12 +1065,38 @@ function apptNextFriday(){ const d=new Date(); let add=(5-d.getDay()+7)%7; if(ad
 function apptFmtLong(iso,lang){ const d=apptParse(iso); return lang==='en' ? `${APD_EN[d.getDay()]}, ${APM_EN[d.getMonth()]} ${d.getDate()}` : `${APD_ES[d.getDay()]} ${d.getDate()} de ${APM_ES[d.getMonth()]}`; }
 function appt12h(t){ if(!t) return ''; let [h,m]=t.split(':').map(Number); const ap=h<12?'AM':'PM'; h=h%12; if(h===0)h=12; return h+':'+String(m).padStart(2,'0')+' '+ap; }
 
+window.filterApptClients = function(){
+  const q=(document.getElementById('appt-client-search').value||'').toLowerCase();
+  const terms=q.trim().split(/\s+/).filter(Boolean);
+  const box=document.getElementById('appt-client-results');
+  let items=clients.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(terms.length){
+    items=items.filter(c=>{
+      const hay=((c.name||'')+' '+(c.phone||'')+' '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.color||'')+' '+(c.vin||'')).toLowerCase();
+      return terms.every(t=>hay.includes(t));
+    });
+  }
+  items=items.slice(0,40);
+  let html=`<div onmousedown="pickApptClient('__walkin__')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);color:var(--gold);font-weight:600;">➕ Otro (sin registrar)</div>`;
+  if(!items.length){ html+=`<div style="padding:9px 12px;color:var(--muted);font-size:13px;">Sin coincidencias</div>`; }
+  else items.forEach(c=>{
+    const car=[c.year,c.make,c.model].filter(Boolean).join(' ');
+    html+=`<div onmousedown="pickApptClient('${c.id}')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);">
+      <div style="font-weight:600;font-size:14px;">${c.name||''}${c.kind==='service'?' 🔧':''}</div>
+      <div style="font-size:12px;color:var(--muted);">${car}${c.vin?' · …'+c.vin.slice(-6):''}${c.phone?' · '+c.phone:''}</div>
+    </div>`;
+  });
+  box.innerHTML=html; box.style.display='block';
+};
+window.pickApptClient = function(id){
+  document.getElementById('appt-client').value=id;
+  document.getElementById('appt-client-results').style.display='none';
+  const inp=document.getElementById('appt-client-search');
+  if(id==='__walkin__'){ inp.value='➕ Otro (sin registrar)'; }
+  else { const c=clients.find(x=>x.id===id); inp.value = c ? (c.name + (c.make?' · '+[c.year,c.make,c.model].filter(Boolean).join(' '):'')) : ''; }
+  onApptClientChange();
+};
 window.openApptModal = function(clientId){
-  const sel=document.getElementById('appt-client');
-  const opts=['<option value="">— Selecciona cliente —</option>']
-    .concat(clients.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>`<option value="${c.id}">${c.name}${c.make?' · '+((c.year||'')+' '+c.make+' '+(c.model||'')).trim():''}</option>`))
-    .concat(['<option value="__walkin__">➕ Otro (sin registrar)</option>']);
-  sel.innerHTML=opts.join('');
   document.getElementById('appt-id').value='';
   document.getElementById('appt-type').value='Cambio de aceite';
   document.getElementById('appt-date').value=apptNextFriday();
@@ -1075,8 +1105,10 @@ window.openApptModal = function(clientId){
   document.getElementById('appt-name').value='';
   document.getElementById('appt-phone').value='';
   document.getElementById('appt-lang').value='es';
-  sel.value = clientId || '';
-  onApptClientChange();
+  document.getElementById('appt-client').value='';
+  document.getElementById('appt-client-search').value='';
+  document.getElementById('appt-client-results').style.display='none';
+  if(clientId){ pickApptClient(clientId); } else { onApptClientChange(); }
   document.getElementById('appt-modal').classList.add('active');
 };
 window.onApptClientChange = function(){
@@ -1156,7 +1188,7 @@ window.cancelAppt=async function(id){ if(!confirm('¿Cancelar / eliminar esta ci
 window.editAppt=function(id){
   const a=appointments.find(x=>x.id===id); if(!a) return;
   openApptModal(a.clientId||'');
-  if(!a.clientId){ document.getElementById('appt-client').value='__walkin__'; onApptClientChange(); document.getElementById('appt-name').value=a.clientName||''; document.getElementById('appt-phone').value=a.phone||''; document.getElementById('appt-lang').value=a.lang||'es'; }
+  if(!a.clientId){ pickApptClient('__walkin__'); document.getElementById('appt-name').value=a.clientName||''; document.getElementById('appt-phone').value=a.phone||''; document.getElementById('appt-lang').value=a.lang||'es'; }
   document.getElementById('appt-id').value=a.id;
   document.getElementById('appt-type').value=a.type||'';
   document.getElementById('appt-date').value=a.date||'';
