@@ -126,6 +126,7 @@
   .form-group { margin-bottom: 16px; }
   .form-label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
   .form-input { width: 100%; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: var(--font-body); font-size: 14px; outline: none; transition: border-color 0.2s; }
+  #f-name,#f-make,#f-model,#f-color,#f-city{text-transform:capitalize;} #f-vin{text-transform:uppercase;}
   .form-input:focus { border-color: var(--gold); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .form-hint { font-size: 11px; color: var(--gold); margin-top: 4px; min-height: 16px; }
@@ -380,7 +381,7 @@
       <div class="form-group"><label class="form-label">Color</label><input class="form-input" id="f-color" placeholder="Plata / Blanco"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">VIN</label><input class="form-input" id="f-vin" placeholder="Número VIN del carro"></div>
+      <div class="form-group"><label class="form-label">VIN</label><input class="form-input" id="f-vin" placeholder="Número VIN del carro" oninput="this.value=this.value.toUpperCase()"></div>
       <div class="form-group"><label class="form-label">Millas</label><input class="form-input" id="f-miles" placeholder="85000" type="number"></div>
     </div>
     <div class="form-row">
@@ -689,6 +690,7 @@ function today() {
 function addDays(dateStr, n) { const d = new Date(dateStr+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
 function formatDate(d) { if(!d) return '—'; const [y,m,day]=d.split('-'); return `${m}/${day}/${y}`; }
 function formatMoney(n) { return '$'+Number(n).toLocaleString('en-US'); }
+function titleCase(s){ return String(s||'').replace(/\b\w/g, c=>c.toUpperCase()); }
 function daysUntil(dateStr) { if(!dateStr) return 999; const now=new Date(); now.setHours(0,0,0,0); const d=new Date(dateStr+'T00:00:00'); return Math.round((d-now)/86400000); }
 function generateSchedule(startDate, num, freq) {
   const s = [];
@@ -1268,7 +1270,7 @@ window.openEditModal=function(id){
 
 window.saveClient=async function(){
   console.log("saveClient v3.3 running");
-  const name=document.getElementById('f-name').value.trim();
+  const name=titleCase(document.getElementById('f-name').value.trim());
   if(!name){alert('Nombre requerido');return;}
   const startDate=document.getElementById('f-startdate').value;
   const numPay=parseInt(document.getElementById('f-numpay').value)||0;
@@ -1332,14 +1334,14 @@ window.saveClient=async function(){
       return { marketing:false, date:(prev&&prev.date)||null, source:(prev&&prev.source)||'admin' };
     })(),
     address:document.getElementById('f-address')?.value.trim() || existing.address || '',
-    city:document.getElementById('f-city')?.value.trim() || existing.city || '',
+    city:titleCase(document.getElementById('f-city')?.value.trim() || existing.city || ''),
     state:document.getElementById('f-state')?.value.trim() || existing.state || '',
     zip:document.getElementById('f-zip')?.value.trim() || existing.zip || '',
-    make:document.getElementById('f-make').value.trim(),
-    color:document.getElementById('f-color')?.value.trim() || existing.color || '',
-    model:document.getElementById('f-model').value.trim(),
+    make:titleCase(document.getElementById('f-make').value.trim()),
+    color:titleCase(document.getElementById('f-color')?.value.trim() || existing.color || ''),
+    model:titleCase(document.getElementById('f-model').value.trim()),
     year:document.getElementById('f-year').value,
-    vin:document.getElementById('f-vin')?.value.trim() || existing.vin || '',
+    vin:(document.getElementById('f-vin')?.value.trim() || existing.vin || '').toUpperCase(),
     miles:document.getElementById('f-miles')?.value.trim() || existing.miles || '',
     total:Number(document.getElementById('f-total').value)||0,
     down:Number(document.getElementById('f-down').value)||0,

@@ -14620,12 +14620,12 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
   </div>
     <div style="background:var(--gold);color:var(--dark);border-radius:8px;padding:6px 12px;text-align:center;font-weight:700;font-size:13px;margin-bottom:8px;" id="inv-number-display">Inventory # Auto-assigned</div>
     <input class="cf-input" id="car-year" placeholder="Year / Año" type="number">
-    <input class="cf-input" id="car-make" placeholder="Make / Marca (Toyota)">
-    <input class="cf-input" id="car-model" placeholder="Model / Modelo (Camry)">
+    <input class="cf-input" id="car-make" placeholder="Make / Marca (Toyota)" style="text-transform:capitalize">
+    <input class="cf-input" id="car-model" placeholder="Model / Modelo (Camry)" style="text-transform:capitalize">
     <input class="cf-input" id="car-price" placeholder="Price / Precio ($)" type="number">
     <input class="cf-input" id="car-weekly" placeholder="Weekly Payment / Pago Semanal ($)" type="number">
     <input class="cf-input" id="car-miles" placeholder="Mileage / Millas">
-    <input class="cf-input" id="car-vin" placeholder="VIN Number">
+    <input class="cf-input" id="car-vin" placeholder="VIN Number" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
     <textarea class="cf-input" id="car-desc" rows="2" placeholder="Description / Descripción" style="resize:vertical;"></textarea>
     <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;">📸 Fotos / Photos</label>
     <input type="file" class="cf-input" id="car-photos" accept="image/*" multiple style="padding:8px;cursor:pointer;">
@@ -14759,6 +14759,7 @@ function startCarCosts(){
   }, function(e){ console.log('costs listen', e); });
 }
 function money0(n){ return '$'+Number(n||0).toLocaleString('en-US',{maximumFractionDigits:0}); }
+function titleCase(s){ return String(s||'').replace(/\b\w/g, function(c){return c.toUpperCase();}); }
 function carCostHTML(c){
   var list=(carExpenses[c.id]||[]).slice().sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
   var costCents=list.reduce(function(s,e){return s+(Number(e.amountCents)||0);},0);
@@ -14978,8 +14979,8 @@ function toJpeg(file){
 }
 
 window.saveCar = async function(){
-  const make=document.getElementById('car-make').value.trim();
-  const model=document.getElementById('car-model').value.trim();
+  const make=titleCase(document.getElementById('car-make').value.trim());
+  const model=titleCase(document.getElementById('car-model').value.trim());
   if(!make||!model){alert('Enter make and model');return;}
   
   const btn=document.getElementById('car-save-btn');
@@ -15051,7 +15052,7 @@ window.saveCar = async function(){
       inventoryNum: existing.inventoryNum || generateInvNum(),
       status: existing.status || 'prep',
       gpsPhotoURL,
-      vin: document.getElementById('car-vin')?document.getElementById('car-vin').value.trim():'',
+      vin: (document.getElementById('car-vin')?document.getElementById('car-vin').value.trim():'').toUpperCase(),
       createdAt: existing.createdAt || Date.now(),
       updatedAt: Date.now()
     };
