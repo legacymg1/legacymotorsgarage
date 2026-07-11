@@ -714,6 +714,11 @@ function serviceCardHTML(nextServ, nextAppt, lastAppt){
       </div>
     </div>`;
 }
+window.togglePaySchedule = function(){
+  const w=document.getElementById('pay-sched'); if(!w) return;
+  w.style.display='block';
+  const b=document.getElementById('pay-sched-btn'); if(b) b.style.display='none';
+};
 window.toggleBooking = function(){
   const w=document.getElementById('booking-widget'); if(!w) return;
   w.style.display='block';
@@ -939,8 +944,8 @@ function renderPortal() {
       <div style="margin-top:12px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold2);">${t('myVehicle')}</div>
       <div style="font-size:17px;color:var(--white);margin-top:2px;font-weight:500;">${[c.make,c.color].filter(Boolean).join(' · ') || c.model || ''}</div>
       ${c.vin ? `<div style="font-size:12px;color:var(--muted);margin-top:2px;letter-spacing:0.5px;">VIN: ${c.vin}</div>` : ''}
-      <div class="balance-amount" style="margin-top:18px;">${formatMoney(balance)}</div>
-      <div class="balance-label">${t('balanceLabel')}</div>
+      <div class="balance-amount" style="margin-top:18px;">${status==='paidoff'?(L==='en'?'Paid off 🎉':'Pagado 🎉'):formatMoney(balance)}</div>
+      <div class="balance-label">${status==='paidoff'?(L==='en'?'Vehicle paid in full':'Vehículo pagado'):t('balanceLabel')}</div>
       <div class="progress-section">
         <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
         <div class="progress-info">
@@ -950,7 +955,8 @@ function renderPortal() {
       </div>
     </div>
 
-    <!-- PRÓXIMO PAGO / VENCIDO -->
+    <!-- PRÓXIMO PAGO / VENCIDO (oculto si ya pagó) -->
+    ${status==='paidoff' ? '' : `
     <div class="next-pay-card ${status}">
       <div>
         <div class="npc-label ${status}">${npcLabel}</div>
@@ -961,7 +967,7 @@ function renderPortal() {
         <div class="npc-amount-value">${formatMoney(dueNow(c))}</div>
         <div class="npc-amount-label">${dueNow(c)<(Number(c.weekly)||0)?(L==='en'?'last payment':'último pago'):freqLabel}</div>
       </div>
-    </div>
+    </div>`}
 
     ${serviceCardHTML(nextServ2, nextAppt, _lastAppt)}
 
@@ -979,7 +985,9 @@ function renderPortal() {
       <div class="info-row"><span class="ir-label">${t('nextPayLbl')}</span><span class="ir-value">${status==='paidoff'?'—':formatDate(nextPay)}</span></div>
       <div class="info-row"><span class="ir-label">${t('totalPaid')}</span><span class="ir-value" style="color:var(--green)">${formatMoney(paid)}</span></div>
       <div class="info-row"><span class="ir-label">${t('remaining')}</span><span class="ir-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
-      ${scheduleItems ? `<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:6px;">${scheduleItems}</div>` : ''}
+      ${scheduleItems ? (status==='paidoff'
+        ? `<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px;"><button onclick="togglePaySchedule()" id="pay-sched-btn" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:11px;font-size:13px;cursor:pointer;">${L==='en'?'View payment history':'Ver historial de pagos'}</button><div id="pay-sched" style="display:none;margin-top:12px;">${scheduleItems}</div></div>`
+        : `<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:6px;">${scheduleItems}</div>`) : ''}
     </div>
 
     <!-- Seguro/ID COMPLETADOS abajo (minimizados) -->
