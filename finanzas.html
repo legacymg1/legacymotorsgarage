@@ -69,6 +69,9 @@
 
   /* section */
   .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .coll-head{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 18px;cursor:pointer;user-select:none;transition:border-color .15s;}
+  .coll-head:hover{border-color:var(--gold);}
+  .coll-arrow{font-size:18px;color:var(--gold);line-height:1;padding-left:4px;}
   .section-title{font-size:18px;font-weight:600;letter-spacing:-0.3px;}
   .btn-add{background:var(--gold-soft);color:var(--gold);border:none;border-radius:11px;padding:9px 15px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;}
   .btn-add:hover{background:rgba(232,182,74,0.22);}
@@ -159,17 +162,21 @@
   <div id="gran-total"></div>
   <div id="privadas-section"></div>
 
-  <div class="section-head" style="margin-top:22px;cursor:pointer;" onclick="toggleSubs()">
-    <div class="section-title" style="font-size:14px;color:var(--muted);">Recurrentes y pruebas gratis <span id="subs-arrow" style="font-size:12px;">▾</span></div>
-    <button class="btn-add" onclick="event.stopPropagation();openSub()">＋ Agregar</button>
+  <div class="coll-head" style="margin-top:22px;" onclick="toggleSubs()">
+    <div class="section-title" style="font-size:14px;color:var(--muted);">Recurrentes y pruebas gratis</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <button class="btn-add" onclick="event.stopPropagation();openSub()">＋ Agregar</button>
+      <span id="subs-arrow" class="coll-arrow">▾</span>
+    </div>
   </div>
   <div class="list" id="sub-list"></div>
 
-  <div class="section-head" style="margin-top:30px;cursor:pointer;" onclick="toggleMovs()">
-    <div class="section-title">Movimientos del negocio <span id="movs-arrow" style="font-size:13px;color:var(--muted);">▾</span></div>
-    <div style="display:flex;gap:8px;" onclick="event.stopPropagation()">
-      <button class="btn-add" onclick="openInc()">＋ Ingreso</button>
-      <button class="btn-add" onclick="openExp()">＋ Gasto</button>
+  <div class="coll-head" style="margin-top:30px;" onclick="toggleMovs()">
+    <div class="section-title">Movimientos del negocio</div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="btn-add" onclick="event.stopPropagation();openInc()">＋ Ingreso</button>
+      <button class="btn-add" onclick="event.stopPropagation();openExp()">＋ Gasto</button>
+      <span id="movs-arrow" class="coll-arrow">▾</span>
     </div>
   </div>
   <div class="list" id="exp-list"></div>
