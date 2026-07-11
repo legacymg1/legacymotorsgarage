@@ -325,7 +325,7 @@
     <div class="modal-title" id="modal-title">NUEVO CLIENTE</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="f-name" placeholder="Juan García"></div>
-      <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="f-phone" placeholder="555 555 5555" type="tel"></div>
+      <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="f-phone" placeholder="(555) 555-5555" type="tel" inputmode="tel" oninput="formatPhone(this)"></div>
     </div>
     <div class="form-group">
       <label class="form-label">Tipo de cliente</label>
@@ -572,7 +572,7 @@
     </div>
     <div id="appt-walkin" style="display:none;">
       <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="appt-name" style="text-transform:capitalize;"></div>
-      <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="appt-phone" type="tel" placeholder="(559) 000-0000"></div>
+      <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="appt-phone" type="tel" inputmode="tel" placeholder="(559) 000-0000" oninput="formatPhone(this)"></div>
       <div class="form-group"><label class="form-label">Idioma del mensaje</label>
         <select class="form-input" id="appt-lang"><option value="es">🇲🇽 Español</option><option value="en">🇺🇸 English</option></select>
       </div>
@@ -779,6 +779,17 @@ function addDays(dateStr, n) { const d = new Date(dateStr+'T12:00:00'); d.setDat
 function formatDate(d) { if(!d) return '—'; const [y,m,day]=d.split('-'); return `${m}/${day}/${y}`; }
 function formatMoney(n) { return '$'+Number(n).toLocaleString('en-US'); }
 function titleCase(s){ return String(s||'').replace(/\b\w/g, c=>c.toUpperCase()); }
+window.formatPhone=function(el){
+  let d=(el.value||'').replace(/[^0-9]/g,'');
+  if(d.length===11 && d[0]==='1') d=d.slice(1);   // quita el 1 de país si lo pegaron
+  d=d.slice(0,10);
+  let out;
+  if(d.length>6) out='('+d.slice(0,3)+') '+d.slice(3,6)+'-'+d.slice(6);
+  else if(d.length>3) out='('+d.slice(0,3)+') '+d.slice(3);
+  else if(d.length>0) out='('+d;
+  else out='';
+  el.value=out;
+};
 function daysUntil(dateStr) { if(!dateStr) return 999; const now=new Date(); now.setHours(0,0,0,0); const d=new Date(dateStr+'T00:00:00'); return Math.round((d-now)/86400000); }
 function generateSchedule(startDate, num, freq) {
   const s = [];
@@ -1758,7 +1769,7 @@ window.openEditModal=function(id){
   const _k2=document.getElementById('f-kind'); if(_k2) _k2.value=c.kind||'finance'; toggleKind();
   // Basic fields
   document.getElementById('f-name').value=c.name||'';
-  document.getElementById('f-phone').value=c.phone||'';
+  document.getElementById('f-phone').value=c.phone||''; formatPhone(document.getElementById('f-phone'));
   document.getElementById('f-make').value=c.make||'';
   if(document.getElementById('f-color')) document.getElementById('f-color').value=c.color||'';
   document.getElementById('f-model').value=c.model||'';
@@ -1816,6 +1827,10 @@ window.saveClient=async function(){
   console.log("saveClient v3.3 running");
   const name=titleCase(document.getElementById('f-name').value.trim());
   if(!name){alert('Nombre requerido');return;}
+  const _phD=(document.getElementById('f-phone').value||'').replace(/[^0-9]/g,'');
+  if(_phD.length>0 && _phD.length!==10){
+    if(!confirm('⚠️ El teléfono tiene '+_phD.length+' dígito(s), pero se esperan 10:\n\n'+document.getElementById('f-phone').value+'\n\nEste número es la llave del portal del cliente. ¿Guardar de todos modos?')) return;
+  }
   const kind = document.getElementById('f-kind')?document.getElementById('f-kind').value:'finance';
   const isService = kind === 'service';
   const startDate=document.getElementById('f-startdate').value;
