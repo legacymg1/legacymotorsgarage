@@ -277,6 +277,18 @@
   <div id="today-list" style="padding:16px 20px;"></div>
 </div>
 
+<!-- CITAS BOX -->
+<div id="citas-box" style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;" onclick="toggleSection('citas-list','citas-arrow')">
+    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">📅 CITAS</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <button onclick="event.stopPropagation();openApptModal()" style="background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">＋ Nueva cita</button>
+      <span id="citas-arrow" class="sec-arrow">▾</span>
+    </div>
+  </div>
+  <div id="citas-list" style="padding:14px 18px;"></div>
+</div>
+
 <div class="search-wrap">
     <div style="display:flex;gap:10px;align-items:center;">
       <input class="search-input" placeholder="🔍 Buscar cliente, carro o VIN..." id="search-box" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="flex:1;">
@@ -501,6 +513,7 @@
     <div style="font-family:var(--font-display);font-size:16px;color:var(--muted);margin-top:16px;">HISTORIAL</div>
     <div class="payment-history" id="pay-history"></div>
     <button type="button" onclick="resendLastReceipt()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:10px;">📩 Reenviar recibo del último pago</button>
+    <button type="button" onclick="closeModal('pay-modal');openApptModal(payingId)" style="width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:8px;">📅 Agendar cita de servicio</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('pay-modal')">Cancelar</button>
       <button class="btn-save" onclick="confirmPayment()">CONFIRMAR</button>
@@ -532,6 +545,45 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('pass-modal')">Cancelar</button>
       <button class="btn-save" id="pw-save" onclick="changePassword()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CITA MODAL -->
+<div class="modal-overlay" id="appt-modal">
+  <div class="modal">
+    <div class="modal-title">📅 AGENDAR CITA</div>
+    <div class="form-group"><label class="form-label">Cliente</label>
+      <select class="form-input" id="appt-client" onchange="onApptClientChange()"></select>
+    </div>
+    <div id="appt-walkin" style="display:none;">
+      <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="appt-name" style="text-transform:capitalize;"></div>
+      <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="appt-phone" type="tel" placeholder="(559) 000-0000"></div>
+      <div class="form-group"><label class="form-label">Idioma del mensaje</label>
+        <select class="form-input" id="appt-lang"><option value="es">🇲🇽 Español</option><option value="en">🇺🇸 English</option></select>
+      </div>
+    </div>
+    <div id="appt-carline" style="font-size:13px;color:var(--muted);margin:-6px 0 14px;"></div>
+    <div class="form-group"><label class="form-label">Servicio</label>
+      <input class="form-input" id="appt-type" list="appt-types" placeholder="Cambio de aceite" value="Cambio de aceite">
+      <datalist id="appt-types">
+        <option value="Cambio de aceite"></option>
+        <option value="Servicio general"></option>
+        <option value="Revisión / Diagnóstico"></option>
+        <option value="Reparación"></option>
+        <option value="Rotación de llantas"></option>
+        <option value="Frenos"></option>
+      </datalist>
+    </div>
+    <div style="display:flex;gap:12px;">
+      <div class="form-group" style="flex:1;"><label class="form-label">Fecha</label><input class="form-input" id="appt-date" type="date"></div>
+      <div class="form-group" style="flex:1;"><label class="form-label">Hora (opcional)</label><input class="form-input" id="appt-time" type="time"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Nota (opcional)</label><textarea class="form-input" id="appt-note" rows="2" style="resize:vertical;"></textarea></div>
+    <input type="hidden" id="appt-id">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('appt-modal')">Cancelar</button>
+      <button class="btn-save" onclick="saveAppt()">GUARDAR CITA</button>
     </div>
   </div>
 </div>
@@ -598,7 +650,7 @@ window.toggleSection = function(id, arrowId){
 function applyCollapse(id, arrowId){
   try{ if(localStorage.getItem('col_'+id)==='1'){ const el=document.getElementById(id); if(el) el.style.display='none'; const ar=document.getElementById(arrowId); if(ar) ar.textContent='▸'; } }catch(e){}
 }
-window.addEventListener('DOMContentLoaded', ()=>{ applyCollapse('stats-bar','stats-arrow'); applyCollapse('today-list','today-arrow'); applyCollapse('fin-summary-box','fin-arrow'); });
+window.addEventListener('DOMContentLoaded', ()=>{ applyCollapse('stats-bar','stats-arrow'); applyCollapse('today-list','today-arrow'); applyCollapse('fin-summary-box','fin-arrow'); applyCollapse('citas-list','citas-arrow'); });
 
 window.openPassModal = function(){
   ['pw-current','pw-new','pw-new2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -975,7 +1027,173 @@ function startListening() {
     document.getElementById('sync-status').textContent = '● Sin conexión';
     document.getElementById('sync-status').className = 'sync-status offline';
   });
+  startApptListening();
 }
+
+// ===================== CITAS / APPOINTMENTS =====================
+let appointments = [];
+function startApptListening(){
+  try{
+    onSnapshot(query(collection(db,'appointments')), (snap)=>{
+      appointments = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      if(window.renderAppointments) renderAppointments();
+    }, (err)=>{ console.warn('citas offline', err); });
+  }catch(e){ console.warn('appt listener', e); }
+}
+const APM_ES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const APM_EN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const APD_ES=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const APD_EN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function apptParse(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d); }
+function apptISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function apptTodayISO(){ return apptISO(new Date()); }
+function apptAddDays(iso,n){ const d=apptParse(iso); d.setDate(d.getDate()+n); return apptISO(d); }
+function apptNextFriday(){ const d=new Date(); let add=(5-d.getDay()+7)%7; if(add===0) add=7; d.setDate(d.getDate()+add); return apptISO(d); }
+function apptFmtLong(iso,lang){ const d=apptParse(iso); return lang==='en' ? `${APD_EN[d.getDay()]}, ${APM_EN[d.getMonth()]} ${d.getDate()}` : `${APD_ES[d.getDay()]} ${d.getDate()} de ${APM_ES[d.getMonth()]}`; }
+function appt12h(t){ if(!t) return ''; let [h,m]=t.split(':').map(Number); const ap=h<12?'AM':'PM'; h=h%12; if(h===0)h=12; return h+':'+String(m).padStart(2,'0')+' '+ap; }
+
+window.openApptModal = function(clientId){
+  const sel=document.getElementById('appt-client');
+  const opts=['<option value="">— Selecciona cliente —</option>']
+    .concat(clients.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(c=>`<option value="${c.id}">${c.name}${c.make?' · '+((c.year||'')+' '+c.make+' '+(c.model||'')).trim():''}</option>`))
+    .concat(['<option value="__walkin__">➕ Otro (sin registrar)</option>']);
+  sel.innerHTML=opts.join('');
+  document.getElementById('appt-id').value='';
+  document.getElementById('appt-type').value='Cambio de aceite';
+  document.getElementById('appt-date').value=apptNextFriday();
+  document.getElementById('appt-time').value='';
+  document.getElementById('appt-note').value='';
+  document.getElementById('appt-name').value='';
+  document.getElementById('appt-phone').value='';
+  document.getElementById('appt-lang').value='es';
+  sel.value = clientId || '';
+  onApptClientChange();
+  document.getElementById('appt-modal').classList.add('active');
+};
+window.onApptClientChange = function(){
+  const v=document.getElementById('appt-client').value;
+  const walk=document.getElementById('appt-walkin');
+  const carline=document.getElementById('appt-carline');
+  if(v==='__walkin__'){ walk.style.display='block'; carline.textContent=''; return; }
+  walk.style.display='none';
+  const c=clients.find(x=>x.id===v);
+  carline.textContent = c && c.make ? `🚗 ${(c.year||'')} ${c.make} ${(c.model||'')}${c.vin?' · VIN '+c.vin.slice(-6):''}`.trim() : '';
+};
+window.saveAppt = async function(){
+  const v=document.getElementById('appt-client').value;
+  const type=document.getElementById('appt-type').value.trim();
+  const date=document.getElementById('appt-date').value;
+  const time=document.getElementById('appt-time').value;
+  const note=document.getElementById('appt-note').value.trim();
+  if(!type){ alert('Escribe el servicio.'); return; }
+  if(!date){ alert('Elige la fecha.'); return; }
+  let clientId='', clientName='', phone='', lang='es', carLabel='', vin='';
+  if(v==='__walkin__'){
+    clientName=titleCase((document.getElementById('appt-name').value||'').trim());
+    phone=(document.getElementById('appt-phone').value||'').trim();
+    lang=document.getElementById('appt-lang').value;
+    if(!clientName||!phone){ alert('Escribe nombre y teléfono.'); return; }
+  } else {
+    const c=clients.find(x=>x.id===v);
+    if(!c){ alert('Selecciona un cliente.'); return; }
+    clientId=c.id; clientName=c.name; phone=c.phone||''; lang=c.lang||'es';
+    carLabel=[c.year,c.make,c.model].filter(Boolean).join(' '); vin=c.vin||'';
+  }
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
+  const existing=document.getElementById('appt-id').value;
+  const id=existing || ('appt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7));
+  const prior=appointments.find(x=>x.id===id)||{};
+  const data={ clientId, clientName, phone, lang, carLabel, vin, type, date, time, note, status:'scheduled',
+    confirmSent: existing?(prior.confirmSent||false):false, reminderSent: existing?(prior.reminderSent||false):false,
+    createdBy: prior.createdBy||who, createdAt: prior.createdAt||new Date().toISOString(), updatedBy:who, updatedAt:new Date().toISOString() };
+  try{
+    await setDoc(doc(db,'appointments',id), data);
+    closeModal('appt-modal');
+    if(!existing && phone && confirm('Cita guardada ✅\n\n¿Enviar confirmación por SMS ahora?')){
+      sendApptSms({id, ...data}, 'confirm');
+    }
+  }catch(e){ alert('Error al guardar la cita: '+e.message); }
+};
+function apptTypeI18n(type,lang){
+  if(lang!=='en') return type;
+  const map={'cambio de aceite':'oil change','servicio general':'general service','revisión / diagnóstico':'inspection / diagnostic','reparación':'repair','rotación de llantas':'tire rotation','frenos':'brake service'};
+  return map[(type||'').toLowerCase()]||type;
+}
+function apptMsg(a,kind){
+  const nombre=(a.clientName||'').split(' ')[0];
+  const lang=a.lang||'es';
+  const tipo=apptTypeI18n(a.type||'',lang);
+  const hora=a.time?(lang==='en'?' at '+appt12h(a.time):' a las '+appt12h(a.time)):'';
+  if(kind==='reminder'){
+    return lang==='en'
+      ? `Hi ${nombre}, a friendly reminder of your ${tipo} appointment tomorrow, ${apptFmtLong(a.date,'en')}${hora}, at Legacy Motors Garage.\n\nWe look forward to seeing you. To reschedule, call or reply to this text.\n\n— Legacy Motors Garage\n📞 (559) 540-5145`
+      : `Hola ${nombre}, le recordamos su cita de ${tipo} mañana ${apptFmtLong(a.date,'es')}${hora}, en Legacy Motors Garage.\n\nAquí lo esperamos. Para reagendar, llámenos o responda a este mensaje.\n\n— Legacy Motors Garage\n📞 (559) 540-5145`;
+  }
+  return lang==='en'
+    ? `Hi ${nombre}, this confirms your ${tipo} appointment on ${apptFmtLong(a.date,'en')}${hora}, at Legacy Motors Garage (21122 Ave 152, Porterville, CA).\n\nNeed to reschedule? Call or reply to this text. Thank you!\n\n— Legacy Motors Garage\n📞 (559) 540-5145`
+    : `Hola ${nombre}, le confirmamos su cita de ${tipo} el ${apptFmtLong(a.date,'es')}${hora}, en Legacy Motors Garage (21122 Ave 152, Porterville, CA).\n\nSi necesita reagendar, llámenos o responda a este mensaje. ¡Gracias!\n\n— Legacy Motors Garage\n📞 (559) 540-5145`;
+}
+async function sendApptSms(a,kind){
+  const phone=(a.phone||'').replace(/\D/g,'');
+  if(!phone){ alert('Este contacto no tiene teléfono.'); return; }
+  const link=`sms:${phone}?body=${encodeURIComponent(apptMsg(a,kind))}`;
+  const el=document.createElement('a'); el.href=link; el.click();
+  try{ await updateDoc(doc(db,'appointments',a.id), kind==='reminder'?{reminderSent:true}:{confirmSent:true}); }catch(e){}
+}
+window.sendApptConfirm=function(id){ const a=appointments.find(x=>x.id===id); if(a) sendApptSms(a,'confirm'); };
+window.sendApptReminder=function(id){ const a=appointments.find(x=>x.id===id); if(a) sendApptSms(a,'reminder'); };
+window.markApptDone=async function(id){ if(!confirm('¿Marcar esta cita como completada?')) return; try{ await updateDoc(doc(db,'appointments',id),{status:'done'}); }catch(e){ alert(e.message);} };
+window.cancelAppt=async function(id){ if(!confirm('¿Cancelar / eliminar esta cita?')) return; try{ await deleteDoc(doc(db,'appointments',id)); }catch(e){ alert(e.message);} };
+window.editAppt=function(id){
+  const a=appointments.find(x=>x.id===id); if(!a) return;
+  openApptModal(a.clientId||'');
+  if(!a.clientId){ document.getElementById('appt-client').value='__walkin__'; onApptClientChange(); document.getElementById('appt-name').value=a.clientName||''; document.getElementById('appt-phone').value=a.phone||''; document.getElementById('appt-lang').value=a.lang||'es'; }
+  document.getElementById('appt-id').value=a.id;
+  document.getElementById('appt-type').value=a.type||'';
+  document.getElementById('appt-date').value=a.date||'';
+  document.getElementById('appt-time').value=a.time||'';
+  document.getElementById('appt-note').value=a.note||'';
+};
+window.renderAppointments=function(){
+  const box=document.getElementById('citas-list'); if(!box) return;
+  const todayISO=apptTodayISO(), tomoISO=apptAddDays(todayISO,1);
+  const up=appointments.filter(a=>a.status==='scheduled').sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  if(!up.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:6px 0;">No hay citas agendadas. Toca <strong style="color:var(--gold);">＋ Nueva cita</strong> para agendar.</div>'; return; }
+  const groups=[
+    {label:'⚠️ Atrasadas', color:'var(--red)', items:up.filter(a=>a.date<todayISO)},
+    {label:'Hoy', color:'var(--green)', items:up.filter(a=>a.date===todayISO)},
+    {label:'Mañana — enviar recordatorio', color:'var(--gold)', items:up.filter(a=>a.date===tomoISO)},
+    {label:'Próximas', color:'var(--muted)', items:up.filter(a=>a.date>tomoISO)},
+  ];
+  let html='';
+  for(const g of groups){
+    if(!g.items.length) continue;
+    html+=`<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${g.color};font-weight:700;margin:12px 0 6px;">${g.label}</div>`;
+    for(const a of g.items){
+      const hora=a.time?' · '+appt12h(a.time):'';
+      const car=a.carLabel?' · '+a.carLabel:'';
+      const flag=(a.lang==='en')?'🇺🇸':'🇲🇽';
+      html+=`<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+          <div style="min-width:170px;flex:1;">
+            <div style="font-weight:600;font-size:14px;">${a.clientName||''} ${flag}</div>
+            <div style="font-size:12px;color:var(--muted);">${a.type||''}${car}</div>
+            <div style="font-size:12px;color:var(--gold);margin-top:2px;">${apptFmtLong(a.date,'es')}${hora}</div>
+            ${a.note?'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px;">'+a.note+'</div>':''}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button onclick="sendApptConfirm('${a.id}')" title="Confirmar por SMS" style="background:${a.confirmSent?'transparent':'#2196F3'};color:${a.confirmSent?'var(--muted)':'#fff'};border:1px solid ${a.confirmSent?'var(--border)':'#2196F3'};border-radius:7px;padding:6px 9px;font-size:11px;font-weight:700;cursor:pointer;">${a.confirmSent?'✓ Confirmó':'📩 Confirmar'}</button>
+            <button onclick="sendApptReminder('${a.id}')" title="Recordatorio por SMS" style="background:${a.reminderSent?'transparent':'var(--gold3)'};color:${a.reminderSent?'var(--muted)':'var(--navy3)'};border:1px solid ${a.reminderSent?'var(--border)':'var(--gold)'};border-radius:7px;padding:6px 9px;font-size:11px;font-weight:700;cursor:pointer;">${a.reminderSent?'✓ Recordó':'🔔 Recordar'}</button>
+            <button onclick="editAppt('${a.id}')" title="Editar" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer;">✏️</button>
+            <button onclick="markApptDone('${a.id}')" title="Completada" style="background:transparent;color:var(--green);border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer;">✅</button>
+            <button onclick="cancelAppt('${a.id}')" title="Cancelar" style="background:transparent;color:var(--red);border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer;">✖</button>
+          </div>
+        </div>
+      </div>`;
+    }
+  }
+  box.innerHTML=html;
+};
 
 // ---- MIGRACIÓN (una sola vez): agrega phoneE164 a los clientes existentes ----
 window.migratePhones = async function(){
@@ -1163,6 +1381,7 @@ window.renderAll = function() {
         <div class="card-actions">
           <button type="button" class="btn btn-pay" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">💵 Pago</button>
           <button type="button" class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)">💬 SMS</button>
+          <button type="button" class="btn" style="flex:0;padding:9px 10px;" onclick="event.stopPropagation();openApptModal('${c.id}')" title="Agendar cita">📅</button>
           ${(!c.insurance||c.insuranceExp<today())?'<button class="btn" data-cid="'+c.id+'" onclick="event.stopPropagation();openInsuranceSMS(this.dataset.cid)" style="flex:0;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>':''}
           <button type="button" class="btn btn-edit" style="flex:0;padding:9px 10px;" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">✏️</button>
           <button class="btn" style="flex:0;padding:9px 10px;background:var(--gold3);color:var(--navy3);" onclick="event.stopPropagation();generateContract('${c.id}')" title="Generar Contrato">📄</button>
