@@ -326,6 +326,13 @@
       <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="f-name" placeholder="Juan García"></div>
       <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="f-phone" placeholder="555 555 5555" type="tel"></div>
     </div>
+    <div class="form-group">
+      <label class="form-label">Tipo de cliente</label>
+      <select class="form-input" id="f-kind" onchange="toggleKind()">
+        <option value="finance">🚗 Financiado (con pagos)</option>
+        <option value="service">🔧 Servicio (sin pagos — solo taller / partes)</option>
+      </select>
+    </div>
     <div class="form-group" style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;">
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:14px;line-height:1.4;">
         <input type="checkbox" id="f-private" style="width:18px;height:18px;margin-top:1px;flex:none;">
@@ -398,6 +405,7 @@
       <div class="form-group"><label class="form-label">VIN</label><input class="form-input" id="f-vin" placeholder="Número VIN del carro" oninput="this.value=this.value.toUpperCase()"></div>
       <div class="form-group"><label class="form-label">Millas</label><input class="form-input" id="f-miles" placeholder="85000" type="number"></div>
     </div>
+    <div id="finance-only">
     <div class="form-row">
       <div class="form-group"><label class="form-label">Precio del Vehículo ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcFinancing('price')"></div>
       <div class="form-group"><label class="form-label">Down Payment ($)</label><input class="form-input" id="f-down" placeholder="1000" type="number" oninput="calcFinancing('down')"></div>
@@ -473,6 +481,7 @@
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha Primer Pago</label><input class="form-input" id="f-startdate" type="date" onchange="setTimeout(calcHint,50)"></div>
     </div>
+    </div><!-- /finance-only -->
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Póliza de Seguro</label>
@@ -1249,12 +1258,13 @@ window.renderAll = function() {
   const todayStr=today();
 
   const overdueC=filtered.filter(c=>getStatus(c)==='overdue');
+  const mainList = filtered.filter(c => !(c.kind==='service' || isPaidOff(c)));
   let html='';
 
   const isListView = currentView === 'list';
-  html+=`<div class="section-title">Todos los Clientes</div><div class="${isListView ? 'client-list' : 'clients-grid'}" style="${isListView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
-  if(!filtered.length){
-    html+=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚗</div><div class="empty-text">Sin clientes aún</div><div style="font-size:14px">Agrega tu primer cliente</div></div>`;
+  html+=`<div class="section-title">Clientes con pagos activos</div><div class="${isListView ? 'client-list' : 'clients-grid'}" style="${isListView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
+  if(!mainList.length){
+    html+=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚗</div><div class="empty-text">Sin clientes con pagos activos</div><div style="font-size:14px">Los de servicio y liquidados están más abajo</div></div>`;
   } else if(isListView) {
     // Header row
     html += `<div class="client-list-header">
@@ -1266,7 +1276,7 @@ window.renderAll = function() {
       <div class="cli-header-cell">Saldo</div>
       <div class="cli-header-cell">Acciones</div>
     </div>`;
-    filtered.forEach(c=>{
+    mainList.forEach(c=>{
       const status=getStatus(c);
       const nextPay=getNextPayDate(c);
       const days=daysUntil(nextPay);
@@ -1320,7 +1330,7 @@ window.renderAll = function() {
 
     // skip the else block below
   } else {
-    filtered.forEach(c=>{
+    mainList.forEach(c=>{
       const status=getStatus(c);
       const nextPay=getNextPayDate(c);
       const days=daysUntil(nextPay);
@@ -1392,6 +1402,33 @@ window.renderAll = function() {
   }
   html+='</div>';
 
+  // ---- Sección: Servicio y Liquidados ----
+  const archive = filtered.filter(c => c.kind==='service' || isPaidOff(c)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const archCol = (()=>{try{return localStorage.getItem('col_archive-list')==='1';}catch(e){return false;}})();
+  html += `<div class="sec-head" style="margin-top:22px;" onclick="toggleSection('archive-list','archive-arrow')"><span>🔧 Servicio y ✅ Liquidados (${archive.length})</span><span id="archive-arrow" class="sec-arrow">${archCol?'▸':'▾'}</span></div><div id="archive-list" style="margin:0 24px;${archCol?'display:none;':''}">`;
+  if(!archive.length){
+    html += `<div style="color:var(--muted);font-size:13px;padding:8px 0;">Aún no hay clientes de servicio ni contratos liquidados.</div>`;
+  } else {
+    archive.forEach(c=>{
+      const serv = c.kind==='service';
+      const abadge = serv ? `<span style="font-size:10px;background:rgba(33,150,243,0.15);color:#64b5f6;border:1px solid #2196F3;border-radius:5px;padding:2px 7px;">🔧 Servicio</span>` : `<span style="font-size:10px;background:rgba(0,200,83,0.12);color:var(--green);border:1px solid var(--green);border-radius:5px;padding:2px 7px;">✅ Liquidado</span>`;
+      const acar = [c.year,c.make,c.model].filter(Boolean).join(' ');
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+        <div style="min-width:170px;flex:1;">
+          <div style="font-weight:600;font-size:14px;">${c.name} ${abadge} ${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
+          <div style="font-size:12px;color:var(--muted);">${acar}${c.vin?' · …'+c.vin.slice(-6):''}${c.phone?' · '+c.phone:''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="openApptModal('${c.id}')" title="Agendar cita" style="background:var(--gold);color:var(--navy3);border:none;border-radius:7px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">📅</button>
+          <button type="button" onclick="smsPlain('${c.id}')" title="SMS" style="background:#2196F3;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">💬</button>
+          <button type="button" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Editar" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">✏️</button>
+          <button type="button" data-action="delete" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Eliminar" style="background:transparent;color:var(--red);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">🗑</button>
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
   // Financial summary - se pinta ARRIBA, en su propio contenedor
   let finHTML = '';
   if(clients.length > 0) {
@@ -1434,6 +1471,12 @@ window.renderAll = function() {
 window.toggleSchedule=function(id){const el=document.getElementById('sched-'+id);if(el)el.style.display=el.style.display==='none'?'block':'none';};
 
 // ---- ADD/EDIT ----
+window.toggleKind=function(){
+  const k=document.getElementById('f-kind')?document.getElementById('f-kind').value:'finance';
+  const fo=document.getElementById('finance-only');
+  if(fo) fo.style.display = (k==='service') ? 'none' : '';
+};
+window.smsPlain=function(id){ const c=clients.find(x=>x.id===id); if(!c) return; const ph=(c.phone||'').replace(/[^0-9]/g,''); if(ph){ const a=document.createElement('a'); a.href='sms:'+ph; a.click(); } };
 window.openAddModal=function(){
   editingId=null;
   document.getElementById('modal-title').textContent='NUEVO CLIENTE';
@@ -1443,6 +1486,7 @@ window.openAddModal=function(){
   document.getElementById('f-startdate').value=today();
   document.getElementById('f-numpay').value='';
   document.getElementById('f-hint').textContent='';
+  const _k=document.getElementById('f-kind'); if(_k) _k.value='finance'; toggleKind();
   document.getElementById('add-modal').classList.add('active');
 };
 
@@ -1451,6 +1495,7 @@ window.openEditModal=function(id){
   const c=clients.find(x=>x.id===id);
   if(!c) return;
   document.getElementById('modal-title').textContent='EDITAR CLIENTE';
+  const _k2=document.getElementById('f-kind'); if(_k2) _k2.value=c.kind||'finance'; toggleKind();
   // Basic fields
   document.getElementById('f-name').value=c.name||'';
   document.getElementById('f-phone').value=c.phone||'';
@@ -1511,10 +1556,14 @@ window.saveClient=async function(){
   console.log("saveClient v3.3 running");
   const name=titleCase(document.getElementById('f-name').value.trim());
   if(!name){alert('Nombre requerido');return;}
+  const kind = document.getElementById('f-kind')?document.getElementById('f-kind').value:'finance';
+  const isService = kind === 'service';
   const startDate=document.getElementById('f-startdate').value;
   const numPay=parseInt(document.getElementById('f-numpay').value)||0;
-  if(!startDate){alert('Fecha del primer pago requerida');return;}
-  if(!numPay){alert('Número de pagos requerido');return;}
+  if(!isService){
+    if(!startDate){alert('Fecha del primer pago requerida');return;}
+    if(!numPay){alert('Número de pagos requerido');return;}
+  }
 
   const btn=document.getElementById('save-btn');
   btn.textContent='GUARDANDO...';btn.disabled=true;
@@ -1610,10 +1659,22 @@ window.saveClient=async function(){
     insurance: document.getElementById('f-insurance')?document.getElementById('f-insurance').value.trim():'',
     insuranceExp: document.getElementById('f-insurance-exp')?document.getElementById('f-insurance-exp').value:'',
     startDate,
-    schedule:generateSchedule(startDate,numPay,freq),
+    schedule: isService ? [] : generateSchedule(startDate,numPay,freq),
     notes:document.getElementById('f-notes').value.trim(),
     payments:existing.payments||[],
   };
+
+  // Cliente de SERVICIO: sin financiamiento (no pagos, no saldo). Se guarda para recordatorios/citas.
+  if(isService){
+    data.kind='service';
+    data.weekly=0; data.numPay=0; data.total=0; data.down=0; data.amountFinanced=0;
+    data.totalOfPayments=0; data.financeCharge=0; data.salesTax=0; data.dmvFees=0;
+    data.ccoaAccepted=false; data.ccoaFee=0; data.freq=''; data.startDate=''; data.schedule=[];
+    data.settled=false;
+    if(!data.lastServiceDate) data.lastServiceDate=today();
+  } else {
+    data.kind='finance';
+  }
 
   try{
     console.log('Saving client data:', JSON.stringify(data).slice(0,200));
