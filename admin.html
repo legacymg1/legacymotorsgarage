@@ -292,6 +292,7 @@
 <div class="search-wrap">
     <div style="display:flex;gap:10px;align-items:center;">
       <input class="search-input" placeholder="🔍 Buscar cliente, carro o VIN..." id="search-box" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="flex:1;">
+      <button onclick="openCotizador()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:0.5px;cursor:pointer;white-space:nowrap;" title="Simular pagos para un cliente">🧮 Cotizador</button>
       <div style="display:flex;gap:6px;align-items:center;">
         <button id="sort-next" class="sort-btn" onclick="setSort('next')" style="background:var(--gold);color:var(--navy3);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">💰 PRÓXIMO</button>
         <button id="sort-date" class="sort-btn" onclick="setSort('date')" style="background:var(--border);color:var(--muted);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">📅 FECHA</button>
@@ -596,6 +597,27 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('appt-modal')">Cancelar</button>
       <button class="btn-save" onclick="saveAppt()">GUARDAR CITA</button>
+    </div>
+  </div>
+</div>
+
+<!-- COTIZADOR MODAL -->
+<div class="modal-overlay" id="cot-modal">
+  <div class="modal" style="max-width:920px;width:100%;">
+    <div class="modal-title">🧮 COTIZADOR DE PAGOS</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Simula el pago de uno o varios carros para que el cliente se lleve el presupuesto impreso. Es informativo, no es un contrato.</div>
+    <div class="form-group"><label class="form-label">Cliente (para el presupuesto)</label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente (opcional)"></div>
+    <div class="form-group"><label class="form-label">Agregar carro del inventario</label>
+      <div style="position:relative;">
+        <input class="form-input" id="cot-car-search" placeholder="🔍 Busca por # inventario, marca, modelo o VIN..." autocomplete="off" oninput="cotFilterCars()" onfocus="cotFilterCars()" onblur="setTimeout(()=>{const b=document.getElementById('cot-car-results');if(b)b.style.display='none';},200)">
+        <div id="cot-car-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--navy2);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:240px;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,0.5);"></div>
+      </div>
+    </div>
+    <div id="cot-options"></div>
+    <button type="button" onclick="cotAddBlank()" style="background:transparent;color:var(--gold);border:1px dashed var(--gold);border-radius:10px;padding:10px;width:100%;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">＋ Agregar otra opción en blanco</button>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('cot-modal')">Cerrar</button>
+      <button class="btn-save" onclick="printCotizacion()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);">🖨 Imprimir presupuesto</button>
     </div>
   </div>
 </div>
@@ -1288,6 +1310,158 @@ window.renderAppointments=function(){
     }
   }
   box.innerHTML=html;
+};
+
+// ===================== COTIZADOR / SIMULADOR DE PAGOS =====================
+let cotInventory=[]; let cotOpts=[]; let cotSeq=0;
+window.openCotizador=function(){
+  document.getElementById('cot-customer').value='';
+  document.getElementById('cot-car-search').value='';
+  document.getElementById('cot-car-results').style.display='none';
+  cotOpts=[]; cotSeq=0;
+  getDocs(collection(db,'inventory')).then(snap=>{ cotInventory=snap.docs.map(d=>({id:d.id,...d.data()})); }).catch(()=>{});
+  cotAddBlank();
+  document.getElementById('cot-modal').classList.add('active');
+};
+window.cotFilterCars=function(){
+  const q=(document.getElementById('cot-car-search').value||'').toLowerCase();
+  const terms=q.trim().split(/\s+/).filter(Boolean);
+  const box=document.getElementById('cot-car-results');
+  let items=cotInventory.slice();
+  if(terms.length) items=items.filter(c=>{ const hay=((c.inventoryNum||'')+' '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.color||'')+' '+(c.vin||'')).toLowerCase(); return terms.every(x=>hay.includes(x)); });
+  items=items.slice(0,30);
+  let html='';
+  if(!items.length) html='<div style="padding:9px 12px;color:var(--muted);font-size:13px;">Sin coincidencias — o escribe el carro a mano abajo.</div>';
+  else items.forEach(c=>{ const label=[c.year,c.make,c.model].filter(Boolean).join(' '); html+=`<div onmousedown="cotAddFromCar('${c.id}')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);"><div style="font-weight:600;">#${c.inventoryNum||'?'} · ${label}</div><div style="font-size:12px;color:var(--muted);">${c.price?formatMoney(c.price):'sin precio'}${c.vin?' · …'+String(c.vin).slice(-6):''}</div></div>`; });
+  box.innerHTML=html; box.style.display='block';
+};
+window.cotAddFromCar=function(id){
+  const c=cotInventory.find(x=>x.id===id); if(!c) return;
+  document.getElementById('cot-car-results').style.display='none';
+  document.getElementById('cot-car-search').value='';
+  cotOpts.push({ id:++cotSeq, car:[c.year,c.make,c.model].filter(Boolean).join(' '), vin:c.vin||'', miles:c.miles||'', price:Number(c.price)||0, down:0, tax:0, dmv:0, numpay:52, freq:'weekly' });
+  renderCotOptions();
+};
+window.cotAddBlank=function(){ cotOpts.push({id:++cotSeq, car:'', vin:'', miles:'', price:0, down:0, tax:0, dmv:0, numpay:52, freq:'weekly'}); renderCotOptions(); };
+window.cotDup=function(i){ const o=cotOpts[i]; if(!o) return; cotOpts.splice(i+1,0,{...o,id:++cotSeq}); renderCotOptions(); };
+window.cotRemove=function(i){ cotOpts.splice(i,1); renderCotOptions(); };
+window.cotSet=function(i,field,val){ if(!cotOpts[i]) return; cotOpts[i][field]=(field==='car'||field==='vin'||field==='freq'||field==='miles')?val:(Number(val)||0); cotUpdateResult(i); };
+function cotCalc(o){
+  const docFee=70;
+  const price=Number(o.price)||0, down=Number(o.down)||0, tax=Number(o.tax)||0, dmv=Number(o.dmv)||0;
+  const numpay=Math.max(1, parseInt(o.numpay)||1);
+  const freq=o.freq||'weekly'; const cash=freq==='cash';
+  const amountFinanced=Math.max(0, price+docFee-down);
+  const daysPerPay = freq==='monthly'?30.44:freq==='biweekly'?14:7;
+  const months=(numpay*daysPerPay)/30.44;
+  const financeCharge = cash?0:Math.round(amountFinanced*0.20*(months/6)*100)/100;
+  const totalPayments = cash?0:Math.round((amountFinanced+financeCharge)*100)/100;
+  const payEven = cash?0:Math.round((totalPayments/numpay)*100)/100;
+  const lastPay = cash?0:Math.round((totalPayments-payEven*(numpay-1))*100)/100;
+  const payToday = down+tax+dmv;
+  return {docFee,price,down,tax,dmv,numpay,freq,cash,amountFinanced,financeCharge,totalPayments,payEven,lastPay,payToday};
+}
+function cotResultHTML(r){
+  if(r.cash){
+    return `<div style="background:var(--navy2);border-radius:10px;padding:12px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Precio de contado</span><b>${formatMoney(r.price)}</b></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Impuestos + DMV</span><b>${formatMoney(r.tax+r.dmv)}</b></div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">Total de contado</span><b style="color:var(--gold);">${formatMoney(r.price+r.tax+r.dmv)}</b></div></div>`;
+  }
+  return `<div style="background:var(--navy2);border-radius:10px;padding:12px;font-size:13px;">
+    <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Paga hoy (enganche+imp.+DMV)</span><b style="color:var(--green);">${formatMoney(r.payToday)}</b></div>
+    <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Monto financiado</span><b>${formatMoney(r.amountFinanced)}</b></div>
+    <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Cargo por financiamiento</span><b>${formatMoney(r.financeCharge)}</b></div>
+    <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Total a financiar</span><b>${formatMoney(r.totalPayments)}</b></div>
+    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">${r.numpay} pagos de</span><b style="color:var(--gold);font-size:17px;">${formatMoney(r.payEven)}</b></div>
+    ${Math.abs(r.lastPay-r.payEven)>0.01?`<div style="font-size:11px;color:var(--muted);text-align:right;">(último pago ${formatMoney(r.lastPay)})</div>`:''}</div>`;
+}
+function cotUpdateResult(i){ const el=document.getElementById('cot-res-'+i); if(el && cotOpts[i]) el.innerHTML=cotResultHTML(cotCalc(cotOpts[i])); }
+function renderCotOptions(){
+  const box=document.getElementById('cot-options'); if(!box) return;
+  if(!cotOpts.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px 0;">Busca un carro arriba o agrega una opción en blanco.</div>'; return; }
+  box.innerHTML=cotOpts.map((o,i)=>`<div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-weight:700;color:var(--gold);">Opción ${i+1}</div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" onclick="cotDup(${i})" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;">⧉ Duplicar</button>
+          <button type="button" onclick="cotRemove(${i})" style="background:transparent;color:var(--red);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;">✖</button>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Carro</label><input class="form-input" value="${(o.car||'').replace(/"/g,'&quot;')}" oninput="cotSet(${i},'car',this.value)" placeholder="2019 Toyota Camry"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="form-group" style="flex:1;min-width:120px;"><label class="form-label">Precio $</label><input class="form-input" type="number" value="${o.price||''}" oninput="cotSet(${i},'price',this.value)"></div>
+        <div class="form-group" style="flex:1;min-width:120px;"><label class="form-label">Enganche $</label><input class="form-input" type="number" value="${o.down||''}" oninput="cotSet(${i},'down',this.value)"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="form-group" style="flex:1;min-width:110px;"><label class="form-label">Impuestos $</label><input class="form-input" type="number" value="${o.tax||''}" oninput="cotSet(${i},'tax',this.value)"></div>
+        <div class="form-group" style="flex:1;min-width:110px;"><label class="form-label">DMV $</label><input class="form-input" type="number" value="${o.dmv||''}" oninput="cotSet(${i},'dmv',this.value)"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="form-group" style="flex:1;min-width:110px;"><label class="form-label"># Pagos</label><input class="form-input" type="number" value="${o.numpay||''}" oninput="cotSet(${i},'numpay',this.value)"></div>
+        <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">Frecuencia</label>
+          <select class="form-input" onchange="cotSet(${i},'freq',this.value)">
+            <option value="weekly"${o.freq==='weekly'?' selected':''}>Semanal</option>
+            <option value="biweekly"${o.freq==='biweekly'?' selected':''}>Quincenal</option>
+            <option value="monthly"${o.freq==='monthly'?' selected':''}>Mensual</option>
+            <option value="cash"${o.freq==='cash'?' selected':''}>Contado</option>
+          </select>
+        </div>
+      </div>
+      <div id="cot-res-${i}" style="margin-top:6px;"></div>
+    </div>`).join('');
+  cotOpts.forEach((o,i)=>cotUpdateResult(i));
+}
+window.printCotizacion=function(){
+  if(!cotOpts.length){ alert('Agrega al menos una opción.'); return; }
+  const cust=document.getElementById('cot-customer').value.trim();
+  const dstr=new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'});
+  const freqTxt={weekly:'semanales',biweekly:'quincenales',monthly:'mensuales',cash:'de contado'};
+  let cards='';
+  cotOpts.forEach((o,i)=>{
+    const r=cotCalc(o);
+    let rows;
+    if(r.cash){
+      rows=`<tr><td>Precio de contado</td><td>${formatMoney(r.price)}</td></tr><tr><td>Impuestos + DMV</td><td>${formatMoney(r.tax+r.dmv)}</td></tr><tr class="tot"><td>Total de contado</td><td>${formatMoney(r.price+r.tax+r.dmv)}</td></tr>`;
+    } else {
+      rows=`<tr><td>Precio del vehículo</td><td>${formatMoney(r.price)}</td></tr><tr><td>Enganche / Down</td><td>${formatMoney(r.down)}</td></tr><tr><td>Impuestos + DMV</td><td>${formatMoney(r.tax+r.dmv)}</td></tr><tr class="hl"><td>Paga hoy / Due today</td><td>${formatMoney(r.payToday)}</td></tr><tr><td>Monto financiado</td><td>${formatMoney(r.amountFinanced)}</td></tr><tr><td>Cargo por financiamiento</td><td>${formatMoney(r.financeCharge)}</td></tr><tr class="tot"><td>Total a financiar</td><td>${formatMoney(r.totalPayments)}</td></tr>`;
+    }
+    const payLine = r.cash ? '' : `<div class="pay">${r.numpay} pagos ${freqTxt[r.freq]} de <b>${formatMoney(r.payEven)}</b>${Math.abs(r.lastPay-r.payEven)>0.01?` <span class="last">(último ${formatMoney(r.lastPay)})</span>`:''}</div>`;
+    cards+=`<div class="opt"><h3>Opción ${i+1}${o.car?' — '+o.car:''}</h3>${o.vin?`<div class="vin">VIN: ${o.vin}${o.miles?' · '+o.miles+' mi':''}</div>`:''}<table>${rows}</table>${payLine}</div>`;
+  });
+  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Presupuesto — Legacy Motors Garage</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;padding:32px;max-width:900px;margin:0 auto;}
+  .head{text-align:center;border-bottom:3px solid #c9a24a;padding-bottom:16px;margin-bottom:8px;}
+  .head h1{font-size:26px;letter-spacing:2px;color:#0b0e14;}
+  .head .sub{color:#c9a24a;font-weight:700;letter-spacing:3px;font-size:12px;margin-top:2px;}
+  .meta{display:flex;justify-content:space-between;font-size:13px;color:#555;margin:14px 0 20px;}
+  .opt{border:1px solid #ddd;border-radius:10px;padding:16px 18px;margin-bottom:16px;page-break-inside:avoid;}
+  .opt h3{font-size:16px;color:#0b0e14;margin-bottom:4px;}
+  .opt .vin{font-size:11px;color:#888;margin-bottom:10px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  td{padding:6px 0;border-bottom:1px solid #eee;}
+  td:last-child{text-align:right;font-weight:600;}
+  tr.hl td{color:#0a7a35;font-weight:700;}
+  tr.tot td{border-top:2px solid #0b0e14;border-bottom:none;color:#0b0e14;font-weight:800;padding-top:8px;}
+  .pay{margin-top:12px;text-align:center;background:#faf4e4;border:1px solid #e6d29a;border-radius:8px;padding:12px;font-size:15px;color:#0b0e14;}
+  .pay b{font-size:22px;color:#0b0e14;}
+  .pay .last{font-size:12px;color:#777;}
+  .disc{font-size:10.5px;color:#888;border-top:1px solid #ddd;margin-top:20px;padding-top:12px;line-height:1.5;}
+  .foot{text-align:center;font-size:12px;color:#555;margin-top:14px;line-height:1.7;}
+  @media print{body{padding:0;}}
+</style></head><body>
+  <div class="head"><h1>LEGACY MOTORS GARAGE</h1><div class="sub">PRESUPUESTO · FINANCING ESTIMATE</div></div>
+  <div class="meta"><div><b>Cliente:</b> ${cust||'—'}</div><div><b>Fecha:</b> ${dstr}</div></div>
+  ${cards}
+  <div class="disc"><b>Presupuesto informativo — no es un contrato ni una oferta de crédito.</b> Cifras aproximadas, sujetas a verificación, inventario disponible y aprobación. Los montos finales se establecen en el contrato firmado. Incluye tarifa de documentación de $70. / <b>Estimate only — not a contract or a credit offer.</b> Figures are approximate and subject to verification and approval.</div>
+  <div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California Dealer License No. 83177</div>
+</body></html>`;
+  const w=window.open('','_blank');
+  if(!w){ alert('Permite las ventanas emergentes para imprimir el presupuesto.'); return; }
+  w.document.write(html); w.document.close(); w.focus();
+  setTimeout(()=>{ try{ w.print(); }catch(e){} }, 500);
 };
 
 // ---- MIGRACIÓN (una sola vez): agrega phoneE164 a los clientes existentes ----
