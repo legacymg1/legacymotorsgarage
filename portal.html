@@ -262,7 +262,7 @@ const I18N = {
     modalNoChange:'Diga que no y <strong>nada cambia</strong>: seguirá recibiendo los avisos de su cuenta y sus pagos.',
     contactBtn:'💬 Mandarnos un mensaje',
     myVehicle:'Mi Vehículo', vehicle:'Vehículo', totalPrice:'Precio del vehículo', totalOfPay:'Total de pagos (contrato)', downPayment:'Enganche',
-    paymentLabel:'Pago', totalPaid:'Total pagado', remaining:'Saldo restante',
+    paymentLabel:'Pago', totalPaid:'Total pagado', remaining:'Saldo restante', lastPay:'Último pago', nextPayLbl:'Próximo pago',
     contactMsg:(c)=>`Hola Legacy Motors Garage, soy ${c.name} y quiero información sobre mi cuenta (${c.year} ${c.make} ${c.model})`,
     lgTitle:'Consulta tu cuenta', lgPhoneLabel:'Número de Teléfono',
     lgKeep:'Mantener sesión iniciada en este teléfono',
@@ -319,7 +319,7 @@ const I18N = {
     modalNoChange:'Say no and <strong>nothing changes</strong>: you will still receive messages about your account and payments.',
     contactBtn:'💬 Text us',
     myVehicle:'My Vehicle', vehicle:'Vehicle', totalPrice:'Vehicle price', totalOfPay:'Total of payments (contract)', downPayment:'Down payment',
-    paymentLabel:'Payment', totalPaid:'Total paid', remaining:'Remaining balance',
+    paymentLabel:'Payment', totalPaid:'Total paid', remaining:'Remaining balance', lastPay:'Last payment', nextPayLbl:'Next payment',
     contactMsg:(c)=>`Hello Legacy Motors Garage, this is ${c.name}. I have a question about my account (${c.year} ${c.make} ${c.model})`,
     lgTitle:'Check your account', lgPhoneLabel:'Phone Number',
     lgKeep:'Keep me signed in on this phone',
@@ -492,6 +492,8 @@ onAuthStateChanged(auth, async (user)=>{
 function updateInsuranceDisplay() {
   const c = currentClient;
   if(!c) return;
+  const _insForm=document.getElementById('ins-edit-form');
+  if(_insForm && !_insForm.dataset.userOpen) _insForm.style.display = c.insurance ? 'none' : 'block';
   const badge = document.getElementById('ins-badge');
   const current = document.getElementById('ins-current');
   const expEl = document.getElementById('ins-exp');
@@ -531,14 +533,19 @@ function updateInsuranceDisplay() {
 
 window.toggleIDForm = function() {
   const form = document.getElementById('id-edit-form');
-  const btn = document.getElementById('id-edit-btn');
-  if(form.style.display === 'none'){
-    form.style.display = 'block';
-    btn.textContent = '✕ Cancelar / Cancel';
-  } else {
-    form.style.display = 'none';
-    btn.textContent = '✏️ Editar / Edit ID';
-  }
+  const show = form.style.display === 'none';
+  form.style.display = show ? 'block' : 'none';
+  form.dataset.userOpen = show ? '1' : '';
+};
+window.toggleInsForm = function() {
+  const form = document.getElementById('ins-edit-form');
+  const show = form.style.display === 'none';
+  form.style.display = show ? 'block' : 'none';
+  form.dataset.userOpen = show ? '1' : '';
+};
+window.toggleSmsForm = function() {
+  const form = document.getElementById('sms-edit-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
 };
 
 window.updateID = async function() {
@@ -565,8 +572,7 @@ window.updateID = async function() {
     
     document.getElementById('id-success').textContent = t('idSaved');
     document.getElementById('id-success').style.display='block';
-    document.getElementById('id-edit-form').style.display='none';
-    document.getElementById('id-edit-btn').textContent=t('idEdit');
+    const _idf=document.getElementById('id-edit-form'); if(_idf){ _idf.style.display='none'; _idf.dataset.userOpen=''; }
     updateIDDisplay();
     setTimeout(()=>{ document.getElementById('id-success').style.display='none'; }, 3000);
   } catch(e) {
@@ -577,6 +583,8 @@ window.updateID = async function() {
 
 function updateIDDisplay() {
   const c = currentClient;
+  const _idForm=document.getElementById('id-edit-form');
+  if(_idForm && !_idForm.dataset.userOpen) _idForm.style.display = (c && c.idNumber) ? 'none' : 'block';
   const badge = document.getElementById('id-badge');
   const current = document.getElementById('id-current');
   const preview = document.getElementById('portal-id-preview');
@@ -631,8 +639,8 @@ window.updateInsurance = async function() {
     currentClient = {...currentClient, insurance: number, insuranceCompany: company, insuranceExp: expDate, insurancePhotoURL: photoURL};
     document.getElementById('ins-success').style.display='block';
     document.getElementById('ins-success').textContent = photoFile ? t('insSavedPhoto') : t('insSaved');
+    const _if=document.getElementById('ins-edit-form'); if(_if) _if.dataset.userOpen='';
     updateInsuranceDisplay();
-      updateIDDisplay();
     setTimeout(()=>{ document.getElementById('ins-success').style.display='none'; }, 4000);
   } catch(e) {
     alert('Error al guardar: ' + e.message);
@@ -682,16 +690,17 @@ function renderPortal() {
 
   const dealerPhone = '+15595405145';
 
-  // Build schedule list
-  let schedHTML = '';
+  // Último pago + items del calendario
+  const _paysArr=(c.payments||[]);
+  const lastPayDate = _paysArr.length ? _paysArr[_paysArr.length-1].date : null;
+  let scheduleItems = '';
   if(c.schedule&&c.schedule.length){
-    schedHTML = `<div class="section-title">${t('scheduleTitle')}</div>`;
     c.schedule.forEach((d,i)=>{
       let badgeCls='pb-pending', badgeLabel=t('pending');
       if(paidDates.has(d)){badgeCls='pb-paid';badgeLabel=t('paidBadge');}
       else if(d===nextPay&&d<todayStr){badgeCls='pb-overdue';badgeLabel=t('overdueBadge');}
       else if(d===nextPay){badgeCls='pb-next';badgeLabel=t('nextBadge');}
-      schedHTML+=`<div class="pay-item">
+      scheduleItems+=`<div class="pay-item">
         <div class="pay-item-left">
           <div class="pay-num">${t('paymentNum')} #${i+1}</div>
           <div class="pay-date-text">${formatDate(d)}</div>
@@ -702,22 +711,15 @@ function renderPortal() {
   }
 
   document.getElementById('portal-content').innerHTML = `
-    <!-- WELCOME -->
+    <!-- SALUDO + VEHÍCULO -->
     <div class="welcome-card">
       <div class="welcome-name">${t('hi')}, ${c.name.split(' ')[0]} 👋</div>
-      <div class="welcome-car">${c.year} ${c.make} ${c.model}</div>
-      <div class="balance-amount">${formatMoney(balance)}</div>
-      <div class="balance-label">${t('balanceLabel')}</div>
-      <div class="progress-section">
-        <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
-        <div class="progress-info">
-          <span>${formatMoney(paid)} ${t('paidWord')}</span>
-          <span>${paidCount} ${t('of')} ${totalPay} ${t('paymentsWord')} · ${progress}%</span>
-        </div>
-      </div>
+      <div style="margin-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold2);">${t('myVehicle')}</div>
+      <div style="font-size:19px;color:var(--white);margin-top:3px;font-weight:500;">${[c.make,c.color].filter(Boolean).join(' · ') || c.model || ''}</div>
+      ${c.vin ? `<div style="font-size:12px;color:var(--muted);margin-top:3px;letter-spacing:0.5px;">VIN: ${c.vin}</div>` : ''}
     </div>
 
-    <!-- NEXT PAYMENT -->
+    <!-- PRÓXIMO PAGO / VENCIDO -->
     <div class="next-pay-card ${status}">
       <div>
         <div class="npc-label ${status}">${npcLabel}</div>
@@ -730,41 +732,43 @@ function renderPortal() {
       </div>
     </div>
 
-    <!-- INSURANCE -->
+    <!-- SEGURO (colapsable) -->
     <div class="insurance-section" id="insurance-section">
-      <div class="insurance-header">
-        <div class="insurance-title">${t('insTitle')}</div>
-        <span class="insurance-badge" id="ins-badge"></span>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-weight:600;font-size:15px;">${t('insTitle')}</span>
+          <span class="insurance-badge" id="ins-badge"></span>
+        </div>
+        <button onclick="toggleInsForm()" id="ins-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">✏️ ${t('idEdit').replace('✏️ ','')}</button>
       </div>
-      <div id="ins-current" style="font-size:14px;color:var(--muted);margin-bottom:4px;"></div>
-      <div id="ins-exp" style="font-size:13px;color:var(--muted);"></div>
-      <div class="ins-form">
+      <div id="ins-current" style="font-size:13px;color:var(--muted);margin-top:6px;"></div>
+      <div id="ins-exp" style="font-size:12px;color:var(--muted);"></div>
+      <div class="ins-success" id="ins-success" style="display:none;"></div>
+      <div class="ins-form" id="ins-edit-form" style="display:none;margin-top:14px;">
         <div class="ins-form-title">${t('insFormTitle')}</div>
         <input class="fi" id="ins-company" placeholder="${t('insCompany')}" style="margin-bottom:10px;">
         <input class="fi" id="ins-number" placeholder="${t('policyNumber')}" style="margin-bottom:10px;">
         <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('expDate')}</label>
         <input class="fi" id="ins-exp-date" type="date" style="margin-bottom:10px;">
-        <div style="margin-bottom:10px;">
-          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('insPhoto')}</label>
-          <input type="file" id="ins-photo" accept="image/*,application/pdf" style="width:100%;background:var(--navy2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
-          <div id="ins-photo-preview" style="margin-top:8px;"></div>
-        </div>
+        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('insPhoto')}</label>
+        <input type="file" id="ins-photo" accept="image/*,application/pdf" style="width:100%;background:var(--navy2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
+        <div id="ins-photo-preview" style="margin:8px 0;"></div>
         <button class="ins-btn" onclick="updateInsurance()">${t('insBtn')}</button>
-        <div class="ins-success" id="ins-success" style="display:none;"></div>
       </div>
     </div>
 
-    <!-- ID SECTION -->
+    <!-- IDENTIFICACIÓN (colapsable) -->
     <div class="insurance-section" id="id-section" style="margin-top:16px;">
-      <div class="insurance-header">
-        <div class="insurance-title">${t('idTitle')}</div>
-        <span id="id-badge" class="insurance-badge"></span>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-weight:600;font-size:15px;">${t('idTitle')}</span>
+          <span id="id-badge" class="insurance-badge"></span>
+        </div>
+        <button onclick="toggleIDForm()" id="id-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">✏️ ${t('idEdit').replace('✏️ ','')}</button>
       </div>
-      <div id="id-current" style="font-size:14px;color:var(--muted);margin-bottom:4px;"></div>
-      <div style="margin-top:10px;">
-        <button onclick="toggleIDForm()" id="id-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;width:100%;">${t('idEdit')}</button>
-      </div>
-      <div class="ins-form" id="id-edit-form" style="display:none;margin-top:12px;">
+      <div id="id-current" style="font-size:13px;color:var(--muted);margin-top:6px;"></div>
+      <div class="ins-success" id="id-success" style="display:none;"></div>
+      <div class="ins-form" id="id-edit-form" style="display:none;margin-top:14px;">
         <div class="ins-form-title">${t('idFormTitle')}</div>
         <select class="fi" id="portal-id-type" style="margin-bottom:10px;">
           <option value="">${t('idTypeSel')}</option>
@@ -779,49 +783,48 @@ function renderPortal() {
         <input type="file" class="fi" id="portal-id-photo" accept="image/*" style="margin-bottom:10px;padding:8px;cursor:pointer;">
         <div id="portal-id-preview" style="margin-bottom:10px;"></div>
         <button class="ins-btn" onclick="updateID()">${t('idBtn')}</button>
-        <div class="ins-success" id="id-success" style="display:none;"></div>
       </div>
     </div>
 
-    <!-- SMS CONSENT (TCPA) -->
-    <div class="insurance-section" id="sms-section" style="margin-top:16px;">
-      <div class="insurance-header">
-        <div class="insurance-title">${t('smsTitle')}</div>
-        <span id="sms-badge" class="insurance-badge"></span>
-      </div>
-      <div style="font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:14px;">
-        ${t('smsDesc')} <strong style="color:var(--white);">${c.phone || ''}</strong>
-      </div>
-      <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;background:rgba(232,182,74,0.06);border:1px solid var(--border);border-radius:12px;padding:14px;">
-        <input type="checkbox" id="sms-opt" style="width:20px;height:20px;margin-top:2px;flex:none;cursor:pointer;">
-        <span style="font-size:13px;line-height:1.5;color:var(--white);">${t('smsAgree')}</span>
-      </label>
-      <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.55;">
-        ${t('smsFreq')} ${t('smsStop')}<br><br>⚖️ ${t('smsNotRequired')}
-      </div>
-      <a href="sms-terms.html" target="_blank" style="display:inline-block;font-size:12px;color:var(--gold);margin-top:10px;">${t('smsFullTerms')}</a>
-      <button class="ins-btn" onclick="saveSmsConsent()">${t('save')}</button>
-      <div class="ins-success" id="sms-success" style="display:none;"></div>
-    </div>
-
-    <!-- CONTACT -->
-    <button class="contact-btn" onclick="location.href='sms:${dealerPhone}?body=${encodeURIComponent(t('contactMsg')(c))}'">
-      ${t('contactBtn')}
-    </button>
-
-    <!-- CAR INFO -->
-    <div class="section-title">${t('myVehicle')}</div>
-    <div class="info-card">
+    <!-- CALENDARIO DE PAGOS + RESUMEN -->
+    <div class="info-card" style="margin-top:16px;">
+      <div class="section-title" style="margin:0 0 14px;">${t('scheduleTitle')}</div>
       <div class="info-row"><span class="ir-label">${t('vehicle')}</span><span class="ir-value">${c.year} ${c.make} ${c.model}</span></div>
       <div class="info-row"><span class="ir-label">${t('totalPrice')}</span><span class="ir-value">${formatMoney(c.total)}</span></div>
-      <div class="info-row"><span class="ir-label">${t('totalOfPay')}</span><span class="ir-value">${formatMoney(totalOfPayments(c))}</span></div>
-      <div class="info-row"><span class="ir-label">${t('downPayment')}</span><span class="ir-value">${formatMoney(c.down)}</span></div>
-      <div class="info-row"><span class="ir-label">${t('paymentLabel')}</span><span class="ir-value">${formatMoney(c.weekly)}</span></div>
+      <div class="info-row"><span class="ir-label">${t('paymentLabel')}</span><span class="ir-value">${formatMoney(c.weekly)} · ${freqLabel}</span></div>
+      <div class="info-row"><span class="ir-label">${t('lastPay')}</span><span class="ir-value">${lastPayDate?formatDate(lastPayDate):'—'}</span></div>
+      <div class="info-row"><span class="ir-label">${t('nextPayLbl')}</span><span class="ir-value">${status==='paidoff'?'—':formatDate(nextPay)}</span></div>
       <div class="info-row"><span class="ir-label">${t('totalPaid')}</span><span class="ir-value" style="color:var(--green)">${formatMoney(paid)}</span></div>
       <div class="info-row"><span class="ir-label">${t('remaining')}</span><span class="ir-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
+      ${scheduleItems ? `<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:6px;">${scheduleItems}</div>` : ''}
     </div>
 
-    ${schedHTML}
+    <!-- MENSAJES DE TEXTO (discreto, colapsable) -->
+    <div class="insurance-section" id="sms-section" style="margin-top:16px;padding:16px 20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-weight:500;font-size:14px;color:var(--muted);">${t('smsTitle')}</span>
+          <span id="sms-badge" class="insurance-badge"></span>
+        </div>
+        <button onclick="toggleSmsForm()" id="sms-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">✏️</button>
+      </div>
+      <div class="ins-success" id="sms-success" style="display:none;"></div>
+      <div class="ins-form" id="sms-edit-form" style="display:none;margin-top:12px;">
+        <div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">${t('smsDesc')} <strong style="color:var(--white);">${c.phone || ''}</strong></div>
+        <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;background:rgba(232,182,74,0.06);border:1px solid var(--border);border-radius:12px;padding:14px;">
+          <input type="checkbox" id="sms-opt" style="width:20px;height:20px;margin-top:2px;flex:none;cursor:pointer;">
+          <span style="font-size:13px;line-height:1.5;color:var(--white);">${t('smsAgree')}</span>
+        </label>
+        <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.55;">${t('smsFreq')} ${t('smsStop')}<br><br>⚖️ ${t('smsNotRequired')}</div>
+        <a href="sms-terms.html" target="_blank" style="display:inline-block;font-size:12px;color:var(--gold);margin-top:10px;">${t('smsFullTerms')}</a>
+        <button class="ins-btn" onclick="saveSmsConsent()">${t('save')}</button>
+      </div>
+    </div>
+
+    <!-- CONTACTO (discreto) -->
+    <div style="text-align:center;margin-top:20px;">
+      <a onclick="location.href='sms:${dealerPhone}?body=${encodeURIComponent(t('contactMsg')(c))}'" style="font-size:13px;color:var(--muted);text-decoration:underline;cursor:pointer;">${t('contactBtn')}</a>
+    </div>
   `;
 }
 
