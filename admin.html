@@ -576,6 +576,8 @@
       <div class="form-group"><label class="form-label">Idioma del mensaje</label>
         <select class="form-input" id="appt-lang"><option value="es">🇲🇽 Español</option><option value="en">🇺🇸 English</option></select>
       </div>
+      <div class="form-group"><label class="form-label">Carro que trae</label><input class="form-input" id="appt-car" placeholder="2019 Kia Forte blanco" style="text-transform:capitalize;"></div>
+      <div class="form-group"><label class="form-label">VIN (opcional)</label><input class="form-input" id="appt-vin" placeholder="Últimos dígitos o completo" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
     <div id="appt-carline" style="font-size:13px;color:var(--muted);margin:-6px 0 14px;"></div>
     <div class="form-group"><label class="form-label">Servicios (puedes agregar varios)</label>
@@ -1137,6 +1139,8 @@ window.openApptModal = function(clientId){
   document.getElementById('appt-name').value='';
   document.getElementById('appt-phone').value='';
   document.getElementById('appt-lang').value='es';
+  document.getElementById('appt-car').value='';
+  document.getElementById('appt-vin').value='';
   document.getElementById('appt-client').value='';
   document.getElementById('appt-client-search').value='';
   document.getElementById('appt-client-results').style.display='none';
@@ -1166,6 +1170,8 @@ window.saveAppt = async function(){
     clientName=titleCase((document.getElementById('appt-name').value||'').trim());
     phone=(document.getElementById('appt-phone').value||'').trim();
     lang=document.getElementById('appt-lang').value;
+    carLabel=titleCase((document.getElementById('appt-car').value||'').trim());
+    vin=(document.getElementById('appt-vin').value||'').trim().toUpperCase();
     if(!clientName||!phone){ alert('Escribe nombre y teléfono.'); return; }
   } else {
     const c=clients.find(x=>x.id===v);
@@ -1275,7 +1281,7 @@ window.cancelAppt=async function(id){ if(!confirm('¿Cancelar / eliminar esta ci
 window.editAppt=function(id){
   const a=appointments.find(x=>x.id===id); if(!a) return;
   openApptModal(a.clientId||'');
-  if(!a.clientId){ pickApptClient('__walkin__'); document.getElementById('appt-name').value=a.clientName||''; document.getElementById('appt-phone').value=a.phone||''; document.getElementById('appt-lang').value=a.lang||'es'; }
+  if(!a.clientId){ pickApptClient('__walkin__'); document.getElementById('appt-name').value=a.clientName||''; document.getElementById('appt-phone').value=a.phone||''; document.getElementById('appt-lang').value=a.lang||'es'; document.getElementById('appt-car').value=a.carLabel||''; document.getElementById('appt-vin').value=a.vin||''; }
   document.getElementById('appt-id').value=a.id;
   apptServices = apptServiceList(a).map(s=>({es:s.es,en:s.en,custom:s.custom})); renderApptServices();
   document.getElementById('appt-date').value=a.date||'';
