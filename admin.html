@@ -577,16 +577,15 @@
       </div>
     </div>
     <div id="appt-carline" style="font-size:13px;color:var(--muted);margin:-6px 0 14px;"></div>
-    <div class="form-group"><label class="form-label">Servicio</label>
-      <input class="form-input" id="appt-type" list="appt-types" placeholder="Cambio de aceite" value="Cambio de aceite">
-      <datalist id="appt-types">
-        <option value="Cambio de aceite"></option>
-        <option value="Servicio general"></option>
-        <option value="Revisión / Diagnóstico"></option>
-        <option value="Reparación"></option>
-        <option value="Rotación de llantas"></option>
-        <option value="Frenos"></option>
-      </datalist>
+    <div class="form-group"><label class="form-label">Servicios (puedes agregar varios)</label>
+      <div id="appt-service-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input class="form-input" id="appt-service-custom" placeholder="Otro servicio…" onkeydown="if(event.key==='Enter'){event.preventDefault();addApptServiceCustom();}">
+        <button type="button" onclick="addApptServiceCustom()" style="background:var(--navy3);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:0 16px;font-weight:700;cursor:pointer;">＋</button>
+      </div>
+      <div id="appt-service-selected" style="margin-top:8px;"></div>
+      <input type="hidden" id="appt-type">
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">✨ Cada cita incluye una <b>inspección de cortesía sin costo</b> (se agrega sola al mensaje).</div>
     </div>
     <div style="display:flex;gap:12px;">
       <div class="form-group" style="flex:1;"><label class="form-label">Fecha</label><input class="form-input" id="appt-date" type="date"></div>
@@ -1098,7 +1097,7 @@ window.pickApptClient = function(id){
 };
 window.openApptModal = function(clientId){
   document.getElementById('appt-id').value='';
-  document.getElementById('appt-type').value='Cambio de aceite';
+  apptServices=[{es:'Cambio de aceite',en:'Oil change'}]; renderApptServices();
   document.getElementById('appt-date').value=apptNextFriday();
   document.getElementById('appt-time').value='';
   document.getElementById('appt-note').value='';
@@ -1122,11 +1121,12 @@ window.onApptClientChange = function(){
 };
 window.saveAppt = async function(){
   const v=document.getElementById('appt-client').value;
-  const type=document.getElementById('appt-type').value.trim();
+  const services = apptServices.slice();
+  const type = services.map(s=>s.es).join(', ');
   const date=document.getElementById('appt-date').value;
   const time=document.getElementById('appt-time').value;
   const note=document.getElementById('appt-note').value.trim();
-  if(!type){ alert('Escribe el servicio.'); return; }
+  if(!services.length){ alert('Agrega al menos un servicio.'); return; }
   if(!date){ alert('Elige la fecha.'); return; }
   let clientId='', clientName='', phone='', lang='es', carLabel='', vin='';
   if(v==='__walkin__'){
@@ -1144,7 +1144,7 @@ window.saveAppt = async function(){
   const existing=document.getElementById('appt-id').value;
   const id=existing || ('appt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7));
   const prior=appointments.find(x=>x.id===id)||{};
-  const data={ clientId, clientName, phone, lang, carLabel, vin, type, date, time, note, status:'scheduled',
+  const data={ clientId, clientName, phone, lang, carLabel, vin, type, services, date, time, note, status:'scheduled',
     confirmSent: existing?(prior.confirmSent||false):false, reminderSent: existing?(prior.reminderSent||false):false,
     createdBy: prior.createdBy||who, createdAt: prior.createdAt||new Date().toISOString(), updatedBy:who, updatedAt:new Date().toISOString() };
   try{
@@ -1155,6 +1155,54 @@ window.saveAppt = async function(){
     }
   }catch(e){ alert('Error al guardar la cita: '+e.message); }
 };
+const SERVICE_CATALOG=[
+  {es:'Cambio de aceite',en:'Oil change'},
+  {es:'Rotación de llantas',en:'Tire rotation'},
+  {es:'Frenos',en:'Brake service'},
+  {es:'Alineación',en:'Wheel alignment'},
+  {es:'Afinación',en:'Tune-up'},
+  {es:'Batería',en:'Battery'},
+  {es:'Diagnóstico',en:'Diagnostic'},
+  {es:'Anticongelante',en:'Coolant service'},
+  {es:'Transmisión',en:'Transmission service'},
+  {es:'Revisión general',en:'General inspection'},
+  {es:'Instalación de accesorios',en:'Accessory installation'},
+];
+let apptServices=[];
+function apptSvcKey(s){ return (s.es||'').toLowerCase(); }
+window.toggleApptService=function(i){
+  const s=SERVICE_CATALOG[i]; if(!s) return;
+  const k=apptSvcKey(s); const at=apptServices.findIndex(x=>apptSvcKey(x)===k);
+  if(at>=0) apptServices.splice(at,1); else apptServices.push({es:s.es,en:s.en});
+  renderApptServices();
+};
+window.addApptServiceCustom=function(){
+  const inp=document.getElementById('appt-service-custom'); const v=(inp.value||'').trim();
+  if(!v) return;
+  if(!apptServices.some(x=>apptSvcKey(x)===v.toLowerCase())) apptServices.push({es:v,en:v,custom:true});
+  inp.value=''; renderApptServices();
+};
+window.removeApptService=function(i){ apptServices.splice(i,1); renderApptServices(); };
+function renderApptServices(){
+  const chipBox=document.getElementById('appt-service-chips');
+  if(chipBox){
+    chipBox.innerHTML=SERVICE_CATALOG.map((s,i)=>{
+      const on=apptServices.some(x=>apptSvcKey(x)===apptSvcKey(s));
+      return `<button type="button" onclick="toggleApptService(${i})" style="background:${on?'var(--gold)':'transparent'};color:${on?'var(--navy3)':'var(--text)'};border:1px solid ${on?'var(--gold)':'var(--border)'};border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">${on?'✓ ':''}${s.es}</button>`;
+    }).join('');
+  }
+  const selBox=document.getElementById('appt-service-selected');
+  if(selBox){
+    if(!apptServices.length){ selBox.innerHTML='<span style="font-size:12px;color:var(--red);">Agrega al menos un servicio.</span>'; }
+    else selBox.innerHTML='<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;">En esta cita:</div>'+apptServices.map((s,i)=>`<span style="display:inline-flex;align-items:center;gap:6px;background:var(--navy3);border:1px solid var(--border);border-radius:20px;padding:4px 10px;margin:0 6px 6px 0;font-size:12px;">${s.es}${s.custom?'':' <span style="color:var(--muted);">/ '+s.en+'</span>'} <span onclick="removeApptService(${i})" style="cursor:pointer;color:var(--red);font-weight:700;">×</span></span>`).join('');
+  }
+  const hid=document.getElementById('appt-type'); if(hid) hid.value=apptServices.map(s=>s.es).join(', ');
+}
+function apptServiceList(a){
+  if(Array.isArray(a.services)&&a.services.length) return a.services;
+  if(a.type) return a.type.split(',').map(x=>({es:x.trim(),en:apptTypeI18n(x.trim(),'en')}));
+  return [];
+}
 function apptTypeI18n(type,lang){
   if(lang!=='en') return type;
   const map={'cambio de aceite':'oil change','servicio general':'general service','revisión / diagnóstico':'inspection / diagnostic','reparación':'repair','rotación de llantas':'tire rotation','frenos':'brake service'};
@@ -1163,16 +1211,22 @@ function apptTypeI18n(type,lang){
 function apptMsg(a,kind){
   const nombre=(a.clientName||'').split(' ')[0];
   const lang=a.lang||'es';
-  const tipo=apptTypeI18n(a.type||'',lang);
   const hora=a.time?(lang==='en'?' at '+appt12h(a.time):' a las '+appt12h(a.time)):'';
-  if(kind==='reminder'){
-    return lang==='en'
-      ? `Hi ${nombre}, a friendly reminder of your ${tipo} appointment tomorrow, ${apptFmtLong(a.date,'en')}${hora}, at Legacy Motors Garage.\n\nWe look forward to seeing you. To reschedule, call or reply to this text.\n\n— Legacy Motors Garage\n📞 (559) 540-5145`
-      : `Hola ${nombre}, le recordamos su cita de ${tipo} mañana ${apptFmtLong(a.date,'es')}${hora}, en Legacy Motors Garage.\n\nAquí lo esperamos. Para reagendar, llámenos o responda a este mensaje.\n\n— Legacy Motors Garage\n📞 (559) 540-5145`;
+  const svcs=apptServiceList(a).map(s=>'• '+(lang==='en'?(s.en||s.es):(s.es||s.en)));
+  svcs.push(lang==='en'?'• Complimentary inspection — no charge':'• Inspección de cortesía — sin costo');
+  const svcBlock=svcs.join('\n');
+  const car=a.carLabel?('\n🚗 '+a.carLabel):'';
+  const fecha=apptFmtLong(a.date,lang);
+  if(lang==='en'){
+    if(kind==='reminder'){
+      return `Dear ${nombre},\n\nA gentle reminder of your service appointment tomorrow at Legacy Motors Garage.\n\n📅 ${fecha}${hora}${car}\n\nScheduled services:\n${svcBlock}\n\nOur team will have everything ready for you. If you'd like to make any changes, simply reply to this message and we'll gladly assist.\n\nWarm regards,\nLegacy Motors Garage\n📞 (559) 540-5145`;
+    }
+    return `Dear ${nombre},\n\nIt is our pleasure to confirm your service appointment at Legacy Motors Garage.\n\n📅 ${fecha}${hora}${car}\n\nScheduled services:\n${svcBlock}\n\nOur team will take great care of your vehicle. Should you wish to make any changes, simply reply to this message.\n\nWarm regards,\nLegacy Motors Garage\n21122 Ave 152, Porterville, CA\n📞 (559) 540-5145`;
   }
-  return lang==='en'
-    ? `Hi ${nombre}, this confirms your ${tipo} appointment on ${apptFmtLong(a.date,'en')}${hora}, at Legacy Motors Garage (21122 Ave 152, Porterville, CA).\n\nNeed to reschedule? Call or reply to this text. Thank you!\n\n— Legacy Motors Garage\n📞 (559) 540-5145`
-    : `Hola ${nombre}, le confirmamos su cita de ${tipo} el ${apptFmtLong(a.date,'es')}${hora}, en Legacy Motors Garage (21122 Ave 152, Porterville, CA).\n\nSi necesita reagendar, llámenos o responda a este mensaje. ¡Gracias!\n\n— Legacy Motors Garage\n📞 (559) 540-5145`;
+  if(kind==='reminder'){
+    return `Estimado/a ${nombre}:\n\nLe recordamos con gusto su cita de servicio para mañana en Legacy Motors Garage.\n\n📅 ${fecha}${hora}${car}\n\nServicios programados:\n${svcBlock}\n\nNuestro equipo tendrá todo listo para atenderle. Si desea hacer algún ajuste, solo responda a este mensaje y con gusto le ayudamos.\n\nCon aprecio,\nLegacy Motors Garage\n📞 (559) 540-5145`;
+  }
+  return `Estimado/a ${nombre}:\n\nEs un gusto confirmar su cita de servicio en Legacy Motors Garage.\n\n📅 ${fecha}${hora}${car}\n\nServicios programados:\n${svcBlock}\n\nCuidaremos su vehículo con el mayor esmero. Si desea hacer algún ajuste, solo responda a este mensaje.\n\nCon aprecio,\nLegacy Motors Garage\n21122 Ave 152, Porterville, CA\n📞 (559) 540-5145`;
 }
 async function sendApptSms(a,kind){
   const phone=(a.phone||'').replace(/\D/g,'');
@@ -1190,7 +1244,7 @@ window.editAppt=function(id){
   openApptModal(a.clientId||'');
   if(!a.clientId){ pickApptClient('__walkin__'); document.getElementById('appt-name').value=a.clientName||''; document.getElementById('appt-phone').value=a.phone||''; document.getElementById('appt-lang').value=a.lang||'es'; }
   document.getElementById('appt-id').value=a.id;
-  document.getElementById('appt-type').value=a.type||'';
+  apptServices = apptServiceList(a).map(s=>({es:s.es,en:s.en,custom:s.custom})); renderApptServices();
   document.getElementById('appt-date').value=a.date||'';
   document.getElementById('appt-time').value=a.time||'';
   document.getElementById('appt-note').value=a.note||'';
@@ -1219,7 +1273,7 @@ window.renderAppointments=function(){
           <div style="min-width:170px;flex:1;">
             <div style="font-weight:600;font-size:14px;">${a.clientName||''} ${flag}</div>
             <div style="font-size:12px;color:var(--muted);">${a.type||''}${car}</div>
-            <div style="font-size:12px;color:var(--gold);margin-top:2px;">${apptFmtLong(a.date,'es')}${hora}</div>
+            <div style="font-size:15px;font-weight:700;color:var(--gold);margin-top:3px;">${apptFmtLong(a.date,'es')}${hora}</div>
             ${a.note?'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px;">'+a.note+'</div>':''}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
