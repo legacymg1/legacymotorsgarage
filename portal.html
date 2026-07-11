@@ -220,6 +220,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 let currentClient = null;
+let serviceAppointments = [];
 
 // ============ IDIOMA / LANGUAGE ============
 const I18N = {
@@ -400,6 +401,14 @@ function totalOfPayments(c) {
   return (Number(c.weekly)||0) * ((c.schedule||[]).length);
 }
 function calcPaid(c) { return (c.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0); }
+function clientVehicles(c){
+  const list=[]; const seen=new Set();
+  const pl=[c.year,c.make,c.model].filter(Boolean).join(' ');
+  const pvin=(c.vin||'').toUpperCase();
+  if(pl||pvin){ list.push({vin:pvin, label:(pl||('VIN …'+pvin.slice(-6)))}); if(pvin) seen.add(pvin); }
+  (c.vehicles||[]).forEach(v=>{ const k=(v.vin||'').toUpperCase(); if(k&&seen.has(k))return; if(k)seen.add(k); list.push({vin:k, label:(v.label||[v.year,v.make,v.model].filter(Boolean).join(' ')||('VIN …'+k.slice(-6)))}); });
+  return list;
+}
 function isLegacyPaidOff(c) {   // misma red de seguridad que el CRM
   return !Number(c.totalOfPayments) && (c.schedule||[]).length > 0
       && (c.payments||[]).filter(p=>p.schedDate).length >= (c.schedule||[]).length;
@@ -492,6 +501,7 @@ onAuthStateChanged(auth, async (user)=>{
     if(qs.empty){ showLoginError(t('errNoAccount')); await signOut(auth); return; }
     currentClient = { id: qs.docs[0].id, ...qs.docs[0].data() };
     setLang(localStorage.getItem('lmg_lang_' + currentClient.id) || (currentClient.lang === 'en' ? 'en' : 'es'));
+    try{ const aq = await getDocs(query(collection(db,'appointments'), where('phoneE164','==', user.phoneNumber))); serviceAppointments = aq.docs.map(d=>d.data()); }catch(e){ serviceAppointments=[]; }
     showLoginError('');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='block';
@@ -672,8 +682,62 @@ window.doLogout = async function() {
   document.getElementById('login-screen').style.display='flex';
 };
 
+function renderServicePortal(c){
+  const es = L!=='en';
+  const vehicles = clientVehicles(c);
+  const todayS = today();
+  const appts = (serviceAppointments||[]).slice().sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  const next = appts.filter(a=>(a.status||'scheduled')==='scheduled' && a.date>=todayS)[0] || null;
+  const last = appts.filter(a=>a.date<todayS || a.status==='done').sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0] || null;
+  const lastServ = c.lastServiceDate || (last&&last.date) || '';
+  let nextServ='';
+  if(lastServ){ const d=new Date(lastServ+'T00:00:00'); d.setMonth(d.getMonth()+3); nextServ=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  const fmtA=(iso)=> iso?formatDate(iso):'—';
+  const vehHTML = vehicles.length ? vehicles.map(v=>`<div class="info-row"><span class="ir-label">🚗 ${es?'Vehículo':'Vehicle'}</span><span class="ir-value">${v.label}${v.vin?' · …'+v.vin.slice(-6):''}</span></div>`).join('') : `<div style="color:var(--muted);font-size:14px;padding:4px 0;">${es?'Aún no tenemos tu vehículo registrado.':'No vehicle on file yet.'}</div>`;
+  document.getElementById('portal-content').innerHTML = `
+    <div class="welcome-card">
+      <div class="welcome-name">${es?'Hola':'Hi'}, ${c.name.split(' ')[0]} 👋</div>
+      <div style="margin-top:10px;font-size:14px;color:var(--muted);">${es?'Bienvenido a tu portal de servicio de Legacy Motors Garage.':'Welcome to your Legacy Motors Garage service portal.'}</div>
+    </div>
+    <div class="info-card" style="margin-top:16px;">
+      <div class="section-title" style="margin:0 0 14px;">${es?'Mis vehículos':'My vehicles'}</div>
+      ${vehHTML}
+    </div>
+    <div class="info-card" style="margin-top:16px;">
+      <div class="section-title" style="margin:0 0 14px;">${es?'Mi servicio':'My service'}</div>
+      <div class="info-row"><span class="ir-label">${es?'Próxima cita':'Next appointment'}</span><span class="ir-value" style="color:var(--gold);">${next?`${fmtA(next.date)}${next.time?' · '+next.time:''}`:(es?'Sin cita programada':'None scheduled')}</span></div>
+      ${next&&next.type?`<div class="info-row"><span class="ir-label">${es?'Servicio':'Service'}</span><span class="ir-value">${next.type}</span></div>`:''}
+      <div class="info-row"><span class="ir-label">${es?'Última visita':'Last visit'}</span><span class="ir-value">${fmtA(last&&last.date)}</span></div>
+      <div class="info-row"><span class="ir-label">${es?'Próximo servicio sugerido':'Next service due'}</span><span class="ir-value" style="color:var(--green);">${nextServ?fmtA(nextServ):'—'}</span></div>
+    </div>
+    <div class="insurance-section" id="sms-section" style="margin-top:16px;padding:16px 20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-weight:500;font-size:14px;color:var(--muted);">${t('smsTitle')}</span>
+          <span id="sms-badge" class="insurance-badge"></span>
+        </div>
+        <button onclick="toggleSmsForm()" id="sms-edit-btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">✏️</button>
+      </div>
+      <div class="ins-success" id="sms-success" style="display:none;"></div>
+      <div class="ins-form" id="sms-edit-form" style="display:none;margin-top:12px;">
+        <div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">${t('smsDesc')} <strong style="color:var(--white);">${c.phone || ''}</strong></div>
+        <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;background:rgba(232,182,74,0.06);border:1px solid var(--border);border-radius:12px;padding:14px;">
+          <input type="checkbox" id="sms-opt" style="width:20px;height:20px;margin-top:2px;flex:none;cursor:pointer;">
+          <span style="font-size:13px;line-height:1.5;color:var(--white);">${t('smsAgree')}</span>
+        </label>
+        <div style="font-size:11px;color:var(--muted);margin-top:12px;line-height:1.55;">${t('smsFreq')} ${t('smsStop')}<br><br>⚖️ ${t('smsNotRequired')}</div>
+        <a href="sms-terms.html" target="_blank" style="display:inline-block;font-size:12px;color:var(--gold);margin-top:10px;">${t('smsFullTerms')}</a>
+        <button class="ins-btn" onclick="saveSmsConsent()">${t('save')}</button>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:20px;">
+      <a onclick="location.href='sms:+15595405145'" style="font-size:13px;color:var(--muted);text-decoration:underline;cursor:pointer;">${es?'Contactar al dealer':'Contact the dealer'}</a>
+    </div>
+  `;
+}
 function renderPortal() {
   const c = currentClient;
+  if((c.kind||'')==='service'){ return renderServicePortal(c); }
   const balance = calcBalance(c);
   const paid = calcPaid(c);
   const progress = calcProgress(c);
