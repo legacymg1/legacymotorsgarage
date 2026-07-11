@@ -682,6 +682,44 @@ window.doLogout = async function() {
   document.getElementById('login-screen').style.display='flex';
 };
 
+function serviceStatusInfo(nextServ){
+  const es=L!=='en';
+  if(!nextServ) return {color:'var(--muted)', label:es?'Sin datos de servicio':'No service data', msg:es?'Aún no tenemos registro de tu último servicio.':'No last service on file yet.'};
+  const dd=daysUntil(nextServ);
+  if(dd<0) return {color:'var(--red)', label:es?'Servicio vencido':'Service overdue', msg:(es?'Te tocaba el ':'Was due ')+formatDate(nextServ)};
+  if(dd<=30) return {color:'var(--yellow)', label:es?'Servicio próximo':'Service coming up', msg:(es?'Te toca el ':'Due ')+formatDate(nextServ)};
+  return {color:'var(--green)', label:es?'Al día':'Up to date', msg:(es?'Próximo servicio: ':'Next service: ')+formatDate(nextServ)};
+}
+function serviceCardHTML(nextServ, nextAppt, lastAppt){
+  const es=L!=='en';
+  const si=serviceStatusInfo(nextServ);
+  return `
+    <div class="info-card" style="margin-top:16px;border:1px solid var(--gold3);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div class="section-title" style="margin:0;">${es?'Servicio de tu vehículo':'Vehicle service'}</div>
+        <span style="font-size:20px;">🔧</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="width:12px;height:12px;border-radius:50%;background:${si.color};display:inline-block;box-shadow:0 0 10px ${si.color};flex:none;"></span>
+        <span style="font-weight:700;font-size:15px;color:${si.color};">${si.label}</span>
+      </div>
+      <div style="font-size:13px;color:var(--muted);margin-top:6px;">${si.msg}</div>
+      ${nextAppt?`<div class="info-row" style="margin-top:12px;"><span class="ir-label">${es?'Tu próxima cita':'Your next appointment'}</span><span class="ir-value" style="color:var(--gold);">${formatDate(nextAppt.date)}${nextAppt.time?' · '+bk12h(nextAppt.time):''}</span></div>`:''}
+      <button onclick="toggleBooking()" id="book-toggle" style="width:100%;margin-top:14px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:13px;font-family:var(--font-display);font-size:16px;letter-spacing:0.5px;cursor:pointer;">📅 ${nextAppt?(es?'Agendar otra cita':'Book another'):(es?'Agenda tu cita':'Book your appointment')}</button>
+      <div id="booking-widget" style="display:none;margin-top:14px;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${es?'Atendemos los viernes de 9:00 a 4:00. Elige el día y la hora:':'We service on Fridays, 9:00 to 4:00 — pick a day and time:'}</div>
+        <div id="book-days" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <div id="book-slots" style="margin-top:6px;"></div>
+        <div id="book-msg" style="margin-top:8px;font-size:13px;"></div>
+      </div>
+    </div>`;
+}
+window.toggleBooking = function(){
+  const w=document.getElementById('booking-widget'); if(!w) return;
+  w.style.display='block';
+  const bt=document.getElementById('book-toggle'); if(bt) bt.style.display='none';
+  renderBooking();
+};
 function renderServicePortal(c){
   const es = L!=='en';
   const vehicles = clientVehicles(c);
@@ -703,13 +741,7 @@ function renderServicePortal(c){
       <div class="section-title" style="margin:0 0 14px;">${es?'Mis vehículos':'My vehicles'}</div>
       ${vehHTML}
     </div>
-    <div class="info-card" style="margin-top:16px;">
-      <div class="section-title" style="margin:0 0 14px;">${es?'Mi servicio':'My service'}</div>
-      <div class="info-row"><span class="ir-label">${es?'Próxima cita':'Next appointment'}</span><span class="ir-value" style="color:var(--gold);">${next?`${fmtA(next.date)}${next.time?' · '+next.time:''}`:(es?'Sin cita programada':'None scheduled')}</span></div>
-      ${next&&next.type?`<div class="info-row"><span class="ir-label">${es?'Servicio':'Service'}</span><span class="ir-value">${next.type}</span></div>`:''}
-      <div class="info-row"><span class="ir-label">${es?'Última visita':'Last visit'}</span><span class="ir-value">${fmtA(last&&last.date)}</span></div>
-      <div class="info-row"><span class="ir-label">${es?'Próximo servicio sugerido':'Next service due'}</span><span class="ir-value" style="color:var(--green);">${nextServ?fmtA(nextServ):'—'}</span></div>
-    </div>
+    ${serviceCardHTML(nextServ, next, last)}
     <div class="insurance-section" id="sms-section" style="margin-top:16px;padding:16px 20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div style="display:flex;align-items:center;gap:8px;">
@@ -730,18 +762,10 @@ function renderServicePortal(c){
         <button class="ins-btn" onclick="saveSmsConsent()">${t('save')}</button>
       </div>
     </div>
-    <div class="info-card" id="booking-card" style="margin-top:16px;">
-      <div class="section-title" style="margin:0 0 10px;">${es?'Agendar mi cita':'Book my appointment'}</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${es?'Atendemos los viernes de 9:00 a 4:00. Elige el día y la hora:':'We service on Fridays, 9:00 to 4:00. Pick a day and time:'}</div>
-      <div id="book-days" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-      <div id="book-slots" style="margin-top:6px;"></div>
-      <div id="book-msg" style="margin-top:8px;font-size:13px;"></div>
-    </div>
     <div style="text-align:center;margin-top:20px;">
       <a onclick="location.href='sms:+15595405145'" style="font-size:13px;color:var(--muted);text-decoration:underline;cursor:pointer;">${es?'Contactar al dealer':'Contact the dealer'}</a>
     </div>
   `;
-  renderBooking();
 }
 function nextFridays(n){
   const out=[]; const base=new Date(); base.setHours(0,0,0,0);
@@ -939,6 +963,8 @@ function renderPortal() {
       </div>
     </div>
 
+    ${serviceCardHTML(nextServ2, nextAppt, _lastAppt)}
+
     <!-- Seguro/ID PENDIENTES arriba -->
     ${!insComplete ? insSectionHTML : ''}
     ${!idComplete ? idSectionHTML : ''}
@@ -959,23 +985,6 @@ function renderPortal() {
     <!-- Seguro/ID COMPLETADOS abajo (minimizados) -->
     ${insComplete ? insSectionHTML : ''}
     ${idComplete ? idSectionHTML : ''}
-
-    <!-- SERVICIO DE TU VEHÍCULO (premium) + AGENDAR -->
-    <div class="info-card" style="margin-top:16px;border:1px solid var(--gold3);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div class="section-title" style="margin:0;">${L==='en'?'Vehicle service':'Servicio de tu vehículo'}</div>
-        <span style="font-size:20px;">🔧</span>
-      </div>
-      <div class="info-row"><span class="ir-label">${L==='en'?'Next service due':'Próximo servicio sugerido'}</span><span class="ir-value" style="color:var(--green);">${nextServ2?formatDate(nextServ2):'—'}</span></div>
-      <div class="info-row"><span class="ir-label">${L==='en'?'Your next appointment':'Tu próxima cita'}</span><span class="ir-value" style="color:var(--gold);">${nextAppt?formatDate(nextAppt.date)+(nextAppt.time?' · '+bk12h(nextAppt.time):''):(L==='en'?'None scheduled':'Sin cita programada')}</span></div>
-      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
-        <div style="font-size:14px;color:var(--white);font-weight:500;margin-bottom:4px;">${L==='en'?'Book your appointment':'Agenda tu cita'}</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${L==='en'?'Fridays, 9:00 to 4:00 — pick a day and time:':'Viernes de 9:00 a 4:00 — elige el día y la hora:'}</div>
-        <div id="book-days" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        <div id="book-slots" style="margin-top:6px;"></div>
-        <div id="book-msg" style="margin-top:8px;font-size:13px;"></div>
-      </div>
-    </div>
 
     <!-- MENSAJES DE TEXTO (discreto) -->
     <div class="insurance-section" id="sms-section" style="margin-top:16px;padding:16px 20px;">
@@ -1004,7 +1013,6 @@ function renderPortal() {
       <a onclick="location.href='sms:${dealerPhone}?body=${encodeURIComponent(t('contactMsg')(c))}'" style="font-size:13px;color:var(--muted);text-decoration:underline;cursor:pointer;">${t('contactBtn')}</a>
     </div>
   `;
-  renderBooking();
 }
 
 // ---- CONSENTIMIENTO SMS (TCPA) ----
