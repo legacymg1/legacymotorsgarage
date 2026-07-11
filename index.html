@@ -7545,7 +7545,7 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></a>
     <div>
       <div class="cf-title">Send a Message</div>
       <input class="cf-input" id="cf-name" placeholder="Your Name / Tu Nombre">
-      <input class="cf-input" id="cf-phone" placeholder="Phone / Teléfono" type="tel">
+      <input class="cf-input" id="cf-phone" placeholder="(555) 555-5555" type="tel" inputmode="tel" oninput="var d=this.value.replace(/[^0-9]/g,'').slice(0,10);this.value=d.length>6?'('+d.slice(0,3)+') '+d.slice(3,6)+'-'+d.slice(6):d.length>3?'('+d.slice(0,3)+') '+d.slice(3):d.length>0?'('+d:'';">
       <select class="cf-select" id="cf-interest">
         <option value="">I'm interested in... / Me interesa...</option>
         <option>Buying a car / Comprar un carro</option>
