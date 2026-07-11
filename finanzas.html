@@ -346,7 +346,7 @@
       <div class="field"><label>Método</label><select id="i-method"><option value="cash">💵 Efectivo</option><option value="terminal">💳 Terminal</option><option value="ach">🏦 ACH</option><option value="zelle">📲 Zelle/Otro</option></select></div>
       <div class="field"><label>Origen (opcional)</label><input id="i-source" placeholder="De quién / de dónde"></div>
     </div>
-    <div class="field"><label>Nota (opcional)</label><input id="i-note" placeholder="Detalle del ingreso"></div>
+    <div class="field"><label>Concepto / qué fue</label><input id="i-note" placeholder="Ej. venta de catalizador, computadora…"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeInc()">Cancelar</button>
       <button class="btn btn-primary" id="inc-save" onclick="saveInc()">Guardar ingreso</button>
@@ -419,7 +419,7 @@
       <input type="file" id="e-receipt" accept="image/*" capture="environment" onchange="previewReceipt()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
       <div id="e-receipt-preview" style="margin-top:8px;"></div>
     </div>
-    <div class="field"><label>Nota (opcional)</label><input id="e-note" placeholder="Detalle del gasto"></div>
+    <div class="field"><label>Concepto / qué fue</label><input id="e-note" placeholder="Ej. active grille shutter, radio, balatas…"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeExp()">Cancelar</button>
       <button class="btn btn-primary" id="exp-save" onclick="saveExp()">Guardar gasto</button>
@@ -648,13 +648,15 @@ function renderExpenses(){
     const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);text-decoration:none;font-size:12px;">📎 recibo</a>`:'';
     const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
     const who = e.vendor || e.source_name || '';
+    const concepto = e.note || e.category || (inc?'Ingreso':'Gasto');
+    const catChip = e.note ? `<span class="chip">${e.category||''}</span>` : '';
     const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(e.amountCents)}`;
     const act = inc ? '' : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`;
     return `<div class="row">
       <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:(inc?'💵':'🧾')}</div>
       <div class="row-main">
-        <div class="row-name">${e.category||(inc?'Ingreso':'Gasto')}${who?' · '+who:''}</div>
-        <div class="row-meta"><span class="chip">${(DEPT_LABEL[e.dept]||'').replace(/^\S+\s/,'')||e.dept}</span><span>${fmtDate(e.date)}</span>${car}${rec}</div>
+        <div class="row-name">${concepto}${who?' · '+who:''}</div>
+        <div class="row-meta"><span class="chip">${(DEPT_LABEL[e.dept]||'').replace(/^\S+\s/,'')||e.dept}</span>${catChip}<span>${fmtDate(e.date)}</span>${car}${rec}</div>
       </div>
       <div class="row-amt"><div class="row-amt-val" style="${inc?'color:#3ecf8e;':''}">${amt}</div><div class="row-amt-int">${act}</div></div>
     </div>`;
