@@ -902,6 +902,12 @@ function renderPortal() {
       </div>
     </div>`;
 
+  const _todayS = today();
+  const _appts = (serviceAppointments||[]).slice().sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  const nextAppt = _appts.filter(a=>(a.status||'scheduled')==='scheduled' && a.date>=_todayS)[0]||null;
+  const _lastAppt = _appts.filter(a=>a.date<_todayS||a.status==='done').sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0]||null;
+  const _lastServ = c.lastServiceDate || (_lastAppt&&_lastAppt.date) || '';
+  let nextServ2=''; if(_lastServ){ const _d=new Date(_lastServ+'T00:00:00'); _d.setMonth(_d.getMonth()+3); nextServ2=_d.getFullYear()+'-'+String(_d.getMonth()+1).padStart(2,'0')+'-'+String(_d.getDate()).padStart(2,'0'); }
   document.getElementById('portal-content').innerHTML = `
     <!-- SALUDO + VEHÍCULO + SALDO -->
     <div class="welcome-card">
@@ -954,6 +960,23 @@ function renderPortal() {
     ${insComplete ? insSectionHTML : ''}
     ${idComplete ? idSectionHTML : ''}
 
+    <!-- SERVICIO DE TU VEHÍCULO (premium) + AGENDAR -->
+    <div class="info-card" style="margin-top:16px;border:1px solid var(--gold3);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div class="section-title" style="margin:0;">${L==='en'?'Vehicle service':'Servicio de tu vehículo'}</div>
+        <span style="font-size:20px;">🔧</span>
+      </div>
+      <div class="info-row"><span class="ir-label">${L==='en'?'Next service due':'Próximo servicio sugerido'}</span><span class="ir-value" style="color:var(--green);">${nextServ2?formatDate(nextServ2):'—'}</span></div>
+      <div class="info-row"><span class="ir-label">${L==='en'?'Your next appointment':'Tu próxima cita'}</span><span class="ir-value" style="color:var(--gold);">${nextAppt?formatDate(nextAppt.date)+(nextAppt.time?' · '+bk12h(nextAppt.time):''):(L==='en'?'None scheduled':'Sin cita programada')}</span></div>
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
+        <div style="font-size:14px;color:var(--white);font-weight:500;margin-bottom:4px;">${L==='en'?'Book your appointment':'Agenda tu cita'}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${L==='en'?'Fridays, 9:00 to 4:00 — pick a day and time:':'Viernes de 9:00 a 4:00 — elige el día y la hora:'}</div>
+        <div id="book-days" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <div id="book-slots" style="margin-top:6px;"></div>
+        <div id="book-msg" style="margin-top:8px;font-size:13px;"></div>
+      </div>
+    </div>
+
     <!-- MENSAJES DE TEXTO (discreto) -->
     <div class="insurance-section" id="sms-section" style="margin-top:16px;padding:16px 20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -981,6 +1004,7 @@ function renderPortal() {
       <a onclick="location.href='sms:${dealerPhone}?body=${encodeURIComponent(t('contactMsg')(c))}'" style="font-size:13px;color:var(--muted);text-decoration:underline;cursor:pointer;">${t('contactBtn')}</a>
     </div>
   `;
+  renderBooking();
 }
 
 // ---- CONSENTIMIENTO SMS (TCPA) ----
