@@ -750,7 +750,7 @@ onAuthStateChanged(auth, async (user) => {
 
 // ---- HELPERS ----
 let clients = [];
-let editingId = null, payingId = null, waPhone = null;
+let editingId = null, payingId = null, waPhone = null, waLang = 'es';
 let currentView = 'grid';
 let currentSort = 'next'; // 'next', 'status', 'date', 'name', 'balance'
 
@@ -2332,6 +2332,7 @@ window.openWhatsApp=function(id,status){
   if(!c) return;
   waPhone=c.phone.replace(/\D/g,'');
   const lang=c.lang||'es';
+  waLang=lang;
   const nextPay=getNextPayDate(c);
   const balance=formatMoney(calcBalance(c));
   const days=Math.abs(daysUntil(nextPay));
@@ -2371,7 +2372,7 @@ window.openWhatsApp=function(id,status){
 
 window.sendWhatsApp=function(){
   const msg=document.getElementById('wa-text').value;
-  const _a1=document.createElement('a');_a1.href=`sms:${waPhone}?body=${encodeURIComponent(msg+portalTag(lang))}`;_a1.click();
+  const _a1=document.createElement('a');_a1.href=`sms:${waPhone}?body=${encodeURIComponent(msg+portalTag(waLang||'es'))}`;_a1.click();
   closeModal('wa-modal');
 };
 
