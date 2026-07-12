@@ -1306,7 +1306,7 @@ function apptTypeI18n(type,lang){
   return map[(type||'').toLowerCase()]||type;
 }
 const PORTAL_URL='https://legacymotorsgarage.com/portal.html';
-function portalTag(lang){ return (lang==='en'?'\n\n📲 See your appointment, service history & texts anytime in your portal:\n':'\n\n📲 Vea su cita, historial de servicio y sus mensajes cuando guste en su portal:\n')+PORTAL_URL; }
+function portalTag(lang){ return (lang==='en'?'\n\n📲 See your account info, service and more in your portal:\n':'\n\n📲 Vea la información de su cuenta, servicio y más en su portal:\n')+PORTAL_URL; }
 function apptMsg(a,kind){
   const nombre=(a.clientName||'').split(' ')[0];
   const lang=a.lang||'es';
