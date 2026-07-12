@@ -1304,7 +1304,7 @@ function apptTypeI18n(type,lang){
   return map[(type||'').toLowerCase()]||type;
 }
 const PORTAL_URL='https://legacymotorsgarage.com/portal.html';
-function portalTag(lang){ return (lang==='en'?'\n\n📲 Your portal (appointment, service & texts):\n':'\n\n📲 Tu portal (cita, servicio y mensajes):\n')+PORTAL_URL; }
+function portalTag(lang){ return (lang==='en'?'\n\n📲 See your appointment, service history & texts anytime in your portal:\n':'\n\n📲 Vea su cita, historial de servicio y sus mensajes cuando guste en su portal:\n')+PORTAL_URL; }
 function apptMsg(a,kind){
   const nombre=(a.clientName||'').split(' ')[0];
   const lang=a.lang||'es';
@@ -1318,18 +1318,17 @@ function apptMsg(a,kind){
   const svcBlock=svcs.join('\n');
   const car=a.carLabel?('\n🚗 '+a.carLabel):'';
   const fecha=apptFmtLong(a.date,lang);
-  const portal=(lang==='en'?'\n\n📲 View or change your appointment in your portal:\n':'\n\n📲 Ve o cambia tu cita en tu portal:\n')+PORTAL_URL;
   if(lang==='en'){
-    if(kind==='reminder') return `Hi ${nombre} 👋\n\nJust a reminder — your appointment at Legacy Motors Garage is tomorrow:\n\n📅 ${fecha}${hora}${car}\n\nWhat we'll do:\n${svcBlock}${portal}\n\nSee you then! Reply here if you need anything.\nLegacy Motors Garage · (559) 540-5145`;
-    return `Hi ${nombre} 👋\n\nYour appointment at Legacy Motors Garage is all set:\n\n📅 ${fecha}${hora}${car}\n\nWhat we'll do:\n${svcBlock}${portal}\n\nReply here anytime. See you then!\nLegacy Motors Garage · (559) 540-5145`;
+    if(kind==='reminder') return `Hi ${nombre}! 📅 Legacy Motors Garage LLC here.\n\nA friendly reminder that your service appointment is tomorrow:\n\n🗓️ ${fecha}${hora}${car}\n\nWe'll take care of:\n${svcBlock}\n\nNeed to make a change? Just reply to this message. See you then!\n\nThank you for your trust! 😊\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+    return `Hi ${nombre}! 📅 Legacy Motors Garage LLC here.\n\nYour appointment is all set — we look forward to seeing you:\n\n🗓️ ${fecha}${hora}${car}\n\nWe'll take care of:\n${svcBlock}\n\nNeed to make a change? Just reply to this message.\n\nThank you for your trust! 😊\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
   }
-  if(kind==='reminder') return `Hola ${nombre} 👋\n\nSolo un recordatorio — mañana es tu cita en Legacy Motors Garage:\n\n📅 ${fecha}${hora}${car}\n\nLo que haremos:\n${svcBlock}${portal}\n\n¡Aquí te esperamos! Responde aquí si necesitas algo.\nLegacy Motors Garage · (559) 540-5145`;
-  return `Hola ${nombre} 👋\n\n¡Tu cita en Legacy Motors Garage quedó lista!\n\n📅 ${fecha}${hora}${car}\n\nLo que haremos:\n${svcBlock}${portal}\n\nResponde aquí cuando quieras. ¡Te esperamos!\nLegacy Motors Garage · (559) 540-5145`;
+  if(kind==='reminder') return `¡Hola ${nombre}! 📅 Le saluda Legacy Motors Garage LLC.\n\nLe recordamos con gusto que mañana es su cita de servicio:\n\n🗓️ ${fecha}${hora}${car}\n\nLe atenderemos con:\n${svcBlock}\n\nCualquier cambio, solo responda a este mensaje. ¡Aquí le esperamos!\n\n¡Gracias por su confianza! 😊\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
+  return `¡Hola ${nombre}! 📅 Le saluda Legacy Motors Garage LLC.\n\n¡Su cita quedó agendada! Con gusto le esperamos:\n\n🗓️ ${fecha}${hora}${car}\n\nLe atenderemos con:\n${svcBlock}\n\nCualquier cambio, solo responda a este mensaje.\n\n¡Gracias por su confianza! 😊\n— Legacy Motors Garage LLC\n📞 (559) 540-5145`;
 }
 async function sendApptSms(a,kind){
   const phone=(a.phone||'').replace(/\D/g,'');
   if(!phone){ alert('Este contacto no tiene teléfono.'); return; }
-  const link=`sms:${phone}?body=${encodeURIComponent(apptMsg(a,kind))}`;
+  const link=`sms:${phone}?body=${encodeURIComponent(apptMsg(a,kind)+portalTag(a.lang))}`;
   const el=document.createElement('a'); el.href=link; el.click();
   try{ await updateDoc(doc(db,'appointments',a.id), kind==='reminder'?{reminderSent:true}:{confirmSent:true}); }catch(e){}
 }
