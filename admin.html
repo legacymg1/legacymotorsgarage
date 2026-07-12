@@ -573,9 +573,10 @@
     <div id="appt-walkin" style="display:none;">
       <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="appt-name" style="text-transform:capitalize;"></div>
       <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="appt-phone" type="tel" inputmode="tel" placeholder="(559) 000-0000" oninput="formatPhone(this)"></div>
-      <div class="form-group"><label class="form-label">Idioma del mensaje</label>
-        <select class="form-input" id="appt-lang"><option value="es">🇲🇽 Español</option><option value="en">🇺🇸 English</option></select>
-      </div>
+    </div>
+    <div class="form-group"><label class="form-label">📩 Idioma del mensaje al cliente</label>
+      <select class="form-input" id="appt-lang"><option value="es">🇲🇽 Español</option><option value="en">🇺🇸 English</option></select>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;">Se prellena con el idioma del cliente. Cámbialo a inglés/español según cómo deba ir el mensaje (el servicio se traduce solo).</div>
     </div>
     <div class="form-group"><label class="form-label">Carro(s) que trae</label><input class="form-input" id="appt-car" list="appt-car-list" placeholder="2019 Kia Forte" style="text-transform:capitalize;"><datalist id="appt-car-list"></datalist><div style="font-size:11px;color:var(--muted);margin-top:3px;">Si trae más de un carro, sepáralos con coma. (Se prellena con su carro si es cliente registrado.)</div></div>
     <div class="form-group"><label class="form-label">VIN (opcional)</label><input class="form-input" id="appt-vin" placeholder="Últimos dígitos o completo" oninput="this.value=this.value.toUpperCase()"></div>
@@ -1181,6 +1182,7 @@ window.onApptClientChange = function(){
     if(dl) dl.innerHTML=vs.map(x=>`<option value="${(x.label||'').replace(/"/g,'&quot;')}">`).join('');
     document.getElementById('appt-car').value = vs.length ? vs[0].label : [c.year,c.make,c.model,c.color].filter(Boolean).join(' ');
     document.getElementById('appt-vin').value = (vs[0]&&vs[0].vin) || c.vin || '';
+    document.getElementById('appt-lang').value = c.lang||'es';
   } else if(dl){ dl.innerHTML=''; }
 };
 window.saveAppt = async function(){
@@ -1221,7 +1223,7 @@ window.saveAppt = async function(){
   } else {
     const c=clients.find(x=>x.id===v);
     if(!c){ alert('Selecciona un cliente.'); return; }
-    clientId=c.id; clientName=c.name; phone=c.phone||''; lang=c.lang||'es';
+    clientId=c.id; clientName=c.name; phone=c.phone||''; lang=document.getElementById('appt-lang').value;
     if(carLabel||vin) await addVehicleToClient(clientId, {vin, label:carLabel});
   }
   const existing=document.getElementById('appt-id').value;
@@ -1339,7 +1341,8 @@ window.cancelAppt=async function(id){ const a=appointments.find(x=>x.id===id); i
 window.editAppt=function(id){
   const a=appointments.find(x=>x.id===id); if(!a) return;
   openApptModal(a.clientId||'');
-  if(!a.clientId){ pickApptClient('__walkin__'); document.getElementById('appt-name').value=a.clientName||''; document.getElementById('appt-phone').value=a.phone||''; document.getElementById('appt-lang').value=a.lang||'es'; }
+  if(!a.clientId){ pickApptClient('__walkin__'); document.getElementById('appt-name').value=a.clientName||''; document.getElementById('appt-phone').value=a.phone||''; }
+  document.getElementById('appt-lang').value=a.lang||'es';
   document.getElementById('appt-car').value=a.carLabel||'';
   document.getElementById('appt-vin').value=a.vin||'';
   document.getElementById('appt-id').value=a.id;
