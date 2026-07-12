@@ -2364,6 +2364,7 @@ window.openWhatsApp=function(id,status){
     }
   }
 
+  msg = msg + portalTag(lang);
   document.getElementById('wa-preview').textContent=msg;
   document.getElementById('wa-text').value=msg;
   waPhone=c.phone.replace(/\D/g,'');
@@ -2372,7 +2373,7 @@ window.openWhatsApp=function(id,status){
 
 window.sendWhatsApp=function(){
   const msg=document.getElementById('wa-text').value;
-  const _a1=document.createElement('a');_a1.href=`sms:${waPhone}?body=${encodeURIComponent(msg+portalTag(waLang||'es'))}`;_a1.click();
+  const _a1=document.createElement('a');_a1.href=`sms:${waPhone}?body=${encodeURIComponent(msg)}`;_a1.click();
   closeModal('wa-modal');
 };
 
