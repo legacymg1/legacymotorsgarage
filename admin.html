@@ -2292,19 +2292,19 @@ function getThanksMsg(c, nextPayDate, paidAmount) {
   // Use the amount the client ACTUALLY paid (last payment), not the scheduled weekly amount
   const amt = (paidAmount!=null && paidAmount!=='') ? paidAmount
     : ((c.payments && c.payments.length) ? c.payments[c.payments.length-1].amount : c.weekly);
-  return MESSAGES[lang].thanks
+  return (MESSAGES[lang].thanks
     .replace(/{nombre}/g, c.name.split(' ')[0])
     .replace(/{monto}/g, formatMoney(amt))
     .replace(/{carro}/g, `${c.year} ${c.make} ${c.model}`)
     .replace(/{saldo}/g, formatMoney(calcBalance(c)))
-    .replace(/{proximo}/g, formatDate(nextPayDate));
+    .replace(/{proximo}/g, formatDate(nextPayDate))) + portalTag(lang);
 }
 
 function getPaidOffMsg(c) {
   const lang = c.lang || 'es';
-  return MESSAGES[lang].paidOff
+  return (MESSAGES[lang].paidOff
     .replace(/{nombre}/g, c.name.split(' ')[0])
-    .replace(/{carro}/g, `${c.year} ${c.make} ${c.model}`);
+    .replace(/{carro}/g, `${c.year} ${c.make} ${c.model}`)) + portalTag(lang);
 }
 
 
