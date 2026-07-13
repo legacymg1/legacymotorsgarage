@@ -1107,6 +1107,7 @@ function startApptListening(){
     onSnapshot(query(collection(db,'appointments')), (snap)=>{
       appointments = snap.docs.map(d=>({id:d.id, ...d.data()}));
       if(window.renderAppointments) renderAppointments();
+      try{ renderTodayBox(); }catch(e){}
     }, (err)=>{ console.warn('citas offline', err); });
   }catch(e){ console.warn('appt listener', e); }
 }
@@ -2566,9 +2567,15 @@ function monthsSinceService(c) {
 }
 // Recordatorio de servicio: >= 90 dias desde el ultimo servicio.
 // Persiste hasta que se registre el servicio (antes solo aparecia el dia exacto 90/180/270 y se perdia).
+function hasUpcomingAppt(c) {
+  const t = today();
+  const appts = (typeof appointments !== 'undefined') ? appointments : [];
+  return appts.some(a => a.clientId === c.id && (a.status||'scheduled') === 'scheduled' && (a.date||'') >= t);
+}
 function getServiceReminderClients() {
   const todayD = new Date(today()+'T12:00:00');
   return clients.filter(c => {
+    if(hasUpcomingAppt(c)) return false;   // ya tiene cita agendada -> no la marcamos
     const base = serviceBaseDate(c);
     if(!base) return false;
     return Math.round((todayD - new Date(base+'T12:00:00'))/86400000) >= 90;
