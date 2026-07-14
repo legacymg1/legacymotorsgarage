@@ -643,9 +643,20 @@ window.signAndSave = async function(){
   if(!__user){ alert('No hay sesion iniciada. Abre el contrato desde la tarjeta del cliente estando dentro del admin (con tu cuenta), y vuelve a intentar. Si ya estas dentro, cierra esta pestana y reabre el contrato.'); return; }
   var sigData=es.canvas.toDataURL('image/png');
   var stamp=new Date().toLocaleString('en-US');
+  var stampNice=new Date().toLocaleString('en-US',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
   es.buyerLines.forEach(function(line){
     var label=line.innerHTML;
-    line.innerHTML='<img src="'+sigData+'" alt="signature" style="height:52px;display:block;margin:0 auto 2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:8pt;color:#555;">Firmado electronicamente / Signed: '+stamp+'</span></div>';
+    line.innerHTML='<img src="'+sigData+'" alt="signature" style="height:52px;display:block;margin:0 auto 2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:7pt;color:#888;">Firmado electr&oacute;nicamente / e-signed</span></div>';
+    var row=line.parentNode;
+    if(row && row.querySelectorAll){
+      var sibs=row.querySelectorAll('.sign-line');
+      for(var i=0;i<sibs.length;i++){
+        var sl=sibs[i];
+        if(sl!==line && sl.textContent && sl.textContent.replace(/\s/g,'').toLowerCase()==='date'){
+          sl.innerHTML=stampNice+'<br><span style="font-size:8pt;color:#555;">Date</span>';
+        }
+      }
+    }
   });
   if(es.initCanvas){
     var iniData=es.initCanvas.toDataURL('image/png');
