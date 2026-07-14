@@ -7,7 +7,6 @@ const VALOR_APPID = defineSecret("VALOR_APPID");
 const VALOR_APPKEY = defineSecret("VALOR_APPKEY");
 const VALOR_EPI = defineSecret("VALOR_EPI");
 
-// Bases de Valor. Diagnóstico: probamos producción (solo para PEDIR TOKEN, no cobra).
 const BASES = {
   sandbox: "https://securelink-staging.valorpaytech.com:4430",
   production: "https://securelink.valorpaytech.com:4430"
@@ -17,23 +16,20 @@ exports.hello = onRequest({ region: "us-central1", cors: true }, (req, res) => {
   res.json({ ok: true, msg: "Legacy DMS backend está vivo 🚗", time: new Date().toISOString() });
 });
 
+// Fase 1: pide un Client Token a Valor. Los parámetros van en el QUERY STRING (no en el body).
 exports.getClientToken = onRequest(
   { region: "us-central1", cors: true, secrets: [VALOR_APPID, VALOR_APPKEY, VALOR_EPI] },
   async (req, res) => {
-    const mode = (req.query.mode === "production") ? "production" : "sandbox";
+    const mode = (req.query.mode === "sandbox") ? "sandbox" : "production";
     const base = BASES[mode];
     try {
-      const payload = {
-        appid: VALOR_APPID.value(),
-        appkey: VALOR_APPKEY.value(),
-        epi: VALOR_EPI.value(),
-        txn_type: "sale"
-      };
-      const r = await fetch(base + "/?saleapi=", {
-        method: "POST",
-        headers: { accept: "application/json", "content-type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+      const params = new URLSearchParams();
+      params.set("appid", VALOR_APPID.value());
+      params.set("appkey", VALOR_APPKEY.value());
+      params.set("epi", VALOR_EPI.value());
+      params.set("txn_type", "sale");
+      const url = base + "/?" + params.toString();
+      const r = await fetch(url, { method: "POST", headers: { accept: "application/json" } });
       const txt = await r.text();
       let data; try { data = JSON.parse(txt); } catch (e) { data = { raw: txt }; }
       if (data && data.clientToken) {
