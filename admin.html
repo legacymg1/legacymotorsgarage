@@ -1715,12 +1715,12 @@ window.renderAll = function() {
             var daysLeft=exp?Math.round((new Date(exp+'T00:00:00')-new Date(t+'T00:00:00'))/86400000):999;
             if(daysLeft<0) return '<div style="font-size:11px;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">🔴 Seguro vencido</div>';
             if(daysLeft<=30) return '<div style="font-size:11px;background:rgba(255,214,0,0.12);color:var(--yellow);border:1px solid var(--yellow);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">⚠️ Seguro vence en '+daysLeft+'d</div>';
-            return '<div onclick="event.stopPropagation();'+(c.insurancePhotoURL?('window.open(\''+c.insurancePhotoURL+'\',\'_blank\')'):'')+'" title="'+(c.insurancePhotoURL?'Ver foto del seguro':'Sin foto guardada')+'" style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;cursor:'+(c.insurancePhotoURL?'pointer':'default')+';">✅ Seguro activo · '+ins+(c.insurancePhotoURL?' 📷':'')+'</div>';
+            return '<div onclick="event.stopPropagation();'+(c.insurancePhotoURL?('showPhoto(\''+c.insurancePhotoURL+'\',\'Seguro\')'):'')+'" title="'+(c.insurancePhotoURL?'Ver foto del seguro':'Sin foto guardada')+'" style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;cursor:'+(c.insurancePhotoURL?'pointer':'default')+';">✅ Seguro activo · '+ins+(c.insurancePhotoURL?' 📷':'')+'</div>';
           })()}
           ${(c.contractNumber||c.contractDate) ? '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📋 '+(c.contractNumber?('Contrato '+c.contractNumber):'Contrato')+(c.contractDate?(' · '+formatDate(c.contractDate)):'')+'</div>' : ''}
           ${(c.signedContract&&c.signedContract.url) ? '<div style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">✅ Contrato firmado'+(c.signedContract.version?(' v'+c.signedContract.version):'')+(c.signedContract.signedAt?(' · '+formatDate(c.signedContract.signedAt)):'')+'</div>' : ''}
           ${c.vehicleInventoryNum ? '<div style="font-size:11px;color:var(--gold);margin-bottom:8px;">🔑 Inventario #'+c.vehicleInventoryNum+'</div>' : ''}
-          ${c.idNumber ? '<div onclick="event.stopPropagation();'+(c.idPhotoURL?('window.open(\''+c.idPhotoURL+'\',\'_blank\')'):'')+'" title="'+(c.idPhotoURL?'Ver foto del ID':'Sin foto guardada')+'" style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;cursor:'+(c.idPhotoURL?'pointer':'default')+';">🪪 ID ✓'+(c.idPhotoURL?' 📷':'')+'</div>' : '<div style="font-size:11px;background:rgba(255,59,59,0.1);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 Sin ID</div>'}
+          ${c.idNumber ? '<div onclick="event.stopPropagation();'+(c.idPhotoURL?('showPhoto(\''+c.idPhotoURL+'\',\'ID\')'):'')+'" title="'+(c.idPhotoURL?'Ver foto del ID':'Sin foto guardada')+'" style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;cursor:'+(c.idPhotoURL?'pointer':'default')+';">🪪 ID ✓'+(c.idPhotoURL?' 📷':'')+'</div>' : '<div style="font-size:11px;background:rgba(255,59,59,0.1);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 Sin ID</div>'}
           <div class="payment-row"><span class="pay-label">${c.freq==='monthly'?'Pago mensual':c.freq==='biweekly'?'Pago quincenal':'Pago semanal'}</span><span class="pay-value">${formatMoney(c.weekly)}</span></div>
           <div class="payment-row"><span class="pay-label">Próximo pago</span><span class="pay-value" style="color:${payColor}">${status==='paidoff'?'Auto pagado':formatDate(nextPay)+dayLabel}</span></div>
           <div class="payment-row"><span class="pay-label">Pagos</span><span class="pay-value">${paidCount} de ${totalPay}</span></div>
@@ -2958,6 +2958,25 @@ window.generateContractFromForm = function() {
     const w2 = window.open(esFile + qs, '_blank');
     if(!w1 || !w2) alert('⚠️ Tu navegador bloqueó una ventana. Permite las ventanas emergentes (pop-ups) para este sitio y vuelve a generar el contrato.');
   }
+};
+
+window.showPhoto = function(url, title){
+  if(!url) return;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML = '<div style="color:#fff;font-size:14px;margin-bottom:10px;font-weight:600;">'+(title||'Documento')+'</div>'
+    + '<img src="'+url+'" style="max-width:96%;max-height:78vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);background:#fff;" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'[data-fallback]\').style.display=\'block\';">'
+    + '<div data-fallback style="display:none;color:#fff;margin-top:10px;">No se pudo previsualizar (puede ser PDF). <a href="'+url+'" target="_blank" style="color:#f0c040;">Abrir en pestaña nueva</a></div>'
+    + '<div style="margin-top:14px;display:flex;gap:10px;">'
+    + '<a href="'+url+'" target="_blank" style="background:transparent;color:#f0c040;border:1px solid #f0c040;border-radius:8px;padding:8px 16px;text-decoration:none;font-size:13px;">Abrir en pestaña ↗</a>'
+    + '<button type="button" data-close style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">Cerrar ✕</button>'
+    + '</div>';
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if(e.key === 'Escape') close(); };
+  ov.addEventListener('click', (e) => { if(e.target === ov) close(); });
+  ov.querySelector('[data-close]').onclick = close;
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
 };
 
 window.generateContract = function(clientId) {
