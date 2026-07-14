@@ -14628,16 +14628,22 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <input class="cf-input" id="car-year" placeholder="Year / Año" type="number">
     <input class="cf-input" id="car-make" placeholder="Make / Marca (Toyota)" style="text-transform:capitalize">
     <input class="cf-input" id="car-model" placeholder="Model / Modelo (Camry)" style="text-transform:capitalize">
-    <input class="cf-input" id="car-price" placeholder="Price / Precio ($)" type="number">
-    <input class="cf-input" id="car-weekly" placeholder="Weekly Payment / Pago Semanal ($)" type="number">
     <input class="cf-input" id="car-miles" placeholder="Mileage / Millas">
     <input class="cf-input" id="car-vin" placeholder="VIN Number" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
-    <textarea class="cf-input" id="car-desc" rows="2" placeholder="Description / Descripción" style="resize:vertical;"></textarea>
-    <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;">📸 Fotos / Photos</label>
-    <input type="file" class="cf-input" id="car-photos" accept="image/*" multiple style="padding:8px;cursor:pointer;">
-    <div id="car-photo-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
-    <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">🎥 Video</label>
-    <input type="file" class="cf-input" id="car-video" accept="video/*" style="padding:8px;cursor:pointer;">
+    <div id="car-prep-only" style="display:none;">
+      <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">🔧 <b>Preparación (interno).</b> Registra lo que nos costó el carro. Las fotos, video, descripción y precio de venta se piden después, al editarlo para exhibición.</div>
+      <input class="cf-input" id="car-cost" placeholder="Costo de compra / lo que pagamos ($)" type="number">
+    </div>
+    <div id="car-exhib-only">
+      <input class="cf-input" id="car-price" placeholder="Price / Precio ($)" type="number">
+      <input class="cf-input" id="car-weekly" placeholder="Weekly Payment / Pago Semanal ($)" type="number">
+      <textarea class="cf-input" id="car-desc" rows="2" placeholder="Description / Descripción" style="resize:vertical;"></textarea>
+      <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;">📸 Fotos / Photos</label>
+      <input type="file" class="cf-input" id="car-photos" accept="image/*" multiple style="padding:8px;cursor:pointer;">
+      <div id="car-photo-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+      <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">🎥 Video</label>
+      <input type="file" class="cf-input" id="car-video" accept="video/*" style="padding:8px;cursor:pointer;">
+    </div>
     <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">📍 Foto del GPS (para identificar el carro)</label>
     <input type="file" class="cf-input" id="car-gps-photo" accept="image/*" capture="environment" style="padding:8px;cursor:pointer;">
     <div id="car-gps-preview" style="margin-top:6px;"></div>
@@ -14950,6 +14956,11 @@ window.openCarModal = function(carId){
   document.getElementById('car-gps-photo').value='';
   const _gpsC = editingCarId ? cars.find(x=>x.id===editingCarId) : null;
   document.getElementById('car-gps-preview').innerHTML = (_gpsC && _gpsC.gpsPhotoURL) ? '<a href="'+_gpsC.gpsPhotoURL+'" target="_blank" style="color:#f0c040;font-size:12px;">📍 Ver foto GPS actual</a>' : '';
+  // Nuevo = etapa PREP (solo costo); Editar = etapa EXHIBICIÓN (formulario completo)
+  document.getElementById('car-prep-only').style.display = carId ? 'none' : 'block';
+  document.getElementById('car-exhib-only').style.display = carId ? 'block' : 'none';
+  const _cc=document.getElementById('car-cost'); if(_cc) _cc.value='';
+  if(!carId) title.textContent='Agregar (Preparación) / Add (Prep)';
   modal.style.display='flex';
 }
 window.closeCarModal = function(){document.getElementById('car-modal').style.display='none';}
@@ -15064,6 +15075,23 @@ window.saveCar = async function(){
     };
     
     await setDoc(doc(db,'inventory',id), data);
+    // Costo de compra (solo al AGREGAR, si se registró): queda como gasto en el libro (bolsa Dealer)
+    const _cost = parseFloat((document.getElementById('car-cost')||{}).value) || 0;
+    if(!editingCarId && _cost > 0){
+      try{
+        const exId = 'exp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+        await setDoc(doc(db,'transactions',exId), {
+          entryId:exId, type:'expense', dept:'dealer', category:'Compra del vehículo',
+          amountCents: Math.round(_cost*100),
+          method:'', date:new Date().toISOString().slice(0,10), vendor:'',
+          carId:id, carLabel:((data.year||'')+' '+make+' '+model).trim()+' · #'+data.inventoryNum,
+          receiptURL:'', note:'Costo de adquisición (registrado al agregar el carro)',
+          createdAt:new Date().toISOString(),
+          createdBy:(auth.currentUser&&auth.currentUser.email)||'',
+          source:'inventory'
+        });
+      }catch(exErr){ console.warn('No se pudo registrar el costo de compra:', exErr); }
+    }
     closeCarModal();
   } catch(e) {
     alert('Error: '+e.message);
