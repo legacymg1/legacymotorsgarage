@@ -1718,7 +1718,7 @@ window.renderAll = function() {
             var photoLink=c.insurancePhotoURL?'<a href="'+c.insurancePhotoURL+'" target="_blank" style="color:var(--green);">📄</a>':'';
             return '<div style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">✅ Seguro activo · '+ins+' '+photoLink+'</div>';
           })()}
-          ${c.contractDate ? '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📋 Contrato: '+formatDate(c.contractDate)+'</div>' : ''}
+          ${(c.contractNumber||c.contractDate) ? '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📋 '+(c.contractNumber?('Contrato '+c.contractNumber):'Contrato')+(c.contractDate?(' · '+formatDate(c.contractDate)):'')+'</div>' : ''}
           ${c.vehicleInventoryNum ? '<div style="font-size:11px;color:var(--gold);margin-bottom:8px;">🔑 Inventario #'+c.vehicleInventoryNum+'</div>' : ''}
           ${c.idNumber ? '<div style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 ID ✓</div>' : '<div style="font-size:11px;background:rgba(255,59,59,0.1);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 Sin ID</div>'}
           <div class="payment-row"><span class="pay-label">${c.freq==='monthly'?'Pago mensual':c.freq==='biweekly'?'Pago quincenal':'Pago semanal'}</span><span class="pay-value">${formatMoney(c.weekly)}</span></div>
@@ -1991,6 +1991,7 @@ window.saveClient=async function(){
     freq,
     lang,
     contractDate,
+    contractNumber: (existing.contractNumber) || ((freq === 'cash' ? 'LMG-CASH-' : 'LMG-') + new Date().getFullYear() + '-' + String(Date.now()).slice(-5)),
     salesTax: Number(document.getElementById('f-tax')?.value)||0,
     ccoaAccepted: document.getElementById('f-ccoa')?.value === 'yes',
     ccoaFee: document.getElementById('f-ccoa')?.value === 'yes' ? (Number(document.getElementById('f-total')?.value)||0) <= 4999 ? 75 : (Number(document.getElementById('f-total')?.value)||0) <= 9999 ? 150 : 250 : 0,
@@ -2912,7 +2913,8 @@ window.generateContractFromForm = function() {
   const freq = document.getElementById('f-freq')?.value || 'weekly';
   // Get client lang for Spanish civil code compliance
   const clientLang = document.getElementById('f-lang')?.value || 'es';
-  const contractNum = (freq === 'cash' ? 'LMG-CASH-' : 'LMG-') + new Date().getFullYear() + '-' + String(Date.now()).slice(-5);
+  const _exC = editingId ? clients.find(x=>x.id===editingId) : null;
+  const contractNum = (_exC && _exC.contractNumber) || ((freq === 'cash' ? 'LMG-CASH-' : 'LMG-') + new Date().getFullYear() + '-' + String(Date.now()).slice(-5));
   const params = new URLSearchParams({
     contractNum: contractNum,
     name: name,
@@ -2962,7 +2964,8 @@ window.generateContract = function(clientId) {
   if(!c) return;
   
   // Build contract URL with client data as query params
-  const contractNum = (c.freq === 'cash' ? 'LMG-CASH-' : 'LMG-') + new Date().getFullYear() + '-' + String(Date.now()).slice(-5);
+  const contractNum = c.contractNumber || ((c.freq === 'cash' ? 'LMG-CASH-' : 'LMG-') + new Date().getFullYear() + '-' + String(Date.now()).slice(-5));
+  if(!c.contractNumber){ try{ updateDoc(doc(db,'clients',c.id), {contractNumber: contractNum}); }catch(e){} }
   const params = new URLSearchParams({
     contractNum: contractNum,
     name: c.name || '',
