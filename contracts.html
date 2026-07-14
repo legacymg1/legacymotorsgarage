@@ -619,7 +619,7 @@ window.signAndSave = async function(){
     var label=line.innerHTML;
     line.innerHTML='<img src="'+sigData+'" alt="signature" style="height:52px;display:block;margin:0 auto 2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:8pt;color:#555;">Firmado electronicamente / Signed: '+stamp+'</span></div>';
   });
-  document.querySelectorAll('.esign-wrap, .action-bar').forEach(function(el){el.remove();});
+  document.querySelectorAll('.esign-wrap, .action-bar, .lmg-banner').forEach(function(el){el.remove();});
   document.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); el.style.cursor=''; });
   document.querySelectorAll('script').forEach(function(s){s.remove();});
   var snapshotHTML='<!doctype html>'+document.documentElement.outerHTML;
@@ -631,16 +631,82 @@ window.signAndSave = async function(){
     var app=A2.getApps().length?A2.getApps()[0]:A2.initializeApp(cfg);
     var db=FS.getFirestore(app), st=ST.getStorage(app);
     var cnum=q.get('contractNum')||('LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5));
-    var path='contracts/'+clientId+'/'+cnum+'.html';
+    var snap=await FS.getDoc(FS.doc(db,'clients',clientId));
+    var existing=snap.exists()?snap.data():{};
+    var versions=Array.isArray(existing.signedContractVersions)?existing.signedContractVersions.slice():[];
+    var reason=null; try{ reason=sessionStorage.getItem('correctionReason'); }catch(e){}
+    var newVer=versions.length+1;
+    var path='contracts/'+clientId+'/'+cnum+'-v'+newVer+'.html';
     var sref=ST.ref(st,path);
     await ST.uploadString(sref, snapshotHTML, 'raw', {contentType:'text/html; charset=utf-8'});
     var url=await ST.getDownloadURL(sref);
-    var snap=await FS.getDoc(FS.doc(db,'clients',clientId));
-    var existing=snap.exists()?snap.data():{};
-    await FS.setDoc(FS.doc(db,'clients',clientId),Object.assign({},existing,{signedContract:{url:url,contractNumber:cnum,signedAt:new Date().toISOString(),method:'esign'}}));
-    alert('Contrato firmado y guardado. Numero: '+cnum);
+    var nowIso=new Date().toISOString();
+    versions=versions.map(function(v){ if(v.status==='active'){ v.status='voided'; v.voidedAt=nowIso; v.voidReason=reason||'Correccion'; } return v; });
+    var entry={version:newVer,url:url,contractNumber:cnum,signedAt:nowIso,method:'esign',status:'active'};
+    if(reason) entry.correctionReason=reason;
+    versions.push(entry);
+    await FS.setDoc(FS.doc(db,'clients',clientId),Object.assign({},existing,{signedContractVersions:versions,signedContract:entry}));
+    try{ sessionStorage.removeItem('correctionReason'); }catch(e){}
+    alert('Contrato firmado y guardado. Numero: '+cnum+' (version '+newVer+').');
+    var u2=new URL(window.location.href); u2.searchParams.delete('__correct'); u2.searchParams.set('_cb', String(Date.now())); window.location.href=u2.toString();
   }catch(e){ alert('Error al guardar: '+e.message); }
 }
+
+// ===== BLOQUEO DE CONTRATO FIRMADO + CORRECCION (versionado) =====
+(async function checkLock(){
+  var q=new URLSearchParams(window.location.search);
+  var clientId=q.get('clientId');
+  if(!clientId) return; // abierto desde el formulario: queda editable
+  var correcting = q.get('__correct')==='1';
+  try{
+    var A2=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+    var FS=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    var cfg={apiKey:"AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",authDomain:"legacy-motors-garage.firebaseapp.com",projectId:"legacy-motors-garage",storageBucket:"legacy-motors-garage.firebasestorage.app",messagingSenderId:"783567672493",appId:"1:783567672493:web:3a825f2f59ec1c25e9a224"};
+    var app=A2.getApps().length?A2.getApps()[0]:A2.initializeApp(cfg);
+    var db=FS.getFirestore(app);
+    var snap=await FS.getDoc(FS.doc(db,'clients',clientId));
+    var data=snap.exists()?snap.data():{};
+    if(correcting){
+      var reason=''; try{ reason=sessionStorage.getItem('correctionReason')||''; }catch(e){}
+      var nextV=((data.signedContractVersions||[]).length)+1;
+      var b=document.createElement('div'); b.className='lmg-banner no-print';
+      b.style.cssText='position:sticky;top:0;z-index:9998;background:#b45309;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;text-align:center;';
+      b.innerHTML='&#9999;&#65039; CORRIGIENDO — al firmar se creara la version '+nextV+' y la anterior quedara ANULADA.'+(reason?(' Motivo: '+reason):'');
+      document.body.insertBefore(b, document.body.firstChild);
+      return;
+    }
+    var sc=data.signedContract;
+    if(sc && sc.status==='active'){ lockContract(sc, (data.signedContractVersions||[])); }
+  }catch(e){ /* si falla la lectura, no bloquea */ }
+})();
+
+function lockContract(sc, versions){
+  document.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); el.style.borderBottom=''; el.style.cursor=''; });
+  document.querySelectorAll('.esign-wrap, .action-bar, .lmg-banner').forEach(function(el){ el.remove(); });
+  document.querySelectorAll('.opt-box').forEach(function(b){ b.onclick=null; b.style.cursor='default'; });
+  var d=new Date(sc.signedAt); var ds=isNaN(d.getTime())?sc.signedAt:d.toLocaleString('en-US');
+  var voided=(versions||[]).filter(function(v){return v.status==='voided';}).length;
+  var banner=document.createElement('div'); banner.className='lmg-banner no-print';
+  banner.style.cssText='position:sticky;top:0;z-index:9998;background:#065f46;color:#fff;padding:12px 14px;font-size:13px;font-weight:600;text-align:center;';
+  banner.innerHTML='&#9989; CONTRATO FIRMADO — '+(sc.contractNumber||'')+' &middot; '+ds+' &middot; version '+(sc.version||1)+(voided?(' &middot; ('+voided+' anterior(es) anulada(s))'):'')+'<br><span style="font-weight:400;font-size:11px;">Documento oficial bloqueado. Para corregir un error usa el boton Corregir.</span>';
+  document.body.insertBefore(banner, document.body.firstChild);
+  var bar=document.createElement('div'); bar.className='no-print';
+  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid #f0c040;padding:12px;display:flex;gap:10px;justify-content:center;z-index:9999;flex-wrap:wrap;';
+  bar.innerHTML='<button onclick="window.open(\''+sc.url+'\',\'_blank\')" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;">&#128196; Ver firmado oficial</button>'
+    +'<button onclick="window.print()" style="background:transparent;color:#f0c040;border:2px solid #f0c040;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;">&#128424;&#65039; Imprimir</button>'
+    +'<button onclick="startCorrection()" style="background:transparent;color:#f0c040;border:1px solid #b45309;border-radius:8px;padding:12px 20px;font-size:13px;cursor:pointer;">&#9999;&#65039; Corregir (nueva version)</button>'
+    +'<button onclick="window.close()" style="background:transparent;color:#aaa;border:1px solid #444;border-radius:8px;padding:12px 16px;font-size:14px;cursor:pointer;">&#10005; Cerrar</button>';
+  document.body.appendChild(bar);
+  document.body.style.paddingBottom='90px';
+}
+
+window.startCorrection=function(){
+  var reason=prompt('Motivo de la correccion (queda guardado en el registro). Ejemplo: se corrigio el numero de pagos.');
+  if(reason===null) return;
+  if(!reason.trim()){ alert('Escribe el motivo para continuar.'); return; }
+  try{ sessionStorage.setItem('correctionReason', reason.trim()); }catch(e){}
+  var u=new URL(window.location.href); u.searchParams.set('__correct','1'); u.searchParams.set('_cb', String(Date.now())); window.location.href=u.toString();
+};
 </script>
 </body>
 </html>
