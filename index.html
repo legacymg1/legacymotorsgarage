@@ -7387,6 +7387,10 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></a>
     <h2 class="section-title">Available Vehicles<br><em>Vehículos Disponibles</em></h2>
     <p class="section-sub">Quality vehicles at prices that work for every family. All with financing available.</p>
   </div>
+  <div class="inv-controls" style="max-width:1200px;margin:0 auto 16px;padding:0 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <input id="inv-search" oninput="renderCars()" placeholder="🔍 Buscar: año, marca, modelo, VIN, # inventario…" style="flex:1;min-width:200px;background:#12161f;border:1px solid rgba(255,255,255,0.14);border-radius:10px;padding:13px 15px;color:#fff;font-size:14px;outline:none;">
+    <button id="add-car-top" onclick="openCarModal()" style="display:none;background:linear-gradient(135deg,#f0c040,#c8960c);color:#000;border:none;border-radius:10px;padding:13px 20px;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap;letter-spacing:0.5px;">+ Agregar vehículo</button>
+  </div>
   <div class="cars-grid" id="cars-grid"></div>
   <button class="add-car-btn" id="add-car-btn" onclick="openCarModal()">+ Add Vehicle / Agregar Vehículo</button>
   <div class="marketplace-wrap">
@@ -14725,8 +14729,9 @@ window.setAdmin = function(on, owner){
   document.body.classList.toggle('admin-on', !!on);    // navegar/ver = cualquier staff
   const ab=document.getElementById('admin-bar');
   const b=document.getElementById('add-car-btn');
-  if(isAdmin){ if(ab)ab.classList.add('on'); if(b)b.style.display='block'; }
-  else { if(ab)ab.classList.remove('on'); if(b)b.style.display='none'; }
+  const bt=document.getElementById('add-car-top');
+  if(isAdmin){ if(ab)ab.classList.add('on'); if(b)b.style.display='block'; if(bt)bt.style.display='inline-block'; }
+  else { if(ab)ab.classList.remove('on'); if(b)b.style.display='none'; if(bt)bt.style.display='none'; }
   if(typeof renderCars==='function')renderCars();
 }
 window.adminLogout = function(){ signOut(auth); };
@@ -14834,7 +14839,14 @@ window.renderCars = function(){
     grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--silver)"><div style="font-size:48px;margin-bottom:16px;">🚗</div><div style="font-family:var(--font-display);font-size:22px;font-weight:300;margin-bottom:8px;color:var(--white)">Coming Soon · Próximamente</div><div style="font-size:13px;letter-spacing:1px">View our current inventory on Facebook Marketplace</div></div>';
     return;
   }
-  grid.innerHTML=cars.filter(function(c){return c.status!=='prep' || isStaffUser;}).map(function(c,i){
+  var _q=(document.getElementById('inv-search')?document.getElementById('inv-search').value:'').trim().toLowerCase();
+  var _list=cars.filter(function(c){
+    if(!(c.status!=='prep' || isStaffUser)) return false;
+    if(_q){ var hay=((c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.vin||'')+' '+(c.inventoryNum||'')).toLowerCase(); if(hay.indexOf(_q)<0) return false; }
+    return true;
+  });
+  if(_q && !_list.length){ grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--silver);">Sin resultados para “'+_q+'”</div>'; return; }
+  grid.innerHTML=_list.map(function(c,i){
     var thumbSrc = (c.photos&&c.photos[0]) ? c.photos[0] : (c.gpsPhotoURL||'');
     var thumb = thumbSrc ? '<img src="'+thumbSrc+'" onerror="imgFallback(this,220)" style="width:100%;height:220px;object-fit:cover;display:block;" loading="lazy">' : '<div style="width:100%;height:220px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;font-size:48px;">🚗</div>';
     var videoIcon = c.videoURL ? '<div style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;">▶ Video</div>' : '';
