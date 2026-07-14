@@ -2989,28 +2989,48 @@ async function blobToJpeg(blob){
     img.src=u;
   });
 }
-window.repairDocs = async function(){
-  if(!confirm('Revisar TODOS los documentos (ID y seguro) y convertir a imagen los que sean PDF u otro formato.\n\n• Los archivos originales NO se borran.\n• Recomendado: hazlo en el iPad (para fotos HEIC de iPhone).\n\n¿Continuar?')) return;
-  const st=getStorage(); let scanned=0,fixed=0,skipped=0,failed=0; const log=[];
-  for(const c of clients){
-    for(const field of ['idPhotoURL','insurancePhotoURL']){
-      const u=c[field]; if(!u) continue; scanned++;
-      try{
-        const resp=await fetch(u); if(!resp.ok) throw new Error('HTTP '+resp.status);
-        const blob=await resp.blob();
-        const sig=new Uint8Array(await blob.slice(0,4).arrayBuffer());
-        if((sig[0]===0xFF&&sig[1]===0xD8)||(sig[0]===0x89&&sig[1]===0x50)||(sig[0]===0x47&&sig[1]===0x49)){ skipped++; continue; }
-        const jpeg=await blobToJpeg(blob);
-        const folder = field==='idPhotoURL'?'ids':'insurance';
-        const r=ref(st, folder+'/'+c.id+'/'+Date.now()+'_repaired.jpg');
-        await uploadBytes(r, jpeg, {contentType:'image/jpeg'});
-        const newUrl=await getDownloadURL(r);
-        await updateDoc(doc(db,'clients',c.id), {[field]:newUrl});
-        c[field]=newUrl; fixed++; log.push('✓ '+(c.name||c.id)+' · '+(field==='idPhotoURL'?'ID':'Seguro'));
-      }catch(e){ failed++; log.push('✗ '+(c.name||c.id)+' · '+(field==='idPhotoURL'?'ID':'Seguro')+': '+e.message); }
+window.repairDocs = function(){
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;color:#111;border-radius:12px;max-width:540px;width:100%;max-height:88vh;overflow:auto;padding:20px;font-size:14px;';
+  box.innerHTML='<h3 style="margin:0 0 8px;font-size:17px;">🛠 Reparar fotos de ID / seguro</h3>'
+    +'<p style="color:#555;font-size:13px;line-height:1.5;margin:0 0 4px;">Revisa todos los documentos y convierte a imagen (JPG) los que sean PDF u otro formato. Los originales NO se borran.</p>'
+    +'<p style="color:#b45309;font-size:12px;line-height:1.5;margin:0 0 6px;">Recomendado: hazlo en el <strong>iPad</strong> (para fotos HEIC de iPhone).</p>'
+    +'<div data-prog style="margin:10px 0;font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;max-height:44vh;overflow:auto;background:#f5f5f5;border-radius:8px;padding:10px;display:none;"></div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;">'
+    +'<button data-cancel style="background:#eee;border:none;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;">Cerrar</button>'
+    +'<button data-go style="background:#22a06b;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-weight:700;cursor:pointer;">Comenzar</button>'
+    +'</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  const prog=box.querySelector('[data-prog]'), btnGo=box.querySelector('[data-go]'), btnCancel=box.querySelector('[data-cancel]');
+  btnCancel.onclick=()=>ov.remove();
+  const line=(s)=>{ prog.style.display='block'; prog.textContent += s+'\n'; prog.scrollTop=prog.scrollHeight; };
+  btnGo.onclick=async ()=>{
+    btnGo.disabled=true; btnGo.textContent='Trabajando…'; btnCancel.disabled=true;
+    const st=getStorage(); let scanned=0,fixed=0,skipped=0,failed=0;
+    for(const c of clients){
+      for(const field of ['idPhotoURL','insurancePhotoURL']){
+        const u=c[field]; if(!u) continue; scanned++;
+        const who=(c.name||c.id)+' · '+(field==='idPhotoURL'?'ID':'Seguro');
+        try{
+          const resp=await fetch(u); if(!resp.ok) throw new Error('HTTP '+resp.status);
+          const blob=await resp.blob();
+          const sig=new Uint8Array(await blob.slice(0,4).arrayBuffer());
+          if((sig[0]===0xFF&&sig[1]===0xD8)||(sig[0]===0x89&&sig[1]===0x50)||(sig[0]===0x47&&sig[1]===0x49)){ skipped++; line('• '+who+': ya es imagen'); continue; }
+          const jpeg=await blobToJpeg(blob);
+          const folder=field==='idPhotoURL'?'ids':'insurance';
+          const r=ref(st, folder+'/'+c.id+'/'+Date.now()+'_repaired.jpg');
+          await uploadBytes(r, jpeg, {contentType:'image/jpeg'});
+          const newUrl=await getDownloadURL(r);
+          await updateDoc(doc(db,'clients',c.id), {[field]:newUrl});
+          c[field]=newUrl; fixed++; line('✓ '+who+': convertido a imagen');
+        }catch(e){ failed++; line('✗ '+who+': '+(e&&e.message||e)); }
+      }
     }
-  }
-  alert('Reparación terminada.\n\nRevisadas: '+scanned+'\nConvertidas a imagen: '+fixed+'\nYa eran imagen: '+skipped+'\nFallaron: '+failed+(log.length?('\n\n'+log.join('\n')):''));
+    line('\n— LISTO —\nRevisadas: '+scanned+'  |  Convertidas: '+fixed+'  |  Ya eran imagen: '+skipped+'  |  Fallaron: '+failed);
+    btnGo.textContent='Terminado ✓'; btnCancel.disabled=false;
+  };
 };
 
 window.showPhoto = async function(url, title){
