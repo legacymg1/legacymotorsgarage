@@ -1941,7 +1941,7 @@ window.saveClient=async function(){
     try {
       const st = getStorage();
       const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_'+idPhotoFile.name);
-      await uploadBytes(idRef, idPhotoFile);
+      await uploadBytes(idRef, idPhotoFile, {contentType: idPhotoFile.type||'image/jpeg'});
       idPhotoURL = await getDownloadURL(idRef);
     } catch(storErr){ console.log('ID photo skipped:', storErr); }
   }
@@ -2960,13 +2960,12 @@ window.generateContractFromForm = function() {
   }
 };
 
-window.showPhoto = function(url, title){
+window.showPhoto = async function(url, title){
   if(!url) return;
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:100000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
   ov.innerHTML = '<div style="color:#fff;font-size:14px;margin-bottom:10px;font-weight:600;">'+(title||'Documento')+'</div>'
-    + '<img src="'+url+'" style="max-width:96%;max-height:78vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);background:#fff;" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'[data-fallback]\').style.display=\'block\';">'
-    + '<div data-fallback style="display:none;color:#fff;margin-top:10px;">No se pudo previsualizar (puede ser PDF). <a href="'+url+'" target="_blank" style="color:#f0c040;">Abrir en pestaña nueva</a></div>'
+    + '<div data-body style="color:#fff;font-size:13px;">Cargando…</div>'
     + '<div style="margin-top:14px;display:flex;gap:10px;">'
     + '<a href="'+url+'" target="_blank" style="background:transparent;color:#f0c040;border:1px solid #f0c040;border-radius:8px;padding:8px 16px;text-decoration:none;font-size:13px;">Abrir en pestaña ↗</a>'
     + '<button type="button" data-close style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">Cerrar ✕</button>'
@@ -2977,6 +2976,31 @@ window.showPhoto = function(url, title){
   ov.querySelector('[data-close]').onclick = close;
   document.addEventListener('keydown', onKey);
   document.body.appendChild(ov);
+  const body = ov.querySelector('[data-body]');
+  try{
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    let blob = await resp.blob();
+    let type = blob.type;
+    const sig = new Uint8Array(await blob.slice(0,4).arrayBuffer());
+    if(!type || type === 'application/octet-stream'){
+      if(sig[0]===0xFF && sig[1]===0xD8) type='image/jpeg';
+      else if(sig[0]===0x89 && sig[1]===0x50) type='image/png';
+      else if(sig[0]===0x25 && sig[1]===0x50 && sig[2]===0x44 && sig[3]===0x46) type='application/pdf';
+      else if(sig[0]===0x47 && sig[1]===0x49) type='image/gif';
+      else type='image/jpeg';
+      blob = new Blob([blob], {type});
+    }
+    const burl = URL.createObjectURL(blob);
+    if(type === 'application/pdf'){
+      body.innerHTML = '<iframe src="'+burl+'" style="width:92vw;height:80vh;border:none;border-radius:8px;background:#fff;"></iframe>';
+    } else {
+      body.innerHTML = '<img src="'+burl+'" style="max-width:96%;max-height:80vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);background:#fff;">';
+    }
+  }catch(err){
+    body.innerHTML = '<img src="'+url+'" style="max-width:96%;max-height:80vh;border-radius:8px;background:#fff;" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'[data-fb]\').style.display=\'block\';">'
+      + '<div data-fb style="display:none;color:#fff;">No se pudo previsualizar aquí. Usa <strong>Abrir en pestaña ↗</strong> abajo.</div>';
+  }
 };
 
 window.generateContract = function(clientId) {
