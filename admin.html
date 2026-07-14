@@ -1719,6 +1719,7 @@ window.renderAll = function() {
             return '<div style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">✅ Seguro activo · '+ins+' '+photoLink+'</div>';
           })()}
           ${(c.contractNumber||c.contractDate) ? '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">📋 '+(c.contractNumber?('Contrato '+c.contractNumber):'Contrato')+(c.contractDate?(' · '+formatDate(c.contractDate)):'')+'</div>' : ''}
+          ${(c.signedContract&&c.signedContract.url) ? '<div style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:8px;">✅ Contrato firmado'+(c.signedContract.version?(' v'+c.signedContract.version):'')+(c.signedContract.signedAt?(' · '+formatDate(c.signedContract.signedAt)):'')+'</div>' : ''}
           ${c.vehicleInventoryNum ? '<div style="font-size:11px;color:var(--gold);margin-bottom:8px;">🔑 Inventario #'+c.vehicleInventoryNum+'</div>' : ''}
           ${c.idNumber ? '<div style="font-size:11px;background:rgba(0,200,83,0.1);color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 ID ✓</div>' : '<div style="font-size:11px;background:rgba(255,59,59,0.1);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;display:inline-block;margin-bottom:6px;">🪪 Sin ID</div>'}
           <div class="payment-row"><span class="pay-label">${c.freq==='monthly'?'Pago mensual':c.freq==='biweekly'?'Pago quincenal':'Pago semanal'}</span><span class="pay-value">${formatMoney(c.weekly)}</span></div>
@@ -1737,6 +1738,7 @@ window.renderAll = function() {
           ${(!c.insurance||c.insuranceExp<today())?'<button class="btn" data-cid="'+c.id+'" onclick="event.stopPropagation();openInsuranceSMS(this.dataset.cid)" style="flex:0;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>':''}
           <button type="button" class="btn btn-edit" style="flex:0;padding:9px 10px;" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">✏️</button>
           <button class="btn" style="flex:0;padding:9px 10px;background:var(--gold3);color:var(--navy3);" onclick="event.stopPropagation();generateContract('${c.id}')" title="Generar Contrato">📄</button>
+          ${(c.signedContract&&c.signedContract.url) ? '<button class="btn" style="flex:0;padding:9px 10px;background:rgba(0,200,83,0.15);color:var(--green);border:1px solid var(--green);" onclick="event.stopPropagation();window.open(\''+c.signedContract.url+'\',\'_blank\')" title="Ver contrato firmado oficial">📑</button>' : ''}
           <button type="button" class="btn btn-delete" style="flex:0;padding:9px 10px;" data-action="delete" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">🗑</button>
         </div>
       </div>`;
