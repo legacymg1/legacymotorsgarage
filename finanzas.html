@@ -643,6 +643,10 @@ window.saveExp = async function(){
   btn.disabled=false; btn.textContent='Guardar gasto';
 };
 
+window.deleteInc = async function(id){
+  if(!confirm('¿Borrar este ingreso? No se puede deshacer.')) return;
+  try{ await deleteDoc(doc(db,'transactions',id)); }catch(e){ alert('Error: '+e.message); }
+};
 window.reverseExp = async function(id){
   const e=txns.find(x=>x.id===id); if(!e) return;
   if(!confirm(`¿Reversar este gasto de ${centsToUSD(e.amountCents)}?\n\nNo se borra: se agrega un renglón que lo cancela y ambos quedan en el libro.`)) return;
@@ -660,7 +664,7 @@ window.reverseExp = async function(id){
 };
 
 function renderExpenses(){
-  const LT=legacyTxns();
+  const LT=liveTxns();
   const reversed=new Set(LT.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
   const exps=LT.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id));
   const active=exps;
@@ -677,7 +681,7 @@ function renderExpenses(){
     const concepto = e.note || e.category || (inc?'Ingreso':'Gasto');
     const catChip = e.note ? `<span class="chip">${e.category||''}</span>` : '';
     const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(e.amountCents)}`;
-    const act = inc ? '' : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`;
+    const act = inc ? `<span onclick="deleteInc('${e.id}')" style="cursor:pointer;color:var(--faint);">🗑 borrar</span>` : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`;
     return `<div class="row">
       <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:(inc?'💵':'🧾')}</div>
       <div class="row-main">
