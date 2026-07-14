@@ -14835,7 +14835,8 @@ window.renderCars = function(){
     return;
   }
   grid.innerHTML=cars.filter(function(c){return c.status!=='prep' || isStaffUser;}).map(function(c,i){
-    var thumb = (c.photos&&c.photos[0]) ? '<img src="'+c.photos[0]+'" onerror="imgFallback(this,220)" style="width:100%;height:220px;object-fit:cover;display:block;" loading="lazy">' : '<div style="width:100%;height:220px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;font-size:48px;">🚗</div>';
+    var thumbSrc = (c.photos&&c.photos[0]) ? c.photos[0] : (c.gpsPhotoURL||'');
+    var thumb = thumbSrc ? '<img src="'+thumbSrc+'" onerror="imgFallback(this,220)" style="width:100%;height:220px;object-fit:cover;display:block;" loading="lazy">' : '<div style="width:100%;height:220px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;font-size:48px;">🚗</div>';
     var videoIcon = c.videoURL ? '<div style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;">▶ Video</div>' : '';
     var photoCount = (c.photos&&c.photos.length>1) ? '<div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.7);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;">📷 '+c.photos.length+'</div>' : '';
     var sealPos = c.status==='sold' ? 'top:8px;left:8px;' : 'top:8px;right:8px;';
@@ -14897,7 +14898,11 @@ window.openCarDetail = function(carId){
     if(c.photos.length>1) mediaHtml+='<div style="text-align:center;padding:6px;font-size:11px;color:#aaa;">← Swipe for more photos →</div>';
     mediaHtml+='</div>';
   } else if(!c.videoURL) {
-    mediaHtml+='<div style="position:relative;height:200px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;font-size:64px;">🚗'+soldRibbon+'</div>';
+    if(c.gpsPhotoURL){
+      mediaHtml+='<div style="position:relative;">'+soldRibbon+'<img src="'+c.gpsPhotoURL+'" onerror="imgFallback(this,280)" style="width:100%;height:280px;object-fit:cover;display:block;" loading="lazy"></div>';
+    } else {
+      mediaHtml+='<div style="position:relative;height:200px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;font-size:64px;">🚗'+soldRibbon+'</div>';
+    }
   }
   
   document.getElementById('cdm-media').innerHTML=mediaHtml;
