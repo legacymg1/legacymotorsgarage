@@ -670,7 +670,8 @@ window.updateInsurance = async function() {
   const expDate = document.getElementById('ins-exp-date').value;
   if(!number) { alert(t('insNeedPolicy')); return; }
   const _pf = document.getElementById('ins-photo').files[0];
-  if(!_pf && !currentClient.insurancePhotoURL) { alert(t('insNeedPhoto')); return; }
+  const _isCash = (currentClient.freq === 'cash');
+  if(!_isCash && !_pf && !currentClient.insurancePhotoURL) { alert(t('insNeedPhoto')); return; }
   
   const btn = document.querySelector('.ins-btn');
   btn.textContent = 'Guardando...';
@@ -926,12 +927,12 @@ function renderPortal() {
       <div class="ins-success" id="ins-success" style="display:none;"></div>
       <div class="ins-form" id="ins-edit-form" style="display:none;margin-top:14px;">
         <div class="ins-form-title">${t('insFormTitle')}</div>
-        <div style="background:rgba(255,214,0,0.1);border:1px solid var(--yellow);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--yellow);line-height:1.45;margin-bottom:12px;">${t('insLienholder')}</div>
+        ${c.freq !== 'cash' ? `<div style="background:rgba(255,214,0,0.1);border:1px solid var(--yellow);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--yellow);line-height:1.45;margin-bottom:12px;">${t('insLienholder')}</div>` : ''}
         <input class="fi" id="ins-company" placeholder="${t('insCompany')}" style="margin-bottom:10px;">
         <input class="fi" id="ins-number" placeholder="${t('policyNumber')}" style="margin-bottom:10px;">
         <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('expDate')}</label>
         <input class="fi" id="ins-exp-date" type="date" style="margin-bottom:10px;">
-        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('insPhoto')} <span style="color:var(--red);">*</span></label>
+        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('insPhoto')}${c.freq !== 'cash' ? ' <span style="color:var(--red);">*</span>' : ''}</label>
         <input type="file" id="ins-photo" accept="image/*,application/pdf" style="width:100%;background:var(--navy2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
         <div id="ins-photo-preview" style="margin:8px 0;"></div>
         <button class="ins-btn" onclick="updateInsurance()">${t('insBtn')}</button>
