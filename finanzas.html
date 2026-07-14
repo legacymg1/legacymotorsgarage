@@ -1176,7 +1176,7 @@ function renderPrivadas(){
   const rowCli=r=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:14px;"><span>${r.name}<span style="color:var(--faint);font-size:12px;">${r.car?' · '+r.car:''}</span></span><span style="color:var(--muted);white-space:nowrap;">${centsToUSD(r.paid)} cobrado</span></div>`;
   const rowPart=t=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:14px;"><span>${(t.note||t.category||'Venta de parte')}<span style="color:var(--faint);font-size:12px;">${t.date?' · '+fmtDate(t.date):''}</span></span><span style="color:var(--muted);white-space:nowrap;">${centsToUSD(t.amountCents)}</span></div>`;
   box.innerHTML=`
-    <div class="section-head" style="margin-top:22px;"><div class="section-title" style="font-size:14px;color:var(--muted);">🔒 Ventas privadas (fuera de Legacy · no cuentan en impuestos)</div></div>
+    <div class="section-head" style="margin-top:22px;"><div class="section-title" style="font-size:14px;color:var(--muted);">🔒 Ventas privadas (fuera de Legacy)</div></div>
     <div style="${cardCSS}">
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;">🚗 Dealer <span style="font-size:11px;color:var(--faint);font-weight:500;">· clientes privados</span></div>
       ${rows.length?rows.map(rowCli).join(''):empty('Aún no hay ventas privadas de Dealer.')}
