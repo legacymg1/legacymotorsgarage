@@ -261,6 +261,7 @@
     <div class="stat-card"><div class="stat-label">Esta semana</div><div class="stat-value sv-yellow" id="stat-soon">0</div></div>
     <div class="stat-card"><div class="stat-label">Al corriente</div><div class="stat-value sv-green" id="stat-ok">0</div></div>
   </div>
+  <div style="text-align:right;margin:4px 2px 0;"><button type="button" onclick="repairDocs()" title="Convierte a imagen los ID/seguros que sean PDF o HEIC. Hazlo en el iPad para las fotos de iPhone." style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">🛠 Reparar fotos ID/seguro (PDF→imagen)</button></div>
 
   <div class="sec-head" onclick="toggleSection('fin-summary-box','fin-arrow')"><span>Finanzas</span><span id="fin-arrow" class="sec-arrow">▾</span></div>
 <div id="fin-summary-box"></div>
@@ -1940,8 +1941,10 @@ window.saveClient=async function(){
   if(idPhotoFile){
     try {
       const st = getStorage();
-      const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_'+idPhotoFile.name);
-      await uploadBytes(idRef, idPhotoFile, {contentType: idPhotoFile.type||'image/jpeg'});
+      let _idUp = idPhotoFile;
+      try { _idUp = await blobToJpeg(idPhotoFile); } catch(e){ console.warn('ID no convertida, se sube tal cual', e); }
+      const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_id.jpg');
+      await uploadBytes(idRef, _idUp, {contentType: (_idUp.type||'image/jpeg')});
       idPhotoURL = await getDownloadURL(idRef);
     } catch(storErr){ console.log('ID photo skipped:', storErr); }
   }
@@ -2958,6 +2961,56 @@ window.generateContractFromForm = function() {
     const w2 = window.open(esFile + qs, '_blank');
     if(!w1 || !w2) alert('⚠️ Tu navegador bloqueó una ventana. Permite las ventanas emergentes (pop-ups) para este sitio y vuelve a generar el contrato.');
   }
+};
+
+async function _loadPdfjs(){
+  if(window.__pdfjs) return window.__pdfjs;
+  const mod = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs');
+  try{ mod.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs'; }catch(e){}
+  window.__pdfjs = mod; return mod;
+}
+async function blobToJpeg(blob){
+  const sig = new Uint8Array(await blob.slice(0,4).arrayBuffer());
+  const isPdf = sig[0]===0x25 && sig[1]===0x50 && sig[2]===0x44 && sig[3]===0x46;
+  if(isPdf){
+    const pdfjs = await _loadPdfjs();
+    const buf = await blob.arrayBuffer();
+    const pdf = await pdfjs.getDocument({data:new Uint8Array(buf)}).promise;
+    const page = await pdf.getPage(1);
+    const vp = page.getViewport({scale:2});
+    const cv = document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+    await page.render({canvasContext:cv.getContext('2d'), viewport:vp}).promise;
+    return await new Promise((res,rej)=>cv.toBlob(b=>b?res(b):rej(new Error('toBlob')),'image/jpeg',0.9));
+  }
+  return await new Promise((resolve,reject)=>{
+    const u=URL.createObjectURL(blob); const img=new Image();
+    img.onload=function(){ try{ let maxW=1600,w=img.naturalWidth,h=img.naturalHeight; if(!w||!h){URL.revokeObjectURL(u);return reject(new Error('sin dimensiones'));} if(w>maxW){h=Math.round(h*maxW/w);w=maxW;} const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cv.toBlob(function(b){URL.revokeObjectURL(u);b?resolve(b):reject(new Error('toBlob'));},'image/jpeg',0.88);}catch(e){URL.revokeObjectURL(u);reject(e);} };
+    img.onerror=function(){ URL.revokeObjectURL(u); reject(new Error('formato no decodificable (HEIC en computadora?)')); };
+    img.src=u;
+  });
+}
+window.repairDocs = async function(){
+  if(!confirm('Revisar TODOS los documentos (ID y seguro) y convertir a imagen los que sean PDF u otro formato.\n\n• Los archivos originales NO se borran.\n• Recomendado: hazlo en el iPad (para fotos HEIC de iPhone).\n\n¿Continuar?')) return;
+  const st=getStorage(); let scanned=0,fixed=0,skipped=0,failed=0; const log=[];
+  for(const c of clients){
+    for(const field of ['idPhotoURL','insurancePhotoURL']){
+      const u=c[field]; if(!u) continue; scanned++;
+      try{
+        const resp=await fetch(u); if(!resp.ok) throw new Error('HTTP '+resp.status);
+        const blob=await resp.blob();
+        const sig=new Uint8Array(await blob.slice(0,4).arrayBuffer());
+        if((sig[0]===0xFF&&sig[1]===0xD8)||(sig[0]===0x89&&sig[1]===0x50)||(sig[0]===0x47&&sig[1]===0x49)){ skipped++; continue; }
+        const jpeg=await blobToJpeg(blob);
+        const folder = field==='idPhotoURL'?'ids':'insurance';
+        const r=ref(st, folder+'/'+c.id+'/'+Date.now()+'_repaired.jpg');
+        await uploadBytes(r, jpeg, {contentType:'image/jpeg'});
+        const newUrl=await getDownloadURL(r);
+        await updateDoc(doc(db,'clients',c.id), {[field]:newUrl});
+        c[field]=newUrl; fixed++; log.push('✓ '+(c.name||c.id)+' · '+(field==='idPhotoURL'?'ID':'Seguro'));
+      }catch(e){ failed++; log.push('✗ '+(c.name||c.id)+' · '+(field==='idPhotoURL'?'ID':'Seguro')+': '+e.message); }
+    }
+  }
+  alert('Reparación terminada.\n\nRevisadas: '+scanned+'\nConvertidas a imagen: '+fixed+'\nYa eran imagen: '+skipped+'\nFallaron: '+failed+(log.length?('\n\n'+log.join('\n')):''));
 };
 
 window.showPhoto = async function(url, title){
