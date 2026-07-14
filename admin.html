@@ -3070,10 +3070,9 @@ window.showPhoto = async function(url, title){
     if(openLink) openLink.href = burl; // abrir en pestaña = archivo ya tipado (previsualiza, no descarga)
     if(type === 'application/pdf'){
       body.innerHTML = '<iframe src="'+burl+'" style="width:92vw;height:80vh;border:none;border-radius:8px;background:#fff;"></iframe>';
-    } else if(type === 'image/heic' || type === 'image/heif' || (isFtyp && !isPdf)){
-      body.innerHTML = '<div style="color:#fff;max-width:420px;text-align:center;line-height:1.5;">Esta foto está en formato <strong>HEIC (iPhone)</strong>, que muchas computadoras no muestran.<br>Usa <strong>Abrir en pestaña ↗</strong> (funciona en iPad/iPhone), o pídele al cliente que la vuelva a subir desde su portal — ya quedará bien guardada.</div>';
     } else {
-      body.innerHTML = '<img src="'+burl+'" style="max-width:96%;max-height:80vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);background:#fff;">';
+      body.innerHTML = '<img src="'+burl+'" style="max-width:96%;max-height:80vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);background:#fff;" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'[data-heic]\').style.display=\'block\';">'
+        + '<div data-heic style="display:none;color:#fff;max-width:440px;text-align:center;line-height:1.5;">Esta foto está en formato <strong>HEIC (iPhone)</strong> y esta computadora no puede mostrarla. Ábrela en el <strong>iPad</strong>, o corre <strong>🛠 Reparar fotos</strong> (en el iPad) para convertirla a imagen normal que se vea en todos lados.</div>';
     }
   }catch(err){
     body.innerHTML = '<div style="color:#fff;text-align:center;max-width:420px;">No se pudo cargar la vista previa aquí. Usa <strong>Abrir en pestaña ↗</strong> abajo.</div>';
