@@ -14937,6 +14937,7 @@ window.openCarModal = function(carId){
     document.getElementById('car-weekly').value=c.weekly||'';
     document.getElementById('car-miles').value=c.miles||'';
     document.getElementById('car-desc').value=c.desc||'';
+    document.getElementById('car-vin').value=c.vin||'';
     // Show existing photos
     const preview=document.getElementById('car-photo-preview');
     preview.innerHTML=(c.photos||[]).map((p,i)=>`<div style="position:relative;width:60px;"><img src="${p}" onerror="this.style.opacity=0.25" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:${i===0?'2px solid #f0c040':'2px solid rgba(255,255,255,0.12)'};"><button onclick="removePhoto('${carId}',${i})" style="position:absolute;top:-4px;right:-4px;background:red;color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;cursor:pointer;line-height:1;">×</button>${i===0?`<div style="position:absolute;bottom:-1px;left:0;right:0;background:#f0c040;color:#000;font-size:8px;font-weight:800;text-align:center;border-radius:0 0 5px 5px;">PRINCIPAL</div>`:`<button onclick="setMainPhoto('${carId}',${i})" title="Hacer foto principal" style="position:absolute;bottom:-1px;left:0;right:0;background:rgba(0,0,0,0.8);color:#f0c040;border:none;font-size:8px;font-weight:700;text-align:center;cursor:pointer;border-radius:0 0 5px 5px;padding:1px;">★ Principal</button>`}</div>`).join('');
@@ -14949,6 +14950,7 @@ window.openCarModal = function(carId){
     document.getElementById('car-weekly').value='';
     document.getElementById('car-miles').value='';
     document.getElementById('car-desc').value='';
+    document.getElementById('car-vin').value='';
     document.getElementById('car-photo-preview').innerHTML='';
   }
   document.getElementById('car-photos').value='';
