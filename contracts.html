@@ -613,6 +613,18 @@ window.signAndSave = async function(){
   if(!cons || !cons.checked){ alert('El comprador debe aceptar firmar electronicamente.'); return; }
   if(!es || !es.hasInk()){ alert('Falta la firma del comprador.'); return; }
   if(!confirm('Firmar y guardar el contrato? Se guarda una copia oficial firmada en el expediente del cliente.')) return;
+  // asegurar sesion iniciada (misma cuenta del admin) antes de guardar
+  var __user=null;
+  try{
+    var _A=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+    var _AU=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+    var _cfg={apiKey:"AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",authDomain:"legacy-motors-garage.firebaseapp.com",projectId:"legacy-motors-garage",storageBucket:"legacy-motors-garage.firebasestorage.app",messagingSenderId:"783567672493",appId:"1:783567672493:web:3a825f2f59ec1c25e9a224"};
+    var _app=_A.getApps().length?_A.getApps()[0]:_A.initializeApp(_cfg);
+    var _auth=_AU.getAuth(_app);
+    if(_auth.authStateReady){ await _auth.authStateReady(); }
+    __user=_auth.currentUser;
+  }catch(e){}
+  if(!__user){ alert('No hay sesion iniciada. Abre el contrato desde la tarjeta del cliente estando dentro del admin (con tu cuenta), y vuelve a intentar. Si ya estas dentro, cierra esta pestana y reabre el contrato.'); return; }
   var sigData=es.canvas.toDataURL('image/png');
   var stamp=new Date().toLocaleString('en-US');
   es.buyerLines.forEach(function(line){
@@ -661,8 +673,12 @@ window.signAndSave = async function(){
   try{
     var A2=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
     var FS=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    var AU=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
     var cfg={apiKey:"AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",authDomain:"legacy-motors-garage.firebaseapp.com",projectId:"legacy-motors-garage",storageBucket:"legacy-motors-garage.firebasestorage.app",messagingSenderId:"783567672493",appId:"1:783567672493:web:3a825f2f59ec1c25e9a224"};
     var app=A2.getApps().length?A2.getApps()[0]:A2.initializeApp(cfg);
+    var auth=AU.getAuth(app);
+    if(auth.authStateReady){ await auth.authStateReady(); }
+    if(!auth.currentUser) return; // sin sesion no podemos leer el estado; se abre editable
     var db=FS.getFirestore(app);
     var snap=await FS.getDoc(FS.doc(db,'clients',clientId));
     var data=snap.exists()?snap.data():{};
