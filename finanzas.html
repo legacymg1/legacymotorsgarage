@@ -545,7 +545,7 @@ const METHOD_LABEL = { cash:'💵 Efectivo', terminal:'💳 Terminal', ach:'🏦
 function myDepts(){
   var em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
   if(em==='ivan.garcia@legacymotorsgarage.com') return ['parts'];
-  return ['dealer','ebay'];
+  return ['dealer','parts','ebay']; // dueño: acceso completo (default Dealer)
 }
 function applyDeptRestriction(selectId){
   var sel=document.getElementById(selectId); if(!sel) return;
