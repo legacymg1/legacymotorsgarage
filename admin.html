@@ -2967,7 +2967,7 @@ window.showPhoto = async function(url, title){
   ov.innerHTML = '<div style="color:#fff;font-size:14px;margin-bottom:10px;font-weight:600;">'+(title||'Documento')+'</div>'
     + '<div data-body style="color:#fff;font-size:13px;">Cargando…</div>'
     + '<div style="margin-top:14px;display:flex;gap:10px;">'
-    + '<a href="'+url+'" target="_blank" style="background:transparent;color:#f0c040;border:1px solid #f0c040;border-radius:8px;padding:8px 16px;text-decoration:none;font-size:13px;">Abrir en pestaña ↗</a>'
+    + '<a data-open href="'+url+'" target="_blank" style="background:transparent;color:#f0c040;border:1px solid #f0c040;border-radius:8px;padding:8px 16px;text-decoration:none;font-size:13px;">Abrir en pestaña ↗</a>'
     + '<button type="button" data-close style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">Cerrar ✕</button>'
     + '</div>';
   const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
@@ -2977,29 +2977,33 @@ window.showPhoto = async function(url, title){
   document.addEventListener('keydown', onKey);
   document.body.appendChild(ov);
   const body = ov.querySelector('[data-body]');
+  const openLink = ov.querySelector('[data-open]');
   try{
     const resp = await fetch(url);
     if(!resp.ok) throw new Error('HTTP '+resp.status);
     let blob = await resp.blob();
     let type = blob.type;
-    const sig = new Uint8Array(await blob.slice(0,4).arrayBuffer());
+    const sig = new Uint8Array(await blob.slice(0,12).arrayBuffer());
+    const isPdf = sig[0]===0x25 && sig[1]===0x50 && sig[2]===0x44 && sig[3]===0x46;
+    const isJpg = sig[0]===0xFF && sig[1]===0xD8;
+    const isPng = sig[0]===0x89 && sig[1]===0x50;
+    const isGif = sig[0]===0x47 && sig[1]===0x49;
+    const isFtyp = sig[4]===0x66 && sig[5]===0x74 && sig[6]===0x79 && sig[7]===0x70; // 'ftyp' (HEIC/HEIF/MP4)
     if(!type || type === 'application/octet-stream'){
-      if(sig[0]===0xFF && sig[1]===0xD8) type='image/jpeg';
-      else if(sig[0]===0x89 && sig[1]===0x50) type='image/png';
-      else if(sig[0]===0x25 && sig[1]===0x50 && sig[2]===0x44 && sig[3]===0x46) type='application/pdf';
-      else if(sig[0]===0x47 && sig[1]===0x49) type='image/gif';
-      else type='image/jpeg';
+      type = isPdf?'application/pdf':isJpg?'image/jpeg':isPng?'image/png':isGif?'image/gif':isFtyp?'image/heic':'image/jpeg';
       blob = new Blob([blob], {type});
     }
     const burl = URL.createObjectURL(blob);
+    if(openLink) openLink.href = burl; // abrir en pestaña = archivo ya tipado (previsualiza, no descarga)
     if(type === 'application/pdf'){
       body.innerHTML = '<iframe src="'+burl+'" style="width:92vw;height:80vh;border:none;border-radius:8px;background:#fff;"></iframe>';
+    } else if(type === 'image/heic' || type === 'image/heif' || (isFtyp && !isPdf)){
+      body.innerHTML = '<div style="color:#fff;max-width:420px;text-align:center;line-height:1.5;">Esta foto está en formato <strong>HEIC (iPhone)</strong>, que muchas computadoras no muestran.<br>Usa <strong>Abrir en pestaña ↗</strong> (funciona en iPad/iPhone), o pídele al cliente que la vuelva a subir desde su portal — ya quedará bien guardada.</div>';
     } else {
       body.innerHTML = '<img src="'+burl+'" style="max-width:96%;max-height:80vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);background:#fff;">';
     }
   }catch(err){
-    body.innerHTML = '<img src="'+url+'" style="max-width:96%;max-height:80vh;border-radius:8px;background:#fff;" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'[data-fb]\').style.display=\'block\';">'
-      + '<div data-fb style="display:none;color:#fff;">No se pudo previsualizar aquí. Usa <strong>Abrir en pestaña ↗</strong> abajo.</div>';
+    body.innerHTML = '<div style="color:#fff;text-align:center;max-width:420px;">No se pudo cargar la vista previa aquí. Usa <strong>Abrir en pestaña ↗</strong> abajo.</div>';
   }
 };
 
