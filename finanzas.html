@@ -1204,24 +1204,26 @@ function renderPnl(){
     else if(t.type==='contribution'){ D[dept].cap+=amt; }
     else if(t.type==='draw'){ D[dept].draw+=amt; }
   });
-  let totIn=0, totOut=0;
+  const legacy={ in:D.dealer.in+D.parts.in, out:D.dealer.out+D.parts.out, cap:D.dealer.cap+D.parts.cap, draw:D.dealer.draw+D.parts.draw };
+  const ebay=D.ebay;
+  const ganL=legacy.in-legacy.out, ganD=D.dealer.in-D.dealer.out, ganP=D.parts.in-D.parts.out, ganE=ebay.in-ebay.out;
   let html=`<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:14px;">${label}</div>`;
-  PNL_DEPTS.forEach(([k,name])=>{
-    const d=D[k]; const gan=d.in-d.out; totIn+=d.in; totOut+=d.out;
-    html+=`<div style="background:var(--surface2);border-radius:14px;padding:16px;margin-bottom:12px;">
-      <div style="font-size:15px;font-weight:700;margin-bottom:10px;">${name}</div>
-      <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(d.in)}</span></div>
-      <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Gastos</span><span style="color:#ff6b6b;">${centsToUSD(d.out)}</span></div>
-      <div style="display:flex;justify-content:space-between;font-size:16px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--border);"><span style="font-weight:700;">Ganancia</span><span style="font-weight:800;color:${gan>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(gan)}</span></div>
-      ${(d.cap||d.draw)?`<div style="font-size:11px;color:var(--faint);margin-top:8px;">Socios: aportaron ${centsToUSD(d.cap)} · retiraron ${centsToUSD(d.draw)}</div>`:''}
-    </div>`;
-  });
-  const totGan=totIn-totOut;
-  html+=`<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:14px;padding:16px;">
-    <div style="font-size:15px;font-weight:700;margin-bottom:10px;">📊 TOTAL · las 3 bolsas</div>
-    <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(totIn)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Gastos</span><span style="color:#ff6b6b;">${centsToUSD(totOut)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:18px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--border);"><span style="font-weight:800;">GANANCIA</span><span style="font-weight:800;color:${totGan>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(totGan)}</span></div>
+  // LEGACY = Dealer + Partes (misma empresa) — resumen general
+  html+=`<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.38);border-radius:14px;padding:16px;margin-bottom:12px;">
+    <div style="font-size:16px;font-weight:800;margin-bottom:10px;">🏢 Legacy Motors Garage <span style="font-size:12px;color:var(--muted);font-weight:500;">(Dealer + Partes)</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(legacy.in)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Gastos</span><span style="color:#ff6b6b;">${centsToUSD(legacy.out)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:18px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--border);"><span style="font-weight:800;">GANANCIA</span><span style="font-weight:800;color:${ganL>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(ganL)}</span></div>
+    <div style="font-size:12px;color:var(--faint);margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);display:flex;justify-content:space-between;"><span>🚗 Dealer: <b style="color:${ganD>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(ganD)}</b></span><span>🔧 Partes: <b style="color:${ganP>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(ganP)}</b></span></div>
+    ${(legacy.cap||legacy.draw)?`<div style="font-size:11px;color:var(--faint);margin-top:6px;">Socios: aportaron ${centsToUSD(legacy.cap)} · retiraron ${centsToUSD(legacy.draw)}</div>`:''}
+  </div>`;
+  // eBay — se cuenta aparte
+  html+=`<div style="background:var(--surface2);border-radius:14px;padding:16px;margin-bottom:12px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px;">📦 eBay <span style="font-size:11px;color:var(--faint);font-weight:500;">· se cuenta aparte</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(ebay.in)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0;"><span style="color:var(--muted);">Gastos</span><span style="color:#ff6b6b;">${centsToUSD(ebay.out)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:16px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--border);"><span style="font-weight:700;">Ganancia</span><span style="font-weight:800;color:${ganE>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(ganE)}</span></div>
+    ${(ebay.cap||ebay.draw)?`<div style="font-size:11px;color:var(--faint);margin-top:8px;">Socios: aportaron ${centsToUSD(ebay.cap)} · retiraron ${centsToUSD(ebay.draw)}</div>`:''}
   </div>`;
   body.innerHTML=html;
 }
