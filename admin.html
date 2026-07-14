@@ -2951,7 +2951,7 @@ window.generateContractFromForm = function() {
   // opened directly inside this click so the popup blocker doesn't block the 2nd.
   const enFile = freq === 'cash' ? 'contracts_cash.html' : 'contracts.html';
   const esFile = freq === 'cash' ? 'contracts_cash_es.html' : 'contracts_es.html';
-  const qs = '?' + params.toString();
+  const qs = '?' + params.toString() + '&_cb=' + Date.now();
   const w1 = window.open(enFile + qs, '_blank');
   if(clientLang === 'es') {
     const w2 = window.open(esFile + qs, '_blank');
@@ -3003,7 +3003,7 @@ window.generateContract = function(clientId) {
   // Both opened directly inside this click so the popup blocker doesn't block the 2nd.
   const enFile = c.freq === 'cash' ? 'contracts_cash.html' : 'contracts.html';
   const esFile = c.freq === 'cash' ? 'contracts_cash_es.html' : 'contracts_es.html';
-  const qs = '?' + params.toString();
+  const qs = '?' + params.toString() + '&_cb=' + Date.now();
   const w1 = window.open(enFile + qs, '_blank');
   if(c.lang === 'es') {
     const w2 = window.open(esFile + qs, '_blank');
