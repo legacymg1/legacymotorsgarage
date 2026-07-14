@@ -602,7 +602,7 @@ window.saveContract = async function(){
     await setDoc(doc(db,'clients',clientId),{...existing,contract:{params:window.location.search,editedFields,savedAt:new Date().toISOString()}});
     alert('✅ Contract saved!');
   }catch(e){alert('Error: '+e.message);}
-}
+};
 
 window.signAndSave = async function(){
   var q=new URLSearchParams(window.location.search);
@@ -650,7 +650,7 @@ window.signAndSave = async function(){
     alert('Contrato firmado y guardado. Numero: '+cnum+' (version '+newVer+').');
     var u2=new URL(window.location.href); u2.searchParams.delete('__correct'); u2.searchParams.set('_cb', String(Date.now())); window.location.href=u2.toString();
   }catch(e){ alert('Error al guardar: '+e.message); }
-}
+};
 
 // ===== BLOQUEO DE CONTRATO FIRMADO + CORRECCION (versionado) =====
 (async function checkLock(){
