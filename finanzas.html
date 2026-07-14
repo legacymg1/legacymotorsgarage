@@ -536,11 +536,24 @@ function startListening(){
 // ---------- GASTOS (LIBRO) ----------
 const EXP_CATS = {
   dealer: ['Compra de vehículo','Reparación / Reacondicionamiento','Partes para reparación','Transporte / Traída','DMV / Título / Registración','Publicidad','Comisión del procesador','Suministros','Renta / Local','Servicios (luz, internet)','Gasolina','Otro'],
-  parts:  ['Compra de parte / inventario','Envío / Freight','Suministros','Renta / Local','Servicios','Gasolina','Otro'],
+  parts:  ['Partes para carro en venta','Reparación / Reacondicionamiento','Compra de parte / inventario','Envío / Freight','Suministros','Renta / Local','Servicios','Gasolina','Otro'],
   ebay:   ['Sueldos','Compra de parte','Envío / Freight','Comisión eBay / PayPal','Devolución / Reembolso','Suministros','Otro']
 };
 const DEPT_LABEL = { dealer:'🚗 Dealer', parts:'🔧 Partes', ebay:'📦 eBay' };
 const METHOD_LABEL = { cash:'💵 Efectivo', terminal:'💳 Terminal', ach:'🏦 ACH', zelle:'📲 Zelle/Otro' };
+// Restricción por usuario: Ivan solo Partes; el dueño (Enrique) Dealer + eBay.
+function myDepts(){
+  var em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+  if(em==='ivan.garcia@legacymotorsgarage.com') return ['parts'];
+  return ['dealer','ebay'];
+}
+function applyDeptRestriction(selectId){
+  var sel=document.getElementById(selectId); if(!sel) return;
+  var allowed=myDepts();
+  sel.innerHTML=allowed.map(function(d){return '<option value="'+d+'">'+(DEPT_LABEL[d]||d)+'</option>';}).join('');
+  sel.value=allowed[0];
+  sel.disabled = allowed.length<=1;
+}
 const centsToUSD = c => '$'+(Number(c||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 // Movimientos VIVOS: excluye los anulados (type='void') y sus originales.
 function liveTxns(){
@@ -581,7 +594,7 @@ window.previewReceipt = function(){
 window.openExp = function(){
   document.getElementById('e-amount').value='';
   document.getElementById('e-date').value=new Date().toISOString().slice(0,10);
-  document.getElementById('e-dept').value='dealer';
+  applyDeptRestriction('e-dept');
   onDeptChange();
   document.getElementById('e-method').value='cash';
   document.getElementById('e-vendor').value='';
@@ -603,7 +616,7 @@ window.saveExp = async function(){
   const vendor=document.getElementById('e-vendor').value.trim();
   const note=document.getElementById('e-note').value.trim();
   const carSel=document.getElementById('e-car');
-  const carId=(dept==='dealer' && carSel)?carSel.value:'';
+  const carId=((dept==='dealer'||dept==='parts') && carSel)?carSel.value:'';
   const carLabel=carId?(carSel.options[carSel.selectedIndex]?.text||''):'';
   const btn=document.getElementById('exp-save'); btn.disabled=true; btn.textContent='Guardando…';
   const id='exp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
@@ -968,7 +981,7 @@ window.onIncDeptChange = function(){
 window.openInc = function(){
   document.getElementById('i-amount').value='';
   document.getElementById('i-date').value=new Date().toISOString().slice(0,10);
-  document.getElementById('i-dept').value='parts'; onIncDeptChange();
+  applyDeptRestriction('i-dept'); onIncDeptChange();
   document.getElementById('i-method').value='cash';
   document.getElementById('i-source').value=''; document.getElementById('i-note').value='';
   document.getElementById('inc-overlay').classList.add('open');
