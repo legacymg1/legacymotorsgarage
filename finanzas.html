@@ -1164,7 +1164,6 @@ function renderPrivadas(){
   // Partes: ingresos marcados private
   const partSales=live.filter(t=>t.private===true).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const totalParts=partSales.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
-  if(!privateClients.length && !partSales.length){ box.innerHTML=''; return; }
   let inner='';
   if(rows.length){
     inner+=`<div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;">🚗 Dealer (clientes privados)</div>`;
@@ -1174,6 +1173,7 @@ function renderPrivadas(){
     inner+=`<div style="font-size:12px;color:var(--muted);font-weight:600;margin:${rows.length?'12px':'0'} 0 6px;">🔧 Partes (ventas privadas)</div>`;
     inner+=partSales.map(t=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:14px;"><span>${(t.note||t.category||'Venta de parte')}<span style="color:var(--faint);font-size:12px;">${t.date?' · '+fmtDate(t.date):''}</span></span><span style="color:var(--muted);white-space:nowrap;">${centsToUSD(t.amountCents)}</span></div>`).join('');
   }
+  if(!inner) inner='<div style="font-size:13px;color:var(--faint);padding:6px 0;">Aún no hay ventas privadas registradas. Aparecerán aquí.</div>';
   box.innerHTML=`
     <div class="section-head" style="margin-top:22px;"><div class="section-title" style="font-size:14px;color:var(--muted);">🔒 Ventas privadas (fuera de Legacy)</div></div>
     <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:14px 16px;">
