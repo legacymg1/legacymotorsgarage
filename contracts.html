@@ -181,6 +181,10 @@
       <div class="payment-row total"><span>TOTAL OF PAYMENTS / TOTAL OF PAYMENTS</span><span>${{TOTAL_OF_PAYMENTS}}</span></div>
     </div>
   </div>
+  <div class="initial-line" style="margin-top:8px;display:flex;align-items:center;justify-content:flex-end;gap:10px;font-size:8.5pt;color:#333;">
+    <span><strong>Buyer's Initials / Iniciales del comprador</strong> &mdash; I reviewed and agree to these amounts / Revis&eacute; y acepto estos montos:</span>
+    <span class="initial-slot" style="border:1px solid #000;min-width:75px;height:34px;display:inline-block;vertical-align:middle;"></span>
+  </div>
 </div>
 
 <!-- PAYMENT INSTRUCTIONS -->
@@ -560,18 +564,22 @@
     var wrap=document.createElement('div');
     wrap.className='esign-wrap no-print';
     wrap.style.cssText='margin:14px 0;padding:12px;border:1px dashed #999;border-radius:8px;';
-    wrap.innerHTML='<div style="font-size:9pt;margin-bottom:8px;"><label style="cursor:pointer;"><input type="checkbox" id="esign-consent" style="vertical-align:middle;"> <strong>Buyer agrees to sign this contract electronically. / El Comprador acepta firmar este contrato de forma electronica.</strong></label></div><div style="font-size:8pt;color:#555;margin-bottom:4px;">Sign below with finger or stylus / Firme abajo con el dedo o lapiz:</div><canvas id="esign-pad" width="640" height="160" style="border:1px solid #999;border-radius:6px;background:#fff;touch-action:none;max-width:100%;display:block;"></canvas><button type="button" id="esign-clear" style="font-size:8pt;background:transparent;border:1px solid #999;border-radius:5px;padding:4px 12px;margin-top:6px;cursor:pointer;">Clear / Limpiar</button>';
+    wrap.innerHTML='<div style="font-size:9pt;margin-bottom:8px;"><label style="cursor:pointer;"><input type="checkbox" id="esign-consent" style="vertical-align:middle;"> <strong>Buyer agrees to sign this contract electronically. / El Comprador acepta firmar este contrato de forma electronica.</strong></label></div><div style="font-size:8pt;color:#555;margin-bottom:4px;">Sign below with finger or stylus / Firme abajo con el dedo o lapiz:</div><canvas id="esign-pad" width="640" height="160" style="border:1px solid #999;border-radius:6px;background:#fff;touch-action:none;max-width:100%;display:block;"></canvas><div style="font-size:8pt;color:#555;margin:10px 0 4px;">Buyer initials / Iniciales del comprador:</div><canvas id="esign-initials" width="220" height="90" style="border:1px solid #999;border-radius:6px;background:#fff;touch-action:none;max-width:100%;display:block;"></canvas><button type="button" id="esign-clear" style="font-size:8pt;background:transparent;border:1px solid #999;border-radius:5px;padding:4px 12px;margin-top:6px;cursor:pointer;">Clear / Limpiar</button>';
     buyerLines[0].parentNode.insertBefore(wrap,buyerLines[0]);
-    var cv=document.getElementById('esign-pad'), ctx=cv.getContext('2d');
-    ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#0a0a2a';
-    var drawing=false, has=false, lx=0, ly=0;
-    function pos(e){ var r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*(cv.width/r.width), y:(e.clientY-r.top)*(cv.height/r.height)}; }
-    cv.addEventListener('pointerdown',function(e){ drawing=true; var q=pos(e); lx=q.x; ly=q.y; e.preventDefault(); });
-    cv.addEventListener('pointermove',function(e){ if(!drawing)return; var q=pos(e); ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(q.x,q.y); ctx.stroke(); lx=q.x; ly=q.y; has=true; e.preventDefault(); });
-    cv.addEventListener('pointerup',function(){drawing=false;});
-    cv.addEventListener('pointerleave',function(){drawing=false;});
-    document.getElementById('esign-clear').onclick=function(){ ctx.clearRect(0,0,cv.width,cv.height); has=false; };
-    window.__esign={ canvas:cv, hasInk:function(){return has;}, buyerLines:buyerLines };
+    function makePad(cv){
+      var ctx=cv.getContext('2d'); ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#0a0a2a';
+      var drawing=false, has=false, lx=0, ly=0;
+      function pos(e){ var r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*(cv.width/r.width), y:(e.clientY-r.top)*(cv.height/r.height)}; }
+      cv.addEventListener('pointerdown',function(e){ drawing=true; var q=pos(e); lx=q.x; ly=q.y; e.preventDefault(); });
+      cv.addEventListener('pointermove',function(e){ if(!drawing)return; var q=pos(e); ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(q.x,q.y); ctx.stroke(); lx=q.x; ly=q.y; has=true; e.preventDefault(); });
+      cv.addEventListener('pointerup',function(){drawing=false;});
+      cv.addEventListener('pointerleave',function(){drawing=false;});
+      return { canvas:cv, hasInk:function(){return has;}, clear:function(){ ctx.clearRect(0,0,cv.width,cv.height); has=false; } };
+    }
+    var sig=makePad(document.getElementById('esign-pad'));
+    var ini=makePad(document.getElementById('esign-initials'));
+    document.getElementById('esign-clear').onclick=function(){ sig.clear(); ini.clear(); };
+    window.__esign={ canvas:sig.canvas, hasInk:sig.hasInk, initCanvas:ini.canvas, hasInitials:ini.hasInk, buyerLines:buyerLines };
   })();
 
   // Action bar
@@ -612,6 +620,8 @@ window.signAndSave = async function(){
   var cons=document.getElementById('esign-consent');
   if(!cons || !cons.checked){ alert('El comprador debe aceptar firmar electronicamente.'); return; }
   if(!es || !es.hasInk()){ alert('Falta la firma del comprador.'); return; }
+  var __slots=document.querySelectorAll('.initial-slot');
+  if(__slots.length && (!es.hasInitials || !es.hasInitials())){ alert('Faltan las iniciales del comprador (recuadro de iniciales).'); return; }
   if(!confirm('Firmar y guardar el contrato? Se guarda una copia oficial firmada en el expediente del cliente.')) return;
   // asegurar sesion iniciada (misma cuenta del admin) antes de guardar
   var __user=null;
@@ -631,6 +641,7 @@ window.signAndSave = async function(){
     var label=line.innerHTML;
     line.innerHTML='<img src="'+sigData+'" alt="signature" style="height:52px;display:block;margin:0 auto 2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:8pt;color:#555;">Firmado electronicamente / Signed: '+stamp+'</span></div>';
   });
+  if(es.initCanvas){ var iniData=es.initCanvas.toDataURL('image/png'); document.querySelectorAll('.initial-slot').forEach(function(sl){ sl.innerHTML='<img src="'+iniData+'" alt="initials" style="height:30px;display:block;margin:1px auto;">'; }); }
   document.querySelectorAll('.esign-wrap, .action-bar, .lmg-banner').forEach(function(el){el.remove();});
   document.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); el.style.cursor=''; });
   document.querySelectorAll('script').forEach(function(s){s.remove();});
