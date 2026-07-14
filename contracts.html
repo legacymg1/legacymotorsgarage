@@ -681,7 +681,7 @@ window.signAndSave = async function(){
     var entry={version:newVer,url:url,contractNumber:cnum,signedAt:nowIso,method:'esign',status:'active'};
     if(reason) entry.correctionReason=reason;
     versions.push(entry);
-    await FS.setDoc(FS.doc(db,'clients',clientId),Object.assign({},existing,{signedContractVersions:versions,signedContract:entry}));
+    await FS.setDoc(FS.doc(db,'clients',clientId),{signedContractVersions:versions,signedContract:entry},{merge:true});
     try{ sessionStorage.removeItem('correctionReason'); }catch(e){}
     alert('Contrato firmado y guardado. Numero: '+cnum+' (version '+newVer+').');
     var u2=new URL(window.location.href); u2.searchParams.delete('__correct'); u2.searchParams.set('_cb', String(Date.now())); window.location.href=u2.toString();
