@@ -2576,6 +2576,10 @@ function getServiceReminderClients() {
   const todayD = new Date(today()+'T12:00:00');
   return clients.filter(c => {
     if(hasUpcomingAppt(c)) return false;   // ya tiene cita agendada -> no la marcamos
+    if(c.serviceReminderSentAt){           // ya se le mandó recordatorio -> pausa de 7 días
+      const sent = new Date(c.serviceReminderSentAt).getTime();
+      if(!isNaN(sent) && (Date.now() - sent) < 7*86400000) return false;
+    }
     const base = serviceBaseDate(c);
     if(!base) return false;
     return Math.round((todayD - new Date(base+'T12:00:00'))/86400000) >= 90;
@@ -2621,6 +2625,7 @@ window.sendServiceMsg = function(id) {
   }
   const phone = c.phone.replace(/\D/g,'');
   const a = document.createElement('a'); a.href = `sms:${phone}?body=${encodeURIComponent(msg+portalTag(lang))}`; a.click();
+  try{ updateDoc(doc(db,'clients',id), { serviceReminderSentAt: new Date().toISOString() }); }catch(e){}
 };
 
 window.sendBirthdayMsg = function(id) {
