@@ -597,7 +597,7 @@ window.updateID = async function() {
       const storage = getStorage();
       const _idf = await toJpeg(photoFile);
       const idRef = ref(storage, `ids/${currentClient.id}/${Date.now()}_${_idf.name}`);
-      await uploadBytes(idRef, _idf);
+      await uploadBytes(idRef, _idf, {contentType:'image/jpeg'});
       idPhotoURL = await getDownloadURL(idRef);
     }
     
@@ -665,7 +665,7 @@ window.updateInsurance = async function() {
       const storage = getStorage();
       const _insf = await toJpeg(photoFile);
       const photoRef = ref(storage, `insurance/${currentClient.id}/${Date.now()}_${_insf.name}`);
-      await uploadBytes(photoRef, _insf);
+      await uploadBytes(photoRef, _insf, {contentType:'image/jpeg'});
       photoURL = await getDownloadURL(photoRef);
     }
     
