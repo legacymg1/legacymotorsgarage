@@ -553,11 +553,32 @@
     };
   });
 
+  // ===== FIRMA ELECTRONICA (iPad, dedo/lapiz) =====
+  (function setupSignature(){
+    var buyerLines=Array.prototype.slice.call(document.querySelectorAll('.sign-line')).filter(function(el){return /Buyer Signature/i.test(el.textContent);});
+    if(!buyerLines.length) return;
+    var wrap=document.createElement('div');
+    wrap.className='esign-wrap no-print';
+    wrap.style.cssText='margin:14px 0;padding:12px;border:1px dashed #999;border-radius:8px;';
+    wrap.innerHTML='<div style="font-size:9pt;margin-bottom:8px;"><label style="cursor:pointer;"><input type="checkbox" id="esign-consent" style="vertical-align:middle;"> <strong>Buyer agrees to sign this contract electronically. / El Comprador acepta firmar este contrato de forma electronica.</strong></label></div><div style="font-size:8pt;color:#555;margin-bottom:4px;">Sign below with finger or stylus / Firme abajo con el dedo o lapiz:</div><canvas id="esign-pad" width="640" height="160" style="border:1px solid #999;border-radius:6px;background:#fff;touch-action:none;max-width:100%;display:block;"></canvas><button type="button" id="esign-clear" style="font-size:8pt;background:transparent;border:1px solid #999;border-radius:5px;padding:4px 12px;margin-top:6px;cursor:pointer;">Clear / Limpiar</button>';
+    buyerLines[0].parentNode.insertBefore(wrap,buyerLines[0]);
+    var cv=document.getElementById('esign-pad'), ctx=cv.getContext('2d');
+    ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#0a0a2a';
+    var drawing=false, has=false, lx=0, ly=0;
+    function pos(e){ var r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*(cv.width/r.width), y:(e.clientY-r.top)*(cv.height/r.height)}; }
+    cv.addEventListener('pointerdown',function(e){ drawing=true; var q=pos(e); lx=q.x; ly=q.y; e.preventDefault(); });
+    cv.addEventListener('pointermove',function(e){ if(!drawing)return; var q=pos(e); ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(q.x,q.y); ctx.stroke(); lx=q.x; ly=q.y; has=true; e.preventDefault(); });
+    cv.addEventListener('pointerup',function(){drawing=false;});
+    cv.addEventListener('pointerleave',function(){drawing=false;});
+    document.getElementById('esign-clear').onclick=function(){ ctx.clearRect(0,0,cv.width,cv.height); has=false; };
+    window.__esign={ canvas:cv, hasInk:function(){return has;}, buyerLines:buyerLines };
+  })();
+
   // Action bar
   const bar=document.createElement('div');
   bar.className='no-print action-bar';
   bar.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid #f0c040;padding:12px;display:flex;gap:10px;justify-content:center;z-index:9999;';
-  bar.innerHTML='<button onclick="saveContract()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">💾 GUARDAR</button>'
+  bar.innerHTML='<button onclick="signAndSave()" style="background:#22a06b;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">✍️ FIRMAR Y GUARDAR</button>'+'<button onclick="saveContract()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">💾 GUARDAR</button>'
     +'<button onclick="window.print()" style="background:transparent;color:#f0c040;border:2px solid #f0c040;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ IMPRIMIR</button>'
     +'<button onclick="window.close()" style="background:transparent;color:#aaa;border:1px solid #444;border-radius:8px;padding:12px 16px;font-size:14px;cursor:pointer;">✕ CERRAR</button>';
   document.body.appendChild(bar);
@@ -581,6 +602,45 @@ window.saveContract = async function(){
     await setDoc(doc(db,'clients',clientId),{...existing,contract:{params:window.location.search,editedFields,savedAt:new Date().toISOString()}});
     alert('✅ Contract saved!');
   }catch(e){alert('Error: '+e.message);}
-}</script>
+}
+
+window.signAndSave = async function(){
+  var q=new URLSearchParams(window.location.search);
+  var clientId=q.get('clientId');
+  if(!clientId){ alert('No hay cliente ligado. Genera el contrato desde la tarjeta del cliente.'); return; }
+  var es=window.__esign;
+  var cons=document.getElementById('esign-consent');
+  if(!cons || !cons.checked){ alert('El comprador debe aceptar firmar electronicamente.'); return; }
+  if(!es || !es.hasInk()){ alert('Falta la firma del comprador.'); return; }
+  if(!confirm('Firmar y guardar el contrato? Se guarda una copia oficial firmada en el expediente del cliente.')) return;
+  var sigData=es.canvas.toDataURL('image/png');
+  var stamp=new Date().toLocaleString('en-US');
+  es.buyerLines.forEach(function(line){
+    var label=line.innerHTML;
+    line.innerHTML='<img src="'+sigData+'" alt="signature" style="height:52px;display:block;margin:0 auto 2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:8pt;color:#555;">Firmado electronicamente / Signed: '+stamp+'</span></div>';
+  });
+  document.querySelectorAll('.esign-wrap, .action-bar').forEach(function(el){el.remove();});
+  document.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); el.style.cursor=''; });
+  document.querySelectorAll('script').forEach(function(s){s.remove();});
+  var snapshotHTML='<!doctype html>'+document.documentElement.outerHTML;
+  try{
+    var A2=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+    var FS=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    var ST=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js');
+    var cfg={apiKey:"AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",authDomain:"legacy-motors-garage.firebaseapp.com",projectId:"legacy-motors-garage",storageBucket:"legacy-motors-garage.firebasestorage.app",messagingSenderId:"783567672493",appId:"1:783567672493:web:3a825f2f59ec1c25e9a224"};
+    var app=A2.getApps().length?A2.getApps()[0]:A2.initializeApp(cfg);
+    var db=FS.getFirestore(app), st=ST.getStorage(app);
+    var cnum=q.get('contractNum')||('LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5));
+    var path='contracts/'+clientId+'/'+cnum+'.html';
+    var sref=ST.ref(st,path);
+    await ST.uploadString(sref, snapshotHTML, 'raw', {contentType:'text/html; charset=utf-8'});
+    var url=await ST.getDownloadURL(sref);
+    var snap=await FS.getDoc(FS.doc(db,'clients',clientId));
+    var existing=snap.exists()?snap.data():{};
+    await FS.setDoc(FS.doc(db,'clients',clientId),Object.assign({},existing,{signedContract:{url:url,contractNumber:cnum,signedAt:new Date().toISOString(),method:'esign'}}));
+    alert('Contrato firmado y guardado. Numero: '+cnum);
+  }catch(e){ alert('Error al guardar: '+e.message); }
+}
+</script>
 </body>
 </html>
