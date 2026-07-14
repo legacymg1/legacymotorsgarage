@@ -111,6 +111,10 @@
       <div class="payment-row total highlight"><span>TOTAL PURCHASE PRICE / PRECIO TOTAL</span><span>${{TOTAL_PRICE}}</span></div>
       <div class="payment-row" style="background:#e8ffe8;font-weight:bold;font-size:11pt;"><span>AMOUNT PAID TODAY / MONTO PAGADO HOY</span><span>${{AMOUNT_PAID}}</span></div>
     </div>
+    <div class="initial-line" style="margin-top:8px;display:flex;align-items:center;justify-content:flex-end;gap:10px;font-size:8.5pt;color:#333;">
+      <span><strong>Buyer's Initials / Iniciales del comprador</strong> &mdash; reviewed &amp; agree / revis&eacute; y acepto:</span>
+      <span class="initial-slot" style="border:1px solid #000;min-width:75px;height:34px;display:inline-block;vertical-align:middle;"></span>
+    </div>
   </div>
 
   <!-- TERMS -->
@@ -193,5 +197,6 @@
     .replace(/{{AMOUNT_PAID}}/g, fmt(totalPrice));
 })();
 </script>
+<script type="module" src="contract-esign.js?v=1"></script>
 </body>
 </html>
