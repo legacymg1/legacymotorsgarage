@@ -198,9 +198,26 @@ import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthState
 // Convert any picked image (including iPhone HEIC) to a web-friendly JPEG via canvas.
 // Runs on the phone where the browser can decode HEIC; if a browser can't decode
 // the format it safely falls back to uploading the original file.
-function toJpeg(file){
-  return new Promise(function(resolve){
-    if(!file || (file.type && file.type.indexOf('image/')!==0 && !/\.(heic|heif)$/i.test(file.name||''))){ resolve(file); return; }
+async function toJpeg(file){
+  if(!file) return file;
+  var isPdf = (file.type==='application/pdf') || /\.pdf$/i.test(file.name||'');
+  if(isPdf){
+    try{
+      var mod = window.__pdfjs || await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs');
+      window.__pdfjs = mod;
+      try{ mod.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs'; }catch(e){}
+      var pbuf = await file.arrayBuffer();
+      var pdf = await mod.getDocument({data:new Uint8Array(pbuf)}).promise;
+      var page = await pdf.getPage(1);
+      var vp = page.getViewport({scale:2});
+      var pcv = document.createElement('canvas'); pcv.width=vp.width; pcv.height=vp.height;
+      await page.render({canvasContext:pcv.getContext('2d'), viewport:vp}).promise;
+      var pblob = await new Promise(function(r){ pcv.toBlob(function(b){r(b);},'image/jpeg',0.9); });
+      return pblob ? new File([pblob],'doc.jpg',{type:'image/jpeg'}) : file;
+    }catch(e){ return file; }
+  }
+  if(file.type && file.type.indexOf('image/')!==0 && !/\.(heic|heif)$/i.test(file.name||'')) return file;
+  return await new Promise(function(resolve){
     var url=URL.createObjectURL(file);
     var img=new Image();
     img.onload=function(){
@@ -597,7 +614,7 @@ window.updateID = async function() {
       const storage = getStorage();
       const _idf = await toJpeg(photoFile);
       const idRef = ref(storage, `ids/${currentClient.id}/${Date.now()}_${_idf.name}`);
-      await uploadBytes(idRef, _idf, {contentType:'image/jpeg'});
+      await uploadBytes(idRef, _idf, {contentType:_idf.type||'image/jpeg'});
       idPhotoURL = await getDownloadURL(idRef);
     }
     
@@ -665,7 +682,7 @@ window.updateInsurance = async function() {
       const storage = getStorage();
       const _insf = await toJpeg(photoFile);
       const photoRef = ref(storage, `insurance/${currentClient.id}/${Date.now()}_${_insf.name}`);
-      await uploadBytes(photoRef, _insf, {contentType:'image/jpeg'});
+      await uploadBytes(photoRef, _insf, {contentType:_insf.type||'image/jpeg'});
       photoURL = await getDownloadURL(photoRef);
     }
     
