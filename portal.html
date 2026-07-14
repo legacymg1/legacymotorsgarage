@@ -270,6 +270,7 @@ const I18N = {
     insFormTitle:'Actualizar Seguro', insCompany:'Aseguradora', policyNumber:'Número de Póliza',
     expDate:'Fecha de Vencimiento', insPhoto:'Foto de Póliza', insBtn:'Actualizar Seguro',
     insSaved:'✓ Seguro actualizado', insSavedPhoto:'✓ Seguro e imagen actualizados',
+    insNeedPhoto:'Por favor sube una foto de tu seguro como comprobante. Es obligatoria.', insLienholder:'⚠️ Importante: Legacy Motors Garage LLC debe aparecer como acreedor prendario (lienholder) en tu póliza de seguro para que sea válida.',
     insNeedPolicy:'Por favor ingrese el número de póliza', uploading:'Subiendo foto...',
     idTitle:'🪪 Identificación', idNone:'⚠️ SIN ID', idOnFile:'✅ ID EN ARCHIVO',
     idNoRecord:'No tenemos su identificación en archivo. Por favor actualice.',
@@ -327,6 +328,7 @@ const I18N = {
     insFormTitle:'Update Insurance', insCompany:'Insurance Company', policyNumber:'Policy Number',
     expDate:'Expiration Date', insPhoto:'Insurance Photo', insBtn:'Update Insurance',
     insSaved:'✓ Insurance updated', insSavedPhoto:'✓ Insurance and photo updated',
+    insNeedPhoto:'Please upload a photo of your insurance as proof. It is required.', insLienholder:'⚠️ Important: Legacy Motors Garage LLC must be listed as the lienholder on your insurance policy for it to be valid.',
     insNeedPolicy:'Please enter the policy number', uploading:'Uploading photo...',
     idTitle:'🪪 ID', idNone:'⚠️ NO ID', idOnFile:'✅ ID ON FILE',
     idNoRecord:"We don't have your ID on file. Please update.",
@@ -667,6 +669,8 @@ window.updateInsurance = async function() {
   const number = document.getElementById('ins-number').value.trim();
   const expDate = document.getElementById('ins-exp-date').value;
   if(!number) { alert(t('insNeedPolicy')); return; }
+  const _pf = document.getElementById('ins-photo').files[0];
+  if(!_pf && !currentClient.insurancePhotoURL) { alert(t('insNeedPhoto')); return; }
   
   const btn = document.querySelector('.ins-btn');
   btn.textContent = 'Guardando...';
@@ -922,11 +926,12 @@ function renderPortal() {
       <div class="ins-success" id="ins-success" style="display:none;"></div>
       <div class="ins-form" id="ins-edit-form" style="display:none;margin-top:14px;">
         <div class="ins-form-title">${t('insFormTitle')}</div>
+        <div style="background:rgba(255,214,0,0.1);border:1px solid var(--yellow);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--yellow);line-height:1.45;margin-bottom:12px;">${t('insLienholder')}</div>
         <input class="fi" id="ins-company" placeholder="${t('insCompany')}" style="margin-bottom:10px;">
         <input class="fi" id="ins-number" placeholder="${t('policyNumber')}" style="margin-bottom:10px;">
         <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('expDate')}</label>
         <input class="fi" id="ins-exp-date" type="date" style="margin-bottom:10px;">
-        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('insPhoto')}</label>
+        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">${t('insPhoto')} <span style="color:var(--red);">*</span></label>
         <input type="file" id="ins-photo" accept="image/*,application/pdf" style="width:100%;background:var(--navy2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
         <div id="ins-photo-preview" style="margin:8px 0;"></div>
         <button class="ins-btn" onclick="updateInsurance()">${t('insBtn')}</button>
