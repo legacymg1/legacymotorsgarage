@@ -563,7 +563,7 @@ function liveTxns(){
 let privateIds = new Set();
 let privateClients = [];
 // Movimientos de Legacy: vivos, excluyendo ventas privadas.
-function legacyTxns(){ return liveTxns().filter(t=>!(t.clientId && privateIds.has(t.clientId))); }
+function legacyTxns(){ return liveTxns().filter(t=>!(t.clientId && privateIds.has(t.clientId)) && t.private!==true); }
 
 function loadInventory(){
   // En vivo: si agregas un carro, aparece solo en el selector de gastos.
@@ -971,7 +971,7 @@ function renderSocios(){
 
 const INCOME_CATS = {
   dealer: ['Venta de contado','Enganche','Otro ingreso'],
-  parts:  ['Venta de parte','Venta en mostrador','Envío cobrado','Otro'],
+  parts:  ['Venta de parte','Venta en mostrador','Envío cobrado','🔒 Venta privada de partes','Otro'],
   ebay:   ['Venta eBay','Reembolso recibido','Otro']
 };
 window.onIncDeptChange = function(){
@@ -1024,7 +1024,7 @@ window.saveInc = async function(){
   try{
     await setDoc(doc(db,'transactions',id),{
       entryId:id, type:'income', dept:document.getElementById('i-dept').value,
-      category:document.getElementById('i-cat').value, amountCents:Math.round(amount*100),
+      category:document.getElementById('i-cat').value, private:/privada/i.test(document.getElementById('i-cat').value), amountCents:Math.round(amount*100),
       method:document.getElementById('i-method').value, date,
       source_name:document.getElementById('i-source').value.trim(),
       note:document.getElementById('i-note').value.trim(),
@@ -1148,21 +1148,34 @@ function applySubsCollapse(){
 // ---------- VENTAS PRIVADAS (fuera de Legacy) ----------
 function renderPrivadas(){
   const box=document.getElementById('privadas-section'); if(!box) return;
-  if(!privateClients.length){ box.innerHTML=''; return; }
   const live=liveTxns();
   const INCOME=['payment','down','cash_sale','income'];
-  let total=0;
+  // Dealer: clientes marcados privados
+  let totalCli=0;
   const rows=privateClients.map(c=>{
     const paid=live.filter(t=>t.clientId===c.id && INCOME.includes(t.type)).reduce((s,t)=>s+(Number(t.amountCents)||0),0);
-    total+=paid;
+    totalCli+=paid;
     return {name:c.name||'(sin nombre)', car:`${c.year||''} ${c.make||''} ${c.model||''}`.trim(), paid};
   }).sort((a,b)=>b.paid-a.paid);
+  // Partes: ingresos marcados private
+  const partSales=live.filter(t=>t.private===true).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const totalParts=partSales.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+  if(!privateClients.length && !partSales.length){ box.innerHTML=''; return; }
+  let inner='';
+  if(rows.length){
+    inner+=`<div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;">🚗 Dealer (clientes privados)</div>`;
+    inner+=rows.map(r=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:14px;"><span>${r.name}<span style="color:var(--faint);font-size:12px;">${r.car?' · '+r.car:''}</span></span><span style="color:var(--muted);white-space:nowrap;">${centsToUSD(r.paid)} cobrado</span></div>`).join('');
+  }
+  if(partSales.length){
+    inner+=`<div style="font-size:12px;color:var(--muted);font-weight:600;margin:${rows.length?'12px':'0'} 0 6px;">🔧 Partes (ventas privadas)</div>`;
+    inner+=partSales.map(t=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:14px;"><span>${(t.note||t.category||'Venta de parte')}<span style="color:var(--faint);font-size:12px;">${t.date?' · '+fmtDate(t.date):''}</span></span><span style="color:var(--muted);white-space:nowrap;">${centsToUSD(t.amountCents)}</span></div>`).join('');
+  }
   box.innerHTML=`
     <div class="section-head" style="margin-top:22px;"><div class="section-title" style="font-size:14px;color:var(--muted);">🔒 Ventas privadas (fuera de Legacy)</div></div>
     <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:14px 16px;">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Estas ventas NO cuentan en los números ni impuestos de Legacy. Bórralas del CRM cuando se liquiden.</div>
-      ${rows.map(r=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:14px;"><span>${r.name}<span style="color:var(--faint);font-size:12px;">${r.car?' · '+r.car:''}</span></span><span style="color:var(--muted);white-space:nowrap;">${centsToUSD(r.paid)} cobrado</span></div>`).join('')}
-      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:8px;padding-top:8px;font-weight:700;"><span>Total privadas</span><span>${centsToUSD(total)}</span></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Estas ventas NO cuentan en los números ni impuestos de Legacy. Se pueden editar/borrar cuando hagan su corte.</div>
+      ${inner}
+      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:8px;padding-top:8px;font-weight:700;"><span>Total privadas</span><span>${centsToUSD(totalCli+totalParts)}</span></div>
     </div>`;
 }
 
