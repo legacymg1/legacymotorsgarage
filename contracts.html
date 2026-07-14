@@ -553,11 +553,33 @@
     };
   });
 
+  // ===== FIRMA ELECTRÓNICA (iPad, dedo/lápiz) =====
+  (function setupSignature(){
+    const buyerLines = Array.from(document.querySelectorAll('.sign-line')).filter(el => /Buyer Signature/i.test(el.textContent));
+    if(!buyerLines.length) return;
+    const wrap=document.createElement('div'); wrap.className='esign-wrap no-print'; wrap.style.cssText='margin:14px 0;padding:12px;border:1px dashed #999;border-radius:8px;';
+    wrap.innerHTML='<div style="font-size:9pt;margin-bottom:8px;"><label style="cursor:pointer;"><input type="checkbox" id="esign-consent" style="vertical-align:middle;"> <strong>Buyer agrees to sign this contract electronically. / El Comprador acepta firmar este contrato de forma electrónica.</strong></label></div>'
+      +'<div style="font-size:8pt;color:#555;margin-bottom:4px;">Sign below with your finger or stylus / Firme abajo con el dedo o l\u00e1piz:</div>'
+      +'<canvas id="esign-pad" width="640" height="160" style="border:1px solid #999;border-radius:6px;background:#fff;touch-action:none;max-width:100%;display:block;"></canvas>'
+      +'<button type="button" id="esign-clear" style="font-size:8pt;background:transparent;border:1px solid #999;border-radius:5px;padding:4px 12px;margin-top:6px;cursor:pointer;">Clear / Limpiar</button>';
+    buyerLines[0].parentNode.insertBefore(wrap, buyerLines[0]);
+    const cv=document.getElementById('esign-pad'), ctx=cv.getContext('2d');
+    ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#0a0a2a';
+    let drawing=false, has=false, lx=0, ly=0;
+    function pos(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*(cv.width/r.width), y:(e.clientY-r.top)*(cv.height/r.height)}; }
+    cv.addEventListener('pointerdown',e=>{ drawing=true; const q=pos(e); lx=q.x; ly=q.y; e.preventDefault(); });
+    cv.addEventListener('pointermove',e=>{ if(!drawing)return; const q=pos(e); ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(q.x,q.y); ctx.stroke(); lx=q.x; ly=q.y; has=true; e.preventDefault(); });
+    cv.addEventListener('pointerup',()=>drawing=false); cv.addEventListener('pointerleave',()=>drawing=false);
+    document.getElementById('esign-clear').onclick=()=>{ ctx.clearRect(0,0,cv.width,cv.height); has=false; };
+    window.__esign={ canvas:cv, hasInk:()=>has, buyerLines };
+  })();
+
   // Action bar
   const bar=document.createElement('div');
   bar.className='no-print action-bar';
   bar.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#000;border-top:2px solid #f0c040;padding:12px;display:flex;gap:10px;justify-content:center;z-index:9999;';
-  bar.innerHTML='<button onclick="saveContract()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">💾 GUARDAR</button>'
+  bar.innerHTML='<button onclick="signAndSave()" style="background:#0a7a35;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">✍️ FIRMAR Y GUARDAR</button>'
+    +'<button onclick="saveContract()" style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">💾 GUARDAR</button>'
     +'<button onclick="window.print()" style="background:transparent;color:#f0c040;border:2px solid #f0c040;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ IMPRIMIR</button>'
     +'<button onclick="window.close()" style="background:transparent;color:#aaa;border:1px solid #444;border-radius:8px;padding:12px 16px;font-size:14px;cursor:pointer;">✕ CERRAR</button>';
   document.body.appendChild(bar);
@@ -581,6 +603,43 @@ window.saveContract = async function(){
     await setDoc(doc(db,'clients',clientId),{...existing,contract:{params:window.location.search,editedFields,savedAt:new Date().toISOString()}});
     alert('✅ Contract saved!');
   }catch(e){alert('Error: '+e.message);}
+}
+
+window.signAndSave = async function(){
+  const q=new URLSearchParams(window.location.search);
+  const clientId=q.get('clientId');
+  if(!clientId){ alert('No client linked. Genera el contrato desde la tarjeta del cliente (📄).'); return; }
+  const es=window.__esign;
+  if(!document.getElementById('esign-consent') || !document.getElementById('esign-consent').checked){ alert('El comprador debe aceptar firmar electrónicamente. / Buyer must consent to e-sign.'); return; }
+  if(!es || !es.hasInk()){ alert('Falta la firma del comprador. / Buyer signature required.'); return; }
+  if(!confirm('¿Firmar y guardar el contrato? Esto guarda una copia oficial firmada en el expediente del cliente.')) return;
+  const sigData=es.canvas.toDataURL('image/png');
+  const stamp=new Date().toLocaleString('en-US');
+  es.buyerLines.forEach(line=>{
+    const label=line.innerHTML;
+    line.innerHTML='<img src="'+sigData+'" alt="signature" style="height:52px;display:block;margin-bottom:2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:8pt;color:#555;">Signed electronically / Firmado electr\u00f3nicamente: '+stamp+'</span></div>';
+  });
+  // Limpiar UI para el snapshot (firma, barra, editables, scripts)
+  document.querySelectorAll('.esign-wrap, .action-bar').forEach(el=>el.remove());
+  document.querySelectorAll('[contenteditable]').forEach(el=>{ el.removeAttribute('contenteditable'); el.style.borderBottom=''; el.style.cursor=''; });
+  document.querySelectorAll('script').forEach(s=>s.remove());
+  const snapshotHTML='<!doctype html>'+document.documentElement.outerHTML;
+  try{
+    const {initializeApp,getApps}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+    const {getFirestore,doc,setDoc,getDoc}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const {getStorage,ref,uploadString,getDownloadURL}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js');
+    const cfg={apiKey:"AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",authDomain:"legacy-motors-garage.firebaseapp.com",projectId:"legacy-motors-garage",storageBucket:"legacy-motors-garage.firebasestorage.app",messagingSenderId:"783567672493",appId:"1:783567672493:web:3a825f2f59ec1c25e9a224"};
+    const app=getApps().length?getApps()[0]:initializeApp(cfg);
+    const db=getFirestore(app), st=getStorage(app);
+    const cnum=q.get('contractNum')||('LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5));
+    const path='contracts/'+clientId+'/'+cnum+'.html';
+    const sref=ref(st,path);
+    await uploadString(sref, snapshotHTML, 'raw', {contentType:'text/html; charset=utf-8'});
+    const url=await getDownloadURL(sref);
+    const snap=await getDoc(doc(db,'clients',clientId)); const existing=snap.exists()?snap.data():{};
+    await setDoc(doc(db,'clients',clientId), {...existing, contractNumber: existing.contractNumber||cnum, signedContract:{url, contractNumber:cnum, signedAt:new Date().toISOString(), method:'esign', signerName:(q.get('name')||'')}});
+    alert('✅ Contrato firmado y guardado en el expediente del cliente.');
+  }catch(e){ alert('Error al guardar el contrato firmado: '+e.message); }
 }</script>
 </body>
 </html>
