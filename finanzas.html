@@ -1491,10 +1491,11 @@ window.toggleMovs = function(){
   el.style.display = show ? '' : 'none';
   const sb=document.getElementById('mov-search'); if(sb) sb.style.display = show ? '' : 'none';
   const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent = show?'▾':'▸';
+  if(!show && sb){ sb.value=''; if(typeof renderExpenses==='function') renderExpenses(); }   // al minimizar: limpia el buscador
   try{ localStorage.setItem('lmg_movs_col', show?'0':'1'); }catch(e){}
 };
 function applyMovsCollapse(){
-  try{ const c=localStorage.getItem('lmg_movs_col')==='1';
+  try{ const c=localStorage.getItem('lmg_movs_col')!=='0';   // colapsado por defecto (salvo que lo hayas abierto)
     const el=document.getElementById('exp-list'); if(el) el.style.display=c?'none':'';
     const sb=document.getElementById('mov-search'); if(sb) sb.style.display=c?'none':'';
     const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent=c?'▸':'▾';
