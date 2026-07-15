@@ -963,23 +963,7 @@ window.renderCorte = function(){
   const rowM=(label,o)=>o?`<tr><td style="${cell}">${label}</td><td style="${cell}text-align:right;color:#3ecf8e;">${centsToUSD(o.in)}</td><td style="${cell}text-align:right;color:#ff6b6b;">${o.out<0?'+':'-'}${centsToUSD(Math.abs(o.out))}</td><td style="${cell}text-align:right;font-weight:700;">${centsToUSD(o.in-o.out)}</td></tr>`:'';
   const deptName={dealer:'🚗 Dealer',parts:'🔧 Partes',ebay:'📦 eBay','—':'— Sin bolsa'};
 
-  let html=`
-  <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px;">${periodoTxt}</div>
-  <div style="background:rgba(62,207,142,0.08);border:1px solid rgba(62,207,142,0.35);border-radius:14px;padding:16px;margin-bottom:16px;text-align:center;">
-    <div style="font-size:12px;color:var(--muted);letter-spacing:0.5px;">💵 EFECTIVO NETO DEL PERIODO (lo que debe cuadrar en la caja)</div>
-    <div style="font-size:30px;font-weight:800;color:${cashNet>=0?'#3ecf8e':'#ff6b6b'};margin-top:4px;">${centsToUSD(cashNet)}</div>
-  </div>
-  <div style="text-align:center;font-size:13px;color:var(--muted);margin:-6px 0 16px;">💵 En caja ahora (todo el efectivo acumulado): <b style="color:var(--text);">${centsToUSD(cashOnHand)}</b><br><span style="font-size:11px;color:var(--faint);">Incluye lo que quedó de cortes anteriores.</span></div>
-  <div style="display:flex;gap:10px;margin-bottom:18px;">
-    <div style="flex:1;background:var(--surface2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">Entró</div><div style="font-size:18px;font-weight:700;color:#3ecf8e;">${centsToUSD(totIn)}</div></div>
-    <div style="flex:1;background:var(--surface2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">Salió</div><div style="font-size:18px;font-weight:700;color:#ff6b6b;">${centsToUSD(totOut)}</div></div>
-    <div style="flex:1;background:var(--surface2);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">Neto</div><div style="font-size:18px;font-weight:700;color:${net>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(net)}</div></div>
-  </div>
-  <div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:14px;text-align:center;">
-    <div style="font-size:11px;color:var(--muted);">📈 GANANCIA OPERATIVA (ingresos − gastos, sin contar dinero de socios)</div>
-    <div style="font-size:24px;font-weight:800;color:${(opIn-opOut)>=0?'#3ecf8e':'#ff6b6b'};margin-top:2px;">${centsToUSD(opIn-opOut)}</div>
-  </div>
-  ${(capIn||capOut)?`<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:14px;">👥 Movimiento de socios en el periodo — aportaron <b style="color:#3ecf8e;">${centsToUSD(capIn)}</b> · retiraron <b style="color:#ff6b6b;">${centsToUSD(capOut)}</b></div>`:''}`;
+  let html=`<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:14px;">${periodoTxt}</div>`;
 
   // ----- DESGLOSE POR BOLSA (con ventas privadas) — los gastos todos cuentan en Legacy -----
   const _isPriv=t=>(t.clientId && privateIds.has(t.clientId)) || t.private===true;
