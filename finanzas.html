@@ -195,6 +195,7 @@
       <span id="movs-arrow" class="coll-arrow">▾</span>
     </div>
   </div>
+  <input id="mov-search" oninput="movSearch()" placeholder="🔎 Buscar por fecha (ej. abril, 04-14), carro o concepto…" style="width:100%;box-sizing:border-box;margin:4px 0 10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:14px;">
   <div class="list" id="exp-list"></div>
 </div>
 
@@ -314,6 +315,30 @@
       <button class="btn btn-primary" id="ac-save" onclick="saveAssignCar()">Guardar</button>
     </div>
     <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;">Solo cambia a qué carro pertenece el gasto. El monto y la fecha no se tocan.</div>
+  </div>
+</div>
+
+<!-- EDITAR MOVIMIENTO + RECIBO -->
+<div class="overlay" id="mov-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title" id="mov-title">Editar movimiento</div><button class="close" onclick="closeMov()">✕</button></div>
+    <div id="mov-info" style="font-size:13px;color:var(--muted);margin-bottom:12px;"></div>
+    <div class="row2">
+      <div class="field"><label>Monto ($)</label><input id="mov-amount" type="number" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Fecha</label><input id="mov-date" type="date"></div>
+    </div>
+    <div class="field"><label>Categoría</label><select id="mov-cat"></select></div>
+    <div class="field"><label>Concepto / qué fue</label><input id="mov-note" placeholder="Ej. balatas, radio, motor…"></div>
+    <div class="field"><label>📎 Recibo</label>
+      <div id="mov-receipt-cur" style="margin-bottom:8px;"></div>
+      <input type="file" id="mov-receipt" accept="image/*" onchange="movReceiptPreview()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
+      <div id="mov-receipt-preview" style="margin-top:8px;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeMov()">Cancelar</button>
+      <button class="btn btn-primary" id="mov-save" onclick="saveMov()">Guardar</button>
+    </div>
+    <div id="mov-readonly" style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;display:none;">Solo lectura: este movimiento es de la bolsa de tu socio.</div>
   </div>
 </div>
 
@@ -688,12 +713,21 @@ function renderExpenses(){
   const active=exps;
   const el=document.getElementById('exp-list');
   const incomes=LT.filter(t=>t.type==='income');
-  const movs=[...active.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
-              .sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,50);
-  if(!movs.length){ el.innerHTML='<div class="empty"><div class="empty-ic">🧾</div><div class="empty-title">Aún no hay movimientos</div><div class="empty-sub">Registra ingresos y gastos. Si ligas un gasto a un carro, sabrás cuánto te cuesta ese auto.</div></div>'; return; }
+  const q=(document.getElementById('mov-search')?document.getElementById('mov-search').value:'').trim().toLowerCase();
+  let all=[...active.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
+              .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(q){
+    const words=q.split(/\s+/);
+    all=all.filter(e=>{
+      const hay=[e.note,e.category,e.vendor,e.source_name,e.carLabel,e.date,fmtDate(e.date),(DEPT_LABEL[e.dept]||'')].join(' ').toLowerCase();
+      return words.every(w=>hay.indexOf(w)>=0);
+    });
+  }
+  const movs=all.slice(0, q?400:50);
+  if(!movs.length){ el.innerHTML=`<div class="empty"><div class="empty-ic">${q?'🔎':'🧾'}</div><div class="empty-title">${q?'Sin resultados':'Aún no hay movimientos'}</div><div class="empty-sub">${q?'Prueba con otra fecha o palabra (ej. «abril», «Altima», «placas»).':'Registra ingresos y gastos. Si ligas un gasto a un carro, sabrás cuánto te cuesta ese auto.'}</div></div>`; return; }
   el.innerHTML=movs.map(e=>{
     const inc = e._kind==='inc';
-    const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);text-decoration:none;font-size:12px;">📎 recibo</a>`:'';
+    const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);text-decoration:none;font-size:12px;">📎 recibo</a>`:`<span style="color:var(--faint);font-size:12px;">📎 sin recibo</span>`;
     const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
     const who = e.vendor || e.source_name || '';
     const concepto = e.note || e.category || (inc?'Ingreso':'Gasto');
@@ -703,7 +737,7 @@ function renderExpenses(){
     const act = !canEdit ? '' : (inc ? `<span onclick="deleteInc('${e.id}')" style="cursor:pointer;color:var(--faint);">🗑 borrar</span>` : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`);
     return `<div class="row">
       <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:(inc?'💵':'🧾')}</div>
-      <div class="row-main">
+      <div class="row-main" onclick="openMov('${e.id}')" style="cursor:pointer;">
         <div class="row-name">${concepto}${who?' · '+who:''}</div>
         <div class="row-meta"><span class="chip">${(DEPT_LABEL[e.dept]||'').replace(/^\S+\s/,'')||e.dept}</span>${catChip}<span>${fmtDate(e.date)}</span>${car}${rec}</div>
       </div>
@@ -816,6 +850,7 @@ document.getElementById('pnl-overlay').addEventListener('click',e=>{ if(e.target
 document.getElementById('inc-overlay').addEventListener('click',e=>{ if(e.target.id==='inc-overlay') closeInc(); });
 document.getElementById('transfer-overlay').addEventListener('click',e=>{ if(e.target.id==='transfer-overlay') closeTransfer(); });
 document.getElementById('assigncar-overlay').addEventListener('click',e=>{ if(e.target.id==='assigncar-overlay') closeAssignCar(); });
+document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
 document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.target.id==='split-overlay') closeSplit(); });
@@ -1073,6 +1108,66 @@ window.saveAssignCar=async function(){
   }catch(e){ alert('Error: '+e.message+'\n\n(¿Publicaste la regla nueva de transactions?)'); }
   btn.disabled=false; btn.textContent='Guardar';
 };
+
+// ---------- BUSCAR + EDITAR MOVIMIENTO (monto/fecha/recibo) ----------
+let _movSearchT=null;
+window.movSearch=function(){ if(_movSearchT) clearTimeout(_movSearchT); _movSearchT=setTimeout(renderExpenses,180); };
+
+let _movId=null, _movTx=null;
+window.openMov=function(id){
+  const tx=txns.find(x=>x.id===id); if(!tx) return;
+  _movId=id; _movTx=tx;
+  const inc = tx.type==='income';
+  const canEdit = myDepts().indexOf(tx.dept)>=0;
+  document.getElementById('mov-title').textContent = inc?'Editar ingreso':'Editar gasto';
+  document.getElementById('mov-info').textContent = (DEPT_LABEL[tx.dept]||tx.dept)+(tx.carLabel?' · '+tx.carLabel:'');
+  document.getElementById('mov-amount').value = (Number(tx.amountCents||0)/100).toFixed(2);
+  document.getElementById('mov-date').value = tx.date||'';
+  document.getElementById('mov-note').value = tx.note||'';
+  const cats = inc ? (INCOME_CATS[tx.dept]||[]) : (EXP_CATS[tx.dept]||[]);
+  const cur = tx.category||'';
+  const list = cats.indexOf(cur)>=0 ? cats : (cur?[cur].concat(cats):cats);
+  document.getElementById('mov-cat').innerHTML = list.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+  const curBox=document.getElementById('mov-receipt-cur');
+  curBox.innerHTML = tx.receiptURL ? `<a href="${tx.receiptURL}" target="_blank" style="color:var(--gold);font-size:13px;">📎 Ver recibo actual</a>` : `<span style="color:var(--faint);font-size:13px;">Sin recibo — toma o sube la foto abajo 👇</span>`;
+  document.getElementById('mov-receipt').value='';
+  document.getElementById('mov-receipt-preview').innerHTML='';
+  ['mov-amount','mov-date','mov-note','mov-cat','mov-receipt'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
+  document.getElementById('mov-save').style.display = canEdit?'':'none';
+  document.getElementById('mov-readonly').style.display = canEdit?'none':'block';
+  document.getElementById('mov-overlay').classList.add('open');
+};
+window.closeMov=function(){ document.getElementById('mov-overlay').classList.remove('open'); _movId=null; _movTx=null; };
+window.movReceiptPreview=function(){
+  const f=document.getElementById('mov-receipt').files[0]; const box=document.getElementById('mov-receipt-preview');
+  box.innerHTML = f ? `<div style="font-size:12px;color:var(--muted);">📎 ${f.name} (se guarda al presionar Guardar)</div>` : '';
+};
+window.saveMov=async function(){
+  if(!_movId||!_movTx) return;
+  if(!canEditTx(_movId)){ alert('Solo puedes modificar los movimientos de tu bolsa.'); return; }
+  const amount=Number(document.getElementById('mov-amount').value);
+  if(!amount||amount<=0){ alert('Pon un monto válido'); return; }
+  const date=document.getElementById('mov-date').value; if(!date){ alert('Pon la fecha'); return; }
+  const category=document.getElementById('mov-cat').value;
+  const note=document.getElementById('mov-note').value.trim();
+  const btn=document.getElementById('mov-save'); btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    const upd={ amountCents:Math.round(amount*100), date, category, note };
+    if(_movTx.type==='income') upd.private=/privada/i.test(category);
+    const file=document.getElementById('mov-receipt').files[0];
+    if(file){
+      btn.textContent='Subiendo recibo…';
+      const jpg=await toJpeg(file);
+      const r=ref(storage,'receipts/'+_movId+'/'+Date.now()+'_'+(jpg.name||'recibo.jpg'));
+      await uploadBytes(r,jpg);
+      upd.receiptURL=await getDownloadURL(r);
+    }
+    await updateDoc(doc(db,'transactions',_movId), upd);
+    closeMov();
+  }catch(e){ alert('Error al guardar: '+e.message); }
+  btn.disabled=false; btn.textContent='Guardar';
+};
+
 window.saveInc = async function(){
   const amount=Number(document.getElementById('i-amount').value);
   if(!amount||amount<=0){ alert('Pon el monto'); return; }
@@ -1180,12 +1275,14 @@ window.toggleMovs = function(){
   const el=document.getElementById('exp-list'); if(!el) return;
   const show = el.style.display==='none';
   el.style.display = show ? '' : 'none';
+  const sb=document.getElementById('mov-search'); if(sb) sb.style.display = show ? '' : 'none';
   const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent = show?'▾':'▸';
   try{ localStorage.setItem('lmg_movs_col', show?'0':'1'); }catch(e){}
 };
 function applyMovsCollapse(){
   try{ const c=localStorage.getItem('lmg_movs_col')==='1';
     const el=document.getElementById('exp-list'); if(el) el.style.display=c?'none':'';
+    const sb=document.getElementById('mov-search'); if(sb) sb.style.display=c?'none':'';
     const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent=c?'▸':'▾';
   }catch(e){}
 }
