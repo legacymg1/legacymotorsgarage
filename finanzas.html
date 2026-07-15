@@ -453,17 +453,19 @@
     <div id="corte-body"></div>
 
     <div id="cierre-block" style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
-      <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Cerrar corte y repartir</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Anota cuánto se lleva cada quién. Se registra como retiro (sale de la caja) y marca el reinicio: el próximo corte arranca desde aquí.</div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
-        <input id="reparto-total" type="number" inputmode="decimal" placeholder="Total a repartir $" style="flex:2;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px;color:var(--text);font-size:13px;">
-        <button class="btn btn-ghost" onclick="split5050()" style="flex:1;min-width:88px;">⚡ 50/50</button>
-      </div>
-      <div id="reparto-rows"></div>
-      <button class="btn btn-ghost" onclick="addReparto()" style="width:100%;margin-bottom:10px;">＋ Agregar retiro manual</button>
-      <button class="btn btn-primary" id="cierre-save" onclick="confirmCierre()" style="width:100%;">Cerrar corte</button>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Usa los números del <b>cuadre de arriba</b>: reparte a cada socio, deja el fondo y marca el reinicio (el próximo corte arranca desde aquí). Queda un <b>registro permanente</b> que puedes consultar después.</div>
+      <button class="btn btn-primary" id="cierre-save" onclick="confirmCierre()" style="width:100%;margin-bottom:8px;">💾 Cerrar corte y guardar</button>
+      <button class="btn btn-ghost" onclick="openCorteHist()" style="width:100%;">📋 Ver cortes anteriores</button>
     </div>
-    <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:14px;line-height:1.5;">Se calcula del libro contable, en vivo. Los pagos migrados (antes del campo "método") aparecen como "sin especificar".</div>
+    <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:14px;line-height:1.5;">Se calcula del libro contable, en vivo.</div>
+  </div>
+</div>
+
+<div class="overlay" id="cortehist-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title">📋 Cortes anteriores</div><button class="close" onclick="closeCorteHist()">✕</button></div>
+    <div style="font-size:12px;color:var(--faint);margin-bottom:12px;">Cada corte cerrado queda guardado aquí como referencia (no se puede modificar).</div>
+    <div id="cortehist-body" style="max-height:64vh;overflow:auto;"></div>
   </div>
 </div>
 
@@ -894,6 +896,7 @@ document.getElementById('assigncar-overlay').addEventListener('click',e=>{ if(e.
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
 document.getElementById('cleanup-overlay').addEventListener('click',e=>{ if(e.target.id==='cleanup-overlay') closeCleanup(); });
+document.getElementById('cortehist-overlay').addEventListener('click',e=>{ if(e.target.id==='cortehist-overlay') closeCorteHist(); });
 document.getElementById('comis-overlay').addEventListener('click',e=>{ if(e.target.id==='comis-overlay') closeComis(); });
 document.getElementById('bulkcar-overlay').addEventListener('click',e=>{ if(e.target.id==='bulkcar-overlay') closeBulkAssign(); });
 document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.target.id==='split-overlay') closeSplit(); });
@@ -902,7 +905,7 @@ document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.targ
 const INCOME_TYPES = ['payment','down','cash_sale','income'];
 const METHOD_ROW = [['cash','💵 Efectivo'],['terminal','💳 Terminal'],['ach','🏦 ACH'],['zelle','📲 Zelle/Otro'],['','— Sin especificar']];
 let _corteSince = null;   // si esta puesto, el corte filtra por createdAt >= este timestamp (desde el ultimo cierre)
-let _corteTotalNet = 0;   // total neto del periodo (para recalcular fondo/reparto sin re-render)
+let _corteState = {total:0,dNet:0,pNet:0,owe:0,oweDir:'',fondoCents:0,repartir:0,cada:0};   // estado del corte (para cierre e historial)
 function lastClosing(){
   const cls=txns.filter(t=>t.type==='closing').sort((a,b)=>(b.closedAt||'').localeCompare(a.closedAt||''));
   return cls[0]||null;
@@ -978,22 +981,25 @@ window.renderCorte = function(){
   const sumC=arr=>arr.reduce((s,t)=>s+((t.type==='expense_reversal'?-1:1)*(Number(t.amountCents)||0)),0);
   const dIn=sumC(data.dealer.inc), dEx=sumC(data.dealer.exp), pIn=sumC(data.parts.inc), pEx=sumC(data.parts.exp);
   const dNet=dIn-dEx, pNet=pIn-pEx, totalNet=dNet+pNet;
-  _corteTotalNet=totalNet;
   const listBlock=(title,color,items,total)=>
     '<div style="font-size:13px;font-weight:800;color:'+color+';margin:16px 0 4px;">'+title+'</div>'
     +'<div style="max-height:220px;overflow:auto;">'+_pnlListHtml(items)+'</div>'
     +'<div style="display:flex;justify-content:space-between;padding:8px 0 0;border-top:2px solid var(--border);font-weight:800;font-size:14px;"><span>Total</span><span style="color:'+color+';">'+centsToUSD(total)+'</span></div>';
   let html='<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:6px;">'+periodoTxt+'</div>';
+  const subT=(label,net)=>'<div style="display:flex;justify-content:space-between;background:var(--surface2);border-radius:10px;padding:11px 12px;margin:8px 0 10px;font-weight:800;font-size:14px;"><span>'+label+'</span><span style="color:'+(net>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(net)+'</span></div>';
   html+=listBlock('📥 Ingresos Dealer','#3ecf8e',data.dealer.inc,dIn);
   html+=listBlock('📤 Egresos Dealer','#ff6b6b',data.dealer.exp,dEx);
+  html+=subT('🚗 Subtotal Dealer',dNet);
   html+=listBlock('📥 Ingresos Partes','#3ecf8e',data.parts.inc,pIn);
   html+=listBlock('📤 Egresos Partes','#ff6b6b',data.parts.exp,pEx);
+  html+=subT('🔧 Subtotal Partes',pNet);
   // ----- CUADRE ENTRE SOCIOS (cuenta interna) -----
   const owe=Math.round((dNet-pNet)/2);
   const oweDir = owe>=0 ? '🚗 Dealer → 🔧 Partes' : '🔧 Partes → 🚗 Dealer';
   const fondoEl=document.getElementById('corte-fondo'); const fondoStr=fondoEl?fondoEl.value:'';
   const fondoCents=Math.round((Number(fondoStr)||0)*100);
   const repartir=totalNet-fondoCents, cada=Math.round(repartir/2);
+  _corteState={total:totalNet,dNet,pNet,owe,oweDir,fondoCents,repartir,cada};
   html+='<div style="border-top:2px solid var(--border);margin-top:22px;padding-top:14px;">'
     +'<div style="font-weight:800;font-size:15px;margin-bottom:10px;">🔁 Cuadre entre socios <span style="font-size:11px;color:var(--faint);font-weight:500;">(cuenta interna, se registra en el total)</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">🚗 Dealer neto</span><span style="color:'+(dNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(dNet)+'</span></div>'
@@ -1010,7 +1016,8 @@ window.renderCorte = function(){
 window.updateCorteFondo = function(){
   const el=document.getElementById('corte-fondo'); if(!el) return;
   const fondoCents=Math.round((Number(el.value)||0)*100);
-  const rep=_corteTotalNet-fondoCents, cada=Math.round(rep/2);
+  const rep=_corteState.total-fondoCents, cada=Math.round(rep/2);
+  _corteState.fondoCents=fondoCents; _corteState.repartir=rep; _corteState.cada=cada;
   const r=document.getElementById('corte-repartir'); if(r) r.textContent=centsToUSD(rep);
   const c=document.getElementById('corte-cada'); if(c) c.textContent=centsToUSD(cada);
 };
@@ -1041,37 +1048,54 @@ window.split5050 = function(){
   renderReparto();
 };
 window.confirmCierre = async function(){
-  const retiros = repartoRows.filter(r=>Number(r.monto)>0 && (r.nombre||'').trim());
-  const totalReparto = retiros.reduce((s,r)=>s+Number(r.monto),0);
-  const msg = retiros.length
-    ? `Cerrar el corte y registrar ${retiros.length} retiro(s) por ${money2(totalReparto)}.\n\nEse dinero sale de la caja y se marca el reinicio: el próximo corte arranca desde ahora. ¿Confirmar?`
-    : `Cerrar el corte SIN retiros (solo marca el reinicio). ¿Confirmar?`;
+  const s=_corteState;
+  const msg = 'Cerrar el corte:\n\n'
+    +'• Repartir '+money2(s.repartir/100)+' ('+money2(s.cada/100)+' a cada socio)\n'
+    +'• Dejar '+money2(s.fondoCents/100)+' de fondo de caja\n'
+    +(s.owe?('• Cuadre interno: '+s.oweDir.replace(/[🚗🔧]/g,'')+money2(Math.abs(s.owe)/100)+'\n'):'')
+    +'\nMarca el reinicio: el próximo corte arranca desde ahora. Queda registro permanente. ¿Confirmar?';
   if(!confirm(msg)) return;
   const btn=document.getElementById('cierre-save'); btn.disabled=true; btn.textContent='Cerrando…';
   const now=new Date().toISOString(); const day=now.slice(0,10);
   const who=(auth.currentUser&&auth.currentUser.email)||'';
   const closingId='close_'+Date.now();
   try{
+    const retiros = (s.cada>0) ? PARTNERS.map(nombre=>({nombre,cents:s.cada})) : [];
     for(const r of retiros){
       const rid='draw_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
       await setDoc(doc(db,'transactions',rid), {
-        entryId:rid, type:'draw', dept:r.dept||'dealer',
-        amountCents:Math.round(Number(r.monto)*100), method:'cash',
-        date:day, person:(r.nombre||'').trim(), note:'Reparto de corte',
-        closingId, createdAt:now, createdBy:who, source:'finanzas'
+        entryId:rid, type:'draw', dept:'dealer', amountCents:r.cents, method:'cash',
+        date:day, person:r.nombre, note:'Reparto de corte', closingId,
+        createdAt:now, createdBy:who, source:'finanzas'
       });
     }
     await setDoc(doc(db,'transactions',closingId), {
       entryId:closingId, type:'closing', amountCents:0, date:day, closedAt:now,
-      repartoCents:Math.round(totalReparto*100), retiros:retiros.length,
+      dealerNetCents:s.dNet, partesNetCents:s.pNet, totalCents:s.total,
+      oweCents:s.owe, oweDir:s.oweDir, fondoCents:s.fondoCents,
+      repartirCents:s.repartir, cadaCents:s.cada, retiros:retiros.length,
       createdAt:now, createdBy:who, source:'finanzas'
     });
-    repartoRows=[]; renderReparto();
-    alert('✅ Corte cerrado. El próximo arranca desde ahora.');
-    corteQuick('sincelast');
+    alert('✅ Corte cerrado y guardado. El próximo arranca desde ahora.');
+    _corteSince = now; renderCorte();
   }catch(e){ alert('Error al cerrar: '+e.message); }
-  btn.disabled=false; btn.textContent='Cerrar corte';
+  btn.disabled=false; btn.textContent='💾 Cerrar corte y guardar';
 };
+window.openCorteHist = function(){
+  const cls=txns.filter(t=>t.type==='closing').sort((a,b)=>(b.closedAt||'').localeCompare(a.closedAt||''));
+  const box=document.getElementById('cortehist-body');
+  if(!cls.length){ box.innerHTML='<div style="color:var(--faint);text-align:center;padding:24px;">Aún no hay cortes cerrados.</div>'; }
+  else box.innerHTML=cls.map(c=>{
+    const d=fmtDate((c.closedAt||c.date||'').slice(0,10));
+    return '<div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:10px;">'
+      +'<div style="display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-bottom:6px;"><span>🧮 '+d+'</span><span style="color:'+((c.totalCents||0)>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(c.totalCents||0)+'</span></div>'
+      +'<div style="font-size:12px;color:var(--muted);line-height:1.8;">🚗 Dealer neto: '+centsToUSD(c.dealerNetCents||0)+' · 🔧 Partes neto: '+centsToUSD(c.partesNetCents||0)
+      +(c.oweCents?('<br>🔁 Cuadre: '+(c.oweDir||'')+' '+centsToUSD(Math.abs(c.oweCents))):'')
+      +'<br>💰 Fondo: '+centsToUSD(c.fondoCents||0)+' · Repartido: '+centsToUSD(c.repartirCents||0)+' ('+centsToUSD(c.cadaCents||0)+' c/u)</div></div>';
+  }).join('');
+  document.getElementById('cortehist-overlay').classList.add('open');
+};
+window.closeCorteHist = function(){ document.getElementById('cortehist-overlay').classList.remove('open'); };
 
 // ---------- CUENTAS DE SOCIOS ----------
 window.openSocios = function(){ renderSocios(); document.getElementById('socios-overlay').classList.add('open'); };
