@@ -577,7 +577,7 @@ function loadInventory(){
 function populateCarPicker(){
   const sel=document.getElementById('e-car'); if(!sel) return;
   const opts=['<option value="">— Ninguno (gasto general) —</option>'];
-  [...inventory].sort((a,b)=>(parseInt(a.inventoryNum)||0)-(parseInt(b.inventoryNum)||0)).forEach(c=>{
+  [...inventory].sort((a,b)=>(parseInt(b.inventoryNum)||0)-(parseInt(a.inventoryNum)||0)).forEach(c=>{
     opts.push(`<option value="${c.id}">#${c.inventoryNum||'?'} · ${c.year||''} ${c.make||''} ${c.model||''}</option>`);
   });
   sel.innerHTML=opts.join('');
@@ -1004,7 +1004,7 @@ window.openAssignCar=function(txId){
   document.getElementById('ac-info').textContent = tx ? ((tx.category||'Gasto')+' · '+centsToUSD(tx.amountCents)) : '';
   const sel=document.getElementById('ac-car');
   const opts=['<option value="">— Ninguno —</option>'];
-  [...inventory].sort((a,b)=>(parseInt(a.inventoryNum)||0)-(parseInt(b.inventoryNum)||0)).forEach(c=>{
+  [...inventory].sort((a,b)=>(parseInt(b.inventoryNum)||0)-(parseInt(a.inventoryNum)||0)).forEach(c=>{
     const selred = (tx && tx.carId===c.id) ? ' selected' : '';
     opts.push(`<option value="${c.id}"${selred}>#${c.inventoryNum||'?'} · ${c.year||''} ${c.make||''} ${c.model||''}</option>`);
   });
