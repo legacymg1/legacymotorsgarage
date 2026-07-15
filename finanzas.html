@@ -156,8 +156,8 @@
   </div>
   <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
-    <button class="btn-add" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
-    <button class="btn-add" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
+    <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
+    <button class="btn-add" id="btn-total" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
     <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
     <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
@@ -561,6 +561,8 @@ function toJpeg(file){
   });
 }
 const STAFF_EMAILS = ['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];
+// Solo los SOCIOS ven Resultados Privadas y Totales. Un futuro contador (staff) solo verá Legacy.
+const PARTNER_EMAILS = ['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];
 const PARTNERS = ['Enrique V','Ivan G'];   // 50/50 siempre
 
 let subs = [];
@@ -587,6 +589,10 @@ onAuthStateChanged(auth,(user)=>{
     document.getElementById('login').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('user-email').textContent=user.email;
+    const _isPartner = PARTNER_EMAILS.includes((user.email||'').toLowerCase());
+    const _bp=document.getElementById('btn-priv'), _bt=document.getElementById('btn-total');
+    if(_bp) _bp.style.display=_isPartner?'':'none';
+    if(_bt) _bt.style.display=_isPartner?'':'none';
     if(!_listening){ _listening=true; startListening(); }
   } else {
     document.getElementById('app').style.display='none';
@@ -1549,7 +1555,7 @@ let _pnlYear = new Date().getFullYear();
 let _pnlMode = 'month';
 const PNL_DEPTS = [['dealer','🚗 Dealer'],['parts','🔧 Partes'],['ebay','📦 eBay']];
 let _pnlKind='legacy';
-window.openPnl = function(kind){ _pnlKind=(kind==='privadas'||kind==='total')?kind:'legacy'; _pnlMode='month'; _pnlMonth=new Date().toISOString().slice(0,7); _pnlYear=new Date().getFullYear(); renderPnl(); document.getElementById('pnl-overlay').classList.add('open'); };
+window.openPnl = function(kind){ const _em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase(); if((kind==='privadas'||kind==='total') && !PARTNER_EMAILS.includes(_em)) kind='legacy'; _pnlKind=(kind==='privadas'||kind==='total')?kind:'legacy'; _pnlMode='month'; _pnlMonth=new Date().toISOString().slice(0,7); _pnlYear=new Date().getFullYear(); renderPnl(); document.getElementById('pnl-overlay').classList.add('open'); };
 window.closePnl = function(){ document.getElementById('pnl-overlay').classList.remove('open'); };
 window.pnlSetMode = function(m){ _pnlMode=m; if(m==='month') _pnlMonth=new Date().toISOString().slice(0,7); else _pnlYear=new Date().getFullYear(); renderPnl(); };
 window.pnlShift = function(delta){
