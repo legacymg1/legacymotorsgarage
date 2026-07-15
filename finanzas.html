@@ -897,23 +897,8 @@ function lastClosing(){
   const cls=txns.filter(t=>t.type==='closing').sort((a,b)=>(b.closedAt||'').localeCompare(a.closedAt||''));
   return cls[0]||null;
 }
-window.openCorte = function(){ repartoRows=[]; renderReparto(); const lc=lastClosing(); _corteSince = lc ? (lc.closedAt||'') : ''; renderCorte(); document.getElementById('corte-overlay').classList.add('open'); };
+window.openCorte = function(){ const lc=lastClosing(); _corteSince = lc ? (lc.closedAt||'') : ''; renderCorte(); document.getElementById('corte-overlay').classList.add('open'); };
 window.closeCorte = function(){ document.getElementById('corte-overlay').classList.remove('open'); };
-window.corteQuick = function(kind){
-  const now=new Date(); const iso=d=>d.toISOString().slice(0,10);
-  let from=iso(now); const to=iso(now);
-  _corteSince = null;
-  if(kind==='sincelast'){
-    const lc=lastClosing();
-    _corteSince = lc ? (lc.closedAt||'') : '';        // '' = desde el principio
-    from = lc ? (lc.date || (lc.closedAt||'').slice(0,10)) : '';
-  }
-  else if(kind==='week'){ const d=new Date(now); d.setDate(d.getDate()-6); from=iso(d); }
-  else if(kind==='month'){ from=now.toISOString().slice(0,7)+'-01'; }
-  const cf=document.getElementById('c-from'), ct=document.getElementById('c-to'); if(cf) cf.value=from; if(ct) ct.value=to;
-  renderCorte();
-};
-window.onCorteDateChange = function(){ _corteSince = null; renderCorte(); };
 window.renderCorte = function(){
   const cf=document.getElementById('c-from'), ct=document.getElementById('c-to'); const from=cf?cf.value:'', to=ct?ct.value:'';
   const body=document.getElementById('corte-body');
@@ -1017,31 +1002,7 @@ window.updateCorteFondo = function(){
   const c=document.getElementById('corte-cada'); if(c) c.textContent=centsToUSD(cada);
 };
 
-// ---------- CIERRE Y REPARTO ----------
-let repartoRows = [];
-function renderReparto(){
-  const box=document.getElementById('reparto-rows'); if(!box) return;
-  const inp='background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:13px;';
-  box.innerHTML = repartoRows.map((r,i)=>`
-    <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;">
-      <input placeholder="Nombre" value="${r.nombre||''}" oninput="repartoRows[${i}].nombre=this.value" style="flex:2;${inp}">
-      <input placeholder="$" type="number" inputmode="decimal" value="${r.monto||''}" oninput="repartoRows[${i}].monto=this.value" style="flex:1;min-width:60px;${inp}">
-      <select oninput="repartoRows[${i}].dept=this.value" style="flex:1;min-width:74px;${inp}">
-        <option value="dealer"${r.dept==='dealer'?' selected':''}>Dealer</option>
-        <option value="parts"${r.dept==='parts'?' selected':''}>Partes</option>
-        <option value="ebay"${r.dept==='ebay'?' selected':''}>eBay</option>
-      </select>
-      <button onclick="repartoRows.splice(${i},1);renderReparto()" style="background:none;border:none;color:var(--faint);cursor:pointer;font-size:18px;line-height:1;">✕</button>
-    </div>`).join('');
-}
-window.addReparto = function(){ repartoRows.push({nombre:'',monto:'',dept:'dealer'}); renderReparto(); };
-window.split5050 = function(){
-  const total=Number(document.getElementById('reparto-total').value);
-  if(!total||total<=0){ alert('Escribe el total a repartir'); return; }
-  const mitad=Math.round(total*100/2)/100;   // mitad exacta en centavos
-  repartoRows = PARTNERS.map(nombre=>({ nombre, monto:mitad, dept:'dealer' }));
-  renderReparto();
-};
+// ---------- CIERRE ----------
 window.confirmCierre = async function(){
   const s=_corteState;
   const msg = 'Cerrar el corte:\n\n'
