@@ -1565,12 +1565,16 @@ window.pnlShift = function(delta){
 };
 function _pnlListHtml(items){
   if(!items.length) return '<div style="font-size:12px;color:var(--faint);padding:6px 0 6px 2px;">Sin movimientos</div>';
-  return items.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(t=>{
+  return items.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(t=>{
     const neg=t.type==='expense_reversal';
-    const desc=t.note||t.category||t.clientName||(INCOME_TYPES.includes(t.type)?'Ingreso':'Gasto');
-    return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);">'
-      +'<span style="color:var(--muted);min-width:0;">'+fmtDate(t.date)+' · '+desc+'</span>'
-      +'<span style="white-space:nowrap;color:'+(neg?'#ff6b6b':'var(--text)')+';">'+(neg?'−':'')+centsToUSD(t.amountCents)+'</span></div>';
+    const income=INCOME_TYPES.includes(t.type);
+    const desc=t.note||t.clientName||t.category||(income?'Ingreso':'Gasto');
+    const meta=[ (t.note&&t.category)?t.category:'', t.carLabel||'', t.vendor||t.source_name||'' ].filter(Boolean).join(' · ');
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">'
+      +'<span style="flex:1;min-width:0;word-break:break-word;font-size:12.5px;color:var(--text);">'+desc
+        +(meta?'<span style="color:var(--faint);font-size:11px;"> · '+meta+'</span>':'')
+        +'<span style="color:var(--faint);font-size:11px;"> · '+fmtDate(t.date)+'</span></span>'
+      +'<span style="white-space:nowrap;font-size:13px;font-weight:600;color:'+(neg?'#ff6b6b':(income?'#3ecf8e':'var(--text)'))+';">'+(neg?'−':'')+centsToUSD(t.amountCents)+'</span></div>';
   }).join('');
 }
 function _pnlDrill(id,lbl,amount,color,items){
