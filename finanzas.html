@@ -154,6 +154,7 @@
     <button class="btn-add" onclick="openInc()" style="flex:1;font-size:16px;padding:14px;font-weight:700;">＋ Ingreso</button>
     <button class="btn-add" onclick="openExp()" style="flex:1;font-size:16px;padding:14px;font-weight:700;">＋ Gasto</button>
   </div>
+  <input id="mov-search" oninput="movSearch()" placeholder="🔎 Buscar un gasto o ingreso (fecha, carro, concepto)…" style="width:100%;box-sizing:border-box;margin:0 0 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:14px;">
   <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
     <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
@@ -235,7 +236,6 @@
       <span id="movs-arrow" class="coll-arrow">▾</span>
     </div>
   </div>
-  <input id="mov-search" oninput="movSearch()" placeholder="🔎 Buscar por fecha (ej. abril, 04-14), carro o concepto…" style="width:100%;box-sizing:border-box;margin:4px 0 10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:14px;">
   <div class="list" id="exp-list"></div>
 </div>
 
@@ -764,6 +764,7 @@ function renderExpenses(){
   const el=document.getElementById('exp-list');
   const incomes=LT.filter(t=>t.type==='income');
   const q=(document.getElementById('mov-search')?document.getElementById('mov-search').value:'').trim().toLowerCase();
+  if(q){ const _el=document.getElementById('exp-list'); if(_el && _el.style.display==='none'){ _el.style.display=''; const _ar=document.getElementById('movs-arrow'); if(_ar) _ar.textContent='▾'; } }  // al buscar, abre la lista
   let all=[...active.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
               .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(q){
@@ -1489,15 +1490,12 @@ window.toggleMovs = function(){
   const el=document.getElementById('exp-list'); if(!el) return;
   const show = el.style.display==='none';
   el.style.display = show ? '' : 'none';
-  const sb=document.getElementById('mov-search'); if(sb) sb.style.display = show ? '' : 'none';
   const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent = show?'▾':'▸';
-  if(!show && sb){ sb.value=''; if(typeof renderExpenses==='function') renderExpenses(); }   // al minimizar: limpia el buscador
   try{ localStorage.setItem('lmg_movs_col', show?'0':'1'); }catch(e){}
 };
 function applyMovsCollapse(){
   try{ const c=localStorage.getItem('lmg_movs_col')!=='0';   // colapsado por defecto (salvo que lo hayas abierto)
     const el=document.getElementById('exp-list'); if(el) el.style.display=c?'none':'';
-    const sb=document.getElementById('mov-search'); if(sb) sb.style.display=c?'none':'';
     const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent=c?'▸':'▾';
   }catch(e){}
 }
