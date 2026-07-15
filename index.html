@@ -14637,21 +14637,21 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <input class="cf-input" id="car-miles" placeholder="Mileage / Millas">
     <input class="cf-input" id="car-vin" placeholder="VIN Number" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
     <div id="car-prep-only" style="display:none;">
-      <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">🔧 <b>Preparación (interno).</b> Registra lo que nos costó el carro. Las fotos, video, descripción y precio de venta se piden después, al editarlo para exhibición.</div>
+      <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">🔧 <b>Preparación (interno).</b> Registra lo que nos costó el carro. Puedes agregar una foto ya. El video, la descripción y el precio de venta se piden después, al editarlo para exhibición.</div>
       <input class="cf-input" id="car-cost" placeholder="Costo de compra / lo que pagamos ($)" type="number">
     </div>
     <div id="car-exhib-only">
       <input class="cf-input" id="car-price" placeholder="Price / Precio ($)" type="number">
       <input class="cf-input" id="car-weekly" placeholder="Weekly Payment / Pago Semanal ($)" type="number">
       <textarea class="cf-input" id="car-desc" rows="2" placeholder="Description / Descripción" style="resize:vertical;"></textarea>
-      <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;">📸 Fotos / Photos</label>
-      <input type="file" class="cf-input" id="car-photos" accept="image/*" multiple style="padding:8px;cursor:pointer;">
-      <div id="car-photo-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
       <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">🎥 Video</label>
       <input type="file" class="cf-input" id="car-video" accept="video/*" style="padding:8px;cursor:pointer;">
     </div>
+    <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">📸 Fotos / Photos <span style="color:#666;">(de tu galería o cámara)</span></label>
+    <input type="file" class="cf-input" id="car-photos" accept="image/*" multiple style="padding:8px;cursor:pointer;">
+    <div id="car-photo-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
     <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">📍 Foto del GPS (para identificar el carro)</label>
-    <input type="file" class="cf-input" id="car-gps-photo" accept="image/*" capture="environment" style="padding:8px;cursor:pointer;">
+    <input type="file" class="cf-input" id="car-gps-photo" accept="image/*" style="padding:8px;cursor:pointer;">
     <div id="car-gps-preview" style="margin-top:6px;"></div>
     <div id="car-upload-progress" style="display:none;margin-top:8px;font-size:13px;color:#ccc;text-align:center;">Subiendo archivos...</div>
     <div class="modal-actions">
