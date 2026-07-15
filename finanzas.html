@@ -159,6 +159,8 @@
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
     <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
     <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
+    <button class="btn-add" onclick="openComis()" style="font-size:15px;" title="Total pagado en comisiones/sueldos">💼 Comisiones</button>
+    <button class="btn-add" onclick="openBulkAssign()" style="font-size:15px;" title="Asignar gastos a un carro por búsqueda (dueño)">🔗 Asignar a carro</button>
     <button class="btn-add" onclick="openCleanup()" style="font-size:15px;" title="Quitar DMV/placas/tax ya importados (dueño)">🧹 Limpiar DMV</button>
   </div>
 
@@ -185,6 +187,30 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="closeCleanup()">Cancelar</button>
         <button class="btn btn-primary" id="clean-go" onclick="doCleanup()" disabled>Confirmar limpieza</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="comis-overlay">
+    <div class="sheet">
+      <div class="sheet-head"><div class="sheet-title">💼 Comisiones pagadas</div><button class="close" onclick="closeComis()">✕</button></div>
+      <div id="comis-body" style="font-size:12px;color:var(--text);white-space:pre-wrap;max-height:52vh;overflow:auto;font-family:ui-monospace,monospace;line-height:1.6;"></div>
+      <div class="modal-actions"><button class="btn btn-primary" onclick="closeComis()">Cerrar</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="bulkcar-overlay">
+    <div class="sheet">
+      <div class="sheet-head"><div class="sheet-title">🔗 Asignar gastos a un carro</div><button class="close" onclick="closeBulkAssign()">✕</button></div>
+      <p style="font-size:12px;color:var(--faint);line-height:1.5;margin-bottom:10px;">Elige el carro, escribe una palabra (ej. «cmax», «altima gris») y asigna de un jalón todos los gastos que coincidan. Sirve para Dealer y Partes. Solo el dueño.</p>
+      <div class="row2">
+        <div class="field"><label>Carro</label><select id="bc-car" onchange="bulkAssignPreview()"></select></div>
+        <div class="field"><label>Buscar palabra</label><input id="bc-q" oninput="bulkAssignPreview()" placeholder="cmax, altima gris…"></div>
+      </div>
+      <div id="bc-prog" style="font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:38vh;overflow:auto;font-family:ui-monospace,monospace;margin-top:8px;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeBulkAssign()">Cancelar</button>
+        <button class="btn btn-primary" id="bc-go" onclick="doBulkAssign()" disabled>Asignar</button>
       </div>
     </div>
   </div>
@@ -870,6 +896,8 @@ document.getElementById('assigncar-overlay').addEventListener('click',e=>{ if(e.
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
 document.getElementById('cleanup-overlay').addEventListener('click',e=>{ if(e.target.id==='cleanup-overlay') closeCleanup(); });
+document.getElementById('comis-overlay').addEventListener('click',e=>{ if(e.target.id==='comis-overlay') closeComis(); });
+document.getElementById('bulkcar-overlay').addEventListener('click',e=>{ if(e.target.id==='bulkcar-overlay') closeBulkAssign(); });
 document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.target.id==='split-overlay') closeSplit(); });
 
 // ---------- CORTE DE CAJA (solo lectura del libro) ----------
@@ -1156,6 +1184,70 @@ window.doCleanup=async function(){
   else { msg+='\n\n🎉 Todo limpio. Cierra con la ✕.'; _cleanPlan=null; }
   prog.textContent=msg;
   btn.textContent='Hecho'; btn.disabled=true;
+};
+
+// ---------- COMISIONES (total pagado) ----------
+window.openComis=function(){
+  const list=liveTxns().filter(t=>t.type==='expense' && (t.category==='Comisión'||t.category==='Comisiones / Mano de obra'));
+  const m=c=>'$'+(Number(c||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const tot=list.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+  const byDept={dealer:0,parts:0,ebay:0};
+  const byPerson={};
+  list.forEach(t=>{ byDept[t.dept]=(byDept[t.dept]||0)+(Number(t.amountCents)||0);
+    const k=(t.note||'(sin nombre)'); byPerson[k]=(byPerson[k]||0)+(Number(t.amountCents)||0); });
+  let html='💼 TOTAL en comisiones / sueldos: '+m(tot)+'   ('+list.length+' pagos)\n\n';
+  html+='Por bolsa:\n  🚗 Dealer: '+m(byDept.dealer||0)+'\n  🔧 Partes: '+m(byDept.parts||0)+(byDept.ebay?('\n  📦 eBay: '+m(byDept.ebay)):'')+'\n\n';
+  html+='Por persona / concepto:\n';
+  html+=(list.length?Object.entries(byPerson).sort((a,b)=>b[1]-a[1]).map(x=>'  • '+x[0]+': '+m(x[1])).join('\n'):'  (aún no hay comisiones registradas)');
+  document.getElementById('comis-body').textContent=html;
+  document.getElementById('comis-overlay').classList.add('open');
+};
+window.closeComis=function(){ document.getElementById('comis-overlay').classList.remove('open'); };
+
+// ---------- ASIGNAR GASTOS A UN CARRO (por búsqueda, dueño) ----------
+let _bulkMatches=[];
+window.openBulkAssign=function(){
+  const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+  if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño puede asignar en lote.'); return; }
+  const sel=document.getElementById('bc-car');
+  sel.innerHTML=[...inventory].sort((a,b)=>(parseInt(b.inventoryNum)||0)-(parseInt(a.inventoryNum)||0))
+    .map(c=>`<option value="${c.id}">#${c.inventoryNum||'?'} · ${c.year||''} ${c.make||''} ${c.model||''}</option>`).join('');
+  document.getElementById('bc-q').value='';
+  document.getElementById('bc-prog').textContent='Escribe una palabra para buscar los gastos.';
+  document.getElementById('bc-go').disabled=true; _bulkMatches=[];
+  document.getElementById('bulkcar-overlay').classList.add('open');
+};
+window.bulkAssignPreview=function(){
+  const q=(document.getElementById('bc-q').value||'').trim().toLowerCase();
+  const carSel=document.getElementById('bc-car'); const carId=carSel.value;
+  const prog=document.getElementById('bc-prog'), go=document.getElementById('bc-go');
+  if(!q){ prog.textContent='Escribe una palabra para buscar los gastos.'; go.disabled=true; _bulkMatches=[]; return; }
+  _bulkMatches=liveTxns().filter(t=>t.type==='expense'
+    && (((t.note||'')+' '+(t.category||'')).toLowerCase().indexOf(q)>=0)
+    && t.carId!==carId);
+  const m=c=>'$'+(Number(c||0)/100).toLocaleString('en-US',{maximumFractionDigits:0});
+  const tot=_bulkMatches.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+  let html='Coinciden '+_bulkMatches.length+' gastos = '+m(tot)+'\n';
+  html+=_bulkMatches.map(t=>'  • '+fmtDate(t.date)+' · '+(DEPT_LABEL[t.dept]||t.dept)+' · '+(t.note||t.category)+' · '+m(t.amountCents)+(t.carLabel?(' (hoy: '+t.carLabel+')'):'')).join('\n');
+  prog.textContent=html; go.disabled=!_bulkMatches.length;
+};
+window.closeBulkAssign=function(){ document.getElementById('bulkcar-overlay').classList.remove('open'); _bulkMatches=[]; };
+window.doBulkAssign=async function(){
+  if(!_bulkMatches.length) return;
+  const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+  if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño.'); return; }
+  const carSel=document.getElementById('bc-car'); const carId=carSel.value;
+  const carLabel=carId?(carSel.options[carSel.selectedIndex].text.replace(/^#\S+ · /,'').trim()):'';
+  if(!confirm('¿Asignar '+_bulkMatches.length+' gastos a '+carLabel+'?')) return;
+  const btn=document.getElementById('bc-go'), prog=document.getElementById('bc-prog');
+  btn.disabled=true; btn.textContent='Asignando…';
+  let ok=0, fail=0; const errs=[]; const list=_bulkMatches.slice();
+  for(const t of list){
+    try{ await updateDoc(doc(db,'transactions',t.id),{carId,carLabel}); ok++; }catch(e){ fail++; if(errs.length<3) errs.push(e.code||e.message); }
+    prog.textContent='Asignados '+ok+' · fallidos '+fail+' de '+list.length;
+  }
+  prog.textContent='✅ Listo. Asignados '+ok+', fallidos '+fail+'.'+(fail?('\n\n⚠️ '+errs.join(' | ')):'')+'\n\nCierra con la ✕.';
+  btn.textContent='Hecho'; if(!fail){ _bulkMatches=[]; }
 };
 
 window.openInc = function(){
