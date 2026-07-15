@@ -450,16 +450,6 @@
 <div class="overlay" id="corte-overlay">
   <div class="sheet" style="max-width:660px;">
     <div class="sheet-head"><div class="sheet-title">🧮 Corte de caja</div><button class="close" onclick="closeCorte()">✕</button></div>
-    <button class="btn btn-primary" onclick="corteQuick('sincelast')" style="width:100%;margin-bottom:10px;">↺ Desde el último cierre</button>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-      <button class="btn btn-ghost" onclick="corteQuick('today')" style="flex:1;min-width:64px;">Hoy</button>
-      <button class="btn btn-ghost" onclick="corteQuick('week')" style="flex:1;min-width:64px;">7 días</button>
-      <button class="btn btn-ghost" onclick="corteQuick('month')" style="flex:1;min-width:64px;">Mes</button>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Desde</label><input id="c-from" type="date" onchange="onCorteDateChange()"></div>
-      <div class="field"><label>Hasta</label><input id="c-to" type="date" onchange="onCorteDateChange()"></div>
-    </div>
     <div id="corte-body"></div>
 
     <div id="cierre-block" style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
@@ -916,7 +906,7 @@ function lastClosing(){
   const cls=txns.filter(t=>t.type==='closing').sort((a,b)=>(b.closedAt||'').localeCompare(a.closedAt||''));
   return cls[0]||null;
 }
-window.openCorte = function(){ repartoRows=[]; renderReparto(); corteQuick('sincelast'); document.getElementById('corte-overlay').classList.add('open'); };
+window.openCorte = function(){ repartoRows=[]; renderReparto(); const lc=lastClosing(); _corteSince = lc ? (lc.closedAt||'') : ''; renderCorte(); document.getElementById('corte-overlay').classList.add('open'); };
 window.closeCorte = function(){ document.getElementById('corte-overlay').classList.remove('open'); };
 window.corteQuick = function(kind){
   const now=new Date(); const iso=d=>d.toISOString().slice(0,10);
@@ -929,12 +919,12 @@ window.corteQuick = function(kind){
   }
   else if(kind==='week'){ const d=new Date(now); d.setDate(d.getDate()-6); from=iso(d); }
   else if(kind==='month'){ from=now.toISOString().slice(0,7)+'-01'; }
-  document.getElementById('c-from').value=from; document.getElementById('c-to').value=to;
+  const cf=document.getElementById('c-from'), ct=document.getElementById('c-to'); if(cf) cf.value=from; if(ct) ct.value=to;
   renderCorte();
 };
 window.onCorteDateChange = function(){ _corteSince = null; renderCorte(); };
 window.renderCorte = function(){
-  const from=document.getElementById('c-from').value, to=document.getElementById('c-to').value;
+  const cf=document.getElementById('c-from'), ct=document.getElementById('c-to'); const from=cf?cf.value:'', to=ct?ct.value:'';
   const body=document.getElementById('corte-body');
   const inRange = (_corteSince!==null)
     ? (t => (t.createdAt||'') > _corteSince)                         // desde el ultimo cierre (preciso)
