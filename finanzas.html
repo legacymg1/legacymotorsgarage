@@ -164,7 +164,6 @@
     <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
     <button class="btn-add" onclick="openComis()" style="font-size:15px;" title="Total pagado en comisiones/sueldos">💼 Comisiones</button>
     <button class="btn-add" onclick="openBulkAssign()" style="font-size:15px;" title="Asignar gastos a un carro por búsqueda (dueño)">🔗 Asignar a carro</button>
-    <button class="btn-add" onclick="openCleanup()" style="font-size:15px;" title="Quitar DMV/placas/tax ya importados (dueño)">🧹 Limpiar DMV</button>
   </div>
 
   <div id="trial-alert"></div>
@@ -178,18 +177,6 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="closeImport()">Cancelar</button>
         <button class="btn btn-primary" id="imp-go" onclick="doImport()">Importar</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="overlay" id="cleanup-overlay">
-    <div class="sheet">
-      <div class="sheet-head"><div class="sheet-title">🧹 Limpiar DMV / placas / tax</div><button class="close" onclick="closeCleanup()">✕</button></div>
-      <p style="font-size:12px;color:var(--faint);line-height:1.5;margin-bottom:10px;">Quita los gastos de DMV / placas / cambio de nombre / registración / título y los tax (es dinero del cliente, no gasto del dealer). El smog de <b>enero y febrero</b> también se quita; el de <b>marzo en adelante</b> se mueve a Reparación. Revisa la lista antes de confirmar. Solo el dueño.</p>
-      <div id="clean-prog" style="font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:42vh;overflow:auto;font-family:ui-monospace,monospace;"></div>
-      <div class="modal-actions">
-        <button class="btn btn-ghost" onclick="closeCleanup()">Cancelar</button>
-        <button class="btn btn-primary" id="clean-go" onclick="doCleanup()" disabled>Confirmar limpieza</button>
       </div>
     </div>
   </div>
@@ -359,26 +346,26 @@
 </div>
 
 <!-- EDITAR MOVIMIENTO + RECIBO -->
-<div class="overlay" id="mov-overlay">
+<div class="overlay" id="movedit-overlay">
   <div class="sheet">
-    <div class="sheet-head"><div class="sheet-title" id="mov-title">Editar movimiento</div><button class="close" onclick="closeMov()">✕</button></div>
-    <div id="mov-info" style="font-size:13px;color:var(--muted);margin-bottom:12px;"></div>
+    <div class="sheet-head"><div class="sheet-title" id="me-title">Editar movimiento</div><button class="close" onclick="closeMovEdit()">✕</button></div>
+    <div id="me-info" style="font-size:13px;color:var(--muted);margin-bottom:12px;"></div>
     <div class="row2">
-      <div class="field"><label>Monto ($)</label><input id="mov-amount" type="number" inputmode="decimal" step="0.01" placeholder="0.00"></div>
-      <div class="field"><label>Fecha</label><input id="mov-date" type="date"></div>
+      <div class="field"><label>Monto ($)</label><input id="me-amount" type="number" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Fecha</label><input id="me-date" type="date"></div>
     </div>
-    <div class="field"><label>Categoría</label><select id="mov-cat"></select></div>
-    <div class="field"><label>Concepto / qué fue</label><input id="mov-note" placeholder="Ej. balatas, radio, motor…"></div>
+    <div class="field"><label>Categoría</label><select id="me-cat"></select></div>
+    <div class="field"><label>Concepto / qué fue</label><input id="me-note" placeholder="Ej. balatas, radio, motor…"></div>
     <div class="field"><label>📎 Recibo</label>
-      <div id="mov-receipt-cur" style="margin-bottom:8px;"></div>
-      <input type="file" id="mov-receipt" accept="image/*" onchange="movReceiptPreview()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
-      <div id="mov-receipt-preview" style="margin-top:8px;"></div>
+      <div id="me-receipt-cur" style="margin-bottom:8px;"></div>
+      <input type="file" id="me-receipt" accept="image/*" onchange="meReceiptPreview()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
+      <div id="me-receipt-preview" style="margin-top:8px;"></div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeMov()">Cancelar</button>
-      <button class="btn btn-primary" id="mov-save" onclick="saveMov()">Guardar</button>
+      <button class="btn btn-ghost" onclick="closeMovEdit()">Cancelar</button>
+      <button class="btn btn-primary" id="me-save" onclick="saveMovEdit()">Guardar</button>
     </div>
-    <div id="mov-readonly" style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;display:none;">Solo lectura: este movimiento es de la bolsa de tu socio.</div>
+    <div id="me-readonly" style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;display:none;">Solo lectura: este movimiento es de la bolsa de tu socio.</div>
   </div>
 </div>
 
@@ -780,7 +767,7 @@ function renderExpenses(){
     const act = !canEdit ? '' : (inc ? `<span onclick="deleteInc('${e.id}')" style="cursor:pointer;color:var(--faint);">🗑 borrar</span>` : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`);
     return `<div class="row">
       <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:(inc?'💵':'🧾')}</div>
-      <div class="row-main" onclick="openMov('${e.id}')" style="cursor:pointer;">
+      <div class="row-main" onclick="openMovEdit('${e.id}')" style="cursor:pointer;">
         <div class="row-name">${concepto}${who?' · '+who:''}</div>
         <div class="row-meta"><span class="chip">${(DEPT_LABEL[e.dept]||'').replace(/^\S+\s/,'')||e.dept}</span>${catChip}<span>${fmtDate(e.date)}</span>${car}${rec}</div>
       </div>
@@ -894,8 +881,8 @@ document.getElementById('inc-overlay').addEventListener('click',e=>{ if(e.target
 document.getElementById('transfer-overlay').addEventListener('click',e=>{ if(e.target.id==='transfer-overlay') closeTransfer(); });
 document.getElementById('assigncar-overlay').addEventListener('click',e=>{ if(e.target.id==='assigncar-overlay') closeAssignCar(); });
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
+document.getElementById('movedit-overlay').addEventListener('click',e=>{ if(e.target.id==='movedit-overlay') closeMovEdit(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
-document.getElementById('cleanup-overlay').addEventListener('click',e=>{ if(e.target.id==='cleanup-overlay') closeCleanup(); });
 document.getElementById('cortehist-overlay').addEventListener('click',e=>{ if(e.target.id==='cortehist-overlay') closeCorteHist(); });
 document.getElementById('comis-overlay').addEventListener('click',e=>{ if(e.target.id==='comis-overlay') closeComis(); });
 document.getElementById('bulkcar-overlay').addEventListener('click',e=>{ if(e.target.id==='bulkcar-overlay') closeBulkAssign(); });
@@ -1170,76 +1157,6 @@ window.doImport=async function(){
   btn.disabled=false; btn.textContent='Importar';
 };
 
-// ---------- LIMPIAR DMV / PLACAS / TAX (dueño) ----------
-let _cleanPlan=null;
-window.openCleanup=function(){
-  const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
-  if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño puede limpiar movimientos.'); return; }
-  const del=[], recat=[], lic=[];
-  liveTxns().filter(t=>t.type==='expense').forEach(t=>{
-    const note=(t.note||'');
-    const isDMV = t.category==='DMV / Título / Registración';
-    const isSmog = /smog/i.test(note);
-    const isTax = /tax|impuesto|\birs\b/i.test(note);
-    const isLic = /licenc|bond/i.test(note);   // licencia de dealer / bond = gasto REAL, nunca borrar
-    const mo = (t.date||'').slice(0,7);
-    if(isLic){ if(isDMV) lic.push(t); return; }   // proteger: mover a Otro
-    if(isTax){ del.push(t); return; }
-    if(isDMV){
-      if(!isSmog){ del.push(t); return; }
-      if(mo==='2026-01'||mo==='2026-02'){ del.push(t); }
-      else { recat.push(t); }
-    }
-  });
-  _cleanPlan={del,recat,lic};
-  const m=c=>'$'+(Number(c||0)/100).toLocaleString('en-US',{maximumFractionDigits:0});
-  const delTot=del.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
-  let html='';
-  if(!del.length && !recat.length && !lic.length){ html='✅ No hay nada de DMV / placas / tax que limpiar. Todo limpio.'; }
-  else {
-    html+='🗑 SE BORRAN ('+del.length+') = '+m(delTot)+'\n';
-    html+=del.map(t=>'  • '+fmtDate(t.date)+' · '+(t.note||t.category)+' · '+m(t.amountCents)).join('\n');
-    html+='\n\n♻️ SMOG (mar+) → Reparación ('+recat.length+'):\n';
-    html+=(recat.length?recat.map(t=>'  • '+fmtDate(t.date)+' · '+(t.note||'')+' · '+m(t.amountCents)).join('\n'):'  (ninguno)');
-    html+='\n\n🏷 LICENCIA/BOND (gasto real) → "Otro", NO se borra ('+lic.length+'):\n';
-    html+=(lic.length?lic.map(t=>'  • '+fmtDate(t.date)+' · '+(t.note||'')+' · '+m(t.amountCents)).join('\n'):'  (ninguno)');
-  }
-  document.getElementById('clean-prog').textContent=html;
-  const go=document.getElementById('clean-go');
-  go.disabled = !(del.length||recat.length||lic.length);
-  go.textContent='Confirmar limpieza';
-  document.getElementById('cleanup-overlay').classList.add('open');
-};
-window.closeCleanup=function(){ document.getElementById('cleanup-overlay').classList.remove('open'); _cleanPlan=null; };
-window.doCleanup=async function(){
-  if(!_cleanPlan) return;
-  const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
-  if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño.'); return; }
-  const del=_cleanPlan.del, recat=_cleanPlan.recat, lic=_cleanPlan.lic||[];
-  if(!confirm('¿Borrar '+del.length+', mover '+recat.length+' smog a Reparación y '+lic.length+' licencia a Otro?\n\nNo se puede deshacer.')) return;
-  const btn=document.getElementById('clean-go'), prog=document.getElementById('clean-prog');
-  btn.disabled=true; btn.textContent='Limpiando…';
-  let delOk=0, recatOk=0, licOk=0, fail=0; const errs=[]; const total=del.length+recat.length+lic.length;
-  const step=()=>{ prog.textContent='Procesados '+(delOk+recatOk+licOk)+' · fallidos '+fail+' de '+total; };
-  for(const t of del){
-    try{ await deleteDoc(doc(db,'transactions',t.id)); delOk++; }catch(e){ fail++; if(errs.length<3) errs.push(e.code||e.message); }
-    step();
-  }
-  for(const t of recat){
-    try{ await updateDoc(doc(db,'transactions',t.id),{category:'Reparación / Reacondicionamiento'}); recatOk++; }catch(e){ fail++; if(errs.length<3) errs.push(e.code||e.message); }
-    step();
-  }
-  for(const t of lic){
-    try{ await updateDoc(doc(db,'transactions',t.id),{category:'Otro'}); licOk++; }catch(e){ fail++; if(errs.length<3) errs.push(e.code||e.message); }
-    step();
-  }
-  let msg='✅ Resultado REAL → Borrados: '+delOk+' · Smog→Reparación: '+recatOk+' · Licencia→Otro: '+licOk+' · Fallidos: '+fail+'.';
-  if(fail){ msg+='\n\n⚠️ Error exacto: '+errs.join(' | ')+'\n\n👉 Mándame este mensaje (parece un permiso de Firestore).'; }
-  else { msg+='\n\n🎉 Todo limpio. Cierra con la ✕.'; _cleanPlan=null; }
-  prog.textContent=msg;
-  btn.textContent='Hecho'; btn.disabled=true;
-};
-
 // ---------- COMISIONES (total pagado) ----------
 window.openComis=function(){
   const list=liveTxns().filter(t=>t.type==='expense' && (t.category==='Comisión'||t.category==='Comisiones / Mano de obra'));
@@ -1348,47 +1265,47 @@ let _movSearchT=null;
 window.movSearch=function(){ if(_movSearchT) clearTimeout(_movSearchT); _movSearchT=setTimeout(renderExpenses,180); };
 
 let _movId=null, _movTx=null;
-window.openMov=function(id){
+window.openMovEdit=function(id){
   const tx=txns.find(x=>x.id===id); if(!tx) return;
   _movId=id; _movTx=tx;
   const inc = tx.type==='income';
   const canEdit = myDepts().indexOf(tx.dept)>=0;
-  document.getElementById('mov-title').textContent = inc?'Editar ingreso':'Editar gasto';
-  document.getElementById('mov-info').textContent = (DEPT_LABEL[tx.dept]||tx.dept)+(tx.carLabel?' · '+tx.carLabel:'');
-  document.getElementById('mov-amount').value = (Number(tx.amountCents||0)/100).toFixed(2);
-  document.getElementById('mov-date').value = tx.date||'';
-  document.getElementById('mov-note').value = tx.note||'';
+  document.getElementById('me-title').textContent = inc?'Editar ingreso':'Editar gasto';
+  document.getElementById('me-info').textContent = (DEPT_LABEL[tx.dept]||tx.dept)+(tx.carLabel?' · '+tx.carLabel:'');
+  document.getElementById('me-amount').value = (Number(tx.amountCents||0)/100).toFixed(2);
+  document.getElementById('me-date').value = tx.date||'';
+  document.getElementById('me-note').value = tx.note||'';
   const cats = inc ? (INCOME_CATS[tx.dept]||[]) : (EXP_CATS[tx.dept]||[]);
   const cur = tx.category||'';
   const list = cats.indexOf(cur)>=0 ? cats : (cur?[cur].concat(cats):cats);
-  document.getElementById('mov-cat').innerHTML = list.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
-  const curBox=document.getElementById('mov-receipt-cur');
+  document.getElementById('me-cat').innerHTML = list.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+  const curBox=document.getElementById('me-receipt-cur');
   curBox.innerHTML = tx.receiptURL ? `<a href="${tx.receiptURL}" target="_blank" style="color:var(--gold);font-size:13px;">📎 Ver recibo actual</a>` : `<span style="color:var(--faint);font-size:13px;">Sin recibo — toma o sube la foto abajo 👇</span>`;
-  document.getElementById('mov-receipt').value='';
-  document.getElementById('mov-receipt-preview').innerHTML='';
-  ['mov-amount','mov-date','mov-note','mov-cat','mov-receipt'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
-  document.getElementById('mov-save').style.display = canEdit?'':'none';
-  document.getElementById('mov-readonly').style.display = canEdit?'none':'block';
-  document.getElementById('mov-overlay').classList.add('open');
+  document.getElementById('me-receipt').value='';
+  document.getElementById('me-receipt-preview').innerHTML='';
+  ['me-amount','me-date','me-note','me-cat','me-receipt'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
+  document.getElementById('me-save').style.display = canEdit?'':'none';
+  document.getElementById('me-readonly').style.display = canEdit?'none':'block';
+  document.getElementById('movedit-overlay').classList.add('open');
 };
-window.closeMov=function(){ document.getElementById('mov-overlay').classList.remove('open'); _movId=null; _movTx=null; };
-window.movReceiptPreview=function(){
-  const f=document.getElementById('mov-receipt').files[0]; const box=document.getElementById('mov-receipt-preview');
+window.closeMovEdit=function(){ document.getElementById('movedit-overlay').classList.remove('open'); _movId=null; _movTx=null; };
+window.meReceiptPreview=function(){
+  const f=document.getElementById('me-receipt').files[0]; const box=document.getElementById('me-receipt-preview');
   box.innerHTML = f ? `<div style="font-size:12px;color:var(--muted);">📎 ${f.name} (se guarda al presionar Guardar)</div>` : '';
 };
-window.saveMov=async function(){
+window.saveMovEdit=async function(){
   if(!_movId||!_movTx) return;
   if(!canEditTx(_movId)){ alert('Solo puedes modificar los movimientos de tu bolsa.'); return; }
-  const amount=Number(document.getElementById('mov-amount').value);
+  const amount=Number(document.getElementById('me-amount').value);
   if(!amount||amount<=0){ alert('Pon un monto válido'); return; }
-  const date=document.getElementById('mov-date').value; if(!date){ alert('Pon la fecha'); return; }
-  const category=document.getElementById('mov-cat').value;
-  const note=document.getElementById('mov-note').value.trim();
-  const btn=document.getElementById('mov-save'); btn.disabled=true; btn.textContent='Guardando…';
+  const date=document.getElementById('me-date').value; if(!date){ alert('Pon la fecha'); return; }
+  const category=document.getElementById('me-cat').value;
+  const note=document.getElementById('me-note').value.trim();
+  const btn=document.getElementById('me-save'); btn.disabled=true; btn.textContent='Guardando…';
   try{
     const upd={ amountCents:Math.round(amount*100), date, category, note };
     if(_movTx.type==='income') upd.private=/privada/i.test(category);
-    const file=document.getElementById('mov-receipt').files[0];
+    const file=document.getElementById('me-receipt').files[0];
     if(file){
       btn.textContent='Subiendo recibo…';
       const jpg=await toJpeg(file);
@@ -1397,7 +1314,7 @@ window.saveMov=async function(){
       upd.receiptURL=await getDownloadURL(r);
     }
     await updateDoc(doc(db,'transactions',_movId), upd);
-    closeMov();
+    closeMovEdit();
   }catch(e){ alert('Error al guardar: '+e.message); }
   btn.disabled=false; btn.textContent='Guardar';
 };
