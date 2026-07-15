@@ -157,6 +157,7 @@
   <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
     <button class="btn-add" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
+    <button class="btn-add" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
     <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
     <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
@@ -1548,7 +1549,7 @@ let _pnlYear = new Date().getFullYear();
 let _pnlMode = 'month';
 const PNL_DEPTS = [['dealer','🚗 Dealer'],['parts','🔧 Partes'],['ebay','📦 eBay']];
 let _pnlKind='legacy';
-window.openPnl = function(kind){ _pnlKind=(kind==='privadas')?'privadas':'legacy'; _pnlMode='month'; _pnlMonth=new Date().toISOString().slice(0,7); _pnlYear=new Date().getFullYear(); renderPnl(); document.getElementById('pnl-overlay').classList.add('open'); };
+window.openPnl = function(kind){ _pnlKind=(kind==='privadas'||kind==='total')?kind:'legacy'; _pnlMode='month'; _pnlMonth=new Date().toISOString().slice(0,7); _pnlYear=new Date().getFullYear(); renderPnl(); document.getElementById('pnl-overlay').classList.add('open'); };
 window.closePnl = function(){ document.getElementById('pnl-overlay').classList.remove('open'); };
 window.pnlSetMode = function(m){ _pnlMode=m; if(m==='month') _pnlMonth=new Date().toISOString().slice(0,7); else _pnlYear=new Date().getFullYear(); renderPnl(); };
 window.pnlShift = function(delta){
@@ -1578,7 +1579,7 @@ function renderPnl(){
   if(mb) mb.style.opacity=_pnlMode==='month'?'1':'0.45';
   if(yb) yb.style.opacity=_pnlMode==='year'?'1':'0.45';
   const priv=_pnlKind==='privadas';
-  const ttl=document.getElementById('pnl-title'); if(ttl) ttl.textContent=priv?'🔒 Resultados Ventas Privadas':'📊 Resultados Legacy';
+  const ttl=document.getElementById('pnl-title'); if(ttl) ttl.textContent=_pnlKind==='total'?'🏆 Resultados Totales':(priv?'🔒 Resultados Ventas Privadas':'📊 Resultados Legacy');
   let inRange, label;
   if(_pnlMode==='year'){ inRange=t=>(t.date||'').slice(0,4)===String(_pnlYear); label='Año '+_pnlYear; }
   else {
@@ -1592,7 +1593,7 @@ function renderPnl(){
   liveTxns().filter(inRange).forEach(t=>{
     const income=INCOME_TYPES.includes(t.type);
     const isP=isPriv(t);
-    if(priv){ if(!(income && isP)) return; } else { if(income && isP) return; }
+    if(_pnlKind==='privadas'){ if(!(income && isP)) return; } else if(_pnlKind==='legacy'){ if(income && isP) return; }
     let d;
     if(income) d=(t.type==='income' && data[t.dept])?t.dept:'dealer';
     else d=data[t.dept]?t.dept:'dealer';
@@ -1612,8 +1613,11 @@ function renderPnl(){
     html+='<div style="background:var(--surface2);border-radius:14px;padding:14px;margin-bottom:12px;"><div style="font-size:15px;font-weight:700;">🚗 Dealer</div>'+_pnlDrill('pl-d-inc','Ingresos privados',dInc,'#3ecf8e',data.dealer.inc)+'</div>';
     html+='<div style="background:var(--surface2);border-radius:14px;padding:14px;margin-bottom:12px;"><div style="font-size:15px;font-weight:700;">🔧 Partes</div>'+_pnlDrill('pl-p-inc','Ingresos privados',pInc,'#3ecf8e',data.parts.inc)+'</div>';
   } else {
-    html+='<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.38);border-radius:14px;padding:16px;margin-bottom:14px;">'
-      +'<div style="font-size:16px;font-weight:800;margin-bottom:8px;">🏢 Legacy <span style="font-size:12px;color:var(--muted);font-weight:500;">(Dealer + Partes)</span></div>'
+    const _tot=_pnlKind==='total';
+    const _hdBg=_tot?'background:linear-gradient(135deg,rgba(240,192,64,0.22),rgba(200,150,12,0.05));border:1px solid rgba(240,192,64,0.6);':'background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.38);';
+    const _hdTitle=_tot?'🏆 <span style="color:#f0c040;">Totales</span> <span style="font-size:12px;color:var(--muted);font-weight:500;">(Legacy + Privadas)</span>':'🏢 Legacy <span style="font-size:12px;color:var(--muted);font-weight:500;">(Dealer + Partes)</span>';
+    html+='<div style="'+_hdBg+'border-radius:14px;padding:16px;margin-bottom:14px;">'
+      +'<div style="font-size:16px;font-weight:800;margin-bottom:8px;">'+_hdTitle+'</div>'
       +'<div style="display:flex;justify-content:space-between;font-size:14px;padding:2px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">'+centsToUSD(totIn)+'</span></div>'
       +'<div style="display:flex;justify-content:space-between;font-size:14px;padding:2px 0;"><span style="color:var(--muted);">Gastos</span><span style="color:#ff6b6b;">'+centsToUSD(totExp)+'</span></div>'
       +'<div style="display:flex;justify-content:space-between;font-size:18px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--border);"><span style="font-weight:800;">GANANCIA</span><span style="font-weight:800;color:'+(gan>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(gan)+'</span></div></div>';
