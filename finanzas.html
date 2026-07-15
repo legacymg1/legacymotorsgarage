@@ -983,6 +983,33 @@ window.renderCorte = function(){
   </div>
   ${(capIn||capOut)?`<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:14px;">👥 Movimiento de socios en el periodo — aportaron <b style="color:#3ecf8e;">${centsToUSD(capIn)}</b> · retiraron <b style="color:#ff6b6b;">${centsToUSD(capOut)}</b></div>`:''}`;
 
+  // ----- DESGLOSE POR BOLSA (con ventas privadas) — los gastos todos cuentan en Legacy -----
+  const _isPriv=t=>(t.clientId && privateIds.has(t.clientId)) || t.private===true;
+  const bd={ dealer:{incL:0,incP:0,exp:0}, parts:{incL:0,incP:0,exp:0} };
+  liveTxns().filter(inRange).forEach(t=>{
+    const d=t.dept; if(d!=='dealer'&&d!=='parts') return;   // eBay aparte por ahora
+    const a=Number(t.amountCents)||0;
+    if(INCOME_TYPES.includes(t.type)){ if(_isPriv(t)) bd[d].incP+=a; else bd[d].incL+=a; }
+    else if(t.type==='expense') bd[d].exp+=a;
+    else if(t.type==='expense_reversal') bd[d].exp-=a;
+  });
+  const legInc=bd.dealer.incL+bd.parts.incL, legExp=bd.dealer.exp+bd.parts.exp, legProfit=legInc-legExp;
+  const dcell='padding:7px 6px;border-bottom:1px solid var(--border);font-size:13px;';
+  const dRow=(ic,b)=>'<tr><td style="'+dcell+'">'+ic+'</td>'
+    +'<td style="'+dcell+'text-align:right;color:#3ecf8e;">'+centsToUSD(b.incL)+'</td>'
+    +'<td style="'+dcell+'text-align:right;color:#f0c040;">'+centsToUSD(b.incP)+'</td>'
+    +'<td style="'+dcell+'text-align:right;color:#ff6b6b;">'+centsToUSD(b.exp)+'</td>'
+    +'<td style="'+dcell+'text-align:right;font-weight:700;">'+centsToUSD(b.incL+b.incP-b.exp)+'</td></tr>';
+  html+='<div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 4px;">Desglose por bolsa</div>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:12px;"><thead><tr style="color:var(--faint);font-size:10px;text-transform:uppercase;">'
+    +'<th style="'+dcell+'text-align:left;"></th><th style="'+dcell+'text-align:right;">Ing. Legacy</th><th style="'+dcell+'text-align:right;">Ing. privados</th><th style="'+dcell+'text-align:right;">Gastos</th><th style="'+dcell+'text-align:right;">Neto</th></tr></thead><tbody>'
+    +dRow('🚗 Dealer',bd.dealer)+dRow('🔧 Partes',bd.parts)
+    +'</tbody></table>'
+    +'<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">'
+    +'<div style="flex:2;min-width:160px;background:rgba(62,207,142,0.08);border:1px solid rgba(62,207,142,0.35);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">🏢 LEGACY (oficial): ingresos − gastos</div><div style="font-size:22px;font-weight:800;color:'+(legProfit>=0?'#3ecf8e':'#ff6b6b')+';margin-top:2px;">'+centsToUSD(legProfit)+'</div><div style="font-size:10px;color:var(--faint);margin-top:2px;">'+centsToUSD(legInc)+' − '+centsToUSD(legExp)+'</div></div>'
+    +'<div style="flex:1;min-width:140px;background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.35);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">🔒 Ventas privadas</div><div style="font-size:13px;color:#f0c040;margin-top:6px;">🚗 Dealer: '+centsToUSD(bd.dealer.incP)+'</div><div style="font-size:13px;color:#f0c040;margin-top:2px;">🔧 Partes: '+centsToUSD(bd.parts.incP)+'</div></div>'
+    +'</div>';
+
   const table=(title,rowsHtml)=>`<div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:6px 0 4px;">${title}</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><thead><tr style="color:var(--faint);font-size:11px;text-transform:uppercase;">
     <th style="${cell}text-align:left;"></th><th style="${cell}text-align:right;">Entró</th><th style="${cell}text-align:right;">Salió</th><th style="${cell}text-align:right;">Neto</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
