@@ -466,7 +466,7 @@
           <option value="ebay">📦 eBay</option>
         </select>
       </div>
-      <div class="field"><label>Categoría</label><select id="e-cat"></select></div>
+      <div class="field"><label>Categoría</label><select id="e-cat" onchange="onExpCatChange()"></select></div>
     </div>
     <div class="field" id="e-car-row"><label>Carro (opcional — para saber cuánto cuesta)</label><select id="e-car"></select></div>
     <div class="row2">
@@ -587,8 +587,8 @@ function startListening(){
 
 // ---------- GASTOS (LIBRO) ----------
 const EXP_CATS = {
-  dealer: ['Compra de vehículo','Reparación / Reacondicionamiento','Partes para reparación','Transporte / Traída','DMV / Título / Registración','Publicidad','Comisión del procesador','Suministros','Renta / Local','Servicios (luz, internet)','Gasolina','Comisiones / Mano de obra','Otro'],
-  parts:  ['Partes para carro en venta','Reparación / Reacondicionamiento','Compra de parte / inventario','Envío / Freight','Suministros','Renta / Local','Servicios','Gasolina','Comisiones / Mano de obra','Otro'],
+  dealer: ['Compra de vehículo','Reparación / Reacondicionamiento','Partes para reparación','Transporte / Traída','DMV / Título / Registración','Publicidad','Comisión del procesador','Suministros','Renta / Local','Servicios (luz, internet)','Gasolina','Comisión','Otro'],
+  parts:  ['Partes para carro en venta','Reparación / Reacondicionamiento','Compra de parte / inventario','Envío / Freight','Suministros','Renta / Local','Servicios','Gasolina','Comisión','Otro'],
   ebay:   ['Sueldos','Compra de parte','Envío / Freight','Comisión eBay / PayPal','Devolución / Reembolso','Suministros','Otro']
 };
 const DEPT_LABEL = { dealer:'🚗 Dealer', parts:'🔧 Partes', ebay:'📦 eBay' };
@@ -639,6 +639,10 @@ window.onDeptChange = function(){
   const cat=document.getElementById('e-cat');
   cat.innerHTML=(EXP_CATS[dept]||[]).map(c=>`<option>${c}</option>`).join('');
   document.getElementById('e-car-row').style.display = (dept==='dealer'||dept==='parts') ? 'block':'none';
+};
+window.onExpCatChange = function(){
+  // Las comisiones se pagan por Zelle desde el banco → método por defecto
+  if(document.getElementById('e-cat').value==='Comisión'){ document.getElementById('e-method').value='zelle'; }
 };
 window.previewReceipt = function(){
   const f=document.getElementById('e-receipt').files[0]; const box=document.getElementById('e-receipt-preview');
