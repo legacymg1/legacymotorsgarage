@@ -1380,13 +1380,17 @@ function renderBolsas(){
         const a=Number(it.amountCents)||0;
         let sign='−', color='#ff6b6b';
         if(INCOME_TYPES.includes(it.type) || (it.type==='transfer'&&it.dir==='in') || it.type==='expense_reversal'){ sign='+'; color='#3ecf8e'; }
-        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:13px;"><span style="color:var(--muted);">${txDesc(it)} · ${fmtDate(it.date)}</span><span style="color:${color};white-space:nowrap;">${sign}${centsToUSD(a)}</span></div>`;
+        const editable = (it.type==='income' || it.type==='expense');
+        const clip = it.receiptURL ? '📎 ' : '';
+        const click = editable ? `onclick="event.stopPropagation(); openMovEdit('${it.id}')"` : '';
+        const hint = editable ? `<span style="color:var(--faint);font-size:11px;margin-left:6px;">✏️</span>` : '';
+        return `<div ${click} style="display:flex;justify-content:space-between;gap:10px;padding:8px 4px;font-size:13px;border-bottom:1px solid var(--border);${editable?'cursor:pointer;border-radius:6px;':''}"><span style="color:var(--muted);">${clip}${txDesc(it)} · ${fmtDate(it.date)}${hint}</span><span style="color:${color};white-space:nowrap;font-weight:600;">${sign}${centsToUSD(a)}</span></div>`;
       }).join('') || '<div style="font-size:12px;color:var(--faint);padding:4px 0;">Sin movimientos en este corte.</div>';
       const hasT = d.tin||d.tout;
       const transLine = hasT ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">↔ Traspasos</span><span>${d.tin?('<span style=\'color:#3ecf8e\'>+'+centsToUSD(d.tin)+'</span>'):''}${(d.tin&&d.tout)?' / ':''}${d.tout?('<span style=\'color:#ff6b6b\'>−'+centsToUSD(d.tout)+'</span>'):''}</span></div>` : '';
       const neto = net + d.tin - d.tout;
       detail = `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin-bottom:4px;">Desglose</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin-bottom:4px;">Desglose <span style="text-transform:none;letter-spacing:0;">· toca un renglón ✏️ para editar o poner recibo 📎</span></div>
         ${rows}
         <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;font-size:14px;">
           <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(d.in)}</span></div>
