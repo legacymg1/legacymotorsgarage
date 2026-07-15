@@ -356,6 +356,12 @@
     </div>
     <div class="field"><label>Categoría</label><select id="me-cat"></select></div>
     <div class="field"><label>Concepto / qué fue</label><input id="me-note" placeholder="Ej. balatas, radio, motor…"></div>
+    <div class="field" id="me-private-wrap" style="margin-top:2px;display:none;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <input type="checkbox" id="me-private" style="width:20px;height:20px;flex-shrink:0;">
+        <span>🔒 Venta privada <span style="font-weight:400;color:var(--muted);">— NO entra a Legacy</span></span>
+      </label>
+    </div>
     <div class="field"><label>📎 Recibo</label>
       <div id="me-receipt-cur" style="margin-bottom:8px;"></div>
       <input type="file" id="me-receipt" accept="image/*" onchange="meReceiptPreview()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
@@ -419,13 +425,19 @@
     </div>
     <div class="row2">
       <div class="field"><label>Cuenta / Bolsa</label><select id="i-dept" onchange="onIncDeptChange()"><option value="dealer">🚗 Dealer</option><option value="parts">🔧 Partes</option><option value="ebay">📦 eBay</option></select></div>
-      <div class="field"><label>Categoría</label><select id="i-cat"></select></div>
+      <div class="field"><label>Categoría</label><select id="i-cat" onchange="onIncCatChange()"></select></div>
     </div>
     <div class="row2">
       <div class="field"><label>Método</label><select id="i-method"><option value="cash">💵 Efectivo</option><option value="terminal">💳 Terminal</option><option value="ach">🏦 ACH</option><option value="zelle">📲 Zelle/Otro</option></select></div>
       <div class="field"><label>Origen (opcional)</label><input id="i-source" placeholder="De quién / de dónde"></div>
     </div>
     <div class="field"><label>Concepto / qué fue</label><input id="i-note" placeholder="Ej. venta de catalizador, computadora…"></div>
+    <div class="field" id="i-private-wrap" style="margin-top:2px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <input type="checkbox" id="i-private" style="width:20px;height:20px;flex-shrink:0;">
+        <span>🔒 Venta privada <span style="font-weight:400;color:var(--muted);">— NO entra a Legacy ni a Resultados oficiales</span></span>
+      </label>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeInc()">Cancelar</button>
       <button class="btn btn-primary" id="inc-save" onclick="saveInc()">Guardar ingreso</button>
@@ -1081,7 +1093,14 @@ const INCOME_CATS = {
 };
 window.onIncDeptChange = function(){
   const d=document.getElementById('i-dept').value;
-  document.getElementById('i-cat').innerHTML=(INCOME_CATS[d]||[]).map(c=>`<option>${c}</option>`).join('');
+  const cats=INCOME_CATS[d]||[];
+  document.getElementById('i-cat').innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
+  // reset el switch de privada según la categoría por defecto de la nueva bolsa
+  document.getElementById('i-private').checked=/privada/i.test(cats[0]||'');
+};
+window.onIncCatChange = function(){
+  // si eligen una categoría que ya dice "privada", marca el switch (no lo desmarca)
+  if(/privada/i.test(document.getElementById('i-cat').value)) document.getElementById('i-private').checked=true;
 };
 window.openImport=function(){
   const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
@@ -1240,11 +1259,13 @@ window.openMovEdit=function(id){
   const cur = tx.category||'';
   const list = cats.indexOf(cur)>=0 ? cats : (cur?[cur].concat(cats):cats);
   document.getElementById('me-cat').innerHTML = list.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+  document.getElementById('me-private-wrap').style.display = inc?'':'none';
+  document.getElementById('me-private').checked = tx.private===true;
   const curBox=document.getElementById('me-receipt-cur');
   curBox.innerHTML = tx.receiptURL ? `<a href="${tx.receiptURL}" target="_blank" style="color:var(--gold);font-size:13px;">📎 Ver recibo actual</a>` : `<span style="color:var(--faint);font-size:13px;">Sin recibo — toma o sube la foto abajo 👇</span>`;
   document.getElementById('me-receipt').value='';
   document.getElementById('me-receipt-preview').innerHTML='';
-  ['me-amount','me-date','me-note','me-cat','me-receipt'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
+  ['me-amount','me-date','me-note','me-cat','me-receipt','me-private'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
   document.getElementById('me-save').style.display = canEdit?'':'none';
   document.getElementById('me-readonly').style.display = canEdit?'none':'block';
   document.getElementById('movedit-overlay').classList.add('open');
@@ -1265,7 +1286,7 @@ window.saveMovEdit=async function(){
   const btn=document.getElementById('me-save'); btn.disabled=true; btn.textContent='Guardando…';
   try{
     const upd={ amountCents:Math.round(amount*100), date, category, note };
-    if(_movTx.type==='income') upd.private=/privada/i.test(category);
+    if(_movTx.type==='income') upd.private=document.getElementById('me-private').checked;
     const file=document.getElementById('me-receipt').files[0];
     if(file){
       btn.textContent='Subiendo recibo…';
@@ -1289,7 +1310,7 @@ window.saveInc = async function(){
   try{
     await setDoc(doc(db,'transactions',id),{
       entryId:id, type:'income', dept:document.getElementById('i-dept').value,
-      category:document.getElementById('i-cat').value, private:/privada/i.test(document.getElementById('i-cat').value), amountCents:Math.round(amount*100),
+      category:document.getElementById('i-cat').value, private:document.getElementById('i-private').checked, amountCents:Math.round(amount*100),
       method:document.getElementById('i-method').value, date,
       source_name:document.getElementById('i-source').value.trim(),
       note:document.getElementById('i-note').value.trim(),
