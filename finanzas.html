@@ -1089,13 +1089,15 @@ let _cleanPlan=null;
 window.openCleanup=function(){
   const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
   if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño puede limpiar movimientos.'); return; }
-  const del=[], recat=[];
+  const del=[], recat=[], lic=[];
   liveTxns().filter(t=>t.type==='expense').forEach(t=>{
     const note=(t.note||'');
     const isDMV = t.category==='DMV / Título / Registración';
     const isSmog = /smog/i.test(note);
     const isTax = /tax|impuesto|\birs\b/i.test(note);
+    const isLic = /licenc|bond/i.test(note);   // licencia de dealer / bond = gasto REAL, nunca borrar
     const mo = (t.date||'').slice(0,7);
+    if(isLic){ if(isDMV) lic.push(t); return; }   // proteger: mover a Otro
     if(isTax){ del.push(t); return; }
     if(isDMV){
       if(!isSmog){ del.push(t); return; }
@@ -1103,20 +1105,22 @@ window.openCleanup=function(){
       else { recat.push(t); }
     }
   });
-  _cleanPlan={del,recat};
+  _cleanPlan={del,recat,lic};
   const m=c=>'$'+(Number(c||0)/100).toLocaleString('en-US',{maximumFractionDigits:0});
   const delTot=del.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
   let html='';
-  if(!del.length && !recat.length){ html='✅ No hay nada de DMV / placas / tax que limpiar. Todo limpio.'; }
+  if(!del.length && !recat.length && !lic.length){ html='✅ No hay nada de DMV / placas / tax que limpiar. Todo limpio.'; }
   else {
     html+='🗑 SE BORRAN ('+del.length+') = '+m(delTot)+'\n';
     html+=del.map(t=>'  • '+fmtDate(t.date)+' · '+(t.note||t.category)+' · '+m(t.amountCents)).join('\n');
-    html+='\n\n♻️ SMOG (mar+) que se mueve a Reparación ('+recat.length+'):\n';
+    html+='\n\n♻️ SMOG (mar+) → Reparación ('+recat.length+'):\n';
     html+=(recat.length?recat.map(t=>'  • '+fmtDate(t.date)+' · '+(t.note||'')+' · '+m(t.amountCents)).join('\n'):'  (ninguno)');
+    html+='\n\n🏷 LICENCIA/BOND (gasto real) → "Otro", NO se borra ('+lic.length+'):\n';
+    html+=(lic.length?lic.map(t=>'  • '+fmtDate(t.date)+' · '+(t.note||'')+' · '+m(t.amountCents)).join('\n'):'  (ninguno)');
   }
   document.getElementById('clean-prog').textContent=html;
   const go=document.getElementById('clean-go');
-  go.disabled = !(del.length||recat.length);
+  go.disabled = !(del.length||recat.length||lic.length);
   go.textContent='Confirmar limpieza';
   document.getElementById('cleanup-overlay').classList.add('open');
 };
@@ -1125,21 +1129,29 @@ window.doCleanup=async function(){
   if(!_cleanPlan) return;
   const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
   if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño.'); return; }
-  const del=_cleanPlan.del, recat=_cleanPlan.recat;
-  if(!confirm('¿Borrar '+del.length+' renglones y mover '+recat.length+' smog a Reparación?\n\nNo se puede deshacer.')) return;
+  const del=_cleanPlan.del, recat=_cleanPlan.recat, lic=_cleanPlan.lic||[];
+  if(!confirm('¿Borrar '+del.length+', mover '+recat.length+' smog a Reparación y '+lic.length+' licencia a Otro?\n\nNo se puede deshacer.')) return;
   const btn=document.getElementById('clean-go'), prog=document.getElementById('clean-prog');
   btn.disabled=true; btn.textContent='Limpiando…';
-  let done=0, fail=0; const total=del.length+recat.length;
+  let delOk=0, recatOk=0, licOk=0, fail=0; const errs=[]; const total=del.length+recat.length+lic.length;
+  const step=()=>{ prog.textContent='Procesados '+(delOk+recatOk+licOk)+' · fallidos '+fail+' de '+total; };
   for(const t of del){
-    try{ await deleteDoc(doc(db,'transactions',t.id)); done++; }catch(e){ fail++; }
-    prog.textContent='Procesados '+done+' · fallidos '+fail+' de '+total;
+    try{ await deleteDoc(doc(db,'transactions',t.id)); delOk++; }catch(e){ fail++; if(errs.length<3) errs.push(e.code||e.message); }
+    step();
   }
   for(const t of recat){
-    try{ await updateDoc(doc(db,'transactions',t.id),{category:'Reparación / Reacondicionamiento'}); done++; }catch(e){ fail++; }
-    prog.textContent='Procesados '+done+' · fallidos '+fail+' de '+total;
+    try{ await updateDoc(doc(db,'transactions',t.id),{category:'Reparación / Reacondicionamiento'}); recatOk++; }catch(e){ fail++; if(errs.length<3) errs.push(e.code||e.message); }
+    step();
   }
-  prog.textContent='✅ Listo. '+del.length+' borrados, '+recat.length+' movidos a Reparación. Fallidos: '+fail+'.\n\nCierra con la ✕.';
-  _cleanPlan=null; btn.textContent='Hecho'; btn.disabled=true;
+  for(const t of lic){
+    try{ await updateDoc(doc(db,'transactions',t.id),{category:'Otro'}); licOk++; }catch(e){ fail++; if(errs.length<3) errs.push(e.code||e.message); }
+    step();
+  }
+  let msg='✅ Resultado REAL → Borrados: '+delOk+' · Smog→Reparación: '+recatOk+' · Licencia→Otro: '+licOk+' · Fallidos: '+fail+'.';
+  if(fail){ msg+='\n\n⚠️ Error exacto: '+errs.join(' | ')+'\n\n👉 Mándame este mensaje (parece un permiso de Firestore).'; }
+  else { msg+='\n\n🎉 Todo limpio. Cierra con la ✕.'; _cleanPlan=null; }
+  prog.textContent=msg;
+  btn.textContent='Hecho'; btn.disabled=true;
 };
 
 window.openInc = function(){
