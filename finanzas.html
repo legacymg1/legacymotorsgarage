@@ -159,6 +159,7 @@
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
     <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
     <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
+    <button class="btn-add" onclick="openCleanup()" style="font-size:15px;" title="Quitar DMV/placas/tax ya importados (dueño)">🧹 Limpiar DMV</button>
   </div>
 
   <div id="trial-alert"></div>
@@ -172,6 +173,18 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="closeImport()">Cancelar</button>
         <button class="btn btn-primary" id="imp-go" onclick="doImport()">Importar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="cleanup-overlay">
+    <div class="sheet">
+      <div class="sheet-head"><div class="sheet-title">🧹 Limpiar DMV / placas / tax</div><button class="close" onclick="closeCleanup()">✕</button></div>
+      <p style="font-size:12px;color:var(--faint);line-height:1.5;margin-bottom:10px;">Quita los gastos de DMV / placas / cambio de nombre / registración / título y los tax (es dinero del cliente, no gasto del dealer). El smog de <b>enero y febrero</b> también se quita; el de <b>marzo en adelante</b> se mueve a Reparación. Revisa la lista antes de confirmar. Solo el dueño.</p>
+      <div id="clean-prog" style="font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:42vh;overflow:auto;font-family:ui-monospace,monospace;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeCleanup()">Cancelar</button>
+        <button class="btn btn-primary" id="clean-go" onclick="doCleanup()" disabled>Confirmar limpieza</button>
       </div>
     </div>
   </div>
@@ -852,7 +865,7 @@ document.getElementById('transfer-overlay').addEventListener('click',e=>{ if(e.t
 document.getElementById('assigncar-overlay').addEventListener('click',e=>{ if(e.target.id==='assigncar-overlay') closeAssignCar(); });
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
-document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
+document.getElementById('cleanup-overlay').addEventListener('click',e=>{ if(e.target.id==='cleanup-overlay') closeCleanup(); });
 document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.target.id==='split-overlay') closeSplit(); });
 
 // ---------- CORTE DE CAJA (solo lectura del libro) ----------
@@ -1070,6 +1083,65 @@ window.doImport=async function(){
   prog.textContent='✅ Listo. Importados '+ok+', fallidos '+fail+'.'+(errs.length?'\n\n'+errs.join('\n'):'');
   btn.disabled=false; btn.textContent='Importar';
 };
+
+// ---------- LIMPIAR DMV / PLACAS / TAX (dueño) ----------
+let _cleanPlan=null;
+window.openCleanup=function(){
+  const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+  if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño puede limpiar movimientos.'); return; }
+  const del=[], recat=[];
+  liveTxns().filter(t=>t.type==='expense').forEach(t=>{
+    const note=(t.note||'');
+    const isDMV = t.category==='DMV / Título / Registración';
+    const isSmog = /smog/i.test(note);
+    const isTax = /tax|impuesto|\birs\b/i.test(note);
+    const mo = (t.date||'').slice(0,7);
+    if(isTax){ del.push(t); return; }
+    if(isDMV){
+      if(!isSmog){ del.push(t); return; }
+      if(mo==='2026-01'||mo==='2026-02'){ del.push(t); }
+      else { recat.push(t); }
+    }
+  });
+  _cleanPlan={del,recat};
+  const m=c=>'$'+(Number(c||0)/100).toLocaleString('en-US',{maximumFractionDigits:0});
+  const delTot=del.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+  let html='';
+  if(!del.length && !recat.length){ html='✅ No hay nada de DMV / placas / tax que limpiar. Todo limpio.'; }
+  else {
+    html+='🗑 SE BORRAN ('+del.length+') = '+m(delTot)+'\n';
+    html+=del.map(t=>'  • '+fmtDate(t.date)+' · '+(t.note||t.category)+' · '+m(t.amountCents)).join('\n');
+    html+='\n\n♻️ SMOG (mar+) que se mueve a Reparación ('+recat.length+'):\n';
+    html+=(recat.length?recat.map(t=>'  • '+fmtDate(t.date)+' · '+(t.note||'')+' · '+m(t.amountCents)).join('\n'):'  (ninguno)');
+  }
+  document.getElementById('clean-prog').textContent=html;
+  const go=document.getElementById('clean-go');
+  go.disabled = !(del.length||recat.length);
+  go.textContent='Confirmar limpieza';
+  document.getElementById('cleanup-overlay').classList.add('open');
+};
+window.closeCleanup=function(){ document.getElementById('cleanup-overlay').classList.remove('open'); _cleanPlan=null; };
+window.doCleanup=async function(){
+  if(!_cleanPlan) return;
+  const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+  if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño.'); return; }
+  const del=_cleanPlan.del, recat=_cleanPlan.recat;
+  if(!confirm('¿Borrar '+del.length+' renglones y mover '+recat.length+' smog a Reparación?\n\nNo se puede deshacer.')) return;
+  const btn=document.getElementById('clean-go'), prog=document.getElementById('clean-prog');
+  btn.disabled=true; btn.textContent='Limpiando…';
+  let done=0, fail=0; const total=del.length+recat.length;
+  for(const t of del){
+    try{ await deleteDoc(doc(db,'transactions',t.id)); done++; }catch(e){ fail++; }
+    prog.textContent='Procesados '+done+' · fallidos '+fail+' de '+total;
+  }
+  for(const t of recat){
+    try{ await updateDoc(doc(db,'transactions',t.id),{category:'Reparación / Reacondicionamiento'}); done++; }catch(e){ fail++; }
+    prog.textContent='Procesados '+done+' · fallidos '+fail+' de '+total;
+  }
+  prog.textContent='✅ Listo. '+del.length+' borrados, '+recat.length+' movidos a Reparación. Fallidos: '+fail+'.\n\nCierra con la ✕.';
+  _cleanPlan=null; btn.textContent='Hecho'; btn.disabled=true;
+};
+
 window.openInc = function(){
   document.getElementById('i-amount').value='';
   document.getElementById('i-date').value=new Date().toISOString().slice(0,10);
