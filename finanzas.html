@@ -600,6 +600,10 @@ function startListening(){
   onSnapshot(collection(db,'transactions'), snap=>{
     txns = snap.docs.map(d=>({id:d.id,...d.data()}));
     renderExpenses(); renderBolsas(); applyMovsCollapse(); renderPrivadas();
+    // Si el panel del corte está abierto, re-sincroniza el punto de cierre y vuelve a dibujar
+    // (así los dos socios ven SIEMPRE el mismo rango, aunque el otro cierre o agregue algo)
+    const _co=document.getElementById('corte-overlay');
+    if(_co && _co.classList.contains('open')){ const lc=lastClosing(); _corteSince = lc ? (lc.closedAt||'') : ''; renderCorte(); }
   }, err=>{ console.log('txns listen error', err); });
   onSnapshot(collection(db,'clients'), snap=>{
     privateClients = snap.docs.filter(d=>d.data().private===true).map(d=>({id:d.id,...d.data()}));
