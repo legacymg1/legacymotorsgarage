@@ -454,7 +454,7 @@
     <div id="cierre-block" style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
       <div id="cierre-instr" style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Usa los números del <b>cuadre de arriba</b>: reparte a cada socio, deja el fondo y marca el reinicio (el próximo corte arranca desde aquí). Queda un <b>registro permanente</b> que puedes consultar después.</div>
       <button class="btn btn-primary" id="cierre-save" onclick="confirmCierre()" style="width:100%;margin-bottom:8px;">💾 Cerrar corte y guardar</button>
-      <div id="cierre-note-ro" style="display:none;background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:12px;margin-bottom:8px;font-size:12px;color:var(--muted);line-height:1.5;text-align:center;">👀 Puedes ver todo el corte en vivo, pero <b>solo el dueño cierra el corte</b>. Así nadie lo ejecuta por accidente.</div>
+      <div id="cierre-note-ro" style="display:none;background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:12px;margin-bottom:8px;font-size:12px;color:var(--muted);line-height:1.5;text-align:center;">👀 Ves el corte completo en vivo. Para que no se cierre por accidente, <b>el cierre lo ejecuta una sola cuenta</b> — revisen y cuadren los números juntos.</div>
       <button class="btn btn-ghost" onclick="openCorteHist()" style="width:100%;">📋 Ver cortes anteriores</button>
     </div>
     <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:14px;line-height:1.5;">Se calcula del libro contable, en vivo.</div>
@@ -584,12 +584,12 @@ onAuthStateChanged(auth,(user)=>{
     const _bp=document.getElementById('btn-priv'), _bt=document.getElementById('btn-total');
     if(_bp) _bp.style.display=_isPartner?'':'none';
     if(_bt) _bt.style.display=_isPartner?'':'none';
-    // Solo el dueño puede CERRAR el corte (los demás lo ven todo pero no lo ejecutan)
-    const _isOwner = (user.email||'').toLowerCase()==='ev@legacymotorsgarage.com';
+    // Ambos son dueños 50/50; solo UNA cuenta EJECUTA el cierre para que no se cierre por accidente. Los demás lo ven todo.
+    const _canCerrar = (user.email||'').toLowerCase()==='ev@legacymotorsgarage.com';
     const _cs=document.getElementById('cierre-save'), _ci=document.getElementById('cierre-instr'), _cn=document.getElementById('cierre-note-ro');
-    if(_cs) _cs.style.display=_isOwner?'':'none';
-    if(_ci) _ci.style.display=_isOwner?'':'none';
-    if(_cn) _cn.style.display=_isOwner?'none':'';
+    if(_cs) _cs.style.display=_canCerrar?'':'none';
+    if(_ci) _ci.style.display=_canCerrar?'':'none';
+    if(_cn) _cn.style.display=_canCerrar?'none':'';
     if(!_listening){ _listening=true; startListening(); }
   } else {
     document.getElementById('app').style.display='none';
@@ -1027,7 +1027,7 @@ window.updateCorteFondo = function(){
 
 // ---------- CIERRE ----------
 window.confirmCierre = async function(){
-  if(((auth.currentUser&&auth.currentUser.email)||'').toLowerCase()!=='ev@legacymotorsgarage.com'){ alert('🔒 Solo el dueño puede cerrar el corte.'); return; }
+  if(((auth.currentUser&&auth.currentUser.email)||'').toLowerCase()!=='ev@legacymotorsgarage.com'){ alert('El cierre del corte lo ejecuta una sola cuenta para no cerrarlo por accidente. Revísenlo y cuádrenlo juntos.'); return; }
   const s=_corteState;
   const msg = 'Cerrar el corte:\n\n'
     +'• Repartir '+money2(s.repartir/100)+' ('+money2(s.cada/100)+' a cada socio)\n'
