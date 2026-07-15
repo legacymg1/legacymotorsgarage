@@ -158,9 +158,23 @@
     <button class="btn-add" onclick="openPnl()" style="font-size:15px;">📊 Resultados</button>
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
     <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
+    <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
   </div>
 
   <div id="trial-alert"></div>
+
+  <div class="overlay" id="import-overlay">
+    <div class="sheet">
+      <div class="sheet-head"><div class="sheet-title">⬆️ Importar movimientos</div><button class="close" onclick="closeImport()">✕</button></div>
+      <p style="font-size:12px;color:var(--faint);line-height:1.5;margin-bottom:10px;">Pega el JSON que preparó Claude (lista de gastos/ingresos). Se agregan todos a sus bolsas. Puedes editar o borrar después. Solo el dueño.</p>
+      <textarea id="imp-json" placeholder='[ {"date":"2026-01-07","type":"expense","dept":"dealer","category":"Reparación / Reacondicionamiento","amount":80,"note":"Alineación Passat"} ]' style="width:100%;box-sizing:border-box;height:170px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-family:ui-monospace,monospace;font-size:12px;"></textarea>
+      <div id="imp-prog" style="font-size:12px;color:var(--muted);margin-top:8px;white-space:pre-wrap;max-height:28vh;overflow:auto;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeImport()">Cancelar</button>
+        <button class="btn btn-primary" id="imp-go" onclick="doImport()">Importar</button>
+      </div>
+    </div>
+  </div>
 
   <div id="bolsa-cards"></div>
   <div id="gran-total"></div>
@@ -986,6 +1000,40 @@ const INCOME_CATS = {
 window.onIncDeptChange = function(){
   const d=document.getElementById('i-dept').value;
   document.getElementById('i-cat').innerHTML=(INCOME_CATS[d]||[]).map(c=>`<option>${c}</option>`).join('');
+};
+window.openImport=function(){
+  const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+  if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño puede importar movimientos.'); return; }
+  document.getElementById('imp-json').value='';
+  document.getElementById('imp-prog').textContent='';
+  document.getElementById('import-overlay').classList.add('open');
+};
+window.closeImport=function(){ document.getElementById('import-overlay').classList.remove('open'); };
+window.doImport=async function(){
+  let arr;
+  try{ arr=JSON.parse(document.getElementById('imp-json').value); }catch(e){ alert('JSON inválido: '+e.message); return; }
+  if(!Array.isArray(arr)||!arr.length){ alert('Pega una lista [ ... ] de movimientos.'); return; }
+  if(!confirm('¿Importar '+arr.length+' movimientos? Se pueden editar/borrar después.')) return;
+  const prog=document.getElementById('imp-prog'), btn=document.getElementById('imp-go');
+  btn.disabled=true; btn.textContent='Importando…';
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
+  let ok=0, fail=0; const errs=[];
+  for(let i=0;i<arr.length;i++){
+    const m=arr[i]||{};
+    try{
+      const cents=Math.round(Number(m.amount)*100);
+      if(!cents||cents<=0) throw new Error('monto inválido');
+      const t=(m.type==='income')?'income':'expense';
+      const id=(t==='income'?'inc_':'exp_')+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,6);
+      const tx={ entryId:id, type:t, dept:(m.dept||'dealer'), category:(m.category||(t==='income'?'Otro ingreso':'Otro')), amountCents:cents, method:(m.method||'cash'), date:(m.date||''), vendor:(m.vendor||''), source_name:(m.source||''), note:(m.note||''), carId:'', carLabel:'', receiptURL:'', createdAt:new Date().toISOString(), createdBy:who, source:'import-notas' };
+      if(m.private===true) tx.private=true;
+      await setDoc(doc(db,'transactions',id), tx);
+      ok++;
+    }catch(e){ fail++; errs.push('✗ '+((m.note||m.category)||('#'+i))+': '+e.message); }
+    prog.textContent='Importados '+ok+' · fallidos '+fail+' de '+arr.length;
+  }
+  prog.textContent='✅ Listo. Importados '+ok+', fallidos '+fail+'.'+(errs.length?'\n\n'+errs.join('\n'):'');
+  btn.disabled=false; btn.textContent='Importar';
 };
 window.openInc = function(){
   document.getElementById('i-amount').value='';
