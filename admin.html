@@ -1769,12 +1769,19 @@ window.renderAll = function() {
       const serv = c.kind==='service';
       const abadge = serv ? `<span style="font-size:10px;background:rgba(33,150,243,0.15);color:#64b5f6;border:1px solid #2196F3;border-radius:5px;padding:2px 7px;">🔧 Servicio</span>` : `<span style="font-size:10px;background:rgba(0,200,83,0.12);color:var(--green);border:1px solid var(--green);border-radius:5px;padding:2px 7px;">✅ Liquidado</span>`;
       const acar = clientVehicles(c).map(x=>x.label).join(' · ');
+      const _bcss='border:1px solid var(--border);background:transparent;border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;';
+      const docBtns =
+        (!serv ? `<button onclick="event.stopPropagation();generateContract('${c.id}')" title="Contrato" style="${_bcss}color:var(--gold);">📄</button>` : '')
+        + ((c.signedContract&&c.signedContract.url) ? `<button onclick="event.stopPropagation();window.open('${c.signedContract.url}','_blank')" title="Ver contrato firmado" style="${_bcss}color:var(--green);">📑</button>` : '')
+        + (c.idPhotoURL ? `<button onclick="event.stopPropagation();showPhoto('${c.idPhotoURL}','ID')" title="Ver foto del ID" style="${_bcss}color:var(--text);">🪪</button>` : '')
+        + (c.insurancePhotoURL ? `<button onclick="event.stopPropagation();showPhoto('${c.insurancePhotoURL}','Seguro')" title="Ver foto del seguro" style="${_bcss}color:var(--text);">🛡</button>` : '');
       html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
         <div style="min-width:170px;flex:1;">
           <div style="font-weight:600;font-size:14px;">${c.name} ${abadge} ${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
           <div style="font-size:12px;color:var(--muted);">${acar}${c.vin?' · …'+c.vin.slice(-6):''}${c.phone?' · '+c.phone:''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${docBtns}
           <button onclick="openApptModal('${c.id}')" title="Agendar cita" style="background:var(--gold);color:var(--navy3);border:none;border-radius:7px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">📅</button>
           <button type="button" onclick="smsPlain('${c.id}')" title="SMS" style="background:#2196F3;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">💬</button>
           <button type="button" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Editar" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">✏️</button>
