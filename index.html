@@ -7392,6 +7392,7 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></a>
     <p class="section-sub">Quality vehicles at prices that work for every family. All with financing available.</p>
   </div>
   <div class="inv-controls" style="max-width:1200px;margin:0 auto 16px;padding:0 16px;">
+    <div id="inv-counter" style="display:none;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>
     <input id="inv-search" oninput="renderCars()" placeholder="🔍 Buscar: año, marca, modelo, VIN, # inventario…" style="width:100%;box-sizing:border-box;background:#12161f;border:1px solid rgba(255,255,255,0.14);border-radius:10px;padding:13px 15px;color:#fff;font-size:14px;outline:none;">
   </div>
   <div class="cars-grid" id="cars-grid"></div>
@@ -14836,6 +14837,19 @@ document.addEventListener('keydown',e=>{
 window.renderCars = function(){
   var grid=document.getElementById('cars-grid');
   if(!grid) return;
+  var _ct=document.getElementById('inv-counter');
+  if(_ct){
+    if(document.body.classList.contains('admin-on')){
+      var _sold=cars.filter(function(c){return c.status==='sold';}).length;
+      var _prep=cars.filter(function(c){return c.status==='prep';}).length;
+      var _venta=cars.filter(function(c){return c.status!=='sold'&&c.status!=='prep';}).length;
+      _ct.style.display='flex';
+      _ct.innerHTML=
+        '<div style="flex:1;min-width:90px;background:rgba(76,175,80,0.12);border:1px solid rgba(76,175,80,0.4);border-radius:10px;padding:10px 12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:#4caf50;line-height:1;">'+_venta+'</div><div style="font-size:11px;color:#8fdc9c;letter-spacing:0.5px;margin-top:4px;">EN VENTA</div></div>'+
+        '<div style="flex:1;min-width:90px;background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:10px;padding:10px 12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:#ff9800;line-height:1;">'+_prep+'</div><div style="font-size:11px;color:#ffcc80;letter-spacing:0.5px;margin-top:4px;">EN PREP</div></div>'+
+        '<div style="flex:1;min-width:90px;background:rgba(240,192,64,0.12);border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:10px 12px;text-align:center;"><div style="font-size:22px;font-weight:800;color:#f0c040;line-height:1;">'+_sold+'</div><div style="font-size:11px;color:#f0c040;letter-spacing:0.5px;margin-top:4px;">VENDIDOS</div></div>';
+    } else { _ct.style.display='none'; }
+  }
   if(!cars.length){
     grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--silver)"><div style="font-size:48px;margin-bottom:16px;">🚗</div><div style="font-family:var(--font-display);font-size:22px;font-weight:300;margin-bottom:8px;color:var(--white)">Coming Soon · Próximamente</div><div style="font-size:13px;letter-spacing:1px">View our current inventory on Facebook Marketplace</div></div>';
     return;
