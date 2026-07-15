@@ -902,6 +902,7 @@ document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.targ
 const INCOME_TYPES = ['payment','down','cash_sale','income'];
 const METHOD_ROW = [['cash','💵 Efectivo'],['terminal','💳 Terminal'],['ach','🏦 ACH'],['zelle','📲 Zelle/Otro'],['','— Sin especificar']];
 let _corteSince = null;   // si esta puesto, el corte filtra por createdAt >= este timestamp (desde el ultimo cierre)
+let _corteTotalNet = 0;   // total neto del periodo (para recalcular fondo/reparto sin re-render)
 function lastClosing(){
   const cls=txns.filter(t=>t.type==='closing').sort((a,b)=>(b.closedAt||'').localeCompare(a.closedAt||''));
   return cls[0]||null;
@@ -963,43 +964,55 @@ window.renderCorte = function(){
   const rowM=(label,o)=>o?`<tr><td style="${cell}">${label}</td><td style="${cell}text-align:right;color:#3ecf8e;">${centsToUSD(o.in)}</td><td style="${cell}text-align:right;color:#ff6b6b;">${o.out<0?'+':'-'}${centsToUSD(Math.abs(o.out))}</td><td style="${cell}text-align:right;font-weight:700;">${centsToUSD(o.in-o.out)}</td></tr>`:'';
   const deptName={dealer:'🚗 Dealer',parts:'🔧 Partes',ebay:'📦 eBay','—':'— Sin bolsa'};
 
-  let html=`<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:14px;">${periodoTxt}</div>`;
-
-  // ----- DESGLOSE POR BOLSA (con ventas privadas) — los gastos todos cuentan en Legacy -----
-  const _isPriv=t=>(t.clientId && privateIds.has(t.clientId)) || t.private===true;
-  const bd={ dealer:{incL:0,incP:0,exp:0}, parts:{incL:0,incP:0,exp:0} };
+  // ----- 4 listas: Ingresos/Egresos de Dealer y Partes (TODO: privado + no privado) -----
+  const data={ dealer:{inc:[],exp:[]}, parts:{inc:[],exp:[]} };
   liveTxns().filter(inRange).forEach(t=>{
-    const d=t.dept; if(d!=='dealer'&&d!=='parts') return;   // eBay aparte por ahora
-    const a=Number(t.amountCents)||0;
-    if(INCOME_TYPES.includes(t.type)){ if(_isPriv(t)) bd[d].incP+=a; else bd[d].incL+=a; }
-    else if(t.type==='expense') bd[d].exp+=a;
-    else if(t.type==='expense_reversal') bd[d].exp-=a;
+    const income=INCOME_TYPES.includes(t.type);
+    let d;
+    if(income) d=(t.type==='income' && data[t.dept])?t.dept:'dealer';
+    else d=data[t.dept]?t.dept:'dealer';
+    if(!data[d]) return;
+    if(income) data[d].inc.push(t);
+    else if(t.type==='expense'||t.type==='expense_reversal') data[d].exp.push(t);
   });
-  const legInc=bd.dealer.incL+bd.parts.incL, legExp=bd.dealer.exp+bd.parts.exp, legProfit=legInc-legExp;
-  const dcell='padding:7px 6px;border-bottom:1px solid var(--border);font-size:13px;';
-  const dRow=(ic,b)=>'<tr><td style="'+dcell+'">'+ic+'</td>'
-    +'<td style="'+dcell+'text-align:right;color:#3ecf8e;">'+centsToUSD(b.incL)+'</td>'
-    +'<td style="'+dcell+'text-align:right;color:#f0c040;">'+centsToUSD(b.incP)+'</td>'
-    +'<td style="'+dcell+'text-align:right;color:#ff6b6b;">'+centsToUSD(b.exp)+'</td>'
-    +'<td style="'+dcell+'text-align:right;font-weight:700;">'+centsToUSD(b.incL+b.incP-b.exp)+'</td></tr>';
-  html+='<div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 4px;">Desglose por bolsa</div>'
-    +'<table style="width:100%;border-collapse:collapse;margin-bottom:12px;"><thead><tr style="color:var(--faint);font-size:10px;text-transform:uppercase;">'
-    +'<th style="'+dcell+'text-align:left;"></th><th style="'+dcell+'text-align:right;">Ing. Legacy</th><th style="'+dcell+'text-align:right;">Ing. privados</th><th style="'+dcell+'text-align:right;">Gastos</th><th style="'+dcell+'text-align:right;">Neto</th></tr></thead><tbody>'
-    +dRow('🚗 Dealer',bd.dealer)+dRow('🔧 Partes',bd.parts)
-    +'</tbody></table>'
-    +'<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">'
-    +'<div style="flex:2;min-width:160px;background:rgba(62,207,142,0.08);border:1px solid rgba(62,207,142,0.35);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">🏢 LEGACY (oficial): ingresos − gastos</div><div style="font-size:22px;font-weight:800;color:'+(legProfit>=0?'#3ecf8e':'#ff6b6b')+';margin-top:2px;">'+centsToUSD(legProfit)+'</div><div style="font-size:10px;color:var(--faint);margin-top:2px;">'+centsToUSD(legInc)+' − '+centsToUSD(legExp)+'</div></div>'
-    +'<div style="flex:1;min-width:140px;background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.35);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:var(--muted);">🔒 Ventas privadas</div><div style="font-size:13px;color:#f0c040;margin-top:6px;">🚗 Dealer: '+centsToUSD(bd.dealer.incP)+'</div><div style="font-size:13px;color:#f0c040;margin-top:2px;">🔧 Partes: '+centsToUSD(bd.parts.incP)+'</div></div>'
+  const sumC=arr=>arr.reduce((s,t)=>s+((t.type==='expense_reversal'?-1:1)*(Number(t.amountCents)||0)),0);
+  const dIn=sumC(data.dealer.inc), dEx=sumC(data.dealer.exp), pIn=sumC(data.parts.inc), pEx=sumC(data.parts.exp);
+  const dNet=dIn-dEx, pNet=pIn-pEx, totalNet=dNet+pNet;
+  _corteTotalNet=totalNet;
+  const listBlock=(title,color,items,total)=>
+    '<div style="font-size:13px;font-weight:800;color:'+color+';margin:16px 0 4px;">'+title+'</div>'
+    +'<div style="max-height:220px;overflow:auto;">'+_pnlListHtml(items)+'</div>'
+    +'<div style="display:flex;justify-content:space-between;padding:8px 0 0;border-top:2px solid var(--border);font-weight:800;font-size:14px;"><span>Total</span><span style="color:'+color+';">'+centsToUSD(total)+'</span></div>';
+  let html='<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:6px;">'+periodoTxt+'</div>';
+  html+=listBlock('📥 Ingresos Dealer','#3ecf8e',data.dealer.inc,dIn);
+  html+=listBlock('📤 Egresos Dealer','#ff6b6b',data.dealer.exp,dEx);
+  html+=listBlock('📥 Ingresos Partes','#3ecf8e',data.parts.inc,pIn);
+  html+=listBlock('📤 Egresos Partes','#ff6b6b',data.parts.exp,pEx);
+  // ----- CUADRE ENTRE SOCIOS (cuenta interna) -----
+  const owe=Math.round((dNet-pNet)/2);
+  const oweDir = owe>=0 ? '🚗 Dealer → 🔧 Partes' : '🔧 Partes → 🚗 Dealer';
+  const fondoEl=document.getElementById('corte-fondo'); const fondoStr=fondoEl?fondoEl.value:'';
+  const fondoCents=Math.round((Number(fondoStr)||0)*100);
+  const repartir=totalNet-fondoCents, cada=Math.round(repartir/2);
+  html+='<div style="border-top:2px solid var(--border);margin-top:22px;padding-top:14px;">'
+    +'<div style="font-weight:800;font-size:15px;margin-bottom:10px;">🔁 Cuadre entre socios <span style="font-size:11px;color:var(--faint);font-weight:500;">(cuenta interna, se registra en el total)</span></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">🚗 Dealer neto</span><span style="color:'+(dNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(dNet)+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">🔧 Partes neto</span><span style="color:'+(pNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(pNet)+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:2px;border-top:1px solid var(--border);font-weight:700;"><span>Total</span><span style="color:'+(totalNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(totalNet)+'</span></div>'
+    +'<div style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:12px;margin:12px 0;text-align:center;"><div style="font-size:12px;color:var(--muted);">Para quedar 50/50, se debe cuadrar:</div><div style="font-size:17px;font-weight:800;color:#f0c040;margin-top:2px;">'+oweDir+': '+centsToUSD(Math.abs(owe))+'</div></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;"><span style="color:var(--muted);">💰 Dejar de fondo de caja</span><input id="corte-fondo" type="number" inputmode="decimal" value="'+fondoStr+'" oninput="updateCorteFondo()" placeholder="0" style="width:120px;text-align:right;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:14px;"></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">A repartir (Total − fondo)</span><span id="corte-repartir">'+centsToUSD(repartir)+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:800;font-size:15px;"><span>Cada socio (50/50)</span><span id="corte-cada" style="color:#3ecf8e;">'+centsToUSD(cada)+'</span></div>'
     +'</div>';
-
-  const table=(title,rowsHtml)=>`<div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:6px 0 4px;">${title}</div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><thead><tr style="color:var(--faint);font-size:11px;text-transform:uppercase;">
-    <th style="${cell}text-align:left;"></th><th style="${cell}text-align:right;">Entró</th><th style="${cell}text-align:right;">Salió</th><th style="${cell}text-align:right;">Neto</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
-
-  html+=table('Por método (concilia tu caja)', METHOD_ROW.map(([k,l])=>rowM(l,byMethod[k])).join('') || '<tr><td style="'+cell+'" colspan="4">Sin movimientos</td></tr>');
-  html+=table('Por bolsa', Object.keys(byDept).map(k=>rowM(deptName[k]||k,byDept[k])).join(''));
-  html+=table('Por persona (quién registró)', Object.keys(byWho).map(k=>rowM(k==='—'?'—':k.split('@')[0],byWho[k])).join(''));
   body.innerHTML=html;
+};
+
+window.updateCorteFondo = function(){
+  const el=document.getElementById('corte-fondo'); if(!el) return;
+  const fondoCents=Math.round((Number(el.value)||0)*100);
+  const rep=_corteTotalNet-fondoCents, cada=Math.round(rep/2);
+  const r=document.getElementById('corte-repartir'); if(r) r.textContent=centsToUSD(rep);
+  const c=document.getElementById('corte-cada'); if(c) c.textContent=centsToUSD(cada);
 };
 
 // ---------- CIERRE Y REPARTO ----------
@@ -1603,8 +1616,12 @@ function renderPnl(){
       +'<div style="display:flex;justify-content:space-between;font-size:14px;padding:2px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">'+centsToUSD(totIn)+'</span></div>'
       +'<div style="display:flex;justify-content:space-between;font-size:14px;padding:2px 0;"><span style="color:var(--muted);">Gastos</span><span style="color:#ff6b6b;">'+centsToUSD(totExp)+'</span></div>'
       +'<div style="display:flex;justify-content:space-between;font-size:18px;padding:8px 0 0;margin-top:6px;border-top:1px solid var(--border);"><span style="font-weight:800;">GANANCIA</span><span style="font-weight:800;color:'+(gan>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(gan)+'</span></div></div>';
-    html+='<div style="background:var(--surface2);border-radius:14px;padding:14px;margin-bottom:12px;"><div style="font-size:15px;font-weight:700;">🚗 Dealer</div>'+_pnlDrill('pl-d-inc','Ingresos',dInc,'#3ecf8e',data.dealer.inc)+_pnlDrill('pl-d-exp','Gastos',dExp,'#ff6b6b',data.dealer.exp)+'</div>';
-    html+='<div style="background:var(--surface2);border-radius:14px;padding:14px;margin-bottom:12px;"><div style="font-size:15px;font-weight:700;">🔧 Partes</div>'+_pnlDrill('pl-p-inc','Ingresos',pInc,'#3ecf8e',data.parts.inc)+_pnlDrill('pl-p-exp','Gastos',pExp,'#ff6b6b',data.parts.exp)+'</div>';
+    if(_tot){
+      html+='<div style="background:var(--surface2);border-radius:14px;padding:14px;margin-bottom:12px;"><div style="font-size:15px;font-weight:700;">🚗 Dealer</div>'+_pnlDrill('pl-d-inc','Ingresos',dInc,'#3ecf8e',data.dealer.inc)+_pnlDrill('pl-d-exp','Gastos',dExp,'#ff6b6b',data.dealer.exp)+'</div>';
+      html+='<div style="background:var(--surface2);border-radius:14px;padding:14px;margin-bottom:12px;"><div style="font-size:15px;font-weight:700;">🔧 Partes</div>'+_pnlDrill('pl-p-inc','Ingresos',pInc,'#3ecf8e',data.parts.inc)+_pnlDrill('pl-p-exp','Gastos',pExp,'#ff6b6b',data.parts.exp)+'</div>';
+    } else {
+      html+='<div style="background:var(--surface2);border-radius:14px;padding:14px;margin-bottom:12px;">'+_pnlDrill('pl-inc','Ingresos',totIn,'#3ecf8e',data.dealer.inc.concat(data.parts.inc))+_pnlDrill('pl-exp','Gastos',totExp,'#ff6b6b',data.dealer.exp.concat(data.parts.exp))+'</div>';
+    }
   }
   body.innerHTML=html;
 }
