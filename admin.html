@@ -304,9 +304,23 @@
         <button id="btn-list" onclick="setView('list')" style="background:var(--border);color:var(--text);border:none;border-radius:6px;padding:8px 12px;font-size:16px;cursor:pointer;" title="Vista lista">☰</button>
       </div>
     </div>
+    <div style="text-align:right;margin-top:8px;">
+      <button data-action="delete" onclick="openDelClient()" style="background:transparent;color:var(--red);border:1px solid var(--red);border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;">🗑 Eliminar cliente</button>
+    </div>
   </div>
 
   <main id="main-content"><div class="loading">Cargando clientes...</div></main>
+  <div class="modal-overlay" id="del-client-modal">
+    <div class="modal" style="max-height:85vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div class="modal-title" style="margin-bottom:0;">🗑 Eliminar cliente</div>
+        <button onclick="closeModal('del-client-modal')" style="background:transparent;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1;">×</button>
+      </div>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:12px;line-height:1.45;">Busca y elige el cliente a eliminar. Se hace <b>uno a la vez</b> y pedirá confirmación. Esta acción no se puede deshacer.</p>
+      <input class="form-input" id="del-search" placeholder="🔍 Buscar por nombre, carro o VIN..." oninput="renderDelList()" style="margin-bottom:12px;">
+      <div id="del-list" style="max-height:52vh;overflow-y:auto;"></div>
+    </div>
+  </div>
   <button class="fab" onclick="openAddModal()">+ AGREGAR CLIENTE</button>
 </div>
 
@@ -1636,7 +1650,6 @@ window.renderAll = function() {
           <button type="button" class="cli-btn" style="background:var(--green);color:#000;" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">💵</button>
           <button type="button" class="cli-btn" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)">💬</button>
           <button type="button" class="cli-btn" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">✏️</button>
-          <button type="button" class="cli-btn" data-action="delete" data-client-id="${c.id}" style="color:var(--red);" onclick="return handleClientAction(this,event)">🗑</button>
         </div>
       </div>`;
     });
@@ -1739,7 +1752,6 @@ window.renderAll = function() {
           <button type="button" class="btn btn-edit" style="flex:0;padding:9px 10px;" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">✏️</button>
           <button class="btn" style="flex:0;padding:9px 10px;background:var(--gold3);color:var(--navy3);" onclick="event.stopPropagation();generateContract('${c.id}')" title="Generar Contrato">📄</button>
           ${(c.signedContract&&c.signedContract.url) ? '<button class="btn" style="flex:0;padding:9px 10px;background:rgba(0,200,83,0.15);color:var(--green);border:1px solid var(--green);" onclick="event.stopPropagation();window.open(\''+c.signedContract.url+'\',\'_blank\')" title="Ver contrato firmado oficial">📑</button>' : ''}
-          <button type="button" class="btn btn-delete" style="flex:0;padding:9px 10px;" data-action="delete" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">🗑</button>
         </div>
       </div>`;
     });
@@ -1766,7 +1778,6 @@ window.renderAll = function() {
           <button onclick="openApptModal('${c.id}')" title="Agendar cita" style="background:var(--gold);color:var(--navy3);border:none;border-radius:7px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">📅</button>
           <button type="button" onclick="smsPlain('${c.id}')" title="SMS" style="background:#2196F3;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">💬</button>
           <button type="button" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Editar" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">✏️</button>
-          <button type="button" data-action="delete" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Eliminar" style="background:transparent;color:var(--red);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">🗑</button>
         </div>
       </div>`;
     });
@@ -2037,6 +2048,35 @@ window.saveClient=async function(){
   btn.textContent='GUARDAR';btn.disabled=false;
 };
 
+window.openDelClient=function(){
+  const s=document.getElementById('del-search'); if(s) s.value='';
+  renderDelList();
+  document.getElementById('del-client-modal').classList.add('active');
+};
+window.renderDelList=function(){
+  const q=(document.getElementById('del-search').value||'').trim().toLowerCase();
+  const terms=q.split(/\s+/).filter(Boolean);
+  const el=document.getElementById('del-list');
+  const list=clients.filter(c=>{
+    if(!terms.length) return true;
+    const car=`${c.year||''} ${c.make||''} ${c.model||''}`;
+    const hay=((c.name||'')+' '+car+' '+(c.vin||'')+' '+(c.phone||'')).toLowerCase();
+    return terms.every(t=>hay.includes(t));
+  }).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!list.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:14px;text-align:center;">Sin resultados</div>'; return; }
+  el.innerHTML=list.map(c=>{
+    const car=`${c.year||''} ${c.make||''} ${c.model||''}`.trim();
+    const sub=[car, c.vin?('VIN '+c.vin):''].filter(Boolean).join(' · ');
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--border);">
+      <div style="min-width:0;"><div style="font-weight:600;font-size:14px;">${c.name||'(sin nombre)'}</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${sub||'&nbsp;'}</div></div>
+      <button data-cid="${c.id}" onclick="delClientFromModal(this.dataset.cid)" style="flex-shrink:0;background:rgba(255,59,59,0.12);color:var(--red);border:1px solid var(--red);border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">🗑 Eliminar</button>
+    </div>`;
+  }).join('');
+};
+window.delClientFromModal=async function(id){
+  await deleteClient(id);   // deleteClient ya pide confirmación y maneja el libro
+  renderDelList();
+};
 window.deleteClient=async function(id){
   const c=clients.find(x=>x.id===id);
   if(!c) return;
