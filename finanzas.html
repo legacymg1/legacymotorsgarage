@@ -1421,7 +1421,7 @@ function renderBolsas(){
   const box=document.getElementById('bolsa-cards'); if(!box) return;
   const lc=lastClosing(); const since=lc?(lc.closedAt||''):'';
   const inCut = t => (t.createdAt||'') > since;
-  const LT = legacyTxns();
+  const LT = liveTxns();   // TODO el efectivo (Legacy + ventas privadas) para cuadrar contra el billete físico
   const D={dealer:{in:0,out:0,tin:0,tout:0,items:[]}, parts:{in:0,out:0,tin:0,tout:0,items:[]}, ebay:{in:0,out:0,tin:0,tout:0,items:[]}};
   LT.filter(inCut).forEach(t=>{
     const amt=Number(t.amountCents)||0;
