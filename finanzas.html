@@ -1394,7 +1394,7 @@ function renderBolsas(){
       }).join('') || '<div style="font-size:12px;color:var(--faint);padding:4px 0;">Sin movimientos en este corte.</div>';
       const hasT = d.tin||d.tout;
       const transLine = hasT ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">↔ Traspasos</span><span>${d.tin?('<span style=\'color:#3ecf8e\'>+'+centsToUSD(d.tin)+'</span>'):''}${(d.tin&&d.tout)?' / ':''}${d.tout?('<span style=\'color:#ff6b6b\'>−'+centsToUSD(d.tout)+'</span>'):''}</span></div>` : '';
-      const fondoLine = fondoK>0 ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:#f0c040;">💰 Fondo del corte anterior</span><span style="color:#f0c040;">+${centsToUSD(fondoK)}</span></div>` : '';
+      const fondoLine = `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:#f0c040;">💰 Fondo del corte anterior</span><span style="color:#f0c040;">+${centsToUSD(fondoK)}</span></div>`;
       detail = `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin-bottom:4px;">Desglose <span style="text-transform:none;letter-spacing:0;">· toca un renglón ✏️ para editar o poner recibo 📎</span></div>
         ${rows}
@@ -1403,7 +1403,7 @@ function renderBolsas(){
           <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Egresos</span><span style="color:#ff6b6b;">${centsToUSD(d.out)}</span></div>
           ${transLine}
           ${fondoLine}
-          <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);font-size:15px;"><span style="font-weight:700;">Total ${fondoK>0?'<span style=\'font-weight:500;color:var(--faint);font-size:11px;\'>(fondo + este corte)</span>':''}</span><span style="font-weight:800;color:${net>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(net)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);font-size:15px;"><span style="font-weight:700;">Total <span style='font-weight:500;color:var(--faint);font-size:11px;'>(fondo + este corte)</span></span><span style="font-weight:800;color:${net>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(net)}</span></div>
         </div>
       </div>`;
     }
