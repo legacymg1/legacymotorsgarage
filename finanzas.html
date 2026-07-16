@@ -1368,20 +1368,8 @@ function renderBolsas(){
     else if(t.type==='expense_reversal'){ D[dept].out-=amt; D[dept].items.push(t); }
     else if(t.type==='transfer'){ if(t.dir==='in') D[dept].tin+=amt; else D[dept].tout+=amt; D[dept].items.push(t); }
   });
-  const cash={dealer:0,parts:0,ebay:0};
-  // El corte es un REINICIO: la caja arranca con el FONDO que se dejó en el último corte,
-  // y de ahí suma solo el efectivo que ha entrado/salido DESDE ese corte (no toda la historia).
-  const _lcF=lastClosing();
-  if(_lcF && (_lcF.fondoCents||0)>0){ const fd=_lcF.fondoDept||'dealer'; if(cash[fd]!==undefined) cash[fd]+=_lcF.fondoCents; }
-  LT.filter(inCut).forEach(t=>{
-    if((t.method||'')!=='cash') return;
-    const amt=Number(t.amountCents)||0;
-    const dept = cash[t.dept]!==undefined ? t.dept : 'dealer';
-    if(INCOME_TYPES.includes(t.type)||t.type==='contribution'){ const k=(t.type==='income'&&cash[t.dept]!==undefined)?t.dept:'dealer'; cash[k]+=amt; }
-    else if(t.type==='expense'||t.type==='draw') cash[dept]-=amt;
-    else if(t.type==='expense_reversal') cash[dept]+=amt;
-    else if(t.type==='transfer'){ if(t.dir==='in') cash[dept]+=amt; else cash[dept]-=amt; }
-  });
+  // No separamos por método de pago: para las cuentas de los socios TODO se trata igual (como efectivo).
+  // El método (efectivo/tarjeta/Zelle) se guarda en cada movimiento solo como registro para impuestos.
   const META=[['dealer','🚗 Dealer'],['parts','🔧 Partes']];   // eBay se trabaja aparte (se integra a Legacy en Resultados)
   box.innerHTML = META.map(([k,name])=>{
     const d=D[k], net=d.in-d.out, op=!!_bolsaOpen[k];
@@ -1397,10 +1385,9 @@ function renderBolsas(){
         if(INCOME_TYPES.includes(it.type) || (it.type==='transfer'&&it.dir==='in') || it.type==='expense_reversal'){ sign='+'; color='#3ecf8e'; }
         const editable = (it.type==='income' || it.type==='expense');
         const clip = it.receiptURL ? `<span style="background:rgba(62,207,142,0.18);color:#3ecf8e;border:1px solid rgba(62,207,142,0.5);border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;margin-right:6px;white-space:nowrap;">📎 ✓</span>` : '';
-        const cashTag = (it.method==='cash') ? `<span style="background:rgba(240,192,74,0.14);color:#f0c040;border-radius:8px;padding:0 5px;font-size:10px;font-weight:700;margin-left:6px;white-space:nowrap;">💵 efectivo</span>` : '';
         const click = editable ? `onclick="event.stopPropagation(); openMovEdit('${it.id}')"` : '';
         const hint = editable ? `<span style="color:var(--faint);font-size:11px;margin-left:6px;">✏️</span>` : '';
-        return `<div ${click} style="display:flex;justify-content:space-between;gap:10px;padding:8px 4px;font-size:13px;border-bottom:1px solid var(--border);${editable?'cursor:pointer;border-radius:6px;':''}"><span style="color:var(--muted);">${clip}${txDesc(it)} · ${fmtDate(it.date)}${cashTag}${hint}</span><span style="color:${color};white-space:nowrap;font-weight:600;">${sign}${centsToUSD(a)}</span></div>`;
+        return `<div ${click} style="display:flex;justify-content:space-between;gap:10px;padding:8px 4px;font-size:13px;border-bottom:1px solid var(--border);${editable?'cursor:pointer;border-radius:6px;':''}"><span style="color:var(--muted);">${clip}${txDesc(it)} · ${fmtDate(it.date)}${hint}</span><span style="color:${color};white-space:nowrap;font-weight:600;">${sign}${centsToUSD(a)}</span></div>`;
       }).join('') || '<div style="font-size:12px;color:var(--faint);padding:4px 0;">Sin movimientos en este corte.</div>';
       const hasT = d.tin||d.tout;
       const transLine = hasT ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">↔ Traspasos</span><span>${d.tin?('<span style=\'color:#3ecf8e\'>+'+centsToUSD(d.tin)+'</span>'):''}${(d.tin&&d.tout)?' / ':''}${d.tout?('<span style=\'color:#ff6b6b\'>−'+centsToUSD(d.tout)+'</span>'):''}</span></div>` : '';
@@ -1412,7 +1399,6 @@ function renderBolsas(){
           <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(d.in)}</span></div>
           <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Egresos</span><span style="color:#ff6b6b;">${centsToUSD(d.out)}</span></div>
           ${transLine}
-          <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">💵 En caja (desde el corte)</span><span>${centsToUSD(cash[k])}</span></div>
           <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);font-size:15px;"><span style="font-weight:700;">${hasT?'Neto (con traspasos)':'Total'}</span><span style="font-weight:800;color:${neto>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(neto)}</span></div>
         </div>
       </div>`;
@@ -1427,13 +1413,12 @@ function renderBolsas(){
   }).join('');
   const gt=document.getElementById('gran-total'); if(!gt) return;
   const tin=D.dealer.in+D.parts.in, tout=D.dealer.out+D.parts.out, tnet=tin-tout;
-  const tcash=cash.dealer+cash.parts;
   gt.innerHTML=`<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:14px;padding:14px 16px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <span style="font-weight:700;">TOTAL · este corte <span style="font-size:11px;color:var(--faint);font-weight:500;">(Dealer + Partes · Legacy + privadas)</span></span>
       <span style="font-weight:800;font-size:17px;color:${tnet>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(tnet)}</span>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin-top:5px;">Ingresos ${centsToUSD(tin)} · Egresos ${centsToUSD(tout)} · 💵 En caja ${centsToUSD(tcash)}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:5px;">Ingresos ${centsToUSD(tin)} · Egresos ${centsToUSD(tout)}</div>
   </div>`;
 }
 window.toggleMovs = function(){
