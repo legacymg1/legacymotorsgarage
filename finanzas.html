@@ -205,9 +205,13 @@
   <div id="bolsa-cards"></div>
   <div id="gran-total"></div>
 
+  <div id="por-cobrar-box" onclick="openPorCobrar()" style="margin:12px 0 0;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:13px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+    <span style="font-weight:700;">💳 Por cobrar <span style="font-size:11px;color:var(--faint);font-weight:500;">· toca para ver/cobrar</span></span>
+    <span id="por-cobrar-total" style="font-weight:800;font-size:17px;color:#f0c040;">$0.00</span>
+  </div>
+
   <div style="margin:16px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
-    <button class="btn-add" onclick="openPorCobrar()" style="font-size:15px;">💳 Por cobrar</button>
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
     <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
     <button class="btn-add" id="btn-total" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
@@ -677,7 +681,7 @@ function startListening(){
     allClients = snap.docs.map(d=>({id:d.id,...d.data()}));
     privateClients = allClients.filter(c=>c.private===true);
     privateIds = new Set(privateClients.map(c=>c.id));
-    renderBolsas(); renderPrivadas(); renderExpenses();
+    renderBolsas(); renderPrivadas(); renderExpenses(); renderPorCobrarBox();
     if(document.getElementById('inc-overlay').classList.contains('open')){ fillClientSelect(); renderIncAccounts(); }
     if(document.getElementById('porcobrar-overlay').classList.contains('open')) renderPorCobrar();
   }, err=>{ console.log('clients listen error', err); });
@@ -1268,13 +1272,22 @@ window.clearIncAccount=function(){ _incAccount=null; const al=document.getElemen
 // ---- PANEL "POR COBRAR": todas las cuentas abiertas con saldo ----
 window.openPorCobrar=function(){ renderPorCobrar(); document.getElementById('porcobrar-overlay').classList.add('open'); };
 window.closePorCobrar=function(){ document.getElementById('porcobrar-overlay').classList.remove('open'); };
-function renderPorCobrar(){
-  const box=document.getElementById('porcobrar-body'); if(!box) return;
+function porCobrarRows(){
   const rows=[]; let grand=0;
   allClients.forEach(c=>{
     (c.openAccounts||[]).forEach(a=>{ if(a.settled) return; const bal=acctBalanceCents(a); if(bal<=0) return; grand+=bal; rows.push({c,a,bal}); });
   });
   rows.sort((x,y)=>y.bal-x.bal);
+  return {rows, grand};
+}
+// Cajita siempre visible en la pantalla principal
+window.renderPorCobrarBox=function(){
+  const el=document.getElementById('por-cobrar-total'); if(!el) return;
+  el.textContent = centsToUSD(porCobrarRows().grand);
+};
+function renderPorCobrar(){
+  const box=document.getElementById('porcobrar-body'); if(!box) return;
+  const { rows, grand } = porCobrarRows();
   if(!rows.length){ box.innerHTML='<div class="empty"><div class="empty-ic">💳</div><div class="empty-title">Nadie te debe</div><div class="empty-sub">Cuando hagas una venta a pagos, la cuenta aparece aquí con su saldo hasta que se liquide.</div></div>'; return; }
   const dLabel={dealer:'🚗',parts:'🔧',ebay:'📦'};
   box.innerHTML='<div style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.35);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:700;">Te deben en la calle</span><span style="font-weight:800;font-size:18px;color:#f0c040;">'+centsToUSD(grand)+'</span></div>'
