@@ -1370,9 +1370,12 @@ function renderBolsas(){
   });
   // No separamos por método de pago: para las cuentas de los socios TODO se trata igual (como efectivo).
   // El método (efectivo/tarjeta/Zelle) se guarda en cada movimiento solo como registro para impuestos.
+  // El total de cada bolsa = FONDO que se dejó esa bolsa en el último corte + lo de DESPUÉS del corte.
+  const _lcF=lastClosing(); const carried={dealer:0,parts:0};
+  if(_lcF && (_lcF.fondoCents||0)>0){ const fd=_lcF.fondoDept||'dealer'; if(carried[fd]!==undefined) carried[fd]=_lcF.fondoCents; }
   const META=[['dealer','🚗 Dealer'],['parts','🔧 Partes']];   // eBay se trabaja aparte (se integra a Legacy en Resultados)
   box.innerHTML = META.map(([k,name])=>{
-    const d=D[k], net=d.in-d.out, op=!!_bolsaOpen[k];
+    const d=D[k], fondoK=carried[k]||0, net=fondoK+(d.in-d.out)+d.tin-d.tout, op=!!_bolsaOpen[k];
     let detail='';
     if(op){
       const rows = d.items.slice().sort((a,b)=>{
@@ -1391,7 +1394,7 @@ function renderBolsas(){
       }).join('') || '<div style="font-size:12px;color:var(--faint);padding:4px 0;">Sin movimientos en este corte.</div>';
       const hasT = d.tin||d.tout;
       const transLine = hasT ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">↔ Traspasos</span><span>${d.tin?('<span style=\'color:#3ecf8e\'>+'+centsToUSD(d.tin)+'</span>'):''}${(d.tin&&d.tout)?' / ':''}${d.tout?('<span style=\'color:#ff6b6b\'>−'+centsToUSD(d.tout)+'</span>'):''}</span></div>` : '';
-      const neto = net + d.tin - d.tout;
+      const fondoLine = fondoK>0 ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:#f0c040;">💰 Fondo del corte anterior</span><span style="color:#f0c040;">+${centsToUSD(fondoK)}</span></div>` : '';
       detail = `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin-bottom:4px;">Desglose <span style="text-transform:none;letter-spacing:0;">· toca un renglón ✏️ para editar o poner recibo 📎</span></div>
         ${rows}
@@ -1399,7 +1402,8 @@ function renderBolsas(){
           <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(d.in)}</span></div>
           <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Egresos</span><span style="color:#ff6b6b;">${centsToUSD(d.out)}</span></div>
           ${transLine}
-          <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);font-size:15px;"><span style="font-weight:700;">${hasT?'Neto (con traspasos)':'Total'}</span><span style="font-weight:800;color:${neto>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(neto)}</span></div>
+          ${fondoLine}
+          <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);font-size:15px;"><span style="font-weight:700;">Total ${fondoK>0?'<span style=\'font-weight:500;color:var(--faint);font-size:11px;\'>(fondo + este corte)</span>':''}</span><span style="font-weight:800;color:${net>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(net)}</span></div>
         </div>
       </div>`;
     }
@@ -1412,7 +1416,7 @@ function renderBolsas(){
     </div>`;
   }).join('');
   const gt=document.getElementById('gran-total'); if(!gt) return;
-  const tin=D.dealer.in+D.parts.in, tout=D.dealer.out+D.parts.out, tnet=tin-tout;
+  const tin=D.dealer.in+D.parts.in, tout=D.dealer.out+D.parts.out, tfondo=carried.dealer+carried.parts, tnet=tfondo+tin-tout;
   gt.innerHTML=`<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:14px;padding:14px 16px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <span style="font-weight:700;">TOTAL · este corte <span style="font-size:11px;color:var(--faint);font-weight:500;">(Dealer + Partes · Legacy + privadas)</span></span>
