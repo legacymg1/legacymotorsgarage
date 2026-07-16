@@ -212,6 +212,7 @@
 
   <div style="margin:16px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
+    <button class="btn-add" onclick="openClientes()" style="font-size:15px;">👤 Clientes de partes</button>
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
     <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
     <button class="btn-add" id="btn-total" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
@@ -510,6 +511,14 @@
   </div>
 </div>
 
+<!-- CLIENTES DE PARTES (compradores, con semáforo de garantía) -->
+<div class="overlay" id="clientes-overlay">
+  <div class="sheet" style="max-width:640px;">
+    <div class="sheet-head"><div class="sheet-title">👤 Clientes de partes</div><button class="close" onclick="closeClientes()">✕</button></div>
+    <div id="clientes-body"></div>
+  </div>
+</div>
+
 <!-- CORTE DE CAJA -->
 <div class="overlay" id="corte-overlay">
   <div class="sheet" style="max-width:660px;">
@@ -684,6 +693,7 @@ function startListening(){
     renderBolsas(); renderPrivadas(); renderExpenses(); renderPorCobrarBox();
     if(document.getElementById('inc-overlay').classList.contains('open')){ fillClientSelect(); renderIncAccounts(); }
     if(document.getElementById('porcobrar-overlay').classList.contains('open')) renderPorCobrar();
+    if(document.getElementById('clientes-overlay').classList.contains('open')) renderClientes();
   }, err=>{ console.log('clients listen error', err); });
   loadInventory();
 }
@@ -984,6 +994,7 @@ document.getElementById('corte-overlay').addEventListener('click',e=>{ if(e.targ
 document.getElementById('pnl-overlay').addEventListener('click',e=>{ if(e.target.id==='pnl-overlay') closePnl(); });
 document.getElementById('inc-overlay').addEventListener('click',e=>{ if(e.target.id==='inc-overlay') closeInc(); });
 document.getElementById('porcobrar-overlay').addEventListener('click',e=>{ if(e.target.id==='porcobrar-overlay') closePorCobrar(); });
+document.getElementById('clientes-overlay').addEventListener('click',e=>{ if(e.target.id==='clientes-overlay') closeClientes(); });
 document.getElementById('transfer-overlay').addEventListener('click',e=>{ if(e.target.id==='transfer-overlay') closeTransfer(); });
 document.getElementById('assigncar-overlay').addEventListener('click',e=>{ if(e.target.id==='assigncar-overlay') closeAssignCar(); });
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
@@ -1312,6 +1323,58 @@ window.cobrarDesdePanel=function(clientId, acctId, mode){
   onIncClientChange();
   selectIncAccount(acctId, mode);
 };
+
+// ---- CLIENTES DE PARTES + SEMÁFORO DE GARANTÍA ----
+function addMonthsDate(dateStr, months){
+  const d=new Date(((dateStr||'').slice(0,10))+'T12:00:00'); if(isNaN(d)) return null;
+  d.setMonth(d.getMonth()+Number(months||0)); return d;
+}
+// Estado de garantía: {has, active, until(fechaISO)}
+function warrantyInfo(saleDate, months){
+  if(!months || months<=0) return {has:false, active:false, until:''};
+  const exp=addMonthsDate(saleDate, months); if(!exp) return {has:true, active:false, until:''};
+  const hoy=new Date(new Date().toISOString().slice(0,10)+'T12:00:00');
+  return {has:true, active: exp>=hoy, until: exp.toISOString().slice(0,10)};
+}
+// Todas las compras de un cliente (cuentas a pagos + ventas de contado ligadas)
+function clientPurchases(c){
+  const out=[];
+  (c.openAccounts||[]).forEach(a=>out.push({ concept:a.concept||'Parte', saleDate:(a.createdAt||'').slice(0,10), warrantyMonths:a.warrantyMonths||0, photoURLs:a.photoURLs||[], settled:!!a.settled, balCents:acctBalanceCents(a), totalCents:Number(a.totalCents)||0 }));
+  liveTxns().forEach(t=>{
+    if(t.type==='income' && t.clientId===c.id && !t.accountId && (t.saleType==='contado' || (t.warrantyMonths||0)>0)){
+      out.push({ concept:t.note||t.category||'Parte', saleDate:(t.date||t.createdAt||'').slice(0,10), warrantyMonths:t.warrantyMonths||0, photoURLs:t.photoURLs||[], settled:true, balCents:0, totalCents:Number(t.amountCents)||0 });
+    }
+  });
+  return out.sort((a,b)=>(b.saleDate||'').localeCompare(a.saleDate||''));
+}
+let _clienteOpen={};
+window.toggleCliente=function(id){ _clienteOpen[id]=!_clienteOpen[id]; renderClientes(); };
+window.openClientes=function(){ renderClientes(); document.getElementById('clientes-overlay').classList.add('open'); };
+window.closeClientes=function(){ document.getElementById('clientes-overlay').classList.remove('open'); };
+function renderClientes(){
+  const box=document.getElementById('clientes-body'); if(!box) return;
+  const list=allClients.map(c=>({c, purchases:clientPurchases(c)})).filter(x=>x.purchases.length>0);
+  list.sort((a,b)=>(a.c.name||'').localeCompare(b.c.name||''));
+  if(!list.length){ box.innerHTML='<div class="empty"><div class="empty-ic">👤</div><div class="empty-title">Sin clientes de partes</div><div class="empty-sub">Cuando registres una venta de partes ligada a un cliente, aparece aquí con su garantía.</div></div>'; return; }
+  box.innerHTML=list.map(({c,purchases})=>{
+    const anyActive=purchases.some(p=>warrantyInfo(p.saleDate,p.warrantyMonths).active);
+    const dot = anyActive ? '🟢' : '🔴';
+    const open=_clienteOpen[c.id];
+    let detail='';
+    if(open){
+      detail='<div style="margin-top:8px;">'+purchases.map(p=>{
+        const w=warrantyInfo(p.saleDate,p.warrantyMonths);
+        const wtxt = !w.has ? '<span style="color:var(--faint);">⚪ Sin garantía</span>'
+          : (w.active ? '<span style="color:#3ecf8e;font-weight:600;">🟢 Garantía hasta '+fmtDate(w.until)+'</span>'
+                      : '<span style="color:#ff6b6b;font-weight:600;">🔴 Garantía vencida'+(w.until?' ('+fmtDate(w.until)+')':'')+'</span>');
+        const saldo = (!p.settled && p.balCents>0) ? ' · <span style="color:#f0c040;">saldo '+centsToUSD(p.balCents)+'</span>' : ' · <span style="color:#3ecf8e;">pagado</span>';
+        const fotos = (p.photoURLs&&p.photoURLs.length) ? '<div style="margin-top:3px;">'+p.photoURLs.map((u,i)=>'<a href="'+u+'" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);font-size:12px;margin-right:8px;">📷 Foto '+(i+1)+'</a>').join('')+'</div>' : '';
+        return '<div style="padding:8px 0;border-top:1px solid var(--border);font-size:13px;"><div style="font-weight:600;">'+p.concept+' <span style="color:var(--faint);font-weight:400;">· '+fmtDate(p.saleDate)+'</span></div><div style="color:var(--muted);margin-top:2px;">'+wtxt+saldo+'</div>'+fotos+'</div>';
+      }).join('')+'</div>';
+    }
+    return '<div onclick="toggleCliente(\''+c.id+'\')" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;">'+dot+' '+(c.name||'(sin nombre)')+'</span><span style="color:var(--muted);font-size:13px;white-space:nowrap;">'+(c.phone||'')+' <span style="color:var(--faint);">'+(open?'▾':'▸')+'</span></span></div>'+detail+'</div>';
+  }).join('');
+}
 window.incPhotosPreview=function(){
   const box=document.getElementById('i-photos-preview'); const inp=document.getElementById('i-photos'); if(!box||!inp) return;
   const files=Array.from(inp.files||[]);
