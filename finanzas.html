@@ -157,7 +157,8 @@
     <button class="btn-add" onclick="openInc()" style="flex:1;font-size:16px;padding:14px;font-weight:700;">＋ Ingreso</button>
     <button class="btn-add" onclick="openExp()" style="flex:1;font-size:16px;padding:14px;font-weight:700;">＋ Gasto</button>
   </div>
-  <input id="mov-search" oninput="movSearch()" placeholder="🔎 Buscar un gasto o ingreso (fecha, carro, concepto)…" style="width:100%;box-sizing:border-box;margin:0 0 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:14px;">
+  <input id="mov-search" oninput="movSearch()" placeholder="🔎 Buscar un gasto o ingreso (fecha, carro, concepto)…" style="width:100%;box-sizing:border-box;margin:0 0 8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:14px;">
+  <div id="mov-results" style="display:none;margin:0 0 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;max-height:60vh;overflow-y:auto;"></div>
   <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
     <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
@@ -761,41 +762,26 @@ window.reverseExp = async function(id){
   }catch(err){ alert('Error: '+err.message); }
 };
 
-function renderExpenses(){
+// Todos los movimientos (gastos + ingresos), ordenados FIEL a como se fueron ingresando (más reciente arriba), sin distinción.
+function _movAll(){
   const LT=liveTxns();
   const reversed=new Set(LT.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
   const exps=LT.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id));
-  const active=exps;
-  const el=document.getElementById('exp-list');
   const incomes=LT.filter(t=>t.type==='income');
-  const q=(document.getElementById('mov-search')?document.getElementById('mov-search').value:'').trim().toLowerCase();
-  if(q){ const _el=document.getElementById('exp-list'); if(_el && _el.style.display==='none'){ _el.style.display=''; const _ar=document.getElementById('movs-arrow'); if(_ar) _ar.textContent='▾'; } }  // al buscar, abre la lista
-  let all=[...active.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
-              .sort((a,b)=>{
-                const ai=INCOME_TYPES.includes(a.type)?0:1, bi=INCOME_TYPES.includes(b.type)?0:1;
-                if(ai!==bi) return ai-bi;   // ingresos primero, luego gastos
-                return (b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'');   // dentro de cada grupo, lo más reciente arriba
-              });
-  if(q){
-    const words=q.split(/\s+/);
-    all=all.filter(e=>{
-      const hay=[e.note,e.category,e.vendor,e.source_name,e.carLabel,e.date,fmtDate(e.date),(DEPT_LABEL[e.dept]||'')].join(' ').toLowerCase();
-      return words.every(w=>hay.indexOf(w)>=0);
-    });
-  }
-  const movs=all.slice(0, q?400:50);
-  if(!movs.length){ el.innerHTML=`<div class="empty"><div class="empty-ic">${q?'🔎':'🧾'}</div><div class="empty-title">${q?'Sin resultados':'Aún no hay movimientos'}</div><div class="empty-sub">${q?'Prueba con otra fecha o palabra (ej. «abril», «Altima», «placas»).':'Registra ingresos y gastos. Si ligas un gasto a un carro, sabrás cuánto te cuesta ese auto.'}</div></div>`; return; }
-  el.innerHTML=movs.map(e=>{
-    const inc = e._kind==='inc';
-    const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="background:rgba(62,207,142,0.15);color:#3ecf8e;border:1px solid rgba(62,207,142,0.45);border-radius:20px;padding:2px 8px;text-decoration:none;font-size:11px;font-weight:700;white-space:nowrap;">📎 Recibo ✓</a>`:`<span style="color:var(--faint);font-size:12px;">📎 sin recibo</span>`;
-    const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
-    const who = e.vendor || e.source_name || '';
-    const concepto = e.note || e.category || (inc?'Ingreso':'Gasto');
-    const catChip = e.note ? `<span class="chip">${e.category||''}</span>` : '';
-    const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(e.amountCents)}`;
-    const canEdit = myDepts().indexOf(e.dept)>=0;
-    const act = !canEdit ? '' : (inc ? `<span onclick="deleteInc('${e.id}')" style="cursor:pointer;color:var(--faint);">🗑 borrar</span>` : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`);
-    return `<div class="row">
+  return [...exps.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
+    .sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||''));
+}
+function movRowHtml(e){
+  const inc = e._kind==='inc';
+  const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="background:rgba(62,207,142,0.15);color:#3ecf8e;border:1px solid rgba(62,207,142,0.45);border-radius:20px;padding:2px 8px;text-decoration:none;font-size:11px;font-weight:700;white-space:nowrap;">📎 Recibo ✓</a>`:`<span style="color:var(--faint);font-size:12px;">📎 sin recibo</span>`;
+  const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
+  const who = e.vendor || e.source_name || '';
+  const concepto = e.note || e.category || (inc?'Ingreso':'Gasto');
+  const catChip = e.note ? `<span class="chip">${e.category||''}</span>` : '';
+  const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(e.amountCents)}`;
+  const canEdit = myDepts().indexOf(e.dept)>=0;
+  const act = !canEdit ? '' : (inc ? `<span onclick="deleteInc('${e.id}')" style="cursor:pointer;color:var(--faint);">🗑 borrar</span>` : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`);
+  return `<div class="row">
       <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:(inc?'💵':'🧾')}</div>
       <div class="row-main" onclick="openMovEdit('${e.id}')" style="cursor:pointer;">
         <div class="row-name">${concepto}${who?' · '+who:''}</div>
@@ -803,7 +789,30 @@ function renderExpenses(){
       </div>
       <div class="row-amt"><div class="row-amt-val" style="${inc?'color:#3ecf8e;':''}">${amt}</div><div class="row-amt-int">${act}</div></div>
     </div>`;
-  }).join('');
+}
+function renderExpenses(){
+  const el=document.getElementById('exp-list');
+  if(el){
+    const movs=_movAll().slice(0,50);
+    el.innerHTML = movs.length ? movs.map(movRowHtml).join('')
+      : `<div class="empty"><div class="empty-ic">🧾</div><div class="empty-title">Aún no hay movimientos</div><div class="empty-sub">Registra ingresos y gastos. Si ligas un gasto a un carro, sabrás cuánto te cuesta ese auto.</div></div>`;
+  }
+  renderMovResults();   // mantén el desplegable del buscador al día si hay una búsqueda activa
+}
+// Desplegable de resultados JUSTO debajo de la barra de buscar (arriba), para cachar el movimiento sin bajar hasta la lista.
+function renderMovResults(){
+  const box=document.getElementById('mov-results'); if(!box) return;
+  const q=(document.getElementById('mov-search')?document.getElementById('mov-search').value:'').trim().toLowerCase();
+  if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+  const words=q.split(/\s+/);
+  const res=_movAll().filter(e=>{
+    const hay=[e.note,e.category,e.vendor,e.source_name,e.carLabel,e.date,fmtDate(e.date),(DEPT_LABEL[e.dept]||'')].join(' ').toLowerCase();
+    return words.every(w=>hay.indexOf(w)>=0);
+  }).slice(0,400);
+  box.style.display='';
+  box.innerHTML = res.length
+    ? `<div style="font-size:11px;color:var(--faint);padding:2px 6px 6px;">${res.length} resultado${res.length===1?'':'s'} · toca uno para verlo/editarlo</div>`+res.map(movRowHtml).join('')
+    : `<div class="empty" style="padding:18px;"><div class="empty-ic">🔎</div><div class="empty-title">Sin resultados</div><div class="empty-sub">Prueba con otra fecha o palabra (ej. «abril», «Altima», «placas»).</div></div>`;
 }
 
 // ---------- HELPERS ----------
@@ -1261,7 +1270,7 @@ window.saveAssignCar=async function(){
 
 // ---------- BUSCAR + EDITAR MOVIMIENTO (monto/fecha/recibo) ----------
 let _movSearchT=null;
-window.movSearch=function(){ if(_movSearchT) clearTimeout(_movSearchT); _movSearchT=setTimeout(renderExpenses,180); };
+window.movSearch=function(){ if(_movSearchT) clearTimeout(_movSearchT); _movSearchT=setTimeout(renderMovResults,180); };
 
 let _movId=null, _movTx=null;
 window.openMovEdit=function(id){
