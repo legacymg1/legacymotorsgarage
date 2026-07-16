@@ -784,7 +784,7 @@ function renderExpenses(){
   if(!movs.length){ el.innerHTML=`<div class="empty"><div class="empty-ic">${q?'🔎':'🧾'}</div><div class="empty-title">${q?'Sin resultados':'Aún no hay movimientos'}</div><div class="empty-sub">${q?'Prueba con otra fecha o palabra (ej. «abril», «Altima», «placas»).':'Registra ingresos y gastos. Si ligas un gasto a un carro, sabrás cuánto te cuesta ese auto.'}</div></div>`; return; }
   el.innerHTML=movs.map(e=>{
     const inc = e._kind==='inc';
-    const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="color:var(--gold);text-decoration:none;font-size:12px;">📎 recibo</a>`:`<span style="color:var(--faint);font-size:12px;">📎 sin recibo</span>`;
+    const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="background:rgba(62,207,142,0.15);color:#3ecf8e;border:1px solid rgba(62,207,142,0.45);border-radius:20px;padding:2px 8px;text-decoration:none;font-size:11px;font-weight:700;white-space:nowrap;">📎 Recibo ✓</a>`:`<span style="color:var(--faint);font-size:12px;">📎 sin recibo</span>`;
     const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
     const who = e.vendor || e.source_name || '';
     const concepto = e.note || e.category || (inc?'Ingreso':'Gasto');
@@ -1389,7 +1389,7 @@ function renderBolsas(){
         let sign='−', color='#ff6b6b';
         if(INCOME_TYPES.includes(it.type) || (it.type==='transfer'&&it.dir==='in') || it.type==='expense_reversal'){ sign='+'; color='#3ecf8e'; }
         const editable = (it.type==='income' || it.type==='expense');
-        const clip = it.receiptURL ? '📎 ' : '';
+        const clip = it.receiptURL ? `<span style="color:#3ecf8e;font-weight:700;">📎 </span>` : '';
         const click = editable ? `onclick="event.stopPropagation(); openMovEdit('${it.id}')"` : '';
         const hint = editable ? `<span style="color:var(--faint);font-size:11px;margin-left:6px;">✏️</span>` : '';
         return `<div ${click} style="display:flex;justify-content:space-between;gap:10px;padding:8px 4px;font-size:13px;border-bottom:1px solid var(--border);${editable?'cursor:pointer;border-radius:6px;':''}"><span style="color:var(--muted);">${clip}${txDesc(it)} · ${fmtDate(it.date)}${hint}</span><span style="color:${color};white-space:nowrap;font-weight:600;">${sign}${centsToUSD(a)}</span></div>`;
