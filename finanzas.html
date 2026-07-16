@@ -1397,9 +1397,10 @@ function renderBolsas(){
         if(INCOME_TYPES.includes(it.type) || (it.type==='transfer'&&it.dir==='in') || it.type==='expense_reversal'){ sign='+'; color='#3ecf8e'; }
         const editable = (it.type==='income' || it.type==='expense');
         const clip = it.receiptURL ? `<span style="background:rgba(62,207,142,0.18);color:#3ecf8e;border:1px solid rgba(62,207,142,0.5);border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;margin-right:6px;white-space:nowrap;">📎 ✓</span>` : '';
+        const cashTag = (it.method==='cash') ? `<span style="background:rgba(240,192,74,0.14);color:#f0c040;border-radius:8px;padding:0 5px;font-size:10px;font-weight:700;margin-left:6px;white-space:nowrap;">💵 efectivo</span>` : '';
         const click = editable ? `onclick="event.stopPropagation(); openMovEdit('${it.id}')"` : '';
         const hint = editable ? `<span style="color:var(--faint);font-size:11px;margin-left:6px;">✏️</span>` : '';
-        return `<div ${click} style="display:flex;justify-content:space-between;gap:10px;padding:8px 4px;font-size:13px;border-bottom:1px solid var(--border);${editable?'cursor:pointer;border-radius:6px;':''}"><span style="color:var(--muted);">${clip}${txDesc(it)} · ${fmtDate(it.date)}${hint}</span><span style="color:${color};white-space:nowrap;font-weight:600;">${sign}${centsToUSD(a)}</span></div>`;
+        return `<div ${click} style="display:flex;justify-content:space-between;gap:10px;padding:8px 4px;font-size:13px;border-bottom:1px solid var(--border);${editable?'cursor:pointer;border-radius:6px;':''}"><span style="color:var(--muted);">${clip}${txDesc(it)} · ${fmtDate(it.date)}${cashTag}${hint}</span><span style="color:${color};white-space:nowrap;font-weight:600;">${sign}${centsToUSD(a)}</span></div>`;
       }).join('') || '<div style="font-size:12px;color:var(--faint);padding:4px 0;">Sin movimientos en este corte.</div>';
       const hasT = d.tin||d.tout;
       const transLine = hasT ? `<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">↔ Traspasos</span><span>${d.tin?('<span style=\'color:#3ecf8e\'>+'+centsToUSD(d.tin)+'</span>'):''}${(d.tin&&d.tout)?' / ':''}${d.tout?('<span style=\'color:#ff6b6b\'>−'+centsToUSD(d.tout)+'</span>'):''}</span></div>` : '';
