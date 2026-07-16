@@ -768,7 +768,11 @@ function renderExpenses(){
   const q=(document.getElementById('mov-search')?document.getElementById('mov-search').value:'').trim().toLowerCase();
   if(q){ const _el=document.getElementById('exp-list'); if(_el && _el.style.display==='none'){ _el.style.display=''; const _ar=document.getElementById('movs-arrow'); if(_ar) _ar.textContent='▾'; } }  // al buscar, abre la lista
   let all=[...active.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
-              .sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||''));
+              .sort((a,b)=>{
+                const ai=INCOME_TYPES.includes(a.type)?0:1, bi=INCOME_TYPES.includes(b.type)?0:1;
+                if(ai!==bi) return ai-bi;   // ingresos primero, luego gastos
+                return (b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'');   // dentro de cada grupo, lo más reciente arriba
+              });
   if(q){
     const words=q.split(/\s+/);
     all=all.filter(e=>{
@@ -1376,7 +1380,11 @@ function renderBolsas(){
     const d=D[k], net=d.in-d.out, op=!!_bolsaOpen[k];
     let detail='';
     if(op){
-      const rows = d.items.slice().sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'')).map(it=>{
+      const rows = d.items.slice().sort((a,b)=>{
+        const ai=INCOME_TYPES.includes(a.type)?0:1, bi=INCOME_TYPES.includes(b.type)?0:1;
+        if(ai!==bi) return ai-bi;   // ingresos primero, luego gastos
+        return (b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||'');   // dentro de cada grupo, lo más reciente arriba
+      }).map(it=>{
         const a=Number(it.amountCents)||0;
         let sign='−', color='#ff6b6b';
         if(INCOME_TYPES.includes(it.type) || (it.type==='transfer'&&it.dir==='in') || it.type==='expense_reversal'){ sign='+'; color='#3ecf8e'; }
