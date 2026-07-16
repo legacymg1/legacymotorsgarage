@@ -426,26 +426,58 @@
 <!-- REGISTRAR INGRESO -->
 <div class="overlay" id="inc-overlay">
   <div class="sheet">
-    <div class="sheet-head"><div class="sheet-title">Registrar ingreso</div><button class="close" onclick="closeInc()">✕</button></div>
-    <div class="row2">
-      <div class="field"><label>Monto ($)</label><input id="i-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
-      <div class="field"><label>Fecha</label><input id="i-date" type="date"></div>
+    <div class="sheet-head" style="align-items:flex-start;">
+      <div class="sheet-title">Registrar ingreso</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <select id="i-dept" onchange="onIncDeptChange()" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text);font-size:14px;"><option value="dealer">🚗 Dealer</option><option value="parts">🔧 Partes</option><option value="ebay">📦 eBay</option></select>
+        <button class="close" onclick="closeInc()">✕</button>
+      </div>
     </div>
-    <div class="row2">
-      <div class="field"><label>Cuenta / Bolsa</label><select id="i-dept" onchange="onIncDeptChange()"><option value="dealer">🚗 Dealer</option><option value="parts">🔧 Partes</option><option value="ebay">📦 eBay</option></select></div>
-      <div class="field"><label>Categoría</label><select id="i-cat" onchange="onIncCatChange()"></select></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Método</label><select id="i-method"><option value="cash">💵 Efectivo</option><option value="terminal">💳 Terminal</option><option value="ach">🏦 ACH</option><option value="zelle">📲 Zelle/Otro</option></select></div>
-      <div class="field"><label>Origen (opcional)</label><input id="i-source" placeholder="De quién / de dónde"></div>
-    </div>
-    <div class="field"><label>Concepto / qué fue</label><input id="i-note" placeholder="Ej. venta de catalizador, computadora…"></div>
-    <div class="field" id="i-private-wrap" style="margin-top:2px;">
+    <div class="field" id="i-private-wrap" style="margin:0 0 4px;">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;">
         <input type="checkbox" id="i-private" style="width:20px;height:20px;flex-shrink:0;">
         <span>🔒 Venta privada <span style="font-weight:400;color:var(--muted);">— NO entra a Legacy ni a Resultados oficiales</span></span>
       </label>
     </div>
+    <div class="field"><label>Categoría</label><select id="i-cat" onchange="onIncCatChange()"></select></div>
+
+    <div class="row2" id="i-amount-row">
+      <div class="field"><label>Monto ($)</label><input id="i-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
+      <div class="field"><label>Fecha</label><input id="i-date" type="date"></div>
+    </div>
+    <div id="i-pagos-row" style="display:none;">
+      <div class="row2">
+        <div class="field"><label>Monto total de la venta ($)</label><input id="i-total" type="number" inputmode="decimal" placeholder="0.00"></div>
+        <div class="field"><label>Enganche / Down ($)</label><input id="i-down" type="number" inputmode="decimal" placeholder="0.00"></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin:-4px 0 10px;background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.25);border-radius:8px;padding:8px 10px;">Se registra como ingreso <b>solo el enganche</b> (lo que recibes hoy). El resto son pagos que se registran conforme entren. El plan de pagos se arma en <b>Clientes</b>.</div>
+    </div>
+
+    <div class="field"><label>Método</label><select id="i-method"><option value="cash">💵 Efectivo</option><option value="terminal">💳 Terminal</option><option value="ach">🏦 ACH</option><option value="zelle">📲 Zelle/Otro</option></select></div>
+
+    <div id="i-client-section" style="display:none;">
+      <div class="field"><label>Cliente (opcional)</label><select id="i-client"><option value="">— Sin cliente —</option></select></div>
+      <button type="button" class="btn-add" id="i-newclient-btn" onclick="toggleNewClient()" style="font-size:13px;margin-bottom:8px;">➕ Nuevo cliente</button>
+      <div id="i-newclient" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;">
+        <div class="row2">
+          <div class="field"><label>Nombre</label><input id="i-nc-name" placeholder="Nombre del cliente"></div>
+          <div class="field"><label>Teléfono</label><input id="i-nc-phone" type="tel" placeholder="(559) 555-0100"></div>
+        </div>
+        <div style="font-size:11px;color:var(--faint);">Se crea un cliente básico. El financiamiento completo se llena en la sección Clientes.</div>
+      </div>
+    </div>
+
+    <div class="field"><label>Concepto / qué fue</label><input id="i-note" placeholder="Ej. venta Tahoe, catalizador…"></div>
+
+    <div class="field" id="i-warranty-section" style="display:none;"><label>🛡️ Garantía</label>
+      <select id="i-warranty"><option value="0">Sin garantía</option><option value="1">1 mes</option><option value="2">2 meses</option><option value="3">3 meses</option><option value="6">6 meses</option><option value="12">12 meses</option></select>
+    </div>
+
+    <div class="field" id="i-photos-section" style="display:none;"><label>📷 Fotos (carro, contrato, etc.)</label>
+      <input type="file" id="i-photos" accept="image/*" multiple onchange="incPhotosPreview()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
+      <div id="i-photos-preview" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeInc()">Cancelar</button>
       <button class="btn btn-primary" id="inc-save" onclick="saveInc()">Guardar ingreso</button>
@@ -621,9 +653,11 @@ function startListening(){
     if(_co && _co.classList.contains('open')){ const lc=lastClosing(); _corteSince = lc ? (lc.closedAt||'') : ''; renderCorte(); }
   }, err=>{ console.log('txns listen error', err); });
   onSnapshot(collection(db,'clients'), snap=>{
-    privateClients = snap.docs.filter(d=>d.data().private===true).map(d=>({id:d.id,...d.data()}));
+    allClients = snap.docs.map(d=>({id:d.id,...d.data()}));
+    privateClients = allClients.filter(c=>c.private===true);
     privateIds = new Set(privateClients.map(c=>c.id));
     renderBolsas(); renderPrivadas(); renderExpenses();
+    if(document.getElementById('inc-overlay').classList.contains('open')) fillClientSelect();
   }, err=>{ console.log('clients listen error', err); });
   loadInventory();
 }
@@ -659,6 +693,7 @@ function liveTxns(){
 }
 let privateIds = new Set();
 let privateClients = [];
+let allClients = [];
 // Movimientos de Legacy: vivos, excluyendo ventas privadas.
 function legacyTxns(){ return liveTxns().filter(t=>!(t.clientId && privateIds.has(t.clientId)) && t.private!==true); }
 
@@ -779,7 +814,7 @@ function movRowHtml(e){
   const inc = e._kind==='inc';
   const rec=e.receiptURL?`<a href="${e.receiptURL}" target="_blank" onclick="event.stopPropagation()" style="background:rgba(62,207,142,0.15);color:#3ecf8e;border:1px solid rgba(62,207,142,0.45);border-radius:20px;padding:2px 8px;text-decoration:none;font-size:11px;font-weight:700;white-space:nowrap;">📎 Recibo ✓</a>`:`<span style="color:var(--faint);font-size:12px;">📎 sin recibo</span>`;
   const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
-  const who = e.vendor || e.source_name || '';
+  const who = e.vendor || e.clientName || e.source_name || '';
   const concepto = e.note || e.category || (inc?'Ingreso':'Gasto');
   const catChip = e.note ? `<span class="chip">${e.category||''}</span>` : '';
   const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(e.amountCents)}`;
@@ -1120,7 +1155,7 @@ function renderSocios(){
 }
 
 const INCOME_CATS = {
-  dealer: ['Venta de contado','Enganche','Otro ingreso'],
+  dealer: ['Venta de contado','Venta a pagos'],
   parts:  ['🔒 Venta privada de partes','Venta de parte','Venta en mostrador','Envío cobrado','Otro'],
   ebay:   ['Venta eBay','Reembolso recibido','Otro']
 };
@@ -1130,11 +1165,48 @@ window.onIncDeptChange = function(){
   document.getElementById('i-cat').innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
   // reset el switch de privada según la categoría por defecto de la nueva bolsa
   document.getElementById('i-private').checked=/privada/i.test(cats[0]||'');
+  // Cliente / garantía / fotos solo para ventas de Dealer (carros)
+  const isDealer = d==='dealer';
+  ['i-client-section','i-warranty-section','i-photos-section'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=isDealer?'':'none'; });
+  if(isDealer) fillClientSelect();
+  updateIncMode();
 };
 window.onIncCatChange = function(){
   // si eligen una categoría que ya dice "privada", marca el switch (no lo desmarca)
   if(/privada/i.test(document.getElementById('i-cat').value)) document.getElementById('i-private').checked=true;
+  updateIncMode();
 };
+// Muestra los campos de "a pagos" (total + enganche) solo cuando es Venta a pagos de Dealer
+window.updateIncMode = function(){
+  const d=document.getElementById('i-dept').value, cat=document.getElementById('i-cat').value;
+  const aPagos = (d==='dealer' && cat==='Venta a pagos');
+  const ar=document.getElementById('i-amount-row'), pr=document.getElementById('i-pagos-row');
+  if(ar) ar.style.display = aPagos?'none':'';
+  if(pr) pr.style.display = aPagos?'':'none';
+};
+// Llena el selector de clientes existentes
+function fillClientSelect(){
+  const sel=document.getElementById('i-client'); if(!sel) return;
+  const cur=sel.value;
+  const opts=allClients.slice().sort((a,b)=>((a.name||'').localeCompare(b.name||'')))
+    .map(c=>`<option value="${c.id}">${(c.name||'(sin nombre)')}${c.phone?' · '+c.phone:''}</option>`).join('');
+  sel.innerHTML='<option value="">— Sin cliente —</option>'+opts;
+  sel.value=cur;
+}
+window.toggleNewClient=function(){
+  const box=document.getElementById('i-newclient'); if(!box) return;
+  const show = box.style.display==='none';
+  box.style.display = show?'':'none';
+  const btn=document.getElementById('i-newclient-btn'); if(btn) btn.textContent = show?'✕ Cancelar nuevo cliente':'➕ Nuevo cliente';
+  if(show){ const sel=document.getElementById('i-client'); if(sel) sel.value=''; }   // al crear nuevo, ignora el selector
+};
+window.incPhotosPreview=function(){
+  const box=document.getElementById('i-photos-preview'); const inp=document.getElementById('i-photos'); if(!box||!inp) return;
+  const files=Array.from(inp.files||[]);
+  box.innerHTML = files.length ? files.map(f=>`<span style="font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">📷 ${f.name}</span>`).join('') : '';
+};
+// Teléfono a formato E.164 (US) para poder de-duplicar
+function toE164(p){ const d=(p||'').replace(/\D/g,''); if(!d) return ''; if(d.length===10) return '+1'+d; if(d.length===11&&d[0]==='1') return '+'+d; return '+'+d; }
 window.openImport=function(){
   const em=((auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
   if(em!=='ev@legacymotorsgarage.com'){ alert('Solo el dueño puede importar movimientos.'); return; }
@@ -1236,10 +1308,17 @@ window.doBulkAssign=async function(){
 
 window.openInc = function(){
   document.getElementById('i-amount').value='';
+  document.getElementById('i-total').value=''; document.getElementById('i-down').value='';
   document.getElementById('i-date').value=new Date().toISOString().slice(0,10);
-  applyDeptRestriction('i-dept'); onIncDeptChange();
   document.getElementById('i-method').value='cash';
-  document.getElementById('i-source').value=''; document.getElementById('i-note').value='';
+  document.getElementById('i-note').value='';
+  document.getElementById('i-warranty').value='0';
+  document.getElementById('i-client').value='';
+  document.getElementById('i-nc-name').value=''; document.getElementById('i-nc-phone').value='';
+  document.getElementById('i-newclient').style.display='none';
+  document.getElementById('i-newclient-btn').textContent='➕ Nuevo cliente';
+  document.getElementById('i-photos').value=''; document.getElementById('i-photos-preview').innerHTML='';
+  applyDeptRestriction('i-dept'); onIncDeptChange();   // arma categorías, secciones dealer y modo (contado/pagos)
   document.getElementById('inc-overlay').classList.add('open');
 };
 window.closeInc = function(){ document.getElementById('inc-overlay').classList.remove('open'); };
@@ -1343,20 +1422,75 @@ window.saveMovEdit=async function(){
 };
 
 window.saveInc = async function(){
-  const amount=Number(document.getElementById('i-amount').value);
-  if(!amount||amount<=0){ alert('Pon el monto'); return; }
+  const dept=document.getElementById('i-dept').value;
+  const cat=document.getElementById('i-cat').value;
+  const isDealer = dept==='dealer';
+  const aPagos = isDealer && cat==='Venta a pagos';
   const date=document.getElementById('i-date').value; if(!date){ alert('Pon la fecha'); return; }
+  // Monto que se registra como ingreso
+  let amountCents, totalCents=null, downCents=null;
+  if(aPagos){
+    const total=Number(document.getElementById('i-total').value);
+    const down=Number(document.getElementById('i-down').value);
+    if(!down||down<=0){ alert('Pon el enganche (lo que recibes hoy)'); return; }
+    if(!total||total<down){ alert('El monto total de la venta debe ser mayor o igual al enganche'); return; }
+    amountCents=Math.round(down*100); totalCents=Math.round(total*100); downCents=amountCents;
+  } else {
+    const amount=Number(document.getElementById('i-amount').value);
+    if(!amount||amount<=0){ alert('Pon el monto'); return; }
+    amountCents=Math.round(amount*100);
+  }
   const btn=document.getElementById('inc-save'); btn.disabled=true; btn.textContent='Guardando…';
   const id='inc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
   try{
-    await setDoc(doc(db,'transactions',id),{
-      entryId:id, type:'income', dept:document.getElementById('i-dept').value,
-      category:document.getElementById('i-cat').value, private:document.getElementById('i-private').checked, amountCents:Math.round(amount*100),
+    // Cliente: nuevo (si el mini-form está abierto y tiene nombre) o el seleccionado
+    let clientId = isDealer ? (document.getElementById('i-client').value||'') : '';
+    let clientName = '';
+    const ncOpen = isDealer && document.getElementById('i-newclient').style.display!=='none';
+    if(ncOpen){
+      const name=document.getElementById('i-nc-name').value.trim();
+      const phone=document.getElementById('i-nc-phone').value.trim();
+      if(name){
+        const e164=toE164(phone);
+        const match = e164 ? allClients.find(c=>c.phoneE164===e164) : null;
+        if(match){ clientId=match.id; clientName=match.name||name; }
+        else{
+          btn.textContent='Creando cliente…';
+          clientId='c_'+Date.now();
+          clientName=name;
+          await setDoc(doc(db,'clients',clientId), { name, phone, phoneE164:e164, lang:'es', kind:'finanzas',
+            vehicles:[], make:'',model:'',year:'',color:'',vin:'', weekly:0,numPay:0,total:0,down:0,
+            totalOfPayments:0,financeCharge:0,amountFinanced:0,freq:'',schedule:[],settled:false,
+            smsConsent:{marketing:false,date:null,source:'finanzas'},
+            createdAt:new Date().toISOString(), createdBy:who, payments:[] });
+        }
+      }
+    } else if(clientId){
+      const cc=allClients.find(c=>c.id===clientId); clientName=(cc&&cc.name)||'';
+    }
+    // Fotos → Storage (bajo receipts/ para reusar permisos existentes)
+    let photoURLs=[];
+    const files = isDealer ? Array.from(document.getElementById('i-photos').files||[]) : [];
+    for(const f of files){
+      btn.textContent='Subiendo fotos…';
+      const jpg=await toJpeg(f);
+      const r=ref(storage,'receipts/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg'));
+      await uploadBytes(r,jpg); photoURLs.push(await getDownloadURL(r));
+    }
+    btn.textContent='Guardando…';
+    const data={ entryId:id, type:'income', dept, category:cat,
+      private:document.getElementById('i-private').checked, amountCents,
       method:document.getElementById('i-method').value, date,
-      source_name:document.getElementById('i-source').value.trim(),
       note:document.getElementById('i-note').value.trim(),
-      createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
-    });
+      createdAt:new Date().toISOString(), createdBy:who, source:'finanzas' };
+    if(clientId){ data.clientId=clientId; data.clientName=clientName; }
+    if(aPagos){ data.saleType='pagos'; data.saleTotalCents=totalCents; data.downCents=downCents; }
+    else if(isDealer && cat==='Venta de contado'){ data.saleType='contado'; }
+    const warranty = isDealer ? Number(document.getElementById('i-warranty').value||0) : 0;
+    if(warranty>0) data.warrantyMonths=warranty;
+    if(photoURLs.length) data.photoURLs=photoURLs;
+    await setDoc(doc(db,'transactions',id), data);
     closeInc();
   }catch(e){ alert('Error: '+e.message); }
   btn.disabled=false; btn.textContent='Guardar ingreso';
@@ -1370,7 +1504,7 @@ function txDesc(t){
   if(t.type==='payment') return 'Pago · '+(t.clientName||'cliente');
   if(t.type==='down') return 'Enganche · '+(t.clientName||'cliente');
   if(t.type==='cash_sale') return 'Venta contado · '+(t.clientName||'cliente');
-  if(t.type==='income') return (t.note||t.category||'Ingreso')+(t.source_name?' · '+t.source_name:'');
+  if(t.type==='income') return (t.note||t.category||'Ingreso')+(t.clientName?' · '+t.clientName:(t.source_name?' · '+t.source_name:''))+(t.saleType==='pagos'?' · enganche':'');
   if(t.type==='expense') return (t.note||t.category||'Gasto')+(t.vendor?' · '+t.vendor:'')+(t.carLabel?' · '+t.carLabel:'');
   if(t.type==='expense_reversal') return 'Reversa de gasto';
   if(t.type==='transfer') return t.dir==='in' ? ('↔ Traspaso desde '+(DEPT_NAME[t.fromDept]||t.fromDept)) : ('↔ Traspaso a '+(DEPT_NAME[t.toDept]||t.toDept));
