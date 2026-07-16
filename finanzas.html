@@ -163,14 +163,7 @@
   </div>
   <div id="mov-results" style="display:none;margin:0 0 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;max-height:60vh;overflow-y:auto;"></div>
   <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
-    <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
-    <button class="btn-add" id="btn-total" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
-    <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
-    <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
-    <button class="btn-add" onclick="openComis()" style="font-size:15px;" title="Total pagado en comisiones/sueldos">💼 Comisiones</button>
-    <button class="btn-add" onclick="openBulkAssign()" style="font-size:15px;" title="Asignar gastos a un carro por búsqueda (dueño)">🔗 Asignar a carro</button>
   </div>
 
   <div id="trial-alert"></div>
@@ -214,6 +207,16 @@
 
   <div id="bolsa-cards"></div>
   <div id="gran-total"></div>
+
+  <div style="margin:16px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
+    <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
+    <button class="btn-add" id="btn-total" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
+    <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
+    <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
+    <button class="btn-add" onclick="openComis()" style="font-size:15px;" title="Total pagado en comisiones/sueldos">💼 Comisiones</button>
+    <button class="btn-add" onclick="openBulkAssign()" style="font-size:15px;" title="Asignar gastos a un carro por búsqueda (dueño)">🔗 Asignar a carro</button>
+  </div>
 
   <div class="coll-head" style="margin-top:22px;" onclick="toggleSubs()">
     <div class="section-title" style="font-size:14px;color:var(--muted);">Recurrentes y pruebas gratis</div>
