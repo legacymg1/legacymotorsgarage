@@ -207,6 +207,7 @@
 
   <div style="margin:16px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
+    <button class="btn-add" onclick="openPorCobrar()" style="font-size:15px;">💳 Por cobrar</button>
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
     <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
     <button class="btn-add" id="btn-total" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
@@ -497,6 +498,14 @@
   </div>
 </div>
 
+<!-- POR COBRAR (cuentas abiertas de todos los clientes) -->
+<div class="overlay" id="porcobrar-overlay">
+  <div class="sheet" style="max-width:640px;">
+    <div class="sheet-head"><div class="sheet-title">💳 Cuentas por cobrar</div><button class="close" onclick="closePorCobrar()">✕</button></div>
+    <div id="porcobrar-body"></div>
+  </div>
+</div>
+
 <!-- CORTE DE CAJA -->
 <div class="overlay" id="corte-overlay">
   <div class="sheet" style="max-width:660px;">
@@ -669,7 +678,8 @@ function startListening(){
     privateClients = allClients.filter(c=>c.private===true);
     privateIds = new Set(privateClients.map(c=>c.id));
     renderBolsas(); renderPrivadas(); renderExpenses();
-    if(document.getElementById('inc-overlay').classList.contains('open')) fillClientSelect();
+    if(document.getElementById('inc-overlay').classList.contains('open')){ fillClientSelect(); renderIncAccounts(); }
+    if(document.getElementById('porcobrar-overlay').classList.contains('open')) renderPorCobrar();
   }, err=>{ console.log('clients listen error', err); });
   loadInventory();
 }
@@ -969,6 +979,7 @@ document.getElementById('exp-overlay').addEventListener('click',e=>{ if(e.target
 document.getElementById('corte-overlay').addEventListener('click',e=>{ if(e.target.id==='corte-overlay') closeCorte(); });
 document.getElementById('pnl-overlay').addEventListener('click',e=>{ if(e.target.id==='pnl-overlay') closePnl(); });
 document.getElementById('inc-overlay').addEventListener('click',e=>{ if(e.target.id==='inc-overlay') closeInc(); });
+document.getElementById('porcobrar-overlay').addEventListener('click',e=>{ if(e.target.id==='porcobrar-overlay') closePorCobrar(); });
 document.getElementById('transfer-overlay').addEventListener('click',e=>{ if(e.target.id==='transfer-overlay') closeTransfer(); });
 document.getElementById('assigncar-overlay').addEventListener('click',e=>{ if(e.target.id==='assigncar-overlay') closeAssignCar(); });
 document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target.id==='mov-overlay') closeMov(); });
@@ -1254,6 +1265,40 @@ window.selectIncAccount=function(acctId, mode){
   const inp=document.getElementById('i-amount'); if(inp) inp.focus();
 };
 window.clearIncAccount=function(){ _incAccount=null; const al=document.getElementById('i-amount-label'); if(al) al.textContent='Monto ($)'; updateIncMode(); };
+// ---- PANEL "POR COBRAR": todas las cuentas abiertas con saldo ----
+window.openPorCobrar=function(){ renderPorCobrar(); document.getElementById('porcobrar-overlay').classList.add('open'); };
+window.closePorCobrar=function(){ document.getElementById('porcobrar-overlay').classList.remove('open'); };
+function renderPorCobrar(){
+  const box=document.getElementById('porcobrar-body'); if(!box) return;
+  const rows=[]; let grand=0;
+  allClients.forEach(c=>{
+    (c.openAccounts||[]).forEach(a=>{ if(a.settled) return; const bal=acctBalanceCents(a); if(bal<=0) return; grand+=bal; rows.push({c,a,bal}); });
+  });
+  rows.sort((x,y)=>y.bal-x.bal);
+  if(!rows.length){ box.innerHTML='<div class="empty"><div class="empty-ic">💳</div><div class="empty-title">Nadie te debe</div><div class="empty-sub">Cuando hagas una venta a pagos, la cuenta aparece aquí con su saldo hasta que se liquide.</div></div>'; return; }
+  const dLabel={dealer:'🚗',parts:'🔧',ebay:'📦'};
+  box.innerHTML='<div style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.35);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:700;">Te deben en la calle</span><span style="font-weight:800;font-size:18px;color:#f0c040;">'+centsToUSD(grand)+'</span></div>'
+    + rows.map(r=>{
+        return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:700;font-size:14px;">'+(r.c.name||'(sin nombre)')+'</span><span style="color:#f0c040;font-weight:800;white-space:nowrap;">saldo '+centsToUSD(r.bal)+'</span></div>'
+          +'<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">'+(dLabel[r.a.dept]||'')+' '+(r.a.concept||'Cuenta')+' · total '+centsToUSD(Number(r.a.totalCents)||0)+(r.c.phone?' · '+r.c.phone:'')+'</div>'
+          +'<div style="display:flex;gap:8px;"><button type="button" class="btn-add" style="flex:1;font-size:13px;" onclick="cobrarDesdePanel(\''+r.c.id+'\',\''+r.a.id+'\',\'abono\')">Abonar</button><button type="button" class="btn-add" style="flex:1;font-size:13px;background:rgba(62,207,142,0.15);color:#3ecf8e;border-color:#3ecf8e;" onclick="cobrarDesdePanel(\''+r.c.id+'\',\''+r.a.id+'\',\'liquidar\')">Liquidar</button></div>'
+          +'</div>';
+      }).join('');
+}
+// Desde el panel: abre ＋Ingreso ya apuntando a esa cuenta (abono o liquidar)
+window.cobrarDesdePanel=function(clientId, acctId, mode){
+  const c=allClients.find(x=>x.id===clientId); if(!c) return;
+  const a=(c.openAccounts||[]).find(x=>x.id===acctId); if(!a) return;
+  closePorCobrar();
+  openInc();
+  document.getElementById('i-dept').value = a.dept||'parts';
+  onIncDeptChange();
+  fillClientSelect();
+  document.getElementById('i-client').value = clientId;
+  onIncClientChange();
+  selectIncAccount(acctId, mode);
+};
 window.incPhotosPreview=function(){
   const box=document.getElementById('i-photos-preview'); const inp=document.getElementById('i-photos'); if(!box||!inp) return;
   const files=Array.from(inp.files||[]);
