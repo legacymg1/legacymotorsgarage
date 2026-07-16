@@ -1369,7 +1369,11 @@ function renderBolsas(){
     else if(t.type==='transfer'){ if(t.dir==='in') D[dept].tin+=amt; else D[dept].tout+=amt; D[dept].items.push(t); }
   });
   const cash={dealer:0,parts:0,ebay:0};
-  LT.forEach(t=>{
+  // El corte es un REINICIO: la caja arranca con el FONDO que se dejó en el último corte,
+  // y de ahí suma solo el efectivo que ha entrado/salido DESDE ese corte (no toda la historia).
+  const _lcF=lastClosing();
+  if(_lcF && (_lcF.fondoCents||0)>0){ const fd=_lcF.fondoDept||'dealer'; if(cash[fd]!==undefined) cash[fd]+=_lcF.fondoCents; }
+  LT.filter(inCut).forEach(t=>{
     if((t.method||'')!=='cash') return;
     const amt=Number(t.amountCents)||0;
     const dept = cash[t.dept]!==undefined ? t.dept : 'dealer';
@@ -1407,7 +1411,7 @@ function renderBolsas(){
           <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Ingresos</span><span style="color:#3ecf8e;">${centsToUSD(d.in)}</span></div>
           <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Egresos</span><span style="color:#ff6b6b;">${centsToUSD(d.out)}</span></div>
           ${transLine}
-          <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">💵 En caja (acumulado)</span><span>${centsToUSD(cash[k])}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">💵 En caja (desde el corte)</span><span>${centsToUSD(cash[k])}</span></div>
           <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);font-size:15px;"><span style="font-weight:700;">${hasT?'Neto (con traspasos)':'Total'}</span><span style="font-weight:800;color:${neto>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(neto)}</span></div>
         </div>
       </div>`;
