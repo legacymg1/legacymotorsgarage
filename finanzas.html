@@ -157,7 +157,10 @@
     <button class="btn-add" onclick="openInc()" style="flex:1;font-size:16px;padding:14px;font-weight:700;">＋ Ingreso</button>
     <button class="btn-add" onclick="openExp()" style="flex:1;font-size:16px;padding:14px;font-weight:700;">＋ Gasto</button>
   </div>
-  <input id="mov-search" oninput="movSearch()" placeholder="🔎 Buscar un gasto o ingreso (fecha, carro, concepto)…" style="width:100%;box-sizing:border-box;margin:0 0 8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:14px;">
+  <div id="mov-search-wrap" style="position:relative;margin:0 0 8px;">
+    <input id="mov-search" oninput="movSearch()" placeholder="🔎 Buscar un gasto o ingreso (fecha, carro, concepto)…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 40px 11px 12px;color:var(--text);font-size:14px;">
+    <span id="mov-search-x" onclick="clearMovSearch()" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--border);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;user-select:none;">✕</span>
+  </div>
   <div id="mov-results" style="display:none;margin:0 0 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;max-height:60vh;overflow-y:auto;"></div>
   <div style="margin:0 0 20px;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
@@ -803,6 +806,7 @@ function renderExpenses(){
 function renderMovResults(){
   const box=document.getElementById('mov-results'); if(!box) return;
   const q=(document.getElementById('mov-search')?document.getElementById('mov-search').value:'').trim().toLowerCase();
+  const _x=document.getElementById('mov-search-x'); if(_x) _x.style.display=q?'':'none';
   if(!q){ box.style.display='none'; box.innerHTML=''; return; }
   const words=q.split(/\s+/);
   const res=_movAll().filter(e=>{
@@ -1270,7 +1274,15 @@ window.saveAssignCar=async function(){
 
 // ---------- BUSCAR + EDITAR MOVIMIENTO (monto/fecha/recibo) ----------
 let _movSearchT=null;
-window.movSearch=function(){ if(_movSearchT) clearTimeout(_movSearchT); _movSearchT=setTimeout(renderMovResults,180); };
+window.movSearch=function(){ const i=document.getElementById('mov-search'), x=document.getElementById('mov-search-x'); if(i&&x) x.style.display = i.value.trim() ? '' : 'none'; if(_movSearchT) clearTimeout(_movSearchT); _movSearchT=setTimeout(renderMovResults,180); };
+window.clearMovSearch=function(){ const i=document.getElementById('mov-search'); if(i){ i.value=''; } const x=document.getElementById('mov-search-x'); if(x) x.style.display='none'; renderMovResults(); if(i) i.focus(); };
+// Click afuera de la barra/desplegable: cierra el desplegable de resultados.
+document.addEventListener('click', function(e){
+  const res=document.getElementById('mov-results'); if(!res || res.style.display==='none') return;
+  const wrap=document.getElementById('mov-search-wrap');
+  if((wrap && wrap.contains(e.target)) || res.contains(e.target)) return;
+  res.style.display='none';
+});
 
 let _movId=null, _movTx=null;
 window.openMovEdit=function(id){
