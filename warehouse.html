@@ -148,7 +148,7 @@ const T={
     needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Warehouse.',
     roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
-    addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
+    addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Escanea o pega el código…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es?', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte', savePart:'Guardar parte + generar QR', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)',
     seeQR:'⬇️ Ver/descargar QR', tagSold:'Vendido', tagPublished:'Publicado', tagAvailable:'Disponible', noLoc:'sin ubicación',
@@ -159,7 +159,7 @@ const T={
     needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Warehouse.',
     roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
-    addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
+    addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Scan or paste the code…',
     addPart:'➕ Add part', whichPart:'What part is it?', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos', savePart:'Save part + generate QR', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready',
     seeQR:'⬇️ View/download QR', tagSold:'Sold', tagPublished:'Published', tagAvailable:'Available', noLoc:'no location',
@@ -279,16 +279,21 @@ window.decodeVin=async function(){
   msg.textContent=t('decoding');
   try{
     const r=await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/'+encodeURIComponent(vin)+'?format=json');
-    const j=await r.json(); const g=k=>{ const it=(j.Results||[]).find(x=>x.Variable===k); return ((it&&it.Value)||'').trim(); };
+    const j=await r.json(); const results=(j.Results||[]);
+    const g=k=>{ const it=results.find(x=>x.Variable===k); return ((it&&it.Value)||'').trim(); };
     const year=g('Model Year'), make=g('Make'), model=g('Model');
     const displ=g('Displacement (L)'), cyl=g('Engine Number of Cylinders'), fuel=g('Fuel Type - Primary'), hp=g('Engine Brake (hp) From')||g('Engine Brake (hp)');
     const engine=[displ&&(Math.round(parseFloat(displ)*10)/10+'L'), cyl&&cyl+'cyl', fuel].filter(Boolean).join(' ');
-    // Nivel 1 completo — todo lo que da gratis NHTSA (extensible: Nivel 2 mergeará más aquí)
+    // TODA la ficha, campo por campo (se descartan vacíos y ruido administrativo)
+    const EXCLUDE=new Set(['Error Code','Error Text','Additional Error Text','Suggested VIN','Vehicle Descriptor','Note','Possible Values','Destination Market','NCSA Body Type','NCSA Make','NCSA Model','NCSA Note','Base Price ($)']);
+    const bad=v=>{ v=(v||'').trim(); return !v || v==='0' || /^not applicable$/i.test(v) || /^0\.0*$/.test(v); };
+    const all=results.filter(x=>!EXCLUDE.has(x.Variable) && !bad(x.Value)).map(x=>({label:x.Variable, value:x.Value.trim()}));
     const spec={ vin, source:'nhtsa',
       trim:g('Trim')||g('Series'), series:g('Series'), bodyClass:g('Body Class'), doors:g('Doors'),
       drive:g('Drive Type'), transmission:g('Transmission Style'),
       displacementL:displ, cylinders:cyl, fuel:fuel, hp:hp,
-      gvwr:g('Gross Vehicle Weight Rating From'), plant:g('Plant Country'), vehicleType:g('Vehicle Type'), manufacturer:g('Manufacturer Name') };
+      gvwr:g('Gross Vehicle Weight Rating From'), plant:g('Plant Country'), vehicleType:g('Vehicle Type'), manufacturer:g('Manufacturer Name'),
+      all };   // ← lista completa (Nivel 2 mergeará más aquí)
     if(year) document.getElementById('v-year').value=year;
     if(make) document.getElementById('v-make').value=titleCase(make);
     if(model) document.getElementById('v-model').value=titleCase(model);
@@ -297,16 +302,14 @@ window.decodeVin=async function(){
     msg.textContent = (year||make||model) ? t('decodeOk') : t('decodeNone');
   }catch(e){ msg.textContent=t('decodeErr'); _vSpec=null; renderVSpec(null); }
 };
+// Muestra TODA la ficha, un apartado por renglón
 function renderVSpec(s){
   const box=document.getElementById('v-spec'); if(!box) return;
-  if(!s){ box.innerHTML=''; return; }
-  const bits=[];
-  if(s.trim) bits.push('🏷️ '+s.trim);
-  if(s.bodyClass) bits.push('🚗 '+s.bodyClass+(s.doors?' · '+s.doors+'d':''));
-  if(s.transmission) bits.push('⚙️ '+s.transmission);
-  if(s.drive) bits.push('🛞 '+s.drive);
-  if(s.hp) bits.push('🐎 '+s.hp+' hp');
-  box.innerHTML = bits.map(b=>'<span class="chip">'+b+'</span>').join('');
+  if(!s || !s.all || !s.all.length){ box.innerHTML=''; return; }
+  box.innerHTML='<div style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;max-height:42vh;overflow:auto;">'
+    +'<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin-bottom:6px;">'+t('vinFicha')+' ('+s.all.length+')</div>'
+    +s.all.map(f=>`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);"><span class="muted">${f.label}</span><span style="font-weight:600;text-align:right;">${f.value}</span></div>`).join('')
+    +'</div>';
 }
 function titleCase(s){ return String(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); }
 
