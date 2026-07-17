@@ -446,16 +446,34 @@
       </label>
     </div>
 
-    <!-- CLIENTE + sus cuentas abiertas (Dealer y Partes) -->
+    <!-- CLIENTE (buscador) + sus cuentas abiertas (Dealer y Partes) -->
     <div id="i-client-section" style="display:none;">
-      <div class="field"><label>Cliente (opcional)</label><select id="i-client" onchange="onIncClientChange()"><option value="">— Sin cliente —</option></select></div>
-      <button type="button" class="btn-add" id="i-newclient-btn" onclick="toggleNewClient()" style="font-size:13px;margin-bottom:8px;">➕ Nuevo cliente</button>
+      <div class="field">
+        <label>Cliente (opcional)</label>
+        <input type="hidden" id="i-client">
+        <!-- Estado A: buscador -->
+        <div id="i-client-pick">
+          <div id="i-client-search-wrap" style="position:relative;">
+            <input id="i-client-search" oninput="incClientSearch()" autocomplete="off" placeholder="🔎 Buscar cliente por nombre o teléfono…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 40px 11px 12px;color:var(--text);font-size:14px;">
+            <span id="i-client-x" onclick="clearIncClientSearch()" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--border);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;user-select:none;">✕</span>
+          </div>
+          <div id="i-client-results" style="display:none;margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;max-height:40vh;overflow-y:auto;"></div>
+        </div>
+        <!-- Estado B: cliente seleccionado -->
+        <div id="i-client-selected" style="display:none;background:rgba(62,207,142,0.1);border:1px solid rgba(62,207,142,0.4);border-radius:10px;padding:11px 12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <span id="i-client-selected-label" style="font-weight:700;color:#3ecf8e;font-size:14px;"></span>
+            <span onclick="clearIncClient()" style="cursor:pointer;color:var(--faint);font-size:12px;white-space:nowrap;">✕ cambiar</span>
+          </div>
+        </div>
+      </div>
+      <!-- Mini-form de cliente nuevo -->
       <div id="i-newclient" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;">
         <div class="row2">
           <div class="field"><label>Nombre</label><input id="i-nc-name" placeholder="Nombre del cliente"></div>
           <div class="field"><label>Teléfono</label><input id="i-nc-phone" type="tel" placeholder="(559) 555-0100"></div>
         </div>
-        <div style="font-size:11px;color:var(--faint);">Se crea un cliente básico. El financiamiento completo se llena en la sección Clientes.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:var(--faint);">Se crea un cliente básico. El financiamiento se llena en Clientes.</span><span onclick="cancelNewIncClient()" style="cursor:pointer;color:var(--faint);font-size:12px;">✕ cancelar</span></div>
       </div>
       <div id="i-accounts" style="margin-bottom:10px;"></div>
     </div>
@@ -697,7 +715,7 @@ function startListening(){
     privateClients = allClients.filter(c=>c.private===true);
     privateIds = new Set(privateClients.map(c=>c.id));
     renderBolsas(); renderPrivadas(); renderExpenses(); renderPorCobrarBox();
-    if(document.getElementById('inc-overlay').classList.contains('open')){ fillClientSelect(); renderIncAccounts(); }
+    if(document.getElementById('inc-overlay').classList.contains('open')){ refreshIncClientChip(); renderIncAccounts(); }
     if(document.getElementById('porcobrar-overlay').classList.contains('open')) renderPorCobrar();
     if(document.getElementById('clientes-overlay').classList.contains('open')) renderClientes();
   }, err=>{ console.log('clients listen error', err); });
@@ -1214,7 +1232,7 @@ window.onIncDeptChange = function(){
   document.getElementById('i-private').checked=/privada/i.test(cats[0]||'');
   const isSale = (d==='dealer'||d==='parts');   // Cliente + cuentas abiertas para Dealer y Partes
   const cs=document.getElementById('i-client-section'); if(cs) cs.style.display=isSale?'':'none';
-  if(isSale) fillClientSelect();
+  if(isSale) resetIncClientUI();
   clearIncAccount();      // resetea cualquier abono al cambiar de bolsa
   renderIncAccounts();
   updateIncMode();
@@ -1242,22 +1260,84 @@ window.updateIncMode = function(){
   set('i-warranty-section', !abono && isSale && !servicio);   // garantía no aplica a servicio
   set('i-photos-section', !abono && isSale);                  // fotos sí (antes/después)
 };
-// Llena el selector de clientes existentes
-function fillClientSelect(){
-  const sel=document.getElementById('i-client'); if(!sel) return;
-  const cur=sel.value;
-  const opts=allClients.slice().sort((a,b)=>((a.name||'').localeCompare(b.name||'')))
-    .map(c=>`<option value="${c.id}">${(c.name||'(sin nombre)')}${c.phone?' · '+c.phone:''}</option>`).join('');
-  sel.innerHTML='<option value="">— Sin cliente —</option>'+opts;
-  sel.value=cur;
+// ---- BUSCADOR DE CLIENTE (como el buscador de afuera: ✕ + cerrar al click afuera) ----
+function incClientResults(q){
+  q=(q||'').trim().toLowerCase();
+  const box=document.getElementById('i-client-results'); if(!box) return;
+  if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+  const words=q.split(/\s+/);
+  const matches=allClients.filter(c=>{
+    const hay=((c.name||'')+' '+(c.phone||'')+' '+(c.phoneE164||'')).toLowerCase();
+    return words.every(w=>hay.indexOf(w)>=0);
+  }).sort((a,b)=>((a.name||'').localeCompare(b.name||''))).slice(0,30);
+  const rows = matches.map(c=>'<div onclick="pickIncClient(\''+c.id+'\')" style="padding:9px 10px;border-radius:8px;cursor:pointer;font-size:14px;">'+(c.name||'(sin nombre)')+(c.phone?' <span style=\'color:var(--muted);font-size:12px;\'>· '+c.phone+'</span>':'')+'</div>').join('');
+  box.style.display='';
+  box.innerHTML = (rows || '<div style="padding:9px 10px;color:var(--faint);font-size:13px;">Sin coincidencias.</div>')
+    + '<div onclick="newIncClientFromSearch()" style="padding:10px;cursor:pointer;color:var(--gold);font-weight:700;font-size:13px;border-top:1px solid var(--border);margin-top:2px;">➕ Crear cliente nuevo</div>';
+}
+window.incClientSearch=function(){
+  const inp=document.getElementById('i-client-search'), x=document.getElementById('i-client-x');
+  if(inp&&x) x.style.display = inp.value.trim()?'':'none';
+  incClientResults(inp?inp.value:'');
+};
+window.clearIncClientSearch=function(){
+  const inp=document.getElementById('i-client-search'); if(inp){ inp.value=''; inp.focus(); }
+  const x=document.getElementById('i-client-x'); if(x) x.style.display='none';
+  incClientResults('');
+};
+window.pickIncClient=function(id){
+  const c=allClients.find(x=>x.id===id); if(!c) return;
+  document.getElementById('i-client').value=id;
+  document.getElementById('i-client-pick').style.display='none';
+  document.getElementById('i-client-results').style.display='none';
+  document.getElementById('i-newclient').style.display='none';
+  document.getElementById('i-client-selected').style.display='';
+  document.getElementById('i-client-selected-label').textContent='✓ '+(c.name||'(sin nombre)')+(c.phone?' · '+c.phone:'');
+  onIncClientChange();
+};
+window.clearIncClient=function(){
+  document.getElementById('i-client').value='';
+  document.getElementById('i-client-selected').style.display='none';
+  document.getElementById('i-client-pick').style.display='';
+  const inp=document.getElementById('i-client-search'); if(inp) inp.value='';
+  document.getElementById('i-client-x').style.display='none';
+  document.getElementById('i-client-results').style.display='none';
+  onIncClientChange();
+};
+// Estado del picker al abrir la forma o cambiar de bolsa
+function resetIncClientUI(){
+  document.getElementById('i-client').value='';
+  const inp=document.getElementById('i-client-search'); if(inp) inp.value='';
+  document.getElementById('i-client-x').style.display='none';
+  document.getElementById('i-client-results').style.display='none';
+  document.getElementById('i-client-pick').style.display='';
+  document.getElementById('i-client-selected').style.display='none';
+  document.getElementById('i-newclient').style.display='none';
+  document.getElementById('i-accounts').innerHTML='';
+}
+// Si cambian los datos de clientes con la forma abierta, refresca el chip del seleccionado
+function refreshIncClientChip(){
+  const id=document.getElementById('i-client').value; if(!id) return;
+  const c=allClients.find(x=>x.id===id); if(!c) return;
+  document.getElementById('i-client-selected-label').textContent='✓ '+(c.name||'(sin nombre)')+(c.phone?' · '+c.phone:'');
 }
 window.onIncClientChange=function(){ clearIncAccount(); renderIncAccounts(); };
-window.toggleNewClient=function(){
-  const box=document.getElementById('i-newclient'); if(!box) return;
-  const show = box.style.display==='none';
-  box.style.display = show?'':'none';
-  const btn=document.getElementById('i-newclient-btn'); if(btn) btn.textContent = show?'✕ Cancelar nuevo cliente':'➕ Nuevo cliente';
-  if(show){ const sel=document.getElementById('i-client'); if(sel) sel.value=''; clearIncAccount(); renderIncAccounts(); }
+window.newIncClientFromSearch=function(){
+  const q=(document.getElementById('i-client-search').value||'').trim();
+  document.getElementById('i-client-results').style.display='none';
+  const isPhone = /\d{3}/.test(q) && /^[\d\s\-\(\)\+]+$/.test(q);
+  document.getElementById('i-nc-name').value = isPhone?'':q;
+  document.getElementById('i-nc-phone').value = isPhone?q:'';
+  document.getElementById('i-client').value='';          // se creará al guardar
+  document.getElementById('i-newclient').style.display='';
+  document.getElementById('i-client-selected').style.display='none';
+  document.getElementById('i-client-pick').style.display='';
+  clearIncAccount(); renderIncAccounts();
+  (document.getElementById(isPhone?'i-nc-name':'i-nc-phone')||{}).focus&&document.getElementById(isPhone?'i-nc-name':'i-nc-phone').focus();
+};
+window.cancelNewIncClient=function(){
+  document.getElementById('i-newclient').style.display='none';
+  document.getElementById('i-nc-name').value=''; document.getElementById('i-nc-phone').value='';
 };
 // ---- CUENTAS ABIERTAS (por cobrar) del cliente ----
 function acctBalanceCents(a){ return Math.max(0, (Number(a.totalCents)||0) - (a.abonos||[]).reduce((s,p)=>s+(Number(p.amountCents)||0),0)); }
@@ -1326,9 +1406,7 @@ window.cobrarDesdePanel=function(clientId, acctId, mode){
   openInc();
   document.getElementById('i-dept').value = a.dept||'parts';
   onIncDeptChange();
-  fillClientSelect();
-  document.getElementById('i-client').value = clientId;
-  onIncClientChange();
+  pickIncClient(clientId);        // fija el cliente y muestra su chip + cuentas
   selectIncAccount(acctId, mode);
 };
 
@@ -1499,11 +1577,8 @@ window.openInc = function(){
   document.getElementById('i-method').value='cash';
   document.getElementById('i-note').value='';
   document.getElementById('i-warranty').value='0';
-  document.getElementById('i-client').value='';
   document.getElementById('i-nc-name').value=''; document.getElementById('i-nc-phone').value='';
-  document.getElementById('i-newclient').style.display='none';
-  document.getElementById('i-newclient-btn').textContent='➕ Nuevo cliente';
-  document.getElementById('i-accounts').innerHTML='';
+  resetIncClientUI();   // buscador de cliente en estado limpio (sin selección)
   document.getElementById('i-photos').value=''; document.getElementById('i-photos-preview').innerHTML='';
   applyDeptRestriction('i-dept'); onIncDeptChange();   // arma categorías, secciones cliente/cuentas y modo
   document.getElementById('inc-overlay').classList.add('open');
@@ -1547,6 +1622,13 @@ window.clearMovSearch=function(){ const i=document.getElementById('mov-search');
 document.addEventListener('click', function(e){
   const res=document.getElementById('mov-results'); if(!res || res.style.display==='none') return;
   const wrap=document.getElementById('mov-search-wrap');
+  if((wrap && wrap.contains(e.target)) || res.contains(e.target)) return;
+  res.style.display='none';
+});
+// Igual para el buscador de cliente (dentro de ＋Ingreso)
+document.addEventListener('click', function(e){
+  const res=document.getElementById('i-client-results'); if(!res || res.style.display==='none') return;
+  const wrap=document.getElementById('i-client-search-wrap');
   if((wrap && wrap.contains(e.target)) || res.contains(e.target)) return;
   res.style.display='none';
 });
