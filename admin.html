@@ -679,6 +679,12 @@ function toE164(phone){
   if(d.length===11 && d[0]==='1') return '+'+d;
   return d ? '+'+d : '';
 }
+// Firestore rechaza valores undefined: quita cualquier campo undefined (también en arreglos/objetos anidados).
+function cleanUndef(o){
+  if(Array.isArray(o)) return o.map(cleanUndef);
+  if(o && typeof o==='object'){ const r={}; for(const k in o){ const v=cleanUndef(o[k]); if(v!==undefined) r[k]=v; } return r; }
+  return o;
+}
 
 window.adminLogin = async function() {
   const email = (document.getElementById('admin-email').value||'').trim().toLowerCase();
@@ -1247,7 +1253,7 @@ window.saveAppt = async function(){
   } else {
     const c=clients.find(x=>x.id===v);
     if(!c){ alert('Selecciona un cliente.'); return; }
-    clientId=c.id; clientName=c.name; phone=c.phone||''; lang=document.getElementById('appt-lang').value;
+    clientId=c.id; clientName=c.name||''; phone=c.phone||''; lang=(document.getElementById('appt-lang').value||c.lang||'es');
     if(carLabel||vin) await addVehicleToClient(clientId, {vin, label:carLabel});
   }
   const existing=document.getElementById('appt-id').value;
@@ -1257,7 +1263,7 @@ window.saveAppt = async function(){
     confirmSent: existing?(prior.confirmSent||false):false, reminderSent: existing?(prior.reminderSent||false):false,
     createdBy: prior.createdBy||who, createdAt: prior.createdAt||new Date().toISOString(), updatedBy:who, updatedAt:new Date().toISOString() };
   try{
-    await setDoc(doc(db,'appointments',id), data);
+    await setDoc(doc(db,'appointments',id), cleanUndef(data));
     if(time){ try{ await setDoc(doc(db,'availability',date), { taken: arrayUnion(time) }, {merge:true}); }catch(e){} }
     closeModal('appt-modal');
     if(!existing && phone && confirm('Cita guardada ✅\n\n¿Enviar confirmación por SMS ahora?')){
