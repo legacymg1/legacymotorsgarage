@@ -6,13 +6,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Legacy · Yarda</title>
+<title>Legacy Warehouse</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0b0e14">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Yarda">
+<meta name="apple-mobile-web-app-title" content="Warehouse">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root{ --bg:#0b0e14; --surface:#12161f; --surface2:#1a1f2e; --border:rgba(255,255,255,0.09); --text:#e7ebf3; --muted:#95a0b5; --faint:#5b6577; --gold:#f0c040; --green:#3ecf8e; --red:#ff6b6b; }
@@ -50,7 +50,7 @@
 
 <div id="login">
   <div class="card" style="max-width:360px;width:100%;">
-    <div class="title" style="margin-bottom:4px;">🔧 Legacy · Yarda</div>
+    <div class="title" style="margin-bottom:4px;">🏭 Legacy Warehouse</div>
     <div class="sub" style="margin-bottom:16px;">Acceso del equipo</div>
     <label>Correo</label><input id="l-email" type="email" autocomplete="username">
     <label>Contraseña</label><input id="l-pass" type="password" autocomplete="current-password">
@@ -61,7 +61,7 @@
 
 <div id="app" class="wrap" style="display:none;">
   <div class="head">
-    <div><div class="title">🔧 Yarda</div><div class="sub" id="who"></div></div>
+    <div><div class="title">🏭 Warehouse</div><div class="sub" id="who"></div></div>
     <button class="btn ghost sm" onclick="doLogout()">Salir</button>
   </div>
   <div class="tabs" id="tabs"></div>
@@ -173,7 +173,7 @@ onAuthStateChanged(auth,(user)=>{
     if(user && !role){ document.getElementById('l-err').textContent='Esta cuenta no tiene acceso a Yarda.'; signOut(auth); }
   }
 });
-function roleLabel(r){ return r==='owner'?'Dueño':r==='yard'?'Yarda':r==='lister'?'Listado':r==='packager'?'Empaque':''; }
+function roleLabel(r){ return r==='owner'?'Dueño':r==='yard'?'Captura':r==='lister'?'Listado':r==='packager'?'Empaque':''; }
 
 // ---- TABS (solo dueño ve las 3) ----
 let _view='yard';
@@ -181,7 +181,7 @@ function buildTabs(){
   const box=document.getElementById('tabs');
   if(role!=='owner'){ box.style.display='none'; return; }
   box.style.display='flex';
-  box.innerHTML=[['yard','🔧 Yarda'],['lister','🏷️ Listado'],['pack','📦 Empaque']]
+  box.innerHTML=[['yard','🔧 Captura'],['lister','🏷️ Listado'],['pack','📦 Empaque']]
     .map(([k,l])=>`<div class="tab${_view===k?' on':''}" onclick="setView('${k}')">${l}</div>`).join('');
 }
 window.setView=function(k){
