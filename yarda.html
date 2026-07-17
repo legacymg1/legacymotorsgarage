@@ -82,7 +82,10 @@
         <div><label>Modelo</label><input id="v-model"></div>
       </div>
       <div class="row2">
+        <div><label>Millas (si se sabe)</label><input id="v-miles" type="number" inputmode="numeric" placeholder="Ej. 145000"></div>
         <div><label>Motor (opcional)</label><input id="v-engine"></div>
+      </div>
+      <div class="row2">
         <div><label>Color</label><input id="v-color" placeholder="Ej. Blanco"></div>
         <div><label>Código de color (opc.)</label><input id="v-colorcode"></div>
       </div>
@@ -227,9 +230,10 @@ window.saveVehicle=async function(){
   const id='veh_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
   try{
     await setDoc(doc(db,'dismantle_vehicles',id), { entryId:id, vin, year, make, model,
+      miles:document.getElementById('v-miles').value.trim(),
       engine:document.getElementById('v-engine').value.trim(), color:titleCase(document.getElementById('v-color').value.trim()), colorCode:document.getElementById('v-colorcode').value.trim().toUpperCase(),
       status:'desmantelando', createdAt:new Date().toISOString(), createdBy:myEmail });
-    ['v-vin','v-year','v-make','v-model','v-engine','v-color','v-colorcode'].forEach(x=>document.getElementById(x).value='');
+    ['v-vin','v-year','v-make','v-model','v-miles','v-engine','v-color','v-colorcode'].forEach(x=>document.getElementById(x).value='');
     document.getElementById('v-decode-msg').textContent='';
     _selVeh=id;
   }catch(e){ alert('Error: '+e.message); }
@@ -252,7 +256,7 @@ function renderVehicles(){
     }
     return `<div class="card" style="margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;" onclick="selVeh('${v.id}')">
-        <div><div style="font-weight:800;">${vehLabel(v)}</div><div class="sub">${v.color||''}${v.vin?' · VIN '+v.vin.slice(-6):''} · ${vp.length} parte(s)</div></div>
+        <div><div style="font-weight:800;">${vehLabel(v)}</div><div class="sub">${v.color||''}${v.miles?' · '+Number(v.miles).toLocaleString()+' mi':''}${v.vin?' · VIN '+v.vin.slice(-6):''} · ${vp.length} parte(s)</div></div>
         <span class="gold">${open?'▾':'▸'}</span>
       </div>${inner}</div>`;
   }).join('');
@@ -320,7 +324,7 @@ window.savePart=async function(vid){
     const toper=(document.getElementById('p-toper-'+vid).value||'').trim();
     const ebayTitle=[v.year,v.make,v.model,name,(num?'OEM '+num:''), '-', cond].filter(Boolean).join(' ').replace(' - -',' -');
     await setDoc(doc(db,'parts',id), { entryId:id, vehicleId:vid, vehicleLabel:vehLabel(v),
-      vYear:v.year||'', vMake:v.make||'', vModel:v.model||'',
+      vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vMiles:v.miles||'',
       name, partNumber:num, condition:cond, notes:'', photoURLs, qrURL, ebayTitle,
       status:'disponible', priceCents:null, location:{rack,toper},
       createdAt:new Date().toISOString(), createdBy:myEmail });
