@@ -570,22 +570,42 @@
 <!-- EXPENSE SHEET -->
 <div class="overlay" id="exp-overlay">
   <div class="sheet">
-    <div class="sheet-head"><div class="sheet-title">Registrar gasto</div><button class="close" onclick="closeExp()">✕</button></div>
-    <div class="row2">
-      <div class="field"><label>Monto ($)</label><input id="e-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
-      <div class="field"><label>Fecha</label><input id="e-date" type="date"></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Cuenta / Bolsa</label>
-        <select id="e-dept" onchange="onDeptChange()">
+    <div class="sheet-head" style="align-items:flex-start;">
+      <div class="sheet-title">Registrar gasto</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <select id="e-dept" onchange="onDeptChange()" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;color:var(--text);font-size:14px;">
           <option value="dealer">🚗 Dealer</option>
           <option value="parts">🔧 Partes</option>
           <option value="ebay">📦 eBay</option>
         </select>
+        <button class="close" onclick="closeExp()">✕</button>
       </div>
-      <div class="field"><label>Categoría</label><select id="e-cat" onchange="onExpCatChange()"></select></div>
     </div>
-    <div class="field" id="e-car-row"><label>Carro (opcional — para saber cuánto cuesta)</label><select id="e-car"></select></div>
+    <div class="row2">
+      <div class="field"><label>Monto ($)</label><input id="e-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
+      <div class="field"><label>Fecha</label><input id="e-date" type="date"></div>
+    </div>
+    <div class="field"><label>Categoría</label><select id="e-cat" onchange="onExpCatChange()"></select></div>
+
+    <!-- Vehículo (buscador + lista, opcional) -->
+    <div class="field" id="e-car-row">
+      <label>Carro (opcional — para saber cuánto cuesta)</label>
+      <input type="hidden" id="e-car">
+      <div id="e-car-pick">
+        <div id="e-car-search-wrap" style="position:relative;">
+          <input id="e-car-search" oninput="expCarSearch()" onfocus="expCarSearch()" autocomplete="off" placeholder="🔎 Buscar carro (o toca para ver la lista)…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 40px 11px 12px;color:var(--text);font-size:14px;">
+          <span id="e-car-x" onclick="clearExpCarSearch()" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--border);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;user-select:none;">✕</span>
+        </div>
+        <div id="e-car-results" style="display:none;margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;max-height:38vh;overflow-y:auto;"></div>
+      </div>
+      <div id="e-car-selected" style="display:none;background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:11px 12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <span id="e-car-selected-label" style="font-weight:700;color:#f0c040;font-size:14px;"></span>
+          <span onclick="clearExpCar()" style="cursor:pointer;color:var(--faint);font-size:12px;white-space:nowrap;">✕ quitar</span>
+        </div>
+      </div>
+    </div>
+
     <div class="row2">
       <div class="field"><label>Método de pago</label>
         <select id="e-method">
@@ -723,9 +743,11 @@ function startListening(){
 }
 
 // ---------- GASTOS (LIBRO) ----------
+// Dealer y Partes: MISMA lista, en el orden que pidió Enrique. eBay conserva la suya.
+const _EXP_CATS_SHARED = ['Reparación / Reacondicionamiento','Partes no inventario','Gasolinas','Servicios (agua, luz, etc.)','Comisión a empleados','Suministros','Herramientas','Renta','DMV / Título / Registración','Comisión del procesador','Publicidad','Otro'];
 const EXP_CATS = {
-  dealer: ['Compra de vehículo','Reparación / Reacondicionamiento','Partes para reparación','Transporte / Traída','DMV / Título / Registración','Publicidad','Comisión del procesador','Suministros','Renta / Local','Servicios (luz, internet)','Gasolina','Comisión','Otro'],
-  parts:  ['Partes para carro en venta','Reparación / Reacondicionamiento','Compra de parte / inventario','Envío / Freight','Suministros','Renta / Local','Servicios','Gasolina','Comisión','Otro'],
+  dealer: _EXP_CATS_SHARED,
+  parts:  _EXP_CATS_SHARED,
   ebay:   ['Sueldos','Compra de parte','Envío / Freight','Comisión eBay / PayPal','Devolución / Reembolso','Suministros','Otro']
 };
 const DEPT_LABEL = { dealer:'🚗 Dealer', parts:'🔧 Partes', ebay:'📦 eBay' };
@@ -764,23 +786,57 @@ function loadInventory(){
     populateCarPicker();
   }, function(e){ console.log('inv load', e); });
 }
+function carLabelOf(c){ return '#'+(c.inventoryNum||'?')+' · '+[c.year,c.make,c.model].filter(Boolean).join(' '); }
 function populateCarPicker(){
-  const sel=document.getElementById('e-car'); if(!sel) return;
-  const opts=['<option value="">— Ninguno (gasto general) —</option>'];
-  [...inventory].sort((a,b)=>(parseInt(b.inventoryNum)||0)-(parseInt(a.inventoryNum)||0)).forEach(c=>{
-    opts.push(`<option value="${c.id}">#${c.inventoryNum||'?'} · ${c.year||''} ${c.make||''} ${c.model||''}</option>`);
-  });
-  sel.innerHTML=opts.join('');
+  // Con inventario en vivo: refresca el desplegable si está abierto y el chip del carro elegido
+  const res=document.getElementById('e-car-results');
+  if(res && res.style.display!=='none') expCarSearch();
+  const car=document.getElementById('e-car'); const id=car&&car.value;
+  if(id){ const c=inventory.find(x=>x.id===id); const el=document.getElementById('e-car-selected-label'); if(c&&el) el.textContent=carLabelOf(c); }
 }
+// Buscador de carro (escribe o hace scroll; ✕ y cerrar al click afuera, como el otro)
+window.expCarSearch=function(){
+  const inp=document.getElementById('e-car-search'), x=document.getElementById('e-car-x'), box=document.getElementById('e-car-results');
+  if(!inp||!box) return;
+  const q=(inp.value||'').trim().toLowerCase();
+  if(x) x.style.display=q?'':'none';
+  const words=q?q.split(/\s+/):[];
+  const list=[...inventory].sort((a,b)=>(parseInt(b.inventoryNum)||0)-(parseInt(a.inventoryNum)||0)).filter(c=>{
+    if(!words.length) return true;
+    const hay=('#'+(c.inventoryNum||'')+' '+[c.year,c.make,c.model,c.color,c.vin].filter(Boolean).join(' ')).toLowerCase();
+    return words.every(w=>hay.indexOf(w)>=0);
+  }).slice(0,60);
+  box.style.display='';
+  box.innerHTML = list.map(c=>'<div onclick="pickExpCar(\''+c.id+'\')" style="padding:9px 10px;border-radius:8px;cursor:pointer;font-size:14px;">'+carLabelOf(c)+'</div>').join('') || '<div style="padding:9px 10px;color:var(--faint);font-size:13px;">Sin carros que coincidan.</div>';
+};
+window.clearExpCarSearch=function(){ const inp=document.getElementById('e-car-search'); if(inp){ inp.value=''; inp.focus(); } const x=document.getElementById('e-car-x'); if(x) x.style.display='none'; expCarSearch(); };
+window.pickExpCar=function(id){
+  const c=inventory.find(x=>x.id===id); if(!c) return;
+  const car=document.getElementById('e-car'); car.value=id; car.dataset.label=carLabelOf(c);
+  document.getElementById('e-car-pick').style.display='none';
+  document.getElementById('e-car-results').style.display='none';
+  document.getElementById('e-car-selected').style.display='';
+  document.getElementById('e-car-selected-label').textContent=carLabelOf(c);
+};
+window.clearExpCar=function(){
+  const car=document.getElementById('e-car'); if(car){ car.value=''; car.dataset.label=''; }
+  const s=document.getElementById('e-car-selected'); if(s) s.style.display='none';
+  const p=document.getElementById('e-car-pick'); if(p) p.style.display='';
+  const inp=document.getElementById('e-car-search'); if(inp) inp.value='';
+  const x=document.getElementById('e-car-x'); if(x) x.style.display='none';
+  const res=document.getElementById('e-car-results'); if(res) res.style.display='none';
+};
 window.onDeptChange = function(){
   const dept=document.getElementById('e-dept').value;
   const cat=document.getElementById('e-cat');
-  cat.innerHTML=(EXP_CATS[dept]||[]).map(c=>`<option>${c}</option>`).join('');
+  // arranca en "Elegir categoría" (placeholder) para que no se quede la última seleccionada
+  cat.innerHTML='<option value="" disabled selected>— Elegir categoría —</option>'+(EXP_CATS[dept]||[]).map(c=>`<option>${c}</option>`).join('');
   document.getElementById('e-car-row').style.display = (dept==='dealer'||dept==='parts') ? 'block':'none';
+  clearExpCar();
 };
 window.onExpCatChange = function(){
   // Las comisiones se pagan por Zelle desde el banco → método por defecto
-  if(document.getElementById('e-cat').value==='Comisión'){ document.getElementById('e-method').value='zelle'; }
+  if(document.getElementById('e-cat').value==='Comisión a empleados'){ document.getElementById('e-method').value='zelle'; }
 };
 window.previewReceipt = function(){
   const f=document.getElementById('e-receipt').files[0]; const box=document.getElementById('e-receipt-preview');
@@ -808,12 +864,13 @@ window.saveExp = async function(){
   if(!date){ alert('Pon la fecha'); return; }
   const dept=document.getElementById('e-dept').value;
   const category=document.getElementById('e-cat').value;
+  if(!category){ alert('Elige una categoría'); return; }
   const method=document.getElementById('e-method').value;
   const vendor=document.getElementById('e-vendor').value.trim();
   const note=document.getElementById('e-note').value.trim();
-  const carSel=document.getElementById('e-car');
-  const carId=((dept==='dealer'||dept==='parts') && carSel)?carSel.value:'';
-  const carLabel=carId?(carSel.options[carSel.selectedIndex]?.text||''):'';
+  const carEl=document.getElementById('e-car');
+  const carId=((dept==='dealer'||dept==='parts') && carEl)?carEl.value:'';
+  const carLabel=carId?((carEl.dataset&&carEl.dataset.label)||''):'';
   const btn=document.getElementById('exp-save'); btn.disabled=true; btn.textContent='Guardando…';
   const id='exp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   try{
@@ -1229,7 +1286,7 @@ window.onIncDeptChange = function(){
   const d=document.getElementById('i-dept').value;
   const cats=INCOME_CATS[d]||[];
   document.getElementById('i-cat').innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
-  document.getElementById('i-private').checked=/privada/i.test(cats[0]||'');
+  document.getElementById('i-private').checked = (d==='parts');   // Partes (Ivan) → privada ON por default; Dealer/eBay OFF
   const isSale = (d==='dealer'||d==='parts');   // Cliente + cuentas abiertas para Dealer y Partes
   const cs=document.getElementById('i-client-section'); if(cs) cs.style.display=isSale?'':'none';
   if(isSale) resetIncClientUI();
@@ -1238,8 +1295,7 @@ window.onIncDeptChange = function(){
   updateIncMode();
 };
 window.onIncCatChange = function(){
-  // la privada se define por la categoría elegida (marca o desmarca)
-  document.getElementById('i-private').checked = /privada/i.test(document.getElementById('i-cat').value);
+  // la privada la controla la bolsa (default) + el switch manual; la categoría ya no la toca
   updateIncMode();
 };
 // Decide qué campos se ven: abono a cuenta / venta a pagos (cuenta nueva) / ingreso normal
@@ -1629,6 +1685,13 @@ document.addEventListener('click', function(e){
 document.addEventListener('click', function(e){
   const res=document.getElementById('i-client-results'); if(!res || res.style.display==='none') return;
   const wrap=document.getElementById('i-client-search-wrap');
+  if((wrap && wrap.contains(e.target)) || res.contains(e.target)) return;
+  res.style.display='none';
+});
+// Igual para el buscador de carro (dentro de ＋Gasto)
+document.addEventListener('click', function(e){
+  const res=document.getElementById('e-car-results'); if(!res || res.style.display==='none') return;
+  const wrap=document.getElementById('e-car-search-wrap');
   if((wrap && wrap.contains(e.target)) || res.contains(e.target)) return;
   res.style.display='none';
 });
