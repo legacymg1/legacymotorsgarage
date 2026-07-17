@@ -1,6 +1,6 @@
 {
-  "name": "Legacy Finanzas",
-  "short_name": "Finanzas",
+  "name": "Legacy DMS",
+  "short_name": "Legacy",
   "start_url": "finanzas.html",
   "scope": "./",
   "display": "standalone",
