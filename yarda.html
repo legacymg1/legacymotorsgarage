@@ -140,6 +140,7 @@ const db=getFirestore(app); const storage=getStorage(app); const auth=getAuth(ap
 const ROLE_BY_EMAIL={
   'ev@legacymotorsgarage.com':'owner',
   'ivan.garcia@legacymotorsgarage.com':'owner',
+  'warehouse@legacymotorsgarage.com':'warehouse',   // cuenta general del almacén (scanner): ve las 3 pestañas, nada de finanzas
   'yarda@legacymotorsgarage.com':'yard',
   'ebay@legacymotorsgarage.com':'lister',
   'empaque@legacymotorsgarage.com':'packager'
@@ -176,13 +177,13 @@ onAuthStateChanged(auth,(user)=>{
     if(user && !role){ document.getElementById('l-err').textContent='Esta cuenta no tiene acceso a Yarda.'; signOut(auth); }
   }
 });
-function roleLabel(r){ return r==='owner'?'Dueño':r==='yard'?'Captura':r==='lister'?'Listado':r==='packager'?'Empaque':''; }
+function roleLabel(r){ return r==='owner'?'Dueño':r==='warehouse'?'Almacén':r==='yard'?'Captura':r==='lister'?'Listado':r==='packager'?'Empaque':''; }
 
 // ---- TABS (solo dueño ve las 3) ----
 let _view='yard';
 function buildTabs(){
   const box=document.getElementById('tabs');
-  if(role!=='owner'){ box.style.display='none'; return; }
+  if(role!=='owner' && role!=='warehouse'){ box.style.display='none'; return; }   // almacén general también ve las 3 pestañas
   box.style.display='flex';
   box.innerHTML=[['yard','🔧 Captura'],['lister','🏷️ Listado'],['pack','📦 Empaque']]
     .map(([k,l])=>`<div class="tab${_view===k?' on':''}" onclick="setView('${k}')">${l}</div>`).join('');
