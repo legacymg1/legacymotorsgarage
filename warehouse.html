@@ -75,7 +75,7 @@
     <div class="card" style="margin-bottom:14px;">
       <div style="font-weight:800;margin-bottom:6px;" data-i18n="addCar">➕ Carro a desmantelar</div>
       <label>VIN</label>
-      <input id="v-vin" data-i18n-ph="vinPh" placeholder="1FT... (17 dígitos)" style="text-transform:uppercase;">
+      <input id="v-vin" data-i18n-ph="vinPh" placeholder="1FT... (17 dígitos)" style="text-transform:uppercase;" onkeydown="if(event.key==='Enter')decodeVin()">
       <div class="row2" style="margin-top:8px;">
         <button class="btn ghost sm" onclick="scanVin()" data-i18n="scanVinBtn">📠 Escanear VIN</button>
         <button class="btn ghost sm" onclick="decodeVin()" data-i18n="decodeBtn">🔎 Decodificar</button>
