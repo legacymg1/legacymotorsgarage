@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Legacy Warehouse</title>
+<link rel="manifest" href="manifest-warehouse.json">
+<meta name="theme-color" content="#0b0e14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Warehouse">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root{ --bg:#0b0e14; --surface:#12161f; --surface2:#1a1f2e; --border:rgba(255,255,255,0.09); --text:#e7ebf3; --muted:#95a0b5; --faint:#5b6577; --gold:#f0c040; --green:#3ecf8e; --red:#ff6b6b; }
+  *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-text-size-adjust:100%;}
+  .wrap{max-width:760px;margin:0 auto;padding:16px 16px 90px;}
+  #login{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% -10%,#161d2e,var(--bg) 55%);}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;}
+  input,select,textarea{width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:15px;}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px;}
+  .btn{background:var(--gold);color:#0b0e14;border:none;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:800;cursor:pointer;}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border);font-weight:600;}
+  .btn.sm{padding:7px 11px;font-size:13px;}
+  .btn.green{background:rgba(62,207,142,0.15);color:var(--green);border:1px solid var(--green);}
+  .row2{display:flex;gap:10px;flex-wrap:wrap;} .row2>*{flex:1;min-width:130px;}
+  .title{font-size:24px;font-weight:800;letter-spacing:-.4px;}
+  .sub{color:var(--muted);font-size:13px;}
+  .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px;}
+  .tag.dispon{background:rgba(240,192,64,.14);color:var(--gold);}
+  .tag.public{background:rgba(62,207,142,.14);color:var(--green);}
+  .tag.vend{background:rgba(255,107,107,.14);color:var(--red);}
+  .chip{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:2px 8px;font-size:12px;color:var(--muted);}
+  .tabs{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap;}
+  .tab{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;color:var(--muted);}
+  .tab.on{background:var(--gold);color:#0b0e14;border-color:var(--gold);}
+  .part{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;}
+  .thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;} .thumbs img{width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
+  .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;}
+  .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
+  .qrbox{background:#fff;padding:8px;border-radius:8px;display:inline-block;}
+  .qrbox img{display:block;width:130px;height:130px;image-rendering:pixelated;}
+  a{color:var(--gold);}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="card" style="max-width:360px;width:100%;">
+    <div class="title" style="margin-bottom:4px;">🏭 Legacy Warehouse</div>
+    <div class="sub" style="margin-bottom:16px;">Acceso del equipo</div>
+    <label>Correo</label><input id="l-email" type="email" autocomplete="username">
+    <label>Contraseña</label><input id="l-pass" type="password" autocomplete="current-password">
+    <div id="l-err" style="color:var(--red);font-size:13px;min-height:18px;margin:8px 0;"></div>
+    <button class="btn" style="width:100%;" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<div id="app" class="wrap" style="display:none;">
+  <div class="head">
+    <div><div class="title">🏭 Warehouse</div><div class="sub" id="who"></div></div>
+    <button class="btn ghost sm" onclick="doLogout()">Salir</button>
+  </div>
+  <div class="tabs" id="tabs"></div>
+
+  <!-- ===================== VISTA YARDA (captura) ===================== -->
+  <div id="view-yard" style="display:none;">
+    <div class="card" style="margin-bottom:14px;">
+      <div style="font-weight:800;margin-bottom:6px;">➕ Carro a desmantelar</div>
+      <label>VIN</label>
+      <div class="row2">
+        <input id="v-vin" placeholder="1FT... (17 dígitos)" style="text-transform:uppercase;">
+        <button class="btn ghost sm" style="flex:0 0 auto;" onclick="decodeVin()">🔎 Decodificar VIN</button>
+      </div>
+      <div id="v-decode-msg" class="sub" style="margin-top:4px;"></div>
+      <div class="row2" style="margin-top:6px;">
+        <div><label>Año</label><input id="v-year"></div>
+        <div><label>Marca</label><input id="v-make"></div>
+        <div><label>Modelo</label><input id="v-model"></div>
+      </div>
+      <div class="row2">
+        <div><label>Millas (si se sabe)</label><input id="v-miles" type="number" inputmode="numeric" placeholder="Ej. 145000"></div>
+        <div><label>Motor (opcional)</label><input id="v-engine"></div>
+      </div>
+      <div class="row2">
+        <div><label>Color</label><input id="v-color" placeholder="Ej. Blanco"></div>
+        <div><label>Código de color (opc.)</label><input id="v-colorcode"></div>
+      </div>
+      <button class="btn" style="width:100%;margin-top:12px;" id="v-save" onclick="saveVehicle()">Guardar carro</button>
+    </div>
+
+    <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin:8px 2px;">Carros en desmantelamiento</div>
+    <div id="veh-list"></div>
+  </div>
+
+  <!-- ===================== VISTA LISTADO (esposa) ===================== -->
+  <div id="view-lister" style="display:none;">
+    <div class="sub" style="margin-bottom:10px;">Partes listas para publicar. Toca una para copiar los campos, ver precios "sold" y marcar publicada.</div>
+    <input id="lister-search" placeholder="🔎 Buscar parte / carro…" oninput="renderLister()" style="margin-bottom:12px;">
+    <div id="lister-list"></div>
+  </div>
+
+  <!-- ===================== VISTA EMPAQUE (papá) ===================== -->
+  <div id="view-pack" style="display:none;">
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:800;margin-bottom:6px;">📦 Escanear / buscar parte</div>
+      <div class="sub" style="margin-bottom:8px;">Escanea el QR (o pega/teclea el código) para ver dónde está y cambiar su ubicación.</div>
+      <div class="row2">
+        <input id="scan-input" placeholder="Escanea o pega el código…" onkeydown="if(event.key==='Enter')scanLookup()">
+        <button class="btn sm" style="flex:0 0 auto;" onclick="scanLookup()">Buscar</button>
+      </div>
+      <button class="btn ghost sm" style="margin-top:8px;" onclick="startCamScan()">📷 Escanear con cámara</button>
+      <video id="cam" playsinline style="display:none;width:100%;border-radius:10px;margin-top:8px;"></video>
+    </div>
+    <div id="pack-result"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
+  authDomain: "legacy-motors-garage.firebaseapp.com",
+  projectId: "legacy-motors-garage",
+  storageBucket: "legacy-motors-garage.firebasestorage.app",
+  messagingSenderId: "783567672493",
+  appId: "1:783567672493:web:3a825f2f59ec1c25e9a224"
+};
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app); const storage=getStorage(app); const auth=getAuth(app);
+
+// ---- ROLES por correo ----
+const ROLE_BY_EMAIL={
+  'ev@legacymotorsgarage.com':'owner',
+  'ivan.garcia@legacymotorsgarage.com':'owner',
+  'warehouse@legacymotorsgarage.com':'warehouse',   // cuenta general del almacén (scanner): ve las 3 pestañas, nada de finanzas
+  'yarda@legacymotorsgarage.com':'yard',
+  'ebay@legacymotorsgarage.com':'lister',
+  'empaque@legacymotorsgarage.com':'packager'
+};
+const CONDICIONES=['Usado - Excelente','Usado - Bueno','Usado - Regular','Para partes / No funciona','Nuevo (NOS)'];
+let role='', myEmail='';
+let vehicles=[], parts=[], _selVeh='';
+
+// ---- AUTH ----
+window.doLogin=async function(){
+  const email=(document.getElementById('l-email').value||'').trim().toLowerCase();
+  const pass=document.getElementById('l-pass').value; const err=document.getElementById('l-err'); err.textContent='';
+  if(!email||!pass){ err.textContent='Escribe correo y contraseña'; return; }
+  try{ await signInWithEmailAndPassword(auth,email,pass); }
+  catch(e){ err.textContent = (e.code==='auth/too-many-requests')?'Demasiados intentos, espera.':'Correo o contraseña incorrectos'; }
+};
+window.doLogout=function(){ signOut(auth); };
+
+onAuthStateChanged(auth,(user)=>{
+  const email=((user&&user.email)||'').toLowerCase();
+  role = user ? (ROLE_BY_EMAIL[email]||'') : '';
+  myEmail = email;
+  if(user && role){
+    document.getElementById('login').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('who').textContent = email+' · '+roleLabel(role);
+    buildTabs();
+    if(!_listening){ _listening=true; startListening(); }
+    // vista inicial según rol
+    setView(role==='owner'?'yard':(role==='yard'?'yard':role==='lister'?'lister':'pack'));
+  } else {
+    document.getElementById('app').style.display='none';
+    document.getElementById('login').style.display='flex';
+    if(user && !role){ document.getElementById('l-err').textContent='Esta cuenta no tiene acceso a Yarda.'; signOut(auth); }
+  }
+});
+function roleLabel(r){ return r==='owner'?'Dueño':r==='warehouse'?'Almacén':r==='yard'?'Captura':r==='lister'?'Listado':r==='packager'?'Empaque':''; }
+
+// ---- TABS (solo dueño ve las 3) ----
+let _view='yard';
+function buildTabs(){
+  const box=document.getElementById('tabs');
+  if(role!=='owner' && role!=='warehouse'){ box.style.display='none'; return; }   // almacén general también ve las 3 pestañas
+  box.style.display='flex';
+  box.innerHTML=[['yard','🔧 Captura'],['lister','🏷️ Listado'],['pack','📦 Empaque']]
+    .map(([k,l])=>`<div class="tab${_view===k?' on':''}" onclick="setView('${k}')">${l}</div>`).join('');
+}
+window.setView=function(k){
+  _view=k; buildTabs();
+  document.getElementById('view-yard').style.display   = k==='yard'?'':'none';
+  document.getElementById('view-lister').style.display = k==='lister'?'':'none';
+  document.getElementById('view-pack').style.display   = k==='pack'?'':'none';
+  if(k==='yard') renderVehicles();
+  if(k==='lister') renderLister();
+};
+
+// ---- DATA ----
+let _listening=false;
+function startListening(){
+  onSnapshot(collection(db,'dismantle_vehicles'), s=>{ vehicles=s.docs.map(d=>({id:d.id,...d.data()})); if(_view==='yard') renderVehicles(); }, e=>console.log('veh',e));
+  onSnapshot(collection(db,'parts'), s=>{ parts=s.docs.map(d=>({id:d.id,...d.data()})); if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); }, e=>console.log('parts',e));
+}
+
+// ---- VIN decode (NHTSA, gratis) ----
+window.decodeVin=async function(){
+  const vin=(document.getElementById('v-vin').value||'').trim().toUpperCase();
+  const msg=document.getElementById('v-decode-msg');
+  if(vin.length<11){ msg.textContent='El VIN se ve corto (deben ser ~17).'; return; }
+  msg.textContent='Decodificando…';
+  try{
+    const r=await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/'+encodeURIComponent(vin)+'?format=json');
+    const j=await r.json(); const g=k=>{ const it=(j.Results||[]).find(x=>x.Variable===k); return (it&&it.Value)||''; };
+    const year=g('Model Year'), make=g('Make'), model=g('Model'), engine=[g('Displacement (L)'),g('Engine Number of Cylinders')&&g('Engine Number of Cylinders')+' cil',g('Fuel Type - Primary')].filter(Boolean).join(' ');
+    if(year) document.getElementById('v-year').value=year;
+    if(make) document.getElementById('v-make').value=titleCase(make);
+    if(model) document.getElementById('v-model').value=titleCase(model);
+    if(engine) document.getElementById('v-engine').value=engine.trim();
+    msg.textContent = (year||make||model) ? '✓ Datos rellenados — revisa y corrige si hace falta.' : 'No se encontró info de ese VIN; captura a mano.';
+  }catch(e){ msg.textContent='No se pudo decodificar (sin internet o VIN inválido). Captura a mano.'; }
+};
+function titleCase(s){ return String(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); }
+
+window.saveVehicle=async function(){
+  const vin=(document.getElementById('v-vin').value||'').trim().toUpperCase();
+  const year=document.getElementById('v-year').value.trim(), make=titleCase(document.getElementById('v-make').value.trim()), model=titleCase(document.getElementById('v-model').value.trim());
+  if(!make&&!model&&!vin){ alert('Pon al menos VIN o marca/modelo.'); return; }
+  const btn=document.getElementById('v-save'); btn.disabled=true; btn.textContent='Guardando…';
+  const id='veh_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+  try{
+    await setDoc(doc(db,'dismantle_vehicles',id), { entryId:id, vin, year, make, model,
+      miles:document.getElementById('v-miles').value.trim(),
+      engine:document.getElementById('v-engine').value.trim(), color:titleCase(document.getElementById('v-color').value.trim()), colorCode:document.getElementById('v-colorcode').value.trim().toUpperCase(),
+      status:'desmantelando', createdAt:new Date().toISOString(), createdBy:myEmail });
+    ['v-vin','v-year','v-make','v-model','v-miles','v-engine','v-color','v-colorcode'].forEach(x=>document.getElementById(x).value='');
+    document.getElementById('v-decode-msg').textContent='';
+    _selVeh=id;
+  }catch(e){ alert('Error: '+e.message); }
+  btn.disabled=false; btn.textContent='Guardar carro';
+};
+
+function vehLabel(v){ return [v.year,v.make,v.model].filter(Boolean).join(' ')||('VIN '+(v.vin||'').slice(-6))||'Carro'; }
+function renderVehicles(){
+  const box=document.getElementById('veh-list'); if(!box) return;
+  const list=vehicles.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  if(!list.length){ box.innerHTML='<div class="sub" style="padding:8px 2px;">Aún no hay carros. Agrega uno arriba ↑</div>'; return; }
+  box.innerHTML=list.map(v=>{
+    const vp=parts.filter(p=>p.vehicleId===v.id);
+    const open=_selVeh===v.id;
+    let inner='';
+    if(open){
+      inner='<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;">'+addPartFormHtml(v.id)+
+        '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin:12px 2px 6px;">Partes ('+vp.length+')</div>'+
+        (vp.length?vp.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(partCardHtml).join(''):'<div class="sub">Sin partes todavía.</div>')+'</div>';
+    }
+    return `<div class="card" style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;" onclick="selVeh('${v.id}')">
+        <div><div style="font-weight:800;">${vehLabel(v)}</div><div class="sub">${v.color||''}${v.miles?' · '+Number(v.miles).toLocaleString()+' mi':''}${v.vin?' · VIN '+v.vin.slice(-6):''} · ${vp.length} parte(s)</div></div>
+        <span class="gold">${open?'▾':'▸'}</span>
+      </div>${inner}</div>`;
+  }).join('');
+}
+window.selVeh=function(id){ _selVeh=(_selVeh===id?'':id); renderVehicles(); };
+
+function addPartFormHtml(vid){
+  return `<div style="font-weight:700;margin-bottom:4px;">➕ Agregar parte</div>
+    <label>¿Qué parte es?</label><input id="p-name-${vid}" placeholder="Ej. Manija delantera izquierda">
+    <div class="row2">
+      <div><label>Condición</label><select id="p-cond-${vid}">${CONDICIONES.map(c=>'<option>'+c+'</option>').join('')}</select></div>
+      <div><label># de parte (opc.)</label><input id="p-num-${vid}" placeholder="OEM #"></div>
+    </div>
+    <div class="row2">
+      <div><label>Rack</label><input id="p-rack-${vid}" placeholder="Ej. A3"></div>
+      <div><label>Toper #</label><input id="p-toper-${vid}" placeholder="Ej. 14"></div>
+    </div>
+    <label>📷 Fotos de la parte</label>
+    <input type="file" id="p-photos-${vid}" accept="image/*" multiple onchange="partPhotoPreview('${vid}')">
+    <div id="p-prev-${vid}" class="thumbs"></div>
+    <button class="btn" style="width:100%;margin-top:10px;" id="p-save-${vid}" onclick="savePart('${vid}')">Guardar parte + generar QR</button>`;
+}
+window.partPhotoPreview=function(vid){
+  const inp=document.getElementById('p-photos-'+vid), box=document.getElementById('p-prev-'+vid);
+  const n=(inp.files||[]).length; box.innerHTML = n?('<span class="chip">📷 '+n+' foto(s) lista(s)</span>'):'';
+};
+
+async function toJpeg(file){
+  try{
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(file); });
+    const max=1400, sc=Math.min(1,max/Math.max(img.width,img.height));
+    const c=document.createElement('canvas'); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.82));
+    return new File([blob],(file.name||'foto').replace(/\.\w+$/,'')+'.jpg',{type:'image/jpeg'});
+  }catch(e){ return file; }
+}
+// QR (qrcode-generator, CDN). Devuelve dataURL (GIF) del QR.
+async function qrDataUrl(text){
+  if(!window.qrcode){ await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+  const qr=window.qrcode(0,'M'); qr.addData(text); qr.make(); return qr.createDataURL(6,8);
+}
+
+window.savePart=async function(vid){
+  const name=(document.getElementById('p-name-'+vid).value||'').trim();
+  if(!name){ alert('Escribe qué parte es.'); return; }
+  const v=vehicles.find(x=>x.id===vid); if(!v){ alert('Carro no encontrado.'); return; }
+  const btn=document.getElementById('p-save-'+vid); btn.disabled=true; btn.textContent='Guardando…';
+  const id='part_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+  try{
+    // fotos de la parte
+    const files=Array.from(document.getElementById('p-photos-'+vid).files||[]);
+    const photoURLs=[];
+    for(const f of files){ btn.textContent='Subiendo fotos…'; const jpg=await toJpeg(f); const r=ref(storage,'parts/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); photoURLs.push(await getDownloadURL(r)); }
+    // QR (el valor es el id de la parte) → se sube como una foto MÁS del álbum
+    btn.textContent='Generando QR…';
+    const durl=await qrDataUrl(id);
+    const blob=await (await fetch(durl)).blob();
+    const qrRef=ref(storage,'parts/'+id+'/00_QR.gif'); await uploadBytes(qrRef, blob);
+    const qrURL=await getDownloadURL(qrRef);
+    photoURLs.unshift(qrURL);   // el QR queda como primera foto del álbum
+    const cond=document.getElementById('p-cond-'+vid).value;
+    const num=(document.getElementById('p-num-'+vid).value||'').trim();
+    const rack=(document.getElementById('p-rack-'+vid).value||'').trim().toUpperCase();
+    const toper=(document.getElementById('p-toper-'+vid).value||'').trim();
+    const ebayTitle=[v.year,v.make,v.model,name,(num?'OEM '+num:''), '-', cond].filter(Boolean).join(' ').replace(' - -',' -');
+    await setDoc(doc(db,'parts',id), { entryId:id, vehicleId:vid, vehicleLabel:vehLabel(v),
+      vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vMiles:v.miles||'',
+      name, partNumber:num, condition:cond, notes:'', photoURLs, qrURL, ebayTitle,
+      status:'disponible', priceCents:null, location:{rack,toper},
+      createdAt:new Date().toISOString(), createdBy:myEmail });
+    ['p-name-','p-num-','p-rack-','p-toper-'].forEach(p=>{ const el=document.getElementById(p+vid); if(el) el.value=''; });
+    document.getElementById('p-photos-'+vid).value=''; document.getElementById('p-prev-'+vid).innerHTML='';
+  }catch(e){ alert('Error: '+e.message); }
+  btn.disabled=false; btn.textContent='Guardar parte + generar QR';
+};
+
+function statusTag(s){ return s==='vendido'?'<span class="tag vend">Vendido</span>':s==='publicado'?'<span class="tag public">Publicado</span>':'<span class="tag dispon">Disponible</span>'; }
+function locText(p){ const l=p.location||{}; return (l.rack||l.toper)?('Rack '+(l.rack||'?')+' · Toper '+(l.toper||'?')):'sin ubicación'; }
+function partCardHtml(p){
+  const fotos=(p.photoURLs||[]).slice(0,5).map(u=>`<img src="${u}">`).join('');
+  return `<div class="part">
+    <div style="display:flex;justify-content:space-between;gap:8px;"><div style="font-weight:700;">${p.name}</div>${statusTag(p.status)}</div>
+    <div class="sub">${p.condition||''}${p.partNumber?' · OEM '+p.partNumber:''} · 📍 ${locText(p)}</div>
+    <div class="thumbs">${fotos}</div>
+    <div style="margin-top:6px;"><a href="${p.qrURL}" target="_blank">⬇️ Ver/descargar QR</a></div>
+  </div>`;
+}
+
+// ===================== LISTADO (esposa) =====================
+window.renderLister=function(){
+  const box=document.getElementById('lister-list'); if(!box) return;
+  const q=(document.getElementById('lister-search')?document.getElementById('lister-search').value:'').trim().toLowerCase();
+  let list=parts.filter(p=>p.status!=='vendido');
+  if(q){ const w=q.split(/\s+/); list=list.filter(p=>{ const hay=((p.name||'')+' '+(p.vehicleLabel||'')+' '+(p.partNumber||'')).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); }); }
+  list.sort((a,b)=>(a.status==='disponible'?0:1)-(b.status==='disponible'?0:1) || (b.createdAt||'').localeCompare(a.createdAt||''));
+  if(!list.length){ box.innerHTML='<div class="sub">No hay partes por publicar.</div>'; return; }
+  box.innerHTML=list.map(p=>{
+    const sold='https://www.ebay.com/sch/i.html?_nkw='+encodeURIComponent([p.vYear,p.vMake,p.vModel,p.name].filter(Boolean).join(' '))+'&LH_Sold=1&LH_Complete=1';
+    const fotos=(p.photoURLs||[]).slice(0,5).map(u=>`<img src="${u}">`).join('');
+    return `<div class="part">
+      <div style="display:flex;justify-content:space-between;gap:8px;"><div style="font-weight:700;">${p.vehicleLabel} · ${p.name}</div>${statusTag(p.status)}</div>
+      <div class="sub">${p.condition||''}${p.partNumber?' · OEM '+p.partNumber:''} · 📍 ${locText(p)}</div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:8px;font-size:13px;">
+        <b>Título eBay:</b> ${p.ebayTitle||''}
+        <button class="btn ghost sm" style="margin-left:6px;" onclick="copyText(this,'${(p.ebayTitle||'').replace(/'/g,"\\'")}')">Copiar</button>
+      </div>
+      <div class="thumbs">${fotos}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <a class="btn green sm" href="${sold}" target="_blank" style="text-decoration:none;">💲 Ver "sold" en eBay</a>
+        ${p.status==='disponible'?`<button class="btn sm" onclick="markPublished('${p.id}')">✓ Marcar publicada</button>`:`<button class="btn ghost sm" onclick="markSold('${p.id}')">Marcar vendida</button>`}
+      </div>
+    </div>`;
+  }).join('');
+};
+window.copyText=function(btn,t){ navigator.clipboard&&navigator.clipboard.writeText(t); btn.textContent='¡Copiado!'; setTimeout(()=>btn.textContent='Copiar',1200); };
+window.markPublished=async function(id){
+  const priceStr=prompt('¿A qué precio la publicaste? (opcional, en $)'); const price=priceStr?Math.round(Number(priceStr)*100):null;
+  try{ await updateDoc(doc(db,'parts',id), price!=null&&!isNaN(price)?{status:'publicado',priceCents:price}:{status:'publicado'}); }catch(e){ alert('Error: '+e.message); }
+};
+window.markSold=async function(id){ if(!confirm('¿Marcar esta parte como vendida?')) return; try{ await updateDoc(doc(db,'parts',id),{status:'vendido',soldAt:new Date().toISOString()}); }catch(e){ alert('Error: '+e.message);} };
+
+// ===================== EMPAQUE (papá) =====================
+window.scanLookup=function(){
+  const raw=(document.getElementById('scan-input').value||'').trim();
+  if(!raw) return;
+  // el QR puede traer solo el id o una URL con ?part=
+  let id=raw; const m=raw.match(/part[=/]([\w-]+)/); if(m) id=m[1];
+  const p=parts.find(x=>x.id===id || x.entryId===id);
+  const box=document.getElementById('pack-result');
+  if(!p){ box.innerHTML='<div class="card"><div class="red">No encontré esa parte.</div><div class="sub">Código: '+raw+'</div></div>'; return; }
+  box.innerHTML=`<div class="card">
+    <div style="display:flex;justify-content:space-between;gap:8px;"><div style="font-weight:800;">${p.vehicleLabel} · ${p.name}</div>${statusTag(p.status)}</div>
+    <div class="sub" style="margin:6px 0;">${p.condition||''}${p.partNumber?' · OEM '+p.partNumber:''}</div>
+    <div style="font-size:16px;font-weight:800;color:var(--gold);margin:6px 0;">📍 ${locText(p)}</div>
+    <div class="row2">
+      <div><label>Rack</label><input id="pk-rack" value="${(p.location&&p.location.rack)||''}"></div>
+      <div><label>Toper #</label><input id="pk-toper" value="${(p.location&&p.location.toper)||''}"></div>
+    </div>
+    <button class="btn" style="width:100%;margin-top:10px;" onclick="saveLoc('${p.id}')">Guardar nueva ubicación</button>
+    ${p.status!=='vendido'?`<button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="markSold('${p.id}')">Marcar vendida</button>`:''}
+  </div>`;
+  document.getElementById('scan-input').value='';
+};
+window.saveLoc=async function(id){
+  const rack=(document.getElementById('pk-rack').value||'').trim().toUpperCase(), toper=(document.getElementById('pk-toper').value||'').trim();
+  try{ await updateDoc(doc(db,'parts',id),{location:{rack,toper}}); document.getElementById('pack-result').innerHTML='<div class="card green">✓ Ubicación guardada: Rack '+(rack||'?')+' · Toper '+(toper||'?')+'</div>'; }
+  catch(e){ alert('Error: '+e.message); }
+};
+// Cámara (usa BarcodeDetector si el dispositivo lo soporta — Android/Sunmi normalmente sí)
+let _camStream=null;
+window.startCamScan=async function(){
+  const vid=document.getElementById('cam');
+  if(!('BarcodeDetector' in window)){ alert('Este dispositivo no soporta escaneo por cámara en el navegador. Usa el lector físico (se escribe en el campo) o teclea el código.'); return; }
+  try{
+    _camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    vid.srcObject=_camStream; vid.style.display=''; await vid.play();
+    const det=new window.BarcodeDetector({formats:['qr_code']});
+    const tick=async()=>{
+      if(!_camStream) return;
+      try{ const codes=await det.detect(vid); if(codes&&codes.length){ document.getElementById('scan-input').value=codes[0].rawValue; stopCam(); scanLookup(); return; } }catch(e){}
+      requestAnimationFrame(tick);
+    }; tick();
+  }catch(e){ alert('No se pudo abrir la cámara: '+e.message); }
+};
+function stopCam(){ const vid=document.getElementById('cam'); if(_camStream){ _camStream.getTracks().forEach(t=>t.stop()); _camStream=null; } vid.style.display='none'; }
+</script>
+</body>
+</html>
