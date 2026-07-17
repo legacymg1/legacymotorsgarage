@@ -456,7 +456,7 @@ window.savePart=async function(vid){
     const blob=await (await fetch(durl)).blob();
     const qrRef=ref(storage,'parts/'+id+'/00_QR.gif'); await uploadBytes(qrRef, blob);
     const qrURL=await getDownloadURL(qrRef);
-    photoURLs.unshift(qrURL);
+    photoURLs.push(qrURL);   // el QR va al final, las fotos de la parte primero
     const cond=document.getElementById('p-cond-'+vid).value;
     const num=(document.getElementById('p-num-'+vid).value||'').trim();
     const rack=(document.getElementById('p-rack-'+vid).value||'').trim().toUpperCase();
