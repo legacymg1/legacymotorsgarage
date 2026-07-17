@@ -75,10 +75,12 @@
     <div class="card" style="margin-bottom:14px;">
       <div style="font-weight:800;margin-bottom:6px;" data-i18n="addCar">➕ Carro a desmantelar</div>
       <label>VIN</label>
-      <div class="row2">
-        <input id="v-vin" data-i18n-ph="vinPh" placeholder="1FT... (17 dígitos)" style="text-transform:uppercase;">
-        <button class="btn ghost sm" style="flex:0 0 auto;" onclick="decodeVin()" data-i18n="decodeBtn">🔎 Decodificar VIN</button>
+      <input id="v-vin" data-i18n-ph="vinPh" placeholder="1FT... (17 dígitos)" style="text-transform:uppercase;">
+      <div class="row2" style="margin-top:8px;">
+        <button class="btn ghost sm" onclick="scanVin()" data-i18n="scanVinBtn">📠 Escanear VIN</button>
+        <button class="btn ghost sm" onclick="decodeVin()" data-i18n="decodeBtn">🔎 Decodificar</button>
       </div>
+      <video id="vin-cam" playsinline style="display:none;width:100%;border-radius:10px;margin-top:8px;"></video>
       <div id="v-decode-msg" class="sub" style="margin-top:4px;"></div>
       <div class="row2" style="margin-top:6px;">
         <div><label data-i18n="year">Año</label><input id="v-year"></div>
@@ -145,7 +147,7 @@ const T={
     needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Warehouse.',
     roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
-    addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
+    addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Escanea o pega el código…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es?', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte', savePart:'Guardar parte + generar QR', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)',
     seeQR:'⬇️ Ver/descargar QR', tagSold:'Vendido', tagPublished:'Publicado', tagAvailable:'Disponible', noLoc:'sin ubicación',
@@ -156,7 +158,7 @@ const T={
     needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Warehouse.',
     roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
-    addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode VIN', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
+    addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Scan or paste the code…',
     addPart:'➕ Add part', whichPart:'What part is it?', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos', savePart:'Save part + generate QR', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready',
     seeQR:'⬇️ View/download QR', tagSold:'Sold', tagPublished:'Published', tagAvailable:'Available', noLoc:'no location',
@@ -285,6 +287,32 @@ window.decodeVin=async function(){
   }catch(e){ msg.textContent=t('decodeErr'); }
 };
 function titleCase(s){ return String(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); }
+
+// Escanear el VIN con la cámara/lector (código de barras del carro) → rellena y decodifica
+let _vinCamStream=null;
+window.scanVin=async function(){
+  const vid=document.getElementById('vin-cam'); const msg=document.getElementById('v-decode-msg');
+  if(!('BarcodeDetector' in window)){ alert(t('noCamera')); const f=document.getElementById('v-vin'); if(f) f.focus(); return; }
+  try{
+    _vinCamStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    vid.srcObject=_vinCamStream; vid.style.display=''; await vid.play();
+    msg.textContent=t('vinScanPoint');
+    const det=new window.BarcodeDetector();   // todos los formatos soportados (VIN suele ser Code39/PDF417/DataMatrix)
+    const tick=async()=>{
+      if(!_vinCamStream) return;
+      try{
+        const codes=await det.detect(vid);
+        if(codes && codes.length){
+          let raw=(codes[0].rawValue||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+          if(raw.length>17) raw=raw.slice(-17);   // el sticker a veces trae extra; el VIN son 17 (al final)
+          document.getElementById('v-vin').value=raw; stopVinCam(); msg.textContent=''; decodeVin(); return;
+        }
+      }catch(e){}
+      requestAnimationFrame(tick);
+    }; tick();
+  }catch(e){ msg.textContent=''; alert(t('camErr')+e.message); }
+};
+function stopVinCam(){ const vid=document.getElementById('vin-cam'); if(_vinCamStream){ _vinCamStream.getTracks().forEach(tr=>tr.stop()); _vinCamStream=null; } if(vid) vid.style.display='none'; }
 
 window.saveVehicle=async function(){
   const vin=(document.getElementById('v-vin').value||'').trim().toUpperCase();
