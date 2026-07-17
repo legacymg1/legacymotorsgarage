@@ -82,6 +82,7 @@
       </div>
       <video id="vin-cam" playsinline style="display:none;width:100%;border-radius:10px;margin-top:8px;"></video>
       <div id="v-decode-msg" class="sub" style="margin-top:4px;"></div>
+      <div id="v-spec" style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap;"></div>
       <div class="row2" style="margin-top:6px;">
         <div><label data-i18n="year">Año</label><input id="v-year"></div>
         <div><label data-i18n="make">Marca</label><input id="v-make"></div>
@@ -269,7 +270,8 @@ function startListening(){
   onSnapshot(collection(db,'parts'), s=>{ parts=s.docs.map(d=>({id:d.id,...d.data()})); if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); }, e=>console.log('parts',e));
 }
 
-// ---- VIN decode (NHTSA) ----
+// ---- VIN decode (NHTSA, GRATIS) — captura la ficha completa ----
+let _vSpec=null;   // ficha decodificada del carro actual (para guardarla y heredarla a las partes)
 window.decodeVin=async function(){
   const vin=(document.getElementById('v-vin').value||'').trim().toUpperCase();
   const msg=document.getElementById('v-decode-msg');
@@ -277,15 +279,35 @@ window.decodeVin=async function(){
   msg.textContent=t('decoding');
   try{
     const r=await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/'+encodeURIComponent(vin)+'?format=json');
-    const j=await r.json(); const g=k=>{ const it=(j.Results||[]).find(x=>x.Variable===k); return (it&&it.Value)||''; };
-    const year=g('Model Year'), make=g('Make'), model=g('Model'), engine=[g('Displacement (L)'),g('Engine Number of Cylinders')&&g('Engine Number of Cylinders')+' cyl',g('Fuel Type - Primary')].filter(Boolean).join(' ');
+    const j=await r.json(); const g=k=>{ const it=(j.Results||[]).find(x=>x.Variable===k); return ((it&&it.Value)||'').trim(); };
+    const year=g('Model Year'), make=g('Make'), model=g('Model');
+    const displ=g('Displacement (L)'), cyl=g('Engine Number of Cylinders'), fuel=g('Fuel Type - Primary'), hp=g('Engine Brake (hp) From')||g('Engine Brake (hp)');
+    const engine=[displ&&(Math.round(parseFloat(displ)*10)/10+'L'), cyl&&cyl+'cyl', fuel].filter(Boolean).join(' ');
+    // Nivel 1 completo — todo lo que da gratis NHTSA (extensible: Nivel 2 mergeará más aquí)
+    const spec={ vin, source:'nhtsa',
+      trim:g('Trim')||g('Series'), series:g('Series'), bodyClass:g('Body Class'), doors:g('Doors'),
+      drive:g('Drive Type'), transmission:g('Transmission Style'),
+      displacementL:displ, cylinders:cyl, fuel:fuel, hp:hp,
+      gvwr:g('Gross Vehicle Weight Rating From'), plant:g('Plant Country'), vehicleType:g('Vehicle Type'), manufacturer:g('Manufacturer Name') };
     if(year) document.getElementById('v-year').value=year;
     if(make) document.getElementById('v-make').value=titleCase(make);
     if(model) document.getElementById('v-model').value=titleCase(model);
     if(engine) document.getElementById('v-engine').value=engine.trim();
+    _vSpec=spec; renderVSpec(spec);
     msg.textContent = (year||make||model) ? t('decodeOk') : t('decodeNone');
-  }catch(e){ msg.textContent=t('decodeErr'); }
+  }catch(e){ msg.textContent=t('decodeErr'); _vSpec=null; renderVSpec(null); }
 };
+function renderVSpec(s){
+  const box=document.getElementById('v-spec'); if(!box) return;
+  if(!s){ box.innerHTML=''; return; }
+  const bits=[];
+  if(s.trim) bits.push('🏷️ '+s.trim);
+  if(s.bodyClass) bits.push('🚗 '+s.bodyClass+(s.doors?' · '+s.doors+'d':''));
+  if(s.transmission) bits.push('⚙️ '+s.transmission);
+  if(s.drive) bits.push('🛞 '+s.drive);
+  if(s.hp) bits.push('🐎 '+s.hp+' hp');
+  box.innerHTML = bits.map(b=>'<span class="chip">'+b+'</span>').join('');
+}
 function titleCase(s){ return String(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); }
 
 // Escanear el VIN con la cámara/lector (código de barras del carro) → rellena y decodifica
@@ -324,9 +346,10 @@ window.saveVehicle=async function(){
     await setDoc(doc(db,'dismantle_vehicles',id), { entryId:id, vin, year, make, model,
       miles:document.getElementById('v-miles').value.trim(),
       engine:document.getElementById('v-engine').value.trim(), color:titleCase(document.getElementById('v-color').value.trim()), colorCode:document.getElementById('v-colorcode').value.trim().toUpperCase(),
+      spec: (_vSpec && _vSpec.vin===vin) ? _vSpec : null,   // ficha NHTSA (Nivel 1) — extensible a Nivel 2
       status:'desmantelando', createdAt:new Date().toISOString(), createdBy:myEmail });
     ['v-vin','v-year','v-make','v-model','v-miles','v-engine','v-color','v-colorcode'].forEach(x=>document.getElementById(x).value='');
-    document.getElementById('v-decode-msg').textContent='';
+    document.getElementById('v-decode-msg').textContent=''; _vSpec=null; renderVSpec(null);
     _selVeh=id;
   }catch(e){ alert(t('error')+e.message); }
   btn.disabled=false; btn.textContent=t('saveCar');
@@ -348,7 +371,7 @@ function renderVehicles(){
     }
     return `<div class="card" style="margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;" onclick="selVeh('${v.id}')">
-        <div><div style="font-weight:800;">${vehLabel(v)}</div><div class="sub">${v.color||''}${v.miles?' · '+Number(v.miles).toLocaleString()+' mi':''}${v.vin?' · VIN '+v.vin.slice(-6):''} · ${vp.length} ${t('part')}</div></div>
+        <div><div style="font-weight:800;">${vehLabel(v)}</div><div class="sub">${v.color||''}${v.miles?' · '+Number(v.miles).toLocaleString()+' mi':''}${v.vin?' · VIN '+v.vin.slice(-6):''} · ${vp.length} ${t('part')}</div>${v.spec?`<div class="sub" style="margin-top:2px;color:var(--faint);">${[v.spec.trim,v.spec.bodyClass,v.spec.transmission,v.spec.drive].filter(Boolean).join(' · ')}</div>`:''}</div>
         <span class="gold">${open?'▾':'▸'}</span>
       </div>${inner}</div>`;
   }).join('');
@@ -411,9 +434,11 @@ window.savePart=async function(vid){
     const num=(document.getElementById('p-num-'+vid).value||'').trim();
     const rack=(document.getElementById('p-rack-'+vid).value||'').trim().toUpperCase();
     const toper=(document.getElementById('p-toper-'+vid).value||'').trim();
-    const ebayTitle=[v.year,v.make,v.model,name,(num?'OEM '+num:''), '-', cond].filter(Boolean).join(' ').replace(' - -',' -');
+    const sp=v.spec||{};
+    const ebayTitle=[v.year,v.make,v.model,sp.trim||'',name,(num?'OEM '+num:''), '-', cond].filter(Boolean).join(' ').replace(' - -',' -');
     await setDoc(doc(db,'parts',id), { entryId:id, vehicleId:vid, vehicleLabel:vehLabel(v),
       vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vMiles:v.miles||'',
+      vTrim:sp.trim||'', vEngine:v.engine||'', vDrive:sp.drive||'', vTransmission:sp.transmission||'', vBody:sp.bodyClass||'', vSpec: v.spec||null,   // fitment para el listado eBay
       name, partNumber:num, condition:cond, notes:'', photoURLs, qrURL, ebayTitle,
       status:'disponible', priceCents:null, location:{rack,toper},
       createdAt:new Date().toISOString(), createdBy:myEmail });
