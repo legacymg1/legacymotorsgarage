@@ -130,7 +130,7 @@
   <div class="tila-grid">
     <div class="tila-cell">
       <label>Tasa de Porcentaje Anual (APR)</label>
-      <div class="value">79.02%</div>
+      <div class="value">{{APR}}%</div>
       <small>Costo del crédito como tasa anual</small>
     </div>
     <div class="tila-cell">
@@ -149,7 +149,7 @@
       <small>Cantidad pagada después de todos los pagos</small>
     </div>
   </div>
-  <p style="font-size:8pt;margin-top:6px;color:#555;text-align:center;">El APR del 79.02% se calcula como el 20% del saldo pendiente cobrado cada seis (6) meses, convertido a una tasa de porcentaje anual conforme a lo exigido por el Reglamento Z de la Ley de Verdad en los Préstamos (15 U.S.C. § 1601 et seq.).</p>
+  <p style="font-size:8pt;margin-top:6px;color:#555;text-align:center;">El APR del {{APR}}% se calcula como el 20% del monto financiado por cada seis (6) meses de plazo, expresado como tasa de porcentaje anual (método actuarial) conforme a lo exigido por el Reglamento Z de la Ley de Verdad en los Préstamos (15 U.S.C. § 1601 et seq.).</p>
 </div>
 
 <div class="section">
@@ -172,7 +172,7 @@
       <div class="payment-row"><span>Número de Pagos</span><span>{{NUM_PAYMENTS}}</span></div>
       <div class="payment-row"><span>Primer Pago</span><span>{{FIRST_PAYMENT_DATE}}</span></div>
       <div class="payment-row"><span>Último Pago</span><span>{{LAST_PAYMENT_DATE}}</span></div>
-      <div class="payment-row"><span>Cargo Financiero (APR 79.02%)</span><span>${{FINANCE_CHARGE}}</span></div>
+      <div class="payment-row"><span>Cargo Financiero (APR {{APR}}%)</span><span>${{FINANCE_CHARGE}}</span></div>
       <div class="payment-row total"><span>TOTAL DE PAGOS</span><span>${{TOTAL_OF_PAYMENTS}}</span></div>
     </div>
   </div>
@@ -461,6 +461,19 @@
   const totalOfPayments = baseFinanced + financeCharge;
   const payAmt    = weekly > 0 ? weekly : (numPay > 0 ? totalOfPayments / numPay : 0);
   const finalPay  = numPay > 1 ? Math.max(0, Math.round((totalOfPayments - payAmt*(numPay-1))*100)/100) : payAmt;
+  // APR REAL (Reg Z, método actuarial): la tasa periódica que iguala el valor presente de los pagos al monto financiado.
+  const periodsPerYear = freq==='monthly'?12:freq==='biweekly'?26:52;
+  const apr = (function(){
+    const P=baseFinanced, n=numPay;
+    if(!(P>0)||!(n>0)||!(payAmt>0)||financeCharge<=0) return 0;
+    const pays=[]; for(let k=0;k<n-1;k++) pays.push(payAmt); pays.push(finalPay);
+    const npv=i=>{ let s=0; for(let k=0;k<pays.length;k++) s+=pays[k]/Math.pow(1+i,k+1); return s-P; };
+    if(npv(0)<=1e-9) return 0;
+    let lo=0, hi=1, g=0; while(npv(hi)>0 && g<200){ hi*=2; g++; }
+    for(let it=0; it<200; it++){ const m=(lo+hi)/2, v=npv(m); if(Math.abs(v)<1e-9){ lo=hi=m; break; } if(v>0) lo=m; else hi=m; }
+    return ((lo+hi)/2)*periodsPerYear*100;
+  })();
+  const aprStr = apr.toFixed(2);
   const fmt = n => Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const payDisplay = (numPay > 1 && Math.abs(finalPay - payAmt) > 0.01) ? (fmt(payAmt)+' × '+(numPay-1)+' + '+fmt(finalPay)+' (último / last)') : fmt(payAmt);
   let restockFee = 0, netRestock = 0;
@@ -507,6 +520,7 @@
     .replace(/\{\{CANCELLATION_FEE\}\}/g, ccoaYes?fmt(ccoaFee):'N/A')
     .replace(/\{\{TOTAL_CASH_PRICE\}\}/g, fmt(totalCashPrice))
     .replace(/\{\{FINANCE_CHARGE\}\}/g, fmt(financeCharge))
+    .replace(/\{\{APR\}\}/g, aprStr)
     .replace(/\{\{TOTAL_OF_PAYMENTS\}\}/g, fmt(totalOfPayments))
     .replace(/\{\{CCOA_FEE\}\}/g, ccoaYes?fmt(ccoaFee):'N/A')
     .replace(/\{\{RESTOCK_FEE\}\}/g, ccoaYes?fmt(restockFee):'N/A')
