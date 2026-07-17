@@ -7,6 +7,14 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Legacy DMS · Finanzas</title>
+<!-- App instalable (Agregar a inicio) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0e14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanzas">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root{
     --bg:#0b0e14; --surface:#12161f; --surface2:#1a1f2b; --elev:#20263300;
@@ -679,6 +687,18 @@ let txns = [];
 let inventory = [];
 let editingId = null;
 let _listening = false;
+let _deepLinkDone = false;
+// Accesos directos / widget: finanzas.html?do=ingreso | gasto | buscar → abre esa acción al instante
+function handleDeepLink(){
+  try{
+    const doParam=new URLSearchParams(location.search).get('do'); if(!doParam) return;
+    setTimeout(function(){
+      if(doParam==='ingreso') openInc();
+      else if(doParam==='gasto') openExp();
+      else if(doParam==='buscar'){ const i=document.getElementById('mov-search'); if(i){ i.scrollIntoView({block:'center'}); i.focus(); } }
+    }, 350);
+  }catch(e){}
+}
 
 // ---------- AUTH ----------
 window.doLogin = async function(){
@@ -709,6 +729,7 @@ onAuthStateChanged(auth,(user)=>{
     if(_ci) _ci.style.display=_canCerrar?'':'none';
     if(_cn) _cn.style.display=_canCerrar?'none':'';
     if(!_listening){ _listening=true; startListening(); }
+    if(!_deepLinkDone){ _deepLinkDone=true; handleDeepLink(); }
   } else {
     document.getElementById('app').style.display='none';
     document.getElementById('login').style.display='flex';
@@ -744,7 +765,7 @@ function startListening(){
 
 // ---------- GASTOS (LIBRO) ----------
 // Dealer y Partes: MISMA lista, en el orden que pidió Enrique. eBay conserva la suya.
-const _EXP_CATS_SHARED = ['Reparación / Reacondicionamiento','Partes no inventario','Gasolinas','Servicios (agua, luz, etc.)','Comisión a empleados','Suministros','Herramientas','Renta','DMV / Título / Registración','Comisión del procesador','Publicidad','Otro'];
+const _EXP_CATS_SHARED = ['Reparación / Reacondicionamiento','Partes no inventario','Gasolinas','Servicios (agua, luz, etc.)','Comisión a empleados','Suministros','Herramientas','Renta','Comisión del procesador','Publicidad','Otro'];
 const EXP_CATS = {
   dealer: _EXP_CATS_SHARED,
   parts:  _EXP_CATS_SHARED,
@@ -835,8 +856,7 @@ window.onDeptChange = function(){
   clearExpCar();
 };
 window.onExpCatChange = function(){
-  // Las comisiones se pagan por Zelle desde el banco → método por defecto
-  if(document.getElementById('e-cat').value==='Comisión a empleados'){ document.getElementById('e-method').value='zelle'; }
+  // (antes forzaba Zelle en comisión; se quitó porque a veces se paga en efectivo)
 };
 window.previewReceipt = function(){
   const f=document.getElementById('e-receipt').files[0]; const box=document.getElementById('e-receipt-preview');
