@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Warehouse">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" href="wh-apple-touch-icon.png">
 <style>
   :root{ --bg:#0b0e14; --surface:#12161f; --surface2:#1a1f2e; --border:rgba(255,255,255,0.09); --text:#e7ebf3; --muted:#95a0b5; --faint:#5b6577; --gold:#f0c040; --green:#3ecf8e; --red:#ff6b6b; }
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-text-size-adjust:100%;}
@@ -47,6 +47,8 @@
 </style>
 </head>
 <body>
+
+<div id="install-bar" onclick="installApp()" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px;text-align:center;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.45);">📲 Instalar Warehouse como app</div>
 
 <div id="login">
   <div class="card" style="max-width:360px;width:100%;">
@@ -135,6 +137,16 @@ const firebaseConfig = {
 };
 const app=initializeApp(firebaseConfig);
 const db=getFirestore(app); const storage=getStorage(app); const auth=getAuth(app);
+
+// ---- PWA: service worker + botón instalar ----
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw-warehouse.js').catch(e=>console.log('sw',e)); }
+let _deferredPrompt=null;
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); _deferredPrompt=e; const b=document.getElementById('install-bar'); if(b) b.style.display=''; });
+window.addEventListener('appinstalled', ()=>{ const b=document.getElementById('install-bar'); if(b) b.style.display='none'; _deferredPrompt=null; });
+window.installApp=async function(){
+  if(_deferredPrompt){ _deferredPrompt.prompt(); await _deferredPrompt.userChoice; _deferredPrompt=null; const b=document.getElementById('install-bar'); if(b) b.style.display='none'; }
+  else { alert('Para instalar: menú del navegador (⋮) → "Agregar a inicio" / "Instalar app".'); }
+};
 
 // ---- ROLES por correo ----
 const ROLE_BY_EMAIL={
