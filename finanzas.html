@@ -787,7 +787,10 @@ function applyDeptRestriction(selectId){
   sel.disabled = allowed.length<=1;
 }
 // Solo puede modificar (borrar/reversar/asignar) los movimientos de SU bolsa. Ver, todos pueden.
-function canEditTx(id){ var tx=(typeof txns!=='undefined'?txns:[]).find(function(x){return x.id===id;}); return !tx || myDepts().indexOf(tx.dept)>=0; }
+function isOwnerUser(){ return ((auth.currentUser&&auth.currentUser.email)||'').toLowerCase()==='ev@legacymotorsgarage.com'; }
+// El DUEÑO puede corregir/adjuntar recibo en CUALQUIER bolsa (las reglas de Firestore ya se lo permiten).
+// Los demás (Ivan) solo su bolsa: así nadie toca por accidente los movimientos del otro.
+function canEditTx(id){ if(isOwnerUser()) return true; var tx=(typeof txns!=='undefined'?txns:[]).find(function(x){return x.id===id;}); return !tx || myDepts().indexOf(tx.dept)>=0; }
 const centsToUSD = c => '$'+(Number(c||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 // Movimientos VIVOS: excluye los anulados (type='void') y sus originales.
 function liveTxns(){
@@ -955,7 +958,7 @@ function movRowHtml(e){
   const concepto = e.note || e.category || (inc?'Ingreso':'Gasto');
   const catChip = e.note ? `<span class="chip">${e.category||''}</span>` : '';
   const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(e.amountCents)}`;
-  const canEdit = myDepts().indexOf(e.dept)>=0;
+  const canEdit = canEditTx(e.id);
   const act = !canEdit ? '' : (inc ? `<span onclick="deleteInc('${e.id}')" style="cursor:pointer;color:var(--faint);">🗑 borrar</span>` : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`);
   return `<div class="row">
       <div class="row-ic">${DEPT_LABEL[e.dept]?DEPT_LABEL[e.dept].split(' ')[0]:(inc?'💵':'🧾')}</div>
@@ -1721,7 +1724,7 @@ window.openMovEdit=function(id){
   const tx=txns.find(x=>x.id===id); if(!tx) return;
   _movId=id; _movTx=tx;
   const inc = tx.type==='income';
-  const canEdit = myDepts().indexOf(tx.dept)>=0;
+  const canEdit = canEditTx(id);
   document.getElementById('me-title').textContent = inc?'Editar ingreso':'Editar gasto';
   document.getElementById('me-info').textContent = (DEPT_LABEL[tx.dept]||tx.dept)+(tx.carLabel?' · '+tx.carLabel:'');
   document.getElementById('me-amount').value = (Number(tx.amountCents||0)/100).toFixed(2);
