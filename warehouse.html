@@ -679,8 +679,8 @@ window.deletePart=async function(id){
   try{ await deleteDoc(doc(db,'parts',id)); closeModal(); if(_carView) renderCarDetail(); }catch(e){ alert(t('error')+e.message); }
 };
 
-// ---- Etiqueta imprimible (QR + info) para la Rongta R22 vía app (iPhone) ----
-let _labelFile=null;
+// ---- Etiqueta imprimible (solo QR) para la Rongta R22 vía app (iPhone) ----
+let _labelFile=null, _labelDataUrl='';
 function labelWrap(g,text,cx,y,maxW,lineH,maxLines){
   const words=String(text||'').split(/\s+/).filter(Boolean); let lines=[], cur='';
   for(const w of words){ const test=cur?cur+' '+w:w; if(g.measureText(test).width>maxW && cur){ lines.push(cur); cur=w; } else cur=test; }
@@ -702,6 +702,7 @@ async function makeLabel(p){
     const dataUrl=c.toDataURL('image/png');
     const blob=await new Promise(r=>c.toBlob(r,'image/png'));
     _labelFile=blob?new File([blob],'etiqueta_'+p.id+'.png',{type:'image/png'}):null;
+    _labelDataUrl=dataUrl;
     const pa=document.getElementById('print-area'); if(pa) pa.innerHTML='<img src="'+dataUrl+'">';   // lo que se imprime
     document.getElementById('modal2-inner').innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🖨️ ${t('labelTitle')}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
@@ -721,7 +722,16 @@ window.printNewPart=function(vid){
   const num=(document.getElementById('p-num-'+vid).value||'').trim();
   makeLabel({ id:_newPartId, name, partNumber:num, location:{bin}, vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vTrim:sp.trim||'' });
 };
-window.printLabelNow=function(){ window.print(); };
+window.printLabelNow=function(){
+  // iOS bloquea window.print() dentro de la app instalada (PWA) → abrimos la etiqueta en una vista aparte
+  try{
+    const w=window.open('','_blank');
+    if(!w){ shareLabel(); return; }   // si el navegador lo bloquea, caemos al compartir
+    w.document.write('<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>QR</title><style>@page{size:50mm 30mm;margin:0}html,body{margin:0;padding:0}body{display:flex;align-items:center;justify-content:center;height:100vh}img{width:28mm;height:28mm}</style></head><body><img src="'+_labelDataUrl+'"></body></html>');
+    w.document.close(); w.focus();
+    setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
+  }catch(e){ shareLabel(); }
+};
 window.shareLabel=async function(){
   if(!_labelFile){ return; }
   try{
