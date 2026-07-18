@@ -1113,7 +1113,7 @@ document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.targ
 const INCOME_TYPES = ['payment','down','cash_sale','income'];
 const METHOD_ROW = [['cash','💵 Efectivo'],['terminal','💳 Terminal'],['ach','🏦 ACH'],['zelle','📲 Zelle/Otro'],['','— Sin especificar']];
 let _corteSince = null;   // si esta puesto, el corte filtra por createdAt >= este timestamp (desde el ultimo cierre)
-let _corteState = {total:0,dNet:0,pNet:0,owe:0,oweDir:'',fondoCents:0,fondoDept:'dealer',repartir:0,cada:0};   // estado del corte (para cierre e historial)
+let _corteState = {total:0,dNet:0,pNet:0,owe:0,oweDir:'',fondoCents:0,fondoDealerCents:0,fondoPartsCents:0,repartir:0,cada:0};   // estado del corte (para cierre e historial)
 function lastClosing(){
   const cls=txns.filter(t=>t.type==='closing').sort((a,b)=>(b.closedAt||'').localeCompare(a.closedAt||''));
   return cls[0]||null;
@@ -1173,7 +1173,8 @@ window.renderCorte = function(){
   });
   const sumC=arr=>arr.reduce((s,t)=>s+((t.type==='expense_reversal'?-1:1)*(Number(t.amountCents)||0)),0);
   const dIn=sumC(data.dealer.inc), dEx=sumC(data.dealer.exp), pIn=sumC(data.parts.inc), pEx=sumC(data.parts.exp);
-  const _lc=lastClosing(); const carried={dealer:0,parts:0}; if(_lc && (_lc.fondoCents||0)>0) carried[_lc.fondoDept||'dealer']=_lc.fondoCents;   // fondo que dejó el corte anterior
+  const _lc=lastClosing(); const carried={dealer:0,parts:0};   // fondo que dejó el corte anterior (ambas cajas; compat con cortes viejos de una sola)
+  if(_lc){ if(_lc.fondoDealerCents!=null || _lc.fondoPartsCents!=null){ carried.dealer=_lc.fondoDealerCents||0; carried.parts=_lc.fondoPartsCents||0; } else if((_lc.fondoCents||0)>0){ carried[_lc.fondoDept||'dealer']=_lc.fondoCents; } }
   const dNet=dIn-dEx+carried.dealer, pNet=pIn-pEx+carried.parts, totalNet=dNet+pNet;
   const listBlock=(title,color,items,total)=>
     '<div style="font-size:13px;font-weight:800;color:'+color+';margin:16px 0 4px;">'+title+'</div>'
@@ -1193,32 +1194,36 @@ window.renderCorte = function(){
   // ----- CUADRE ENTRE SOCIOS (cuenta interna) -----
   const owe=Math.round((dNet-pNet)/2);
   const oweDir = owe>=0 ? '🚗 Dealer → 🔧 Partes' : '🔧 Partes → 🚗 Dealer';
-  const fondoEl=document.getElementById('corte-fondo'); const fondoStr=fondoEl?fondoEl.value:'';
-  const fondoDeptEl=document.getElementById('corte-fondo-dept'); const fondoDept=fondoDeptEl?fondoDeptEl.value:'dealer';
-  const fondoCents=Math.round((Number(fondoStr)||0)*100);
+  const fdEl=document.getElementById('corte-fondo-dealer'); const fdStr=fdEl?fdEl.value:'';
+  const fpEl=document.getElementById('corte-fondo-parts'); const fpStr=fpEl?fpEl.value:'';
+  const fondoDealerCents=Math.round((Number(fdStr)||0)*100);
+  const fondoPartsCents=Math.round((Number(fpStr)||0)*100);
+  const fondoCents=fondoDealerCents+fondoPartsCents;
   const repartir=totalNet-fondoCents, cada=Math.round(repartir/2);
-  _corteState={total:totalNet,dNet,pNet,owe,oweDir,fondoCents,fondoDept,repartir,cada};
+  _corteState={total:totalNet,dNet,pNet,owe,oweDir,fondoCents,fondoDealerCents,fondoPartsCents,repartir,cada};
   html+='<div style="border-top:2px solid var(--border);margin-top:22px;padding-top:14px;">'
     +'<div style="font-weight:800;font-size:15px;margin-bottom:10px;">🔁 Cuadre entre socios <span style="font-size:11px;color:var(--faint);font-weight:500;">(cuenta interna, se registra en el total)</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">🚗 Dealer neto</span><span style="color:'+(dNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(dNet)+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">🔧 Partes neto</span><span style="color:'+(pNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(pNet)+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:2px;border-top:1px solid var(--border);font-weight:700;"><span>Total</span><span style="color:'+(totalNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(totalNet)+'</span></div>'
     +'<div style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:12px;margin:12px 0;text-align:center;"><div style="font-size:12px;color:var(--muted);">Para quedar 50/50, se debe cuadrar:</div><div style="font-size:17px;font-weight:800;color:#f0c040;margin-top:2px;">'+oweDir+': '+centsToUSD(Math.abs(owe))+'</div></div>'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;flex-wrap:wrap;"><span style="color:var(--muted);">💰 Fondo de caja — se lo queda</span>'
-      +'<select id="corte-fondo-dept" onchange="updateCorteFondo()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:13px;"><option value="dealer"'+(fondoDept==='dealer'?' selected':'')+'>🚗 Dealer</option><option value="parts"'+(fondoDept==='parts'?' selected':'')+'>🔧 Partes</option></select>'
-      +'<input id="corte-fondo" type="number" inputmode="decimal" value="'+fondoStr+'" oninput="updateCorteFondo()" placeholder="0" style="width:100px;text-align:right;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:14px;"></div>'
-    +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">A repartir (Total − fondo)</span><span id="corte-repartir">'+centsToUSD(repartir)+'</span></div>'
+    +'<div style="color:var(--muted);margin:12px 0 4px;font-size:13px;">💰 Fondo que se queda en cada caja:</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;"><span>🚗 Dealer</span><input id="corte-fondo-dealer" type="number" inputmode="decimal" value="'+fdStr+'" oninput="updateCorteFondo()" placeholder="0" style="width:120px;text-align:right;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:14px;"></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;"><span>🔧 Partes</span><input id="corte-fondo-parts" type="number" inputmode="decimal" value="'+fpStr+'" oninput="updateCorteFondo()" placeholder="0" style="width:120px;text-align:right;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:14px;"></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:3px 0;margin-top:6px;"><span style="color:var(--muted);">A repartir (Total − fondos)</span><span id="corte-repartir">'+centsToUSD(repartir)+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:800;font-size:15px;"><span>Cada socio (50/50)</span><span id="corte-cada" style="color:#3ecf8e;">'+centsToUSD(cada)+'</span></div>'
     +'</div>';
   body.innerHTML=html;
 };
 
 window.updateCorteFondo = function(){
-  const el=document.getElementById('corte-fondo'); if(!el) return;
-  const fondoCents=Math.round((Number(el.value)||0)*100);
+  const fd=document.getElementById('corte-fondo-dealer'), fp=document.getElementById('corte-fondo-parts');
+  if(!fd && !fp) return;
+  const fondoDealerCents=Math.round((Number(fd&&fd.value)||0)*100);
+  const fondoPartsCents=Math.round((Number(fp&&fp.value)||0)*100);
+  const fondoCents=fondoDealerCents+fondoPartsCents;
   const rep=_corteState.total-fondoCents, cada=Math.round(rep/2);
-  const de=document.getElementById('corte-fondo-dept');
-  _corteState.fondoCents=fondoCents; _corteState.repartir=rep; _corteState.cada=cada; if(de) _corteState.fondoDept=de.value;
+  _corteState.fondoCents=fondoCents; _corteState.fondoDealerCents=fondoDealerCents; _corteState.fondoPartsCents=fondoPartsCents; _corteState.repartir=rep; _corteState.cada=cada;
   const r=document.getElementById('corte-repartir'); if(r) r.textContent=centsToUSD(rep);
   const c=document.getElementById('corte-cada'); if(c) c.textContent=centsToUSD(cada);
 };
@@ -1229,7 +1234,7 @@ window.confirmCierre = async function(){
   const s=_corteState;
   const msg = 'Cerrar el corte:\n\n'
     +'• Repartir '+money2(s.repartir/100)+' ('+money2(s.cada/100)+' a cada socio)\n'
-    +'• Dejar '+money2(s.fondoCents/100)+' de fondo de caja (se lo queda '+(s.fondoDept==='parts'?'Partes':'Dealer')+')\n'
+    +'• Fondo de caja: 🚗 Dealer '+money2(s.fondoDealerCents/100)+' · 🔧 Partes '+money2(s.fondoPartsCents/100)+'\n'
     +(s.owe?('• Cuadre interno: '+s.oweDir.replace(/[🚗🔧]/g,'')+money2(Math.abs(s.owe)/100)+'\n'):'')
     +'\nMarca el reinicio: el próximo corte arranca desde ahora. Queda registro permanente. ¿Confirmar?';
   if(!confirm(msg)) return;
@@ -1250,7 +1255,7 @@ window.confirmCierre = async function(){
     await setDoc(doc(db,'transactions',closingId), {
       entryId:closingId, type:'closing', amountCents:0, date:day, closedAt:now,
       dealerNetCents:s.dNet, partesNetCents:s.pNet, totalCents:s.total,
-      oweCents:s.owe, oweDir:s.oweDir, fondoCents:s.fondoCents, fondoDept:s.fondoDept,
+      oweCents:s.owe, oweDir:s.oweDir, fondoCents:s.fondoCents, fondoDealerCents:s.fondoDealerCents, fondoPartsCents:s.fondoPartsCents,
       repartirCents:s.repartir, cadaCents:s.cada, retiros:retiros.length,
       createdAt:now, createdBy:who, source:'finanzas'
     });
@@ -1269,7 +1274,7 @@ window.openCorteHist = function(){
       +'<div style="display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-bottom:6px;"><span>🧮 '+d+'</span><span style="color:'+((c.totalCents||0)>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(c.totalCents||0)+'</span></div>'
       +'<div style="font-size:12px;color:var(--muted);line-height:1.8;">🚗 Dealer neto: '+centsToUSD(c.dealerNetCents||0)+' · 🔧 Partes neto: '+centsToUSD(c.partesNetCents||0)
       +(c.oweCents?('<br>🔁 Cuadre: '+(c.oweDir||'')+' '+centsToUSD(Math.abs(c.oweCents))):'')
-      +'<br>💰 Fondo: '+centsToUSD(c.fondoCents||0)+(c.fondoDept?(' (se lo quedó '+(c.fondoDept==='parts'?'🔧 Partes':'🚗 Dealer')+')'):'')+' · Repartido: '+centsToUSD(c.repartirCents||0)+' ('+centsToUSD(c.cadaCents||0)+' c/u)</div></div>';
+      +'<br>💰 Fondo: '+((c.fondoDealerCents!=null||c.fondoPartsCents!=null)?('🚗 '+centsToUSD(c.fondoDealerCents||0)+' · 🔧 '+centsToUSD(c.fondoPartsCents||0)):(centsToUSD(c.fondoCents||0)+(c.fondoDept?(' (se lo quedó '+(c.fondoDept==='parts'?'🔧 Partes':'🚗 Dealer')+')'):'')))+' · Repartido: '+centsToUSD(c.repartirCents||0)+' ('+centsToUSD(c.cadaCents||0)+' c/u)</div></div>';
   }).join('');
   document.getElementById('cortehist-overlay').classList.add('open');
 };
@@ -1952,7 +1957,7 @@ function renderBolsas(){
   // El método (efectivo/tarjeta/Zelle) se guarda en cada movimiento solo como registro para impuestos.
   // El total de cada bolsa = FONDO que se dejó esa bolsa en el último corte + lo de DESPUÉS del corte.
   const _lcF=lastClosing(); const carried={dealer:0,parts:0};
-  if(_lcF && (_lcF.fondoCents||0)>0){ const fd=_lcF.fondoDept||'dealer'; if(carried[fd]!==undefined) carried[fd]=_lcF.fondoCents; }
+  if(_lcF){ if(_lcF.fondoDealerCents!=null || _lcF.fondoPartsCents!=null){ carried.dealer=_lcF.fondoDealerCents||0; carried.parts=_lcF.fondoPartsCents||0; } else if((_lcF.fondoCents||0)>0){ const fd=_lcF.fondoDept||'dealer'; if(carried[fd]!==undefined) carried[fd]=_lcF.fondoCents; } }
   const META=[['dealer','🚗 Dealer'],['parts','🔧 Partes']];   // eBay se trabaja aparte (se integra a Legacy en Resultados)
   box.innerHTML = META.map(([k,name])=>{
     const d=D[k], fondoK=carried[k]||0, net=fondoK+(d.in-d.out)+d.tin-d.tout, op=!!_bolsaOpen[k];
