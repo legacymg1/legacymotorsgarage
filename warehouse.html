@@ -548,22 +548,47 @@ window.openPartModal=function(vid){
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ---- Editar / eliminar CARRO ----
+let _editCarKeep=[], _editCarNew=[];
 window.openCarEdit=function(id){
   const v=vehicles.find(x=>x.id===id); if(!v) return;
+  _editCarKeep=(v.photoURLs||[]).slice(); _editCarNew=[];
   document.getElementById('modal-inner').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-weight:800;">${t('editLbl')}</div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>
     <div class="row2"><div><label>${t('year')}</label><input id="ec-year" value="${esc(v.year)}"></div><div><label>${t('make')}</label><input id="ec-make" value="${esc(v.make)}"></div><div><label>${t('model')}</label><input id="ec-model" value="${esc(v.model)}"></div></div>
     <div class="row2"><div><label>${t('miles')}</label><input id="ec-miles" type="number" value="${esc(v.miles)}"></div><div><label>${t('engine')}</label><input id="ec-engine" value="${esc(v.engine)}"></div></div>
     <div class="row2"><div><label>${t('color')}</label><input id="ec-color" value="${esc(v.color)}"></div><div><label>${t('colorCode')}</label><input id="ec-colorcode" value="${esc(v.colorCode)}"></div></div>
     <label>VIN</label><input id="ec-vin" value="${esc(v.vin)}" style="text-transform:uppercase;">
-    <button class="btn" style="width:100%;margin-top:12px;" onclick="saveCarEdit('${id}')">${t('saveChanges')}</button>`;
+    <label>${t('carPhoto')}</label>
+    <div style="display:flex;gap:8px;">
+      <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('ec-cam').click()">${t('takePhoto')}</button>
+      <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('ec-photos').click()">${t('fromGallery')}</button>
+    </div>
+    <input type="file" id="ec-cam" accept="image/*" capture="environment" multiple style="display:none" onchange="addEditCarPhotos(this)">
+    <input type="file" id="ec-photos" accept="image/*" multiple style="display:none" onchange="addEditCarPhotos(this)">
+    <div id="ec-prev" class="thumbs"></div>
+    <button class="btn" id="ec-save" style="width:100%;margin-top:12px;" onclick="saveCarEdit('${id}')">${t('saveChanges')}</button>`;
   document.getElementById('modal').style.display='block';
+  renderEditCarPhotos();
 };
+window.addEditCarPhotos=function(inp){ Array.from(inp.files||[]).forEach(f=>_editCarNew.push(f)); inp.value=''; renderEditCarPhotos(); };
+window.removeEditCarKeep=function(i){ _editCarKeep.splice(i,1); renderEditCarPhotos(); };
+window.removeEditCarNew=function(i){ _editCarNew.splice(i,1); renderEditCarPhotos(); };
+function renderEditCarPhotos(){
+  const box=document.getElementById('ec-prev'); if(!box) return;
+  const ex=_editCarKeep.map((u,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${u}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;"><button type="button" onclick="removeEditCarKeep(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
+  const nw=_editCarNew.map((f,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${URL.createObjectURL(f)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid var(--gold);"><button type="button" onclick="removeEditCarNew(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
+  box.innerHTML=ex+nw;
+}
 window.saveCarEdit=async function(id){
   const g=x=>(document.getElementById(x).value||'').trim();
-  try{ await updateDoc(doc(db,'dismantle_vehicles',id),{ year:g('ec-year'), make:titleCase(g('ec-make')), model:titleCase(g('ec-model')), miles:g('ec-miles'), engine:g('ec-engine'), color:titleCase(g('ec-color')), colorCode:g('ec-colorcode').toUpperCase(), vin:g('ec-vin').toUpperCase() });
-    closeModal(); if(_carView) renderCarDetail();
-  }catch(e){ alert(t('error')+e.message); }
+  const btn=document.getElementById('ec-save'); if(btn){ btn.disabled=true; btn.textContent=t('savingPhotos'); }
+  try{
+    const newURLs=[];
+    for(const f of _editCarNew){ const jpg=await toJpeg(f); const r=ref(storage,'dismantle_vehicles/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); newURLs.push(await getDownloadURL(r)); }
+    const photoURLs=_editCarKeep.concat(newURLs);
+    await updateDoc(doc(db,'dismantle_vehicles',id),{ year:g('ec-year'), make:titleCase(g('ec-make')), model:titleCase(g('ec-model')), miles:g('ec-miles'), engine:g('ec-engine'), color:titleCase(g('ec-color')), colorCode:g('ec-colorcode').toUpperCase(), vin:g('ec-vin').toUpperCase(), photoURLs });
+    _editCarNew=[]; closeModal(); if(_carView) renderCarDetail();
+  }catch(e){ alert(t('error')+e.message); if(btn){ btn.disabled=false; btn.textContent=t('saveChanges'); } }
 };
 window.deleteCar=async function(id){
   const vp=parts.filter(p=>p.vehicleId===id);
