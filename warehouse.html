@@ -598,22 +598,42 @@ window.deleteCar=async function(id){
 };
 
 // ---- Editar / eliminar PARTE ----
+let _editPartKeep=[], _editPartNew=[], _editPartQR='';
 window.openPartEdit=function(id){
   const p=parts.find(x=>x.id===id); if(!p) return;
   const oldBin=(p.location&&p.location.bin)||((p.location&&(p.location.rack||p.location.toper))?((p.location.rack||'')+(p.location.toper?'-'+p.location.toper:'')):'');
-  const photos=(p.photoURLs||[]).map(u=>`<img src="${u}" onclick="openPhoto('${u}')" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;">`).join('');
+  _editPartQR=p.qrURL||((p.photoURLs||[]).find(u=>/00_QR/.test(u))||'');
+  _editPartKeep=(p.photoURLs||[]).filter(u=>u && u!==_editPartQR && !/00_QR/.test(u));
+  _editPartNew=[];
   document.getElementById('modal-inner').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-weight:800;">${t('editPart')}</div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>
     <label>${t('whichPart')}</label><input id="epa-name" value="${esc(p.name)}">
     <div class="row2"><div><label>${t('condition')}</label><select id="epa-cond">${condOptions()}</select></div><div><label>${t('partNum')}</label><input id="epa-num" value="${esc(p.partNumber)}"></div></div>
     <label>${t('binLbl')}</label><input id="epa-bin" value="${esc(oldBin)}" placeholder="${t('binPh')}">
-    <div class="thumbs" style="margin-top:10px;">${photos}</div>
-    <div style="margin-top:6px;"><a href="${p.qrURL||''}" target="_blank">${t('seeQR')}</a></div>
-    <button class="btn" style="width:100%;margin-top:12px;" onclick="savePartEdit('${id}')">${t('saveChanges')}</button>
+    <label>${t('photos')}</label>
+    <div style="display:flex;gap:8px;">
+      <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('epa-cam').click()">${t('takePhoto')}</button>
+      <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('epa-photos').click()">${t('fromGallery')}</button>
+    </div>
+    <input type="file" id="epa-cam" accept="image/*" capture="environment" multiple style="display:none" onchange="addEditPartPhotos(this)">
+    <input type="file" id="epa-photos" accept="image/*" multiple style="display:none" onchange="addEditPartPhotos(this)">
+    <div id="epa-prev" class="thumbs"></div>
+    ${_editPartQR?`<div style="margin-top:8px;"><a href="${_editPartQR}" target="_blank">${t('seeQR')}</a></div>`:''}
+    <button class="btn" id="epa-save" style="width:100%;margin-top:12px;" onclick="savePartEdit('${id}')">${t('saveChanges')}</button>
     <button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--red);border-color:var(--red);" onclick="deletePart('${id}')">${t('deletePart')}</button>`;
   document.getElementById('modal').style.display='block';
   const sel=document.getElementById('epa-cond'); if(sel) sel.value=p.condition||'';
+  renderEditPartPhotos();
 };
+window.addEditPartPhotos=function(inp){ Array.from(inp.files||[]).forEach(f=>_editPartNew.push(f)); inp.value=''; renderEditPartPhotos(); };
+window.removeEditPartKeep=function(i){ _editPartKeep.splice(i,1); renderEditPartPhotos(); };
+window.removeEditPartNew=function(i){ _editPartNew.splice(i,1); renderEditPartPhotos(); };
+function renderEditPartPhotos(){
+  const box=document.getElementById('epa-prev'); if(!box) return;
+  const ex=_editPartKeep.map((u,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${u}" onclick="openPhoto('${u}')" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer;"><button type="button" onclick="event.stopPropagation();removeEditPartKeep(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
+  const nw=_editPartNew.map((f,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${URL.createObjectURL(f)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid var(--gold);"><button type="button" onclick="removeEditPartNew(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
+  box.innerHTML=ex+nw;
+}
 window.savePartEdit=async function(id){
   const p=parts.find(x=>x.id===id)||{};
   const name=(document.getElementById('epa-name').value||'').trim(); if(!name){ alert(t('alertPart')); return; }
@@ -621,9 +641,14 @@ window.savePartEdit=async function(id){
   const num=(document.getElementById('epa-num').value||'').trim();
   const bin=(document.getElementById('epa-bin').value||'').trim().toUpperCase();
   const ebayTitle=[p.vYear,p.vMake,p.vModel,p.vTrim||'',name,(num?'OEM '+num:''),'-',cond].filter(Boolean).join(' ').replace(' - -',' -');
-  try{ await updateDoc(doc(db,'parts',id),{ name, condition:cond, partNumber:num, location:{bin}, ebayTitle });
-    closeModal(); if(_carView) renderCarDetail();
-  }catch(e){ alert(t('error')+e.message); }
+  const btn=document.getElementById('epa-save'); if(btn){ btn.disabled=true; btn.textContent=t('savingPhotos'); }
+  try{
+    const newURLs=[];
+    for(const f of _editPartNew){ const jpg=await toJpeg(f); const r=ref(storage,'parts/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); newURLs.push(await getDownloadURL(r)); }
+    const photoURLs=_editPartKeep.concat(newURLs); if(_editPartQR) photoURLs.push(_editPartQR);   // QR siempre al final
+    await updateDoc(doc(db,'parts',id),{ name, condition:cond, partNumber:num, location:{bin}, ebayTitle, photoURLs });
+    _editPartNew=[]; closeModal(); if(_carView) renderCarDetail();
+  }catch(e){ alert(t('error')+e.message); if(btn){ btn.disabled=false; btn.textContent=t('saveChanges'); } }
 };
 window.deletePart=async function(id){
   if(!confirm(t('confirmDelPart'))) return;
