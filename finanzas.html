@@ -980,14 +980,15 @@ window.doDevol = async function(id){
   const _lcD=lastClosing(); const _since=_lcD?(_lcD.closedAt||''):'';
   const prior = _since ? ((e.createdAt||e.date||'') <= _since) : false;
   if(!confirm('Devolver este gasto de '+centsToUSD(cents)+' ('+(e.note||e.category||'gasto')+').\n\nSe cancela el gasto y ese dinero se queda como FONDO de '+cajaTxt+' (no cuenta como ingreso ni se reparte). ¿Confirmar?')) return;
+  const origDesc=(e.note||e.category||'gasto')+(e.vendor?(' · '+e.vendor):'')+(e.carLabel?(' · '+e.carLabel):'');
   const rid='dev_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   try{
     await setDoc(doc(db,'transactions',rid), {
-      entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id, devolucion:prior,
+      entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id, devolucion:prior, esDevolucion:true, origDesc:origDesc,
       dept:e.dept, category:e.category||'', amountCents:cents,
       method:e.method||'', date:new Date().toISOString().slice(0,10),
       vendor:e.vendor||'', carId:e.carId||'', carLabel:e.carLabel||'',
-      note:'Devolución (a fondo de caja)', createdAt:new Date().toISOString(),
+      note:'Devolución: '+origDesc, createdAt:new Date().toISOString(),
       createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
     });
     closeDevol();
@@ -1999,7 +2000,7 @@ function txDesc(t){
   if(t.type==='cash_sale') return 'Venta contado · '+(t.clientName||'cliente');
   if(t.type==='income') return (t.note||t.category||'Ingreso')+(t.clientName?' · '+t.clientName:(t.source_name?' · '+t.source_name:''))+(t.saleType==='pagos'?' · enganche':'');
   if(t.type==='expense') return (t.note||t.category||'Gasto')+(t.vendor?' · '+t.vendor:'')+(t.carLabel?' · '+t.carLabel:'');
-  if(t.type==='expense_reversal') return 'Reversa de gasto';
+  if(t.type==='expense_reversal') return t.esDevolucion ? ('↩️ Devolución: '+(t.origDesc||t.category||'gasto')) : 'Reversa de gasto';
   if(t.type==='transfer') return t.dir==='in' ? ('↔ Traspaso desde '+(DEPT_NAME[t.fromDept]||t.fromDept)) : ('↔ Traspaso a '+(DEPT_NAME[t.toDept]||t.toDept));
   return t.category||t.type;
 }
