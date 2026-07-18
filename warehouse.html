@@ -672,8 +672,8 @@ function labelWrap(g,text,cx,y,maxW,lineH,maxLines){
   lines.forEach((ln,i)=>g.fillText(ln,cx,y+i*lineH));
   return y+lines.length*lineH;
 }
-window.printPartLabel=async function(id){
-  const p=parts.find(x=>x.id===id); if(!p) return;
+window.printPartLabel=async function(id){ const p=parts.find(x=>x.id===id); if(p) await makeLabel(p); };
+async function makeLabel(p){
   try{
     const durl=await qrDataUrl(partScanURL(p.id));   // QR = enlace (cámara del iPhone abre la app); local para evitar CORS
     const qrImg=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=durl; });
@@ -784,7 +784,8 @@ window.savePart=async function(vid){
       status:'disponible', priceCents:null, location:{bin},
       createdAt:new Date().toISOString(), createdBy:myEmail });
     _partFiles[vid]=[];
-    closeModal(); if(_carView) renderCarDetail();
+    if(_carView) renderCarDetail();
+    await makeLabel({ id, name, partNumber:num, location:{bin}, vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vTrim:sp.trim||'' });   // etiqueta lista apenas se crea
   }catch(e){ alert(t('error')+e.message); btn.disabled=false; btn.textContent=t('savePart'); }
 };
 
