@@ -713,9 +713,8 @@ async function makeLabel(p){
     document.getElementById('modal2-inner').innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🖨️ ${t('labelTitle')}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
       <img src="${dataUrl}" style="width:100%;max-width:260px;display:block;margin:0 auto;border:1px solid var(--border);border-radius:8px;background:#fff;">
-      <button class="btn" style="width:100%;margin-top:14px;" onclick="printLabelNow()">${t('labelPrint')}</button>
-      <button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="shareLabel()">${t('labelShare')}</button>
-      <div class="sub" style="margin-top:10px;">${t('labelPrintHint')}</div>`;
+      <button class="btn" style="width:100%;margin-top:14px;" onclick="shareLabel()">${t('labelShare')}</button>
+      <div class="sub" style="margin-top:10px;">${t('labelHint')}</div>`;
     document.getElementById('modal2').style.display='block';
   }catch(e){ alert(t('error')+e.message); }
 };
