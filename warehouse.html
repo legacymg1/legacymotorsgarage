@@ -719,13 +719,48 @@ async function makeLabel(p){
   }catch(e){ alert(t('error')+e.message); }
 };
 window.closeModal2=function(){ const m=document.getElementById('modal2'); if(m) m.style.display='none'; const mi=document.getElementById('modal2-inner'); if(mi) mi.innerHTML=''; };
-// Generar/imprimir el QR ANTES de las fotos (usa el ID fijo _newPartId; el título/bin actuales del form)
-window.printNewPart=function(vid){
-  const v=vehicles.find(x=>x.id===vid)||{}; const sp=v.spec||{};
+// Crea o actualiza la parte (misma función para "Generar QR" y "Guardar")
+// withPhotos=false → guarda datos + QR (queda escaneable YA). withPhotos=true → agrega las fotos encima.
+async function upsertPart(vid, withPhotos){
+  const v=vehicles.find(x=>x.id===vid); if(!v){ alert(t('carNotFound')); return null; }
   const name=(document.getElementById('p-name-'+vid).value||'').trim();
-  const bin=(document.getElementById('p-bin-'+vid).value||'').trim().toUpperCase();
+  if(!name){ alert(t('alertPart')); return null; }
+  const sp=v.spec||{};
+  const cond=document.getElementById('p-cond-'+vid).value;
   const num=(document.getElementById('p-num-'+vid).value||'').trim();
-  makeLabel({ id:_newPartId, name, partNumber:num, location:{bin}, vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vTrim:sp.trim||'' });
+  const bin=(document.getElementById('p-bin-'+vid).value||'').trim().toUpperCase();
+  const id=_newPartId || ('part_'+Date.now()+'_'+Math.random().toString(36).slice(2,5));
+  _newPartId=id;
+  const existing=parts.find(x=>x.id===id);
+  // QR digital (una sola vez; su valor = el enlace con el id)
+  let qrURL=(existing&&existing.qrURL)||'';
+  if(!qrURL){
+    const durl=await qrDataUrl(partScanURL(id));
+    const blob=await (await fetch(durl)).blob();
+    const qrRef=ref(storage,'parts/'+id+'/00_QR.gif'); await uploadBytes(qrRef, blob);
+    qrURL=await getDownloadURL(qrRef);
+  }
+  // fotos: conserva las que ya tenía (sin el QR) + agrega las nuevas si aplica
+  let photos=(existing&&existing.photoURLs)? existing.photoURLs.filter(u=>u && u!==qrURL && !/00_QR/.test(u)) : [];
+  if(withPhotos){ for(const f of (_partFiles[vid]||[])){ const jpg=await toJpeg(f); const r=ref(storage,'parts/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); photos.push(await getDownloadURL(r)); } }
+  const photoURLs=photos.slice(); photoURLs.push(qrURL);   // QR al final
+  const ebayTitle=[v.year,v.make,v.model,sp.trim||'',name,(num?'OEM '+num:''),'-',cond].filter(Boolean).join(' ').replace(' - -',' -');
+  await setDoc(doc(db,'parts',id), { entryId:id, vehicleId:vid, vehicleLabel:vehLabel(v),
+    vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vMiles:v.miles||'',
+    vTrim:sp.trim||'', vEngine:v.engine||'', vDrive:sp.drive||'', vTransmission:sp.transmission||'', vBody:sp.bodyClass||'', vSpec:v.spec||null,
+    name, partNumber:num, condition:cond, notes:(existing&&existing.notes)||'', photoURLs, qrURL, ebayTitle,
+    status:(existing&&existing.status)||'disponible', priceCents:(existing&&existing.priceCents!=null)?existing.priceCents:null,
+    location:{bin}, createdAt:(existing&&existing.createdAt)||new Date().toISOString(), createdBy:(existing&&existing.createdBy)||myEmail });
+  return {id, name, num, bin, sp, v};
+}
+// "Generar e imprimir QR" → guarda la parte YA (queda escaneable) y muestra la etiqueta
+window.printNewPart=async function(vid){
+  const btn=document.getElementById('p-genqr-'+vid); if(btn){ btn.disabled=true; btn.textContent=t('savingPart'); }
+  let r=null; try{ r=await upsertPart(vid, false); }catch(e){ alert(t('error')+e.message); }
+  if(btn){ btn.disabled=false; btn.textContent=t('genLabelBtn'); }
+  if(!r) return;
+  if(_carView) renderCarDetail();
+  await makeLabel({ id:r.id, name:r.name, partNumber:r.num, location:{bin:r.bin}, vYear:r.v.year||'', vMake:r.v.make||'', vModel:r.v.model||'', vTrim:r.sp.trim||'' });
 };
 window.printLabelNow=function(){
   // iOS bloquea window.print() dentro de la app instalada (PWA) → abrimos la etiqueta en una vista aparte
@@ -752,7 +787,7 @@ function addPartFormHtml(vid){
       <div><label>${t('partNum')}</label><input id="p-num-${vid}" placeholder="${t('oemPh')}"></div>
     </div>
     <label>${t('binLbl')}</label><input id="p-bin-${vid}" placeholder="${t('binPh')}">
-    <button type="button" class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="printNewPart('${vid}')">${t('genLabelBtn')}</button>
+    <button type="button" id="p-genqr-${vid}" class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="printNewPart('${vid}')">${t('genLabelBtn')}</button>
     <div class="sub" style="margin-top:6px;">${t('labelBeforePhotos')}</div>
     <label>${t('photos')}</label>
     <div style="display:flex;gap:8px;">
@@ -798,35 +833,13 @@ async function qrDataUrl(text){
 }
 
 window.savePart=async function(vid){
-  const name=(document.getElementById('p-name-'+vid).value||'').trim();
-  if(!name){ alert(t('alertPart')); return; }
-  const v=vehicles.find(x=>x.id===vid); if(!v){ alert(t('carNotFound')); return; }
-  const btn=document.getElementById('p-save-'+vid); btn.disabled=true; btn.textContent=t('savingPart');
-  const id=_newPartId || ('part_'+Date.now()+'_'+Math.random().toString(36).slice(2,5));   // mismo ID del QR ya impreso
+  const btn=document.getElementById('p-save-'+vid); if(btn){ btn.disabled=true; btn.textContent=t('savingPart'); }
   try{
-    const files=(_partFiles[vid]||[]);
-    const photoURLs=[];
-    for(const f of files){ btn.textContent=t('savingPhotos'); const jpg=await toJpeg(f); const r=ref(storage,'parts/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); photoURLs.push(await getDownloadURL(r)); }
-    btn.textContent=t('genQR');
-    const durl=await qrDataUrl(partScanURL(id));
-    const blob=await (await fetch(durl)).blob();
-    const qrRef=ref(storage,'parts/'+id+'/00_QR.gif'); await uploadBytes(qrRef, blob);
-    const qrURL=await getDownloadURL(qrRef);
-    photoURLs.push(qrURL);   // el QR va al final, las fotos de la parte primero
-    const cond=document.getElementById('p-cond-'+vid).value;
-    const num=(document.getElementById('p-num-'+vid).value||'').trim();
-    const bin=(document.getElementById('p-bin-'+vid).value||'').trim().toUpperCase();
-    const sp=v.spec||{};
-    const ebayTitle=[v.year,v.make,v.model,sp.trim||'',name,(num?'OEM '+num:''), '-', cond].filter(Boolean).join(' ').replace(' - -',' -');
-    await setDoc(doc(db,'parts',id), { entryId:id, vehicleId:vid, vehicleLabel:vehLabel(v),
-      vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vMiles:v.miles||'',
-      vTrim:sp.trim||'', vEngine:v.engine||'', vDrive:sp.drive||'', vTransmission:sp.transmission||'', vBody:sp.bodyClass||'', vSpec: v.spec||null,   // fitment para el listado eBay
-      name, partNumber:num, condition:cond, notes:'', photoURLs, qrURL, ebayTitle,
-      status:'disponible', priceCents:null, location:{bin},
-      createdAt:new Date().toISOString(), createdBy:myEmail });
+    const r=await upsertPart(vid, true);
+    if(!r){ if(btn){ btn.disabled=false; btn.textContent=t('savePart'); } return; }
     _partFiles[vid]=[]; _newPartId='';
     closeModal(); if(_carView) renderCarDetail();
-  }catch(e){ alert(t('error')+e.message); btn.disabled=false; btn.textContent=t('savePart'); }
+  }catch(e){ alert(t('error')+e.message); if(btn){ btn.disabled=false; btn.textContent=t('savePart'); } }
 };
 
 function statusTag(s){ return s==='vendido'?'<span class="tag vend">'+t('tagSold')+'</span>':s==='publicado'?'<span class="tag public">'+t('tagPublished')+'</span>':'<span class="tag dispon">'+t('tagAvailable')+'</span>'; }
@@ -878,7 +891,7 @@ window.markSold=async function(id){ if(!confirm(t('confirmSold'))) return; try{ 
 window.scanLookup=function(){
   const raw=(document.getElementById('scan-input').value||'').trim();
   if(!raw) return;
-  let id=raw; const m=raw.match(/[?&]scan=([\w-]+)/) || raw.match(/part[=/]([\w-]+)/); if(m) id=m[1];
+  let id=raw; const m=raw.match(/[?&]scan=([\w-]+)/) || raw.match(/part[=/]([\w-]+)/) || raw.match(/(part_\d+_[a-z0-9]+)/i); if(m) id=m[1];
   const p=parts.find(x=>x.id===id || x.entryId===id);
   const box=document.getElementById('pack-result');
   if(!p){ box.innerHTML='<div class="card"><div class="red">'+t('notFoundPart')+'</div><div class="sub">'+t('codeLbl')+': '+raw+'</div></div>'; return; }
