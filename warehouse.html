@@ -694,9 +694,9 @@ async function makeLabel(p){
   try{
     const durl=await qrDataUrl(partScanURL(p.id));   // QR = enlace (cámara del iPhone abre la app); local para evitar CORS
     const qrImg=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=durl; });
-    // Etiqueta al tamaño real del rollo (50x30 mm ≈ 400x240 px a 203dpi), QR centrado.
-    // JPEG (sin canal alfa) para que la impresora térmica SÍ lo imprima.
-    const LW=400, LH=240, qs=224, ox=(LW-qs)/2, oy=(LH-qs)/2;
+    // Cabezal R22 = 48mm / 384 puntos a 203dpi. La imagen NO debe pasar de 384 px de ancho
+    // o la impresora descarta el trabajo (se ve en preview pero no imprime). Alto 30mm ≈ 240 px.
+    const LW=384, LH=240, qs=224, ox=(LW-qs)/2, oy=(LH-qs)/2;
     const c=document.createElement('canvas'); c.width=LW; c.height=LH;
     const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,LW,LH);
     g.drawImage(qrImg, ox, oy, qs, qs);
