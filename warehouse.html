@@ -47,7 +47,7 @@
     body{background:#fff !important;}
     body > *:not(#print-area){display:none !important;}
     #print-area{display:flex !important;align-items:center;justify-content:center;width:50mm;height:30mm;}
-    #print-area img{width:28mm;height:28mm;}
+    #print-area img{width:50mm;height:30mm;}
     @page{size:50mm 30mm;margin:0;}
   }
 </style>
@@ -694,14 +694,15 @@ async function makeLabel(p){
   try{
     const durl=await qrDataUrl(partScanURL(p.id));   // QR = enlace (cámara del iPhone abre la app); local para evitar CORS
     const qrImg=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=durl; });
-    // Etiqueta = SOLO el QR (con margen blanco para que escanee bien)
-    const S=500, qs=440, off=(S-qs)/2;
-    const c=document.createElement('canvas'); c.width=S; c.height=S;
-    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,S,S);
-    g.drawImage(qrImg, off, off, qs, qs);
-    const dataUrl=c.toDataURL('image/png');
-    const blob=await new Promise(r=>c.toBlob(r,'image/png'));
-    _labelFile=blob?new File([blob],'etiqueta_'+p.id+'.png',{type:'image/png'}):null;
+    // Etiqueta al tamaño real del rollo (50x30 mm ≈ 400x240 px a 203dpi), QR centrado.
+    // JPEG (sin canal alfa) para que la impresora térmica SÍ lo imprima.
+    const LW=400, LH=240, qs=224, ox=(LW-qs)/2, oy=(LH-qs)/2;
+    const c=document.createElement('canvas'); c.width=LW; c.height=LH;
+    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,LW,LH);
+    g.drawImage(qrImg, ox, oy, qs, qs);
+    const dataUrl=c.toDataURL('image/jpeg',0.92);
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
+    _labelFile=blob?new File([blob],'etiqueta_'+p.id+'.jpg',{type:'image/jpeg'}):null;
     _labelDataUrl=dataUrl;
     const pa=document.getElementById('print-area'); if(pa) pa.innerHTML='<img src="'+dataUrl+'">';   // lo que se imprime
     document.getElementById('modal2-inner').innerHTML=`
@@ -727,7 +728,7 @@ window.printLabelNow=function(){
   try{
     const w=window.open('','_blank');
     if(!w){ shareLabel(); return; }   // si el navegador lo bloquea, caemos al compartir
-    w.document.write('<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>QR</title><style>@page{size:50mm 30mm;margin:0}html,body{margin:0;padding:0}body{display:flex;align-items:center;justify-content:center;height:100vh}img{width:28mm;height:28mm}</style></head><body><img src="'+_labelDataUrl+'"></body></html>');
+    w.document.write('<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>QR</title><style>@page{size:50mm 30mm;margin:0}html,body{margin:0;padding:0}body{display:flex;align-items:center;justify-content:center;height:100vh}img{width:50mm;height:30mm}</style></head><body><img src="'+_labelDataUrl+'"></body></html>');
     w.document.close(); w.focus();
     setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
   }catch(e){ shareLabel(); }
