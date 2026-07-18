@@ -14644,7 +14644,10 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <input class="cf-input" id="car-make" placeholder="Make / Marca (Toyota)" style="text-transform:capitalize">
     <input class="cf-input" id="car-model" placeholder="Model / Modelo (Camry)" style="text-transform:capitalize">
     <input class="cf-input" id="car-miles" placeholder="Mileage / Millas">
-    <input class="cf-input" id="car-vin" placeholder="VIN Number" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+    <input class="cf-input" id="car-vin" placeholder="VIN Number" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter'){event.preventDefault();decodeCarVin();}">
+    <button type="button" onclick="decodeCarVin()" style="width:100%;background:rgba(240,192,64,0.14);color:#f0c040;border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">🔎 Decodificar VIN (auto-rellenar)</button>
+    <div id="car-vin-msg" style="font-size:12px;color:#aaa;margin:-2px 0 6px;"></div>
+    <div id="car-vin-spec" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;"></div>
     <div id="car-prep-only" style="display:none;">
       <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">🔧 <b>Preparación (interno).</b> Registra lo que nos costó el carro. Puedes agregar una foto ya. El video, la descripción y el precio de venta se piden después, al editarlo para exhibición.</div>
       <input class="cf-input" id="car-cost" placeholder="Costo de compra / lo que pagamos ($)" type="number">
@@ -14717,6 +14720,7 @@ let isStaffUser=false, carExpenses={}, _costListening=false;
 let isAdmin=false;
 let cars=[];
 let editingCarId=null;
+let _carSpec=null;   // ficha decodificada del VIN (NHTSA ahora; extensible a Bumper con backend)
 
 // Load cars from Firebase
 onSnapshot(collection(db,'inventory'), snap=>{
@@ -15005,9 +15009,49 @@ window.openCarModal = function(carId){
   document.getElementById('car-exhib-only').style.display = carId ? 'block' : 'none';
   const _cc=document.getElementById('car-cost'); if(_cc) _cc.value='';
   if(!carId) title.textContent='Agregar (Preparación) / Add (Prep)';
+  _carSpec = carId ? ((cars.find(x=>x.id===carId)||{}).spec||null) : null;
+  renderCarSpec(_carSpec);
+  const _vm=document.getElementById('car-vin-msg'); if(_vm) _vm.textContent='';
   modal.style.display='flex';
 }
 window.closeCarModal = function(){document.getElementById('car-modal').style.display='none';}
+
+// ===== VIN → auto-relleno (NHTSA gratis; deja lista la ficha para el historial de Bumper en Fase 2) =====
+function renderCarSpec(s){
+  const box=document.getElementById('car-vin-spec'); if(!box) return;
+  if(!s){ box.innerHTML=''; return; }
+  const chips=[['🏷️',s.trim],['🚗',s.bodyClass],['⚙️',s.transmission],['🛞',s.drive],['🔧',s.engine]].filter(x=>x[1]);
+  box.innerHTML=chips.map(c=>'<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:20px;padding:3px 9px;font-size:11px;color:#ccc;">'+c[0]+' '+c[1]+'</span>').join('')
+    + ((s.all&&s.all.length)?('<span style="font-size:11px;color:#666;align-self:center;">· '+s.all.length+' datos guardados</span>'):'');
+}
+window.decodeCarVin = async function(){
+  const vinEl=document.getElementById('car-vin'); const vin=(vinEl?vinEl.value:'').trim().toUpperCase();
+  const msg=document.getElementById('car-vin-msg');
+  if(vin.length<11){ if(msg) msg.textContent='El VIN se ve corto (deben ser ~17).'; return; }
+  if(msg) msg.textContent='Decodificando…';
+  try{
+    const r=await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/'+encodeURIComponent(vin)+'?format=json');
+    const j=await r.json(); const results=(j.Results||[]);
+    const g=k=>{ const it=results.find(x=>x.Variable===k); return ((it&&it.Value)||'').trim(); };
+    const tc=s=>String(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+    const year=g('Model Year'), make=g('Make'), model=g('Model');
+    const displ=g('Displacement (L)'), cyl=g('Engine Number of Cylinders'), fuel=g('Fuel Type - Primary');
+    const engine=[displ&&(Math.round(parseFloat(displ)*10)/10+'L'), cyl&&cyl+'cyl', fuel].filter(Boolean).join(' ');
+    const EXCLUDE=new Set(['Error Code','Error Text','Additional Error Text','Suggested VIN','Vehicle Descriptor','Note','Possible Values','Destination Market','NCSA Body Type','NCSA Make','NCSA Model','NCSA Note','Base Price ($)']);
+    const bad=v=>{ v=(v||'').trim(); return !v || v==='0' || /^not applicable$/i.test(v) || /^0\.0*$/.test(v); };
+    const all=results.filter(x=>!EXCLUDE.has(x.Variable) && !bad(x.Value)).map(x=>({label:x.Variable, value:x.Value.trim()}));
+    _carSpec={ vin, source:'nhtsa', decodedAt:new Date().toISOString(),
+      trim:g('Trim')||g('Series'), series:g('Series'), bodyClass:g('Body Class'), doors:g('Doors'),
+      drive:g('Drive Type'), transmission:g('Transmission Style'),
+      displacementL:displ, cylinders:cyl, fuel:fuel,
+      plant:g('Plant Country'), vehicleType:g('Vehicle Type'), manufacturer:g('Manufacturer Name'), engine:engine.trim(), all };
+    if(year) document.getElementById('car-year').value=year;
+    if(make) document.getElementById('car-make').value=tc(make);
+    if(model) document.getElementById('car-model').value=tc(model);
+    renderCarSpec(_carSpec);
+    if(msg) msg.textContent = (year||make||model) ? '✓ Datos rellenados — revisa y corrige si hace falta.' : 'No se encontró info de ese VIN; captura a mano.';
+  }catch(e){ if(msg) msg.textContent='No se pudo decodificar (sin internet o VIN inválido). Captura a mano.'; }
+};
 
 window.generateInvNum = function generateInvNum(){
   if(!cars.length) return '0001';
@@ -15114,6 +15158,7 @@ window.saveCar = async function(){
       status: existing.status || 'prep',
       gpsPhotoURL,
       vin: (document.getElementById('car-vin')?document.getElementById('car-vin').value.trim():'').toUpperCase(),
+      spec: (_carSpec && _carSpec.vin === (document.getElementById('car-vin')?document.getElementById('car-vin').value.trim().toUpperCase():'')) ? _carSpec : (existing.spec||null),
       createdAt: existing.createdAt || Date.now(),
       updatedAt: Date.now()
     };
