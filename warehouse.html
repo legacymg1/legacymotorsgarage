@@ -149,7 +149,7 @@
 </div>
 
 <!-- Botón flotante: agregar parte (solo en la página del carro) -->
-<button id="fab-part" onclick="openPartModal(_carView)" style="display:none;position:fixed;right:18px;bottom:22px;z-index:8000;background:var(--gold);color:#0b0e14;border:none;border-radius:30px;padding:14px 20px;font-size:16px;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;">＋ <span data-i18n="addPartFab">Parte</span></button>
+<button id="fab-part" onclick="openPartModal()" style="display:none;position:fixed;right:18px;bottom:22px;z-index:8000;background:var(--gold);color:#0b0e14;border:none;border-radius:30px;padding:14px 20px;font-size:16px;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;">＋ <span data-i18n="addPartFab">Parte</span></button>
 
 <!-- Modal genérico (ficha VIN / agregar parte) -->
 <div id="modal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);padding:14px;overflow:auto;" onclick="if(event.target===this)closeModal()">
