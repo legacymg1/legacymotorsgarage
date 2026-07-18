@@ -684,17 +684,11 @@ async function makeLabel(p){
   try{
     const durl=await qrDataUrl(partScanURL(p.id));   // QR = enlace (cámara del iPhone abre la app); local para evitar CORS
     const qrImg=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=durl; });
-    const W=600, H=820, cx=W/2;
-    const c=document.createElement('canvas'); c.width=W; c.height=H;
-    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,W,H);
-    const qs=430; g.drawImage(qrImg,(W-qs)/2,20,qs,qs);
-    g.fillStyle='#000'; g.textAlign='center'; g.textBaseline='top';
-    let y=470;
-    const bin=(p.location&&p.location.bin)||'';
-    if(bin){ g.font='bold 60px -apple-system,Arial'; g.fillText('📦 '+bin, cx, y); y+=76; }
-    g.font='bold 40px -apple-system,Arial'; y=labelWrap(g,p.name||'',cx,y,W-30,46,2)+8;
-    g.font='30px -apple-system,Arial'; y=labelWrap(g,[p.vYear,p.vMake,p.vModel,p.vTrim||''].filter(Boolean).join(' '),cx,y,W-30,36,2)+6;
-    if(p.partNumber){ g.font='28px -apple-system,Arial'; g.fillStyle='#444'; g.fillText('OEM '+p.partNumber, cx, y); }
+    // Etiqueta = SOLO el QR (con margen blanco para que escanee bien)
+    const S=500, qs=440, off=(S-qs)/2;
+    const c=document.createElement('canvas'); c.width=S; c.height=S;
+    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,S,S);
+    g.drawImage(qrImg, off, off, qs, qs);
     const dataUrl=c.toDataURL('image/png');
     const blob=await new Promise(r=>c.toBlob(r,'image/png'));
     _labelFile=blob?new File([blob],'etiqueta_'+p.id+'.png',{type:'image/png'}):null;
