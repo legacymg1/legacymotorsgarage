@@ -184,6 +184,7 @@ const T={
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte + generar QR', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería',
     carPhoto:'📷 Foto del carro', binLbl:'📦 Bin', binPh:'Ej. A-14', backCars:'← Carros', vinFichaBtn:'📋 Ficha del VIN', specSearchPh:'🔎 Buscar dato…', partsTitle:'Partes del carro', addPartFab:'Parte', noPhoto:'Sin foto', closeLbl:'Cerrar', tapForParts:'Toca para ver el carro y sus partes',
     searchCarPh:'🔎 Buscar carro…', noCarsMatch:'Ningún carro coincide.', editLbl:'✏️ Editar', deleteLbl:'🗑️ Eliminar', editPart:'✏️ Editar parte', deletePart:'🗑️ Eliminar parte', saveChanges:'Guardar cambios', confirmDelCar:'¿Eliminar este carro? No se puede deshacer.', confirmDelPart:'¿Eliminar esta parte? No se puede deshacer.', carHasParts:'Este carro tiene N parte(s). Elimina o mueve sus partes primero.',
+    printLabel:'🖨️ Imprimir etiqueta', labelTitle:'Etiqueta', labelShare:'📤 Compartir a la impresora', labelHint:'Elige la app de Rongta para imprimir. Si no aparece, mantén presionada la imagen, guárdala y ábrela en la app de Rongta.', labelNoShare:'Tu dispositivo no deja compartir el archivo. Mantén presionada la imagen para guardarla y ábrela en la app de Rongta.', makingLabel:'Generando etiqueta…',
     seeQR:'⬇️ Ver/descargar QR', tagSold:'Vendido', tagPublished:'Publicado', tagAvailable:'Disponible', noLoc:'sin ubicación',
     listerHint:'Partes listas para publicar. Toca una para copiar los campos, ver precios "sold" y marcar publicada.', noToPublish:'No hay partes por publicar.', ebayTitleLbl:'Título eBay:', copy:'Copiar', copied:'¡Copiado!', seeSold:'💲 Ver "sold" en eBay', markPublished:'✓ Marcar publicada', markSold:'Marcar vendida', priceAsk:'¿A qué precio la publicaste? (opcional, en $)', confirmSold:'¿Marcar esta parte como vendida?',
     scanTitle:'📦 Escanear / buscar parte', scanHint:'Escanea el QR (o pega/teclea el código) para ver dónde está y cambiar su ubicación.', searchBtn:'Buscar', scanCam:'📷 Escanear con cámara', saveNewLoc:'Guardar nueva ubicación', notFoundPart:'No encontré esa parte.', codeLbl:'Código', locSaved:'✓ Ubicación guardada', noCamera:'Este dispositivo no soporta escaneo por cámara. Usa el lector físico o teclea el código.', camErr:'No se pudo abrir la cámara: ', installHint:'Para instalar: menú del navegador (⋮) → "Agregar a inicio" / "Instalar app".',
@@ -197,6 +198,7 @@ const T={
     addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part + generate QR', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery',
     carPhoto:'📷 Car photo', binLbl:'📦 Bin', binPh:'e.g. A-14', backCars:'← Cars', vinFichaBtn:'📋 VIN details', specSearchPh:'🔎 Search detail…', partsTitle:'Car parts', addPartFab:'Part', noPhoto:'No photo', closeLbl:'Close', tapForParts:'Tap to open the car and its parts',
     searchCarPh:'🔎 Search car…', noCarsMatch:'No car matches.', editLbl:'✏️ Edit', deleteLbl:'🗑️ Delete', editPart:'✏️ Edit part', deletePart:'🗑️ Delete part', saveChanges:'Save changes', confirmDelCar:'Delete this car? This cannot be undone.', confirmDelPart:'Delete this part? This cannot be undone.', carHasParts:'This car has N part(s). Delete or move its parts first.',
+    printLabel:'🖨️ Print label', labelTitle:'Label', labelShare:'📤 Share to printer', labelHint:'Pick the Rongta app to print. If it is not listed, long-press the image, save it, and open it in the Rongta app.', labelNoShare:'Your device cannot share the file. Long-press the image to save it and open it in the Rongta app.', makingLabel:'Building label…',
     seeQR:'⬇️ View/download QR', tagSold:'Sold', tagPublished:'Published', tagAvailable:'Available', noLoc:'no location',
     listerHint:'Parts ready to list. Tap one to copy the fields, see "sold" prices and mark as published.', noToPublish:'No parts to publish.', ebayTitleLbl:'eBay title:', copy:'Copy', copied:'Copied!', seeSold:'💲 See "sold" on eBay', markPublished:'✓ Mark published', markSold:'Mark sold', priceAsk:'What price did you list it at? (optional, in $)', confirmSold:'Mark this part as sold?',
     scanTitle:'📦 Scan / find part', scanHint:'Scan the QR (or paste/type the code) to see where it is and change its location.', searchBtn:'Search', scanCam:'📷 Scan with camera', saveNewLoc:'Save new location', notFoundPart:"Couldn't find that part.", codeLbl:'Code', locSaved:'✓ Location saved', noCamera:'This device does not support camera scanning. Use the hardware scanner or type the code.', camErr:'Could not open camera: ', installHint:'To install: browser menu (⋮) → "Add to Home screen" / "Install app".',
@@ -616,7 +618,8 @@ window.openPartEdit=function(id){
     <input type="file" id="epa-cam" accept="image/*" capture="environment" multiple style="display:none" onchange="addEditPartPhotos(this)">
     <input type="file" id="epa-photos" accept="image/*" multiple style="display:none" onchange="addEditPartPhotos(this)">
     <div id="epa-prev" class="thumbs"></div>
-    ${_editPartQR?`<div style="margin-top:8px;"><a href="${_editPartQR}" target="_blank">${t('seeQR')}</a></div>`:''}
+    <button class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="printPartLabel('${id}')">${t('printLabel')}</button>
+    ${_editPartQR?`<div style="margin-top:8px;text-align:center;"><a href="${_editPartQR}" target="_blank">${t('seeQR')}</a></div>`:''}
     <button class="btn" id="epa-save" style="width:100%;margin-top:12px;" onclick="savePartEdit('${id}')">${t('saveChanges')}</button>
     ${isDeleter()?`<button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--red);border-color:var(--red);" onclick="deletePart('${id}')">${t('deletePart')}</button>`:''}`;
   document.getElementById('modal').style.display='block';
@@ -651,6 +654,51 @@ window.savePartEdit=async function(id){
 window.deletePart=async function(id){
   if(!confirm(t('confirmDelPart'))) return;
   try{ await deleteDoc(doc(db,'parts',id)); closeModal(); if(_carView) renderCarDetail(); }catch(e){ alert(t('error')+e.message); }
+};
+
+// ---- Etiqueta imprimible (QR + info) para la Rongta R22 vía app (iPhone) ----
+let _labelFile=null;
+function labelWrap(g,text,cx,y,maxW,lineH,maxLines){
+  const words=String(text||'').split(/\s+/).filter(Boolean); let lines=[], cur='';
+  for(const w of words){ const test=cur?cur+' '+w:w; if(g.measureText(test).width>maxW && cur){ lines.push(cur); cur=w; } else cur=test; }
+  if(cur) lines.push(cur);
+  if(lines.length>maxLines){ lines=lines.slice(0,maxLines); lines[maxLines-1]=lines[maxLines-1].slice(0,-1)+'…'; }
+  lines.forEach((ln,i)=>g.fillText(ln,cx,y+i*lineH));
+  return y+lines.length*lineH;
+}
+window.printPartLabel=async function(id){
+  const p=parts.find(x=>x.id===id); if(!p) return;
+  try{
+    const durl=await qrDataUrl(p.id);   // QR local (mismo valor que se escanea; evita CORS)
+    const qrImg=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=durl; });
+    const W=600, H=820, cx=W/2;
+    const c=document.createElement('canvas'); c.width=W; c.height=H;
+    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,W,H);
+    const qs=430; g.drawImage(qrImg,(W-qs)/2,20,qs,qs);
+    g.fillStyle='#000'; g.textAlign='center'; g.textBaseline='top';
+    let y=470;
+    const bin=(p.location&&p.location.bin)||'';
+    if(bin){ g.font='bold 60px -apple-system,Arial'; g.fillText('📦 '+bin, cx, y); y+=76; }
+    g.font='bold 40px -apple-system,Arial'; y=labelWrap(g,p.name||'',cx,y,W-30,46,2)+8;
+    g.font='30px -apple-system,Arial'; y=labelWrap(g,[p.vYear,p.vMake,p.vModel,p.vTrim||''].filter(Boolean).join(' '),cx,y,W-30,36,2)+6;
+    if(p.partNumber){ g.font='28px -apple-system,Arial'; g.fillStyle='#444'; g.fillText('OEM '+p.partNumber, cx, y); }
+    const dataUrl=c.toDataURL('image/png');
+    const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+    _labelFile=blob?new File([blob],'etiqueta_'+p.id+'.png',{type:'image/png'}):null;
+    document.getElementById('modal-inner').innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🖨️ ${t('labelTitle')}</div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>
+      <img src="${dataUrl}" style="width:100%;max-width:260px;display:block;margin:0 auto;border:1px solid var(--border);border-radius:8px;background:#fff;">
+      <button class="btn" style="width:100%;margin-top:14px;" onclick="shareLabel()">${t('labelShare')}</button>
+      <div class="sub" style="margin-top:10px;">${t('labelHint')}</div>`;
+    document.getElementById('modal').style.display='block';
+  }catch(e){ alert(t('error')+e.message); }
+};
+window.shareLabel=async function(){
+  if(!_labelFile){ return; }
+  try{
+    if(navigator.canShare && navigator.canShare({files:[_labelFile]})){ await navigator.share({files:[_labelFile], title:t('labelTitle')}); }
+    else { alert(t('labelNoShare')); }
+  }catch(e){ /* usuario canceló el compartir */ }
 };
 
 function addPartFormHtml(vid){
@@ -793,6 +841,7 @@ window.scanLookup=function(){
     <div style="font-size:16px;font-weight:800;color:var(--gold);margin:6px 0;">📍 ${locText(p)}</div>
     <label>${t('binLbl')}</label><input id="pk-bin" value="${(p.location&&p.location.bin)||''}" placeholder="${t('binPh')}">
     <button class="btn" style="width:100%;margin-top:10px;" onclick="saveLoc('${p.id}')">${t('saveNewLoc')}</button>
+    <button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="printPartLabel('${p.id}')">${t('printLabel')}</button>
     ${p.status!=='vendido'?`<button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="markSold('${p.id}')">${t('markSold')}</button>`:''}
   </div>`;
   document.getElementById('scan-input').value='';
