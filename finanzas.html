@@ -220,6 +220,7 @@
 
   <div style="margin:16px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
+    <button class="btn-add" onclick="openDevol()" style="font-size:15px;">↩️ Devoluciones</button>
     <button class="btn-add" onclick="openClientes()" style="font-size:15px;">👤 Clientes de partes</button>
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
     <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
@@ -572,6 +573,16 @@
     <div class="sheet-head"><div class="sheet-title">📋 Cortes anteriores</div><button class="close" onclick="closeCorteHist()">✕</button></div>
     <div style="font-size:12px;color:var(--faint);margin-bottom:12px;">Cada corte cerrado queda guardado aquí como referencia (no se puede modificar).</div>
     <div id="cortehist-body" style="max-height:64vh;overflow:auto;"></div>
+  </div>
+</div>
+
+<!-- DEVOLUCIONES -->
+<div class="overlay" id="devol-overlay">
+  <div class="sheet">
+    <div class="sheet-head"><div class="sheet-title">↩️ Devolución de gasto</div><button class="close" onclick="closeDevol()">✕</button></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Elige el gasto de la parte que se devolvió. Se <b>cancela ese gasto</b> y el dinero se queda como <b>fondo de esa caja</b> (no cuenta como ingreso ni se reparte 50/50).</div>
+    <input id="devol-search" oninput="renderDevolList()" placeholder="🔎 Buscar gasto…" style="width:100%;box-sizing:border-box;margin-bottom:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);">
+    <div id="devol-body" style="max-height:58vh;overflow:auto;"></div>
   </div>
 </div>
 
@@ -941,6 +952,49 @@ window.reverseExp = async function(id){
   }catch(err){ alert('Error: '+err.message); }
 };
 
+// ---------- DEVOLUCIONES (revierte un gasto; el dinero va a FONDO de esa caja, no se reparte) ----------
+window.openDevol = function(){ const s=document.getElementById('devol-search'); if(s) s.value=''; renderDevolList(); document.getElementById('devol-overlay').classList.add('open'); };
+window.closeDevol = function(){ document.getElementById('devol-overlay').classList.remove('open'); };
+window.renderDevolList = function(){
+  const box=document.getElementById('devol-body'); if(!box) return;
+  const q=((document.getElementById('devol-search')||{}).value||'').trim().toLowerCase();
+  const reversed=new Set(txns.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
+  let list=txns.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id) && canEditTx(t.id));
+  if(q){ const w=q.split(/\s+/); list=list.filter(t=>{ const hay=((t.note||'')+' '+(t.category||'')+' '+(t.vendor||'')+' '+(t.carLabel||'')+' '+((DEPT_LABEL[t.dept]||''))).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); }); }
+  list.sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||''));
+  if(!list.length){ box.innerHTML='<div style="color:var(--faint);text-align:center;padding:24px;">No hay gastos para devolver.</div>'; return; }
+  box.innerHTML=list.map(t=>{
+    const dept=DEPT_LABEL[t.dept]||t.dept;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:11px 12px;margin-bottom:8px;">'
+      +'<div style="min-width:0;"><div style="font-weight:700;">'+(t.note||t.category||'Gasto')+'</div><div style="font-size:12px;color:var(--muted);">'+dept+' · '+centsToUSD(t.amountCents)+(t.carLabel?(' · '+t.carLabel):'')+' · '+((t.date||'').slice(0,10))+'</div></div>'
+      +'<button class="btn-add" style="flex:0 0 auto;font-size:13px;" onclick="doDevol(\''+t.id+'\')">Devolver</button></div>';
+  }).join('');
+};
+window.doDevol = async function(id){
+  if(!canEditTx(id)){ alert('Solo puedes devolver gastos de tu bolsa.'); return; }
+  const e=txns.find(x=>x.id===id); if(!e) return;
+  const cents=Number(e.amountCents)||0;
+  const cajaTxt=(e.dept==='parts')?'🔧 Partes':'🚗 Dealer';
+  // ¿el gasto es de un corte YA cerrado? Solo entonces el reembolso es dinero nuevo que va a fondo;
+  // si es del período actual, la reversa ya lo neutraliza (queda como efectivo en la caja, no se reparte).
+  const _lcD=lastClosing(); const _since=_lcD?(_lcD.closedAt||''):'';
+  const prior = _since ? ((e.createdAt||e.date||'') <= _since) : false;
+  if(!confirm('Devolver este gasto de '+centsToUSD(cents)+' ('+(e.note||e.category||'gasto')+').\n\nSe cancela el gasto y ese dinero se queda como FONDO de '+cajaTxt+' (no cuenta como ingreso ni se reparte). ¿Confirmar?')) return;
+  const rid='dev_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  try{
+    await setDoc(doc(db,'transactions',rid), {
+      entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id, devolucion:prior,
+      dept:e.dept, category:e.category||'', amountCents:cents,
+      method:e.method||'', date:new Date().toISOString().slice(0,10),
+      vendor:e.vendor||'', carId:e.carId||'', carLabel:e.carLabel||'',
+      note:'Devolución (a fondo de caja)', createdAt:new Date().toISOString(),
+      createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
+    });
+    closeDevol();
+    alert('✅ Devolución registrada. El gasto quedó cancelado y '+centsToUSD(cents)+' se queda como fondo de '+cajaTxt+'. En el corte lo verás como fondo (no se reparte).');
+  }catch(err){ alert('Error: '+err.message); }
+};
+
 // Todos los movimientos (gastos + ingresos), ordenados FIEL a como se fueron ingresando (más reciente arriba), sin distinción.
 function _movAll(){
   const LT=liveTxns();
@@ -1105,6 +1159,7 @@ document.getElementById('mov-overlay').addEventListener('click',e=>{ if(e.target
 document.getElementById('movedit-overlay').addEventListener('click',e=>{ if(e.target.id==='movedit-overlay') closeMovEdit(); });
 document.getElementById('socios-overlay').addEventListener('click',e=>{ if(e.target.id==='socios-overlay') closeSocios(); });
 document.getElementById('cortehist-overlay').addEventListener('click',e=>{ if(e.target.id==='cortehist-overlay') closeCorteHist(); });
+document.getElementById('devol-overlay').addEventListener('click',e=>{ if(e.target.id==='devol-overlay') closeDevol(); });
 document.getElementById('comis-overlay').addEventListener('click',e=>{ if(e.target.id==='comis-overlay') closeComis(); });
 document.getElementById('bulkcar-overlay').addEventListener('click',e=>{ if(e.target.id==='bulkcar-overlay') closeBulkAssign(); });
 document.getElementById('split-overlay').addEventListener('click',e=>{ if(e.target.id==='split-overlay') closeSplit(); });
@@ -1176,6 +1231,9 @@ window.renderCorte = function(){
   const _lc=lastClosing(); const carried={dealer:0,parts:0};   // fondo que dejó el corte anterior (ambas cajas; compat con cortes viejos de una sola)
   if(_lc){ if(_lc.fondoDealerCents!=null || _lc.fondoPartsCents!=null){ carried.dealer=_lc.fondoDealerCents||0; carried.parts=_lc.fondoPartsCents||0; } else if((_lc.fondoCents||0)>0){ carried[_lc.fondoDept||'dealer']=_lc.fondoCents; } }
   const dNet=dIn-dEx+carried.dealer, pNet=pIn-pEx+carried.parts, totalNet=dNet+pNet;
+  // Devoluciones del período (reversas marcadas): ese dinero va a FONDO de su caja, NO se reparte
+  const devFondo={dealer:0,parts:0};
+  ['dealer','parts'].forEach(dd=>{ data[dd].exp.forEach(tx=>{ if(tx.type==='expense_reversal' && tx.devolucion) devFondo[dd]+=(Number(tx.amountCents)||0); }); });
   const listBlock=(title,color,items,total)=>
     '<div style="font-size:13px;font-weight:800;color:'+color+';margin:16px 0 4px;">'+title+'</div>'
     +'<div style="max-height:220px;overflow:auto;">'+_pnlListHtml(items)+'</div>'
@@ -1196,21 +1254,25 @@ window.renderCorte = function(){
   const oweDir = owe>=0 ? '🚗 Dealer → 🔧 Partes' : '🔧 Partes → 🚗 Dealer';
   const fdEl=document.getElementById('corte-fondo-dealer'); const fdStr=fdEl?fdEl.value:'';
   const fpEl=document.getElementById('corte-fondo-parts'); const fpStr=fpEl?fpEl.value:'';
-  const fondoDealerCents=Math.round((Number(fdStr)||0)*100);
-  const fondoPartsCents=Math.round((Number(fpStr)||0)*100);
+  const manDealer=Math.round((Number(fdStr)||0)*100);   // fondo adicional que el usuario deja
+  const manParts=Math.round((Number(fpStr)||0)*100);
+  const fondoDealerCents=devFondo.dealer+manDealer;      // total que se queda esa caja = devoluciones + adicional
+  const fondoPartsCents=devFondo.parts+manParts;
   const fondoCents=fondoDealerCents+fondoPartsCents;
   const repartir=totalNet-fondoCents, cada=Math.round(repartir/2);
-  _corteState={total:totalNet,dNet,pNet,owe,oweDir,fondoCents,fondoDealerCents,fondoPartsCents,repartir,cada};
+  _corteState={total:totalNet,dNet,pNet,owe,oweDir,fondoCents,fondoDealerCents,fondoPartsCents,devFondoDealer:devFondo.dealer,devFondoParts:devFondo.parts,repartir,cada};
   html+='<div style="border-top:2px solid var(--border);margin-top:22px;padding-top:14px;">'
     +'<div style="font-weight:800;font-size:15px;margin-bottom:10px;">🔁 Cuadre entre socios <span style="font-size:11px;color:var(--faint);font-weight:500;">(cuenta interna, se registra en el total)</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">🚗 Dealer neto</span><span style="color:'+(dNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(dNet)+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">🔧 Partes neto</span><span style="color:'+(pNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(pNet)+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:2px;border-top:1px solid var(--border);font-weight:700;"><span>Total</span><span style="color:'+(totalNet>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(totalNet)+'</span></div>'
     +'<div style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:12px;margin:12px 0;text-align:center;"><div style="font-size:12px;color:var(--muted);">Para quedar 50/50, se debe cuadrar:</div><div style="font-size:17px;font-weight:800;color:#f0c040;margin-top:2px;">'+oweDir+': '+centsToUSD(Math.abs(owe))+'</div></div>'
-    +'<div style="color:var(--muted);margin:12px 0 4px;font-size:13px;">💰 Fondo que se queda en cada caja:</div>'
+    +((devFondo.dealer||devFondo.parts)?('<div style="background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:9px 12px;margin:12px 0 6px;font-size:12.5px;"><div style="color:var(--muted);margin-bottom:2px;">↩️ Devoluciones → van a fondo (no se reparten):</div><div style="display:flex;justify-content:space-between;font-weight:700;color:#f0c040;"><span>🚗 '+centsToUSD(devFondo.dealer)+'</span><span>🔧 '+centsToUSD(devFondo.parts)+'</span></div></div>'):'')
+    +'<div style="color:var(--muted);margin:12px 0 4px;font-size:13px;">💰 Fondo adicional que dejas en cada caja:</div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;"><span>🚗 Dealer</span><input id="corte-fondo-dealer" type="number" inputmode="decimal" value="'+fdStr+'" oninput="updateCorteFondo()" placeholder="0" style="width:120px;text-align:right;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:14px;"></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;"><span>🔧 Partes</span><input id="corte-fondo-parts" type="number" inputmode="decimal" value="'+fpStr+'" oninput="updateCorteFondo()" placeholder="0" style="width:120px;text-align:right;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:14px;"></div>'
-    +'<div style="display:flex;justify-content:space-between;padding:3px 0;margin-top:6px;"><span style="color:var(--muted);">A repartir (Total − fondos)</span><span id="corte-repartir">'+centsToUSD(repartir)+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:6px 0 3px;margin-top:4px;border-top:1px solid var(--border);"><span style="color:var(--muted);">Fondo total (devoluciones + adicional)</span><span style="color:#f0c040;font-weight:700;">'+centsToUSD(fondoCents)+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">A repartir (Total − fondos)</span><span id="corte-repartir">'+centsToUSD(repartir)+'</span></div>'
     +'<div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:800;font-size:15px;"><span>Cada socio (50/50)</span><span id="corte-cada" style="color:#3ecf8e;">'+centsToUSD(cada)+'</span></div>'
     +'</div>';
   body.innerHTML=html;
@@ -1219,8 +1281,10 @@ window.renderCorte = function(){
 window.updateCorteFondo = function(){
   const fd=document.getElementById('corte-fondo-dealer'), fp=document.getElementById('corte-fondo-parts');
   if(!fd && !fp) return;
-  const fondoDealerCents=Math.round((Number(fd&&fd.value)||0)*100);
-  const fondoPartsCents=Math.round((Number(fp&&fp.value)||0)*100);
+  const manDealer=Math.round((Number(fd&&fd.value)||0)*100);
+  const manParts=Math.round((Number(fp&&fp.value)||0)*100);
+  const fondoDealerCents=(_corteState.devFondoDealer||0)+manDealer;
+  const fondoPartsCents=(_corteState.devFondoParts||0)+manParts;
   const fondoCents=fondoDealerCents+fondoPartsCents;
   const rep=_corteState.total-fondoCents, cada=Math.round(rep/2);
   _corteState.fondoCents=fondoCents; _corteState.fondoDealerCents=fondoDealerCents; _corteState.fondoPartsCents=fondoPartsCents; _corteState.repartir=rep; _corteState.cada=cada;
