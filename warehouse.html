@@ -17,8 +17,16 @@
 <style>
   :root{ --bg:#0b0e14; --surface:#12161f; --surface2:#1a1f2e; --border:rgba(255,255,255,0.09); --text:#e7ebf3; --muted:#95a0b5; --faint:#5b6577; --gold:#f0c040; --green:#3ecf8e; --red:#ff6b6b; }
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-text-size-adjust:100%;}
-  .wrap{max-width:760px;margin:0 auto;padding:16px 16px 90px;}
-  #login{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% -10%,#161d2e,var(--bg) 55%);}
+  .wrap{max-width:760px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(90px + env(safe-area-inset-bottom));}
+  #login{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));background:radial-gradient(ellipse at 50% -10%,#161d2e,var(--bg) 55%);}
+  /* Barra de navegación inferior — solo dueños */
+  #wh-tabbar{display:none;position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);}
+  #wh-tabbar a{flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;}
+  #wh-tabbar a .ic{font-size:21px;line-height:1.15;margin-bottom:1px;}
+  #wh-tabbar a.on{color:#f0c040;}
+  body.owner-nav #wh-tabbar{display:flex;}
+  body.owner-nav #fab-part{bottom:calc(80px + env(safe-area-inset-bottom)) !important;}
+  body.owner-nav #install-bar{bottom:calc(74px + env(safe-area-inset-bottom)) !important;}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;}
   input,select,textarea{width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:15px;}
   label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px;}
@@ -170,6 +178,14 @@
 <!-- Área que se imprime (solo el QR) -->
 <div id="print-area"></div>
 
+<!-- Barra de navegación inferior (solo dueños) -->
+<nav id="wh-tabbar">
+  <a href="index.html"><div class="ic">🚗</div>Inventario</a>
+  <a href="admin.html"><div class="ic">👥</div>Clientes</a>
+  <a href="finanzas.html"><div class="ic">💰</div>Finanzas</a>
+  <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
+</nav>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -292,6 +308,7 @@ onAuthStateChanged(auth,(user)=>{
     document.getElementById('login').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('who').textContent = email+' · '+roleLabel(role);
+    document.body.classList.toggle('owner-nav', role==='owner');
     buildTabs();
     if(!_listening){ _listening=true; startListening(); }
     const canTabs=(role==='owner'||role==='warehouse');
@@ -300,7 +317,7 @@ onAuthStateChanged(auth,(user)=>{
     let saved=''; try{ saved=localStorage.getItem('lmg_wh_view')||''; }catch(e){}
     setView(allowed.indexOf(saved)>=0?saved:def);
   } else {
-    _carView=''; const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
+    _carView=''; document.body.classList.remove('owner-nav'); const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
     const vc=document.getElementById('view-car'); if(vc) vc.style.display='none'; closeModal();
     document.getElementById('app').style.display='none';
     document.getElementById('login').style.display='flex';
