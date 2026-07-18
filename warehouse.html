@@ -253,6 +253,10 @@ const ROLE_BY_EMAIL={
 };
 let role='', myEmail='';
 let vehicles=[], parts=[], _selVeh='', _carView='', _restoredCar=false;
+// El QR de cada parte es un enlace → la cámara normal del iPhone abre la app en esa parte
+const WH_URL='https://legacymotorsgarage.com/warehouse.html';
+function partScanURL(id){ return WH_URL+'?scan='+encodeURIComponent(id); }
+let _pendingScan=''; try{ _pendingScan=new URLSearchParams(location.search).get('scan')||''; }catch(e){}
 
 // ---- AUTH ----
 window.doLogin=async function(){
@@ -313,9 +317,11 @@ let _listening=false;
 function startListening(){
   onSnapshot(collection(db,'dismantle_vehicles'), s=>{ vehicles=s.docs.map(d=>({id:d.id,...d.data()}));
     if(!_restoredCar){ _restoredCar=true; let cid=''; try{ cid=localStorage.getItem('lmg_wh_car')||''; }catch(e){}
-      if(cid && vehicles.find(v=>v.id===cid) && (role==='owner'||role==='warehouse'||role==='yard')){ openCar(cid); return; } }
+      if(cid && !_pendingScan && vehicles.find(v=>v.id===cid) && (role==='owner'||role==='warehouse'||role==='yard')){ openCar(cid); return; } }
     if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); }, e=>console.log('veh',e));
-  onSnapshot(collection(db,'parts'), s=>{ parts=s.docs.map(d=>({id:d.id,...d.data()})); if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); }, e=>console.log('parts',e));
+  onSnapshot(collection(db,'parts'), s=>{ parts=s.docs.map(d=>({id:d.id,...d.data()}));
+    if(_pendingScan && role){ const pid=_pendingScan; _pendingScan=''; try{ history.replaceState({},'',location.pathname); }catch(e){} closeCar(); setView('pack'); const inp=document.getElementById('scan-input'); if(inp) inp.value=pid; scanLookup(); return; }
+    if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); }, e=>console.log('parts',e));
 }
 
 // ---- VIN decode (NHTSA, GRATIS) — captura la ficha completa ----
@@ -669,7 +675,7 @@ function labelWrap(g,text,cx,y,maxW,lineH,maxLines){
 window.printPartLabel=async function(id){
   const p=parts.find(x=>x.id===id); if(!p) return;
   try{
-    const durl=await qrDataUrl(p.id);   // QR local (mismo valor que se escanea; evita CORS)
+    const durl=await qrDataUrl(partScanURL(p.id));   // QR = enlace (cámara del iPhone abre la app); local para evitar CORS
     const qrImg=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=durl; });
     const W=600, H=820, cx=W/2;
     const c=document.createElement('canvas'); c.width=W; c.height=H;
@@ -761,7 +767,7 @@ window.savePart=async function(vid){
     const photoURLs=[];
     for(const f of files){ btn.textContent=t('savingPhotos'); const jpg=await toJpeg(f); const r=ref(storage,'parts/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); photoURLs.push(await getDownloadURL(r)); }
     btn.textContent=t('genQR');
-    const durl=await qrDataUrl(id);
+    const durl=await qrDataUrl(partScanURL(id));
     const blob=await (await fetch(durl)).blob();
     const qrRef=ref(storage,'parts/'+id+'/00_QR.gif'); await uploadBytes(qrRef, blob);
     const qrURL=await getDownloadURL(qrRef);
@@ -831,7 +837,7 @@ window.markSold=async function(id){ if(!confirm(t('confirmSold'))) return; try{ 
 window.scanLookup=function(){
   const raw=(document.getElementById('scan-input').value||'').trim();
   if(!raw) return;
-  let id=raw; const m=raw.match(/part[=/]([\w-]+)/); if(m) id=m[1];
+  let id=raw; const m=raw.match(/[?&]scan=([\w-]+)/) || raw.match(/part[=/]([\w-]+)/); if(m) id=m[1];
   const p=parts.find(x=>x.id===id || x.entryId===id);
   const box=document.getElementById('pack-result');
   if(!p){ box.innerHTML='<div class="card"><div class="red">'+t('notFoundPart')+'</div><div class="sub">'+t('codeLbl')+': '+raw+'</div></div>'; return; }
