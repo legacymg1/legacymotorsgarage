@@ -42,6 +42,14 @@
   .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;}
   .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
   a{color:var(--gold);}
+  #print-area{display:none;}
+  @media print{
+    body{background:#fff !important;}
+    body > *:not(#print-area){display:none !important;}
+    #print-area{display:flex !important;align-items:center;justify-content:center;}
+    #print-area img{width:50mm;height:50mm;}
+    @page{margin:0;}
+  }
 </style>
 </head>
 <body>
@@ -159,6 +167,8 @@
 <div id="modal2" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.7);padding:14px;overflow:auto;" onclick="if(event.target===this)closeModal2()">
   <div id="modal2-inner" class="card" style="max-width:520px;margin:20px auto;"></div>
 </div>
+<!-- Área que se imprime (solo el QR) -->
+<div id="print-area"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -189,7 +199,7 @@ const T={
     carPhoto:'📷 Foto del carro', binLbl:'📦 Bin', binPh:'Ej. A-14', backCars:'← Carros', vinFichaBtn:'📋 Ficha del VIN', specSearchPh:'🔎 Buscar dato…', partsTitle:'Partes del carro', addPartFab:'Parte', noPhoto:'Sin foto', closeLbl:'Cerrar', tapForParts:'Toca para ver el carro y sus partes',
     searchCarPh:'🔎 Buscar carro…', noCarsMatch:'Ningún carro coincide.', editLbl:'✏️ Editar', deleteLbl:'🗑️ Eliminar', editPart:'✏️ Editar parte', deletePart:'🗑️ Eliminar parte', saveChanges:'Guardar cambios', confirmDelCar:'¿Eliminar este carro? No se puede deshacer.', confirmDelPart:'¿Eliminar esta parte? No se puede deshacer.', carHasParts:'Este carro tiene N parte(s). Elimina o mueve sus partes primero.',
     printLabel:'🖨️ Imprimir etiqueta', labelTitle:'Etiqueta', labelShare:'📤 Compartir a la impresora', labelHint:'Elige la app de Rongta para imprimir. Si no aparece, mantén presionada la imagen, guárdala y ábrela en la app de Rongta.', labelNoShare:'Tu dispositivo no deja compartir el archivo. Mantén presionada la imagen para guardarla y ábrela en la app de Rongta.', makingLabel:'Generando etiqueta…',
-    genLabelBtn:'🖨️ Generar e imprimir QR', labelBeforePhotos:'Imprime el QR y pégalo en la parte ANTES de tomar las fotos, así el QR sale en las fotos.',
+    genLabelBtn:'🖨️ Generar e imprimir QR', labelBeforePhotos:'Imprime el QR y pégalo en la parte ANTES de tomar las fotos, así el QR sale en las fotos.', labelPrint:'🖨️ Imprimir', labelPrintHint:'Se abre la vista de impresión — desde ahí comparte a la app de Rongta (o elige la impresora).',
     seeQR:'⬇️ Ver/descargar QR', tagSold:'Vendido', tagPublished:'Publicado', tagAvailable:'Disponible', noLoc:'sin ubicación',
     listerHint:'Partes listas para publicar. Toca una para copiar los campos, ver precios "sold" y marcar publicada.', noToPublish:'No hay partes por publicar.', ebayTitleLbl:'Título eBay:', copy:'Copiar', copied:'¡Copiado!', seeSold:'💲 Ver "sold" en eBay', markPublished:'✓ Marcar publicada', markSold:'Marcar vendida', priceAsk:'¿A qué precio la publicaste? (opcional, en $)', confirmSold:'¿Marcar esta parte como vendida?',
     scanTitle:'📦 Escanear / buscar parte', scanHint:'Escanea el QR (o pega/teclea el código) para ver dónde está y cambiar su ubicación.', searchBtn:'Buscar', scanCam:'📷 Escanear con cámara', saveNewLoc:'Guardar nueva ubicación', notFoundPart:'No encontré esa parte.', codeLbl:'Código', locSaved:'✓ Ubicación guardada', noCamera:'Este dispositivo no soporta escaneo por cámara. Usa el lector físico o teclea el código.', camErr:'No se pudo abrir la cámara: ', installHint:'Para instalar: menú del navegador (⋮) → "Agregar a inicio" / "Instalar app".',
@@ -204,7 +214,7 @@ const T={
     carPhoto:'📷 Car photo', binLbl:'📦 Bin', binPh:'e.g. A-14', backCars:'← Cars', vinFichaBtn:'📋 VIN details', specSearchPh:'🔎 Search detail…', partsTitle:'Car parts', addPartFab:'Part', noPhoto:'No photo', closeLbl:'Close', tapForParts:'Tap to open the car and its parts',
     searchCarPh:'🔎 Search car…', noCarsMatch:'No car matches.', editLbl:'✏️ Edit', deleteLbl:'🗑️ Delete', editPart:'✏️ Edit part', deletePart:'🗑️ Delete part', saveChanges:'Save changes', confirmDelCar:'Delete this car? This cannot be undone.', confirmDelPart:'Delete this part? This cannot be undone.', carHasParts:'This car has N part(s). Delete or move its parts first.',
     printLabel:'🖨️ Print label', labelTitle:'Label', labelShare:'📤 Share to printer', labelHint:'Pick the Rongta app to print. If it is not listed, long-press the image, save it, and open it in the Rongta app.', labelNoShare:'Your device cannot share the file. Long-press the image to save it and open it in the Rongta app.', makingLabel:'Building label…',
-    genLabelBtn:'🖨️ Generate & print QR', labelBeforePhotos:'Print the QR and stick it on the part BEFORE taking the photos, so the QR shows in them.',
+    genLabelBtn:'🖨️ Generate & print QR', labelBeforePhotos:'Print the QR and stick it on the part BEFORE taking the photos, so the QR shows in them.', labelPrint:'🖨️ Print', labelPrintHint:'The print view opens — from there share to the Rongta app (or pick the printer).',
     seeQR:'⬇️ View/download QR', tagSold:'Sold', tagPublished:'Published', tagAvailable:'Available', noLoc:'no location',
     listerHint:'Parts ready to list. Tap one to copy the fields, see "sold" prices and mark as published.', noToPublish:'No parts to publish.', ebayTitleLbl:'eBay title:', copy:'Copy', copied:'Copied!', seeSold:'💲 See "sold" on eBay', markPublished:'✓ Mark published', markSold:'Mark sold', priceAsk:'What price did you list it at? (optional, in $)', confirmSold:'Mark this part as sold?',
     scanTitle:'📦 Scan / find part', scanHint:'Scan the QR (or paste/type the code) to see where it is and change its location.', searchBtn:'Search', scanCam:'📷 Scan with camera', saveNewLoc:'Save new location', notFoundPart:"Couldn't find that part.", codeLbl:'Code', locSaved:'✓ Location saved', noCamera:'This device does not support camera scanning. Use the hardware scanner or type the code.', camErr:'Could not open camera: ', installHint:'To install: browser menu (⋮) → "Add to Home screen" / "Install app".',
@@ -692,11 +702,13 @@ async function makeLabel(p){
     const dataUrl=c.toDataURL('image/png');
     const blob=await new Promise(r=>c.toBlob(r,'image/png'));
     _labelFile=blob?new File([blob],'etiqueta_'+p.id+'.png',{type:'image/png'}):null;
+    const pa=document.getElementById('print-area'); if(pa) pa.innerHTML='<img src="'+dataUrl+'">';   // lo que se imprime
     document.getElementById('modal2-inner').innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🖨️ ${t('labelTitle')}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
       <img src="${dataUrl}" style="width:100%;max-width:260px;display:block;margin:0 auto;border:1px solid var(--border);border-radius:8px;background:#fff;">
-      <button class="btn" style="width:100%;margin-top:14px;" onclick="shareLabel()">${t('labelShare')}</button>
-      <div class="sub" style="margin-top:10px;">${t('labelHint')}</div>`;
+      <button class="btn" style="width:100%;margin-top:14px;" onclick="printLabelNow()">${t('labelPrint')}</button>
+      <button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="shareLabel()">${t('labelShare')}</button>
+      <div class="sub" style="margin-top:10px;">${t('labelPrintHint')}</div>`;
     document.getElementById('modal2').style.display='block';
   }catch(e){ alert(t('error')+e.message); }
 };
@@ -709,6 +721,7 @@ window.printNewPart=function(vid){
   const num=(document.getElementById('p-num-'+vid).value||'').trim();
   makeLabel({ id:_newPartId, name, partNumber:num, location:{bin}, vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vTrim:sp.trim||'' });
 };
+window.printLabelNow=function(){ window.print(); };
 window.shareLabel=async function(){
   if(!_labelFile){ return; }
   try{
