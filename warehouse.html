@@ -109,8 +109,14 @@
       <div id="v-prev" class="thumbs"></div>
       <button class="btn" style="width:100%;margin-top:12px;" id="v-save" onclick="saveVehicle()" data-i18n="saveCar">Guardar carro</button>
     </div>
-    <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin:8px 2px;" data-i18n="carsDismantling">Carros en desmantelamiento</div>
-    <div id="veh-list"></div>
+    <button id="cars-toggle" onclick="toggleCarsList()" class="card" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:800;color:var(--text);">
+      <span>🚗 <span data-i18n="carsDismantling">Carros en desmantelamiento</span> <span id="cars-count" class="muted" style="font-weight:600;"></span></span>
+      <span id="cars-arrow" class="gold">▾</span>
+    </button>
+    <div id="cars-body" style="display:none;margin-top:10px;">
+      <input id="veh-search" oninput="renderVehicles()" data-i18n-ph="searchCarPh" placeholder="🔎 Buscar carro…" style="margin-bottom:10px;">
+      <div id="veh-list"></div>
+    </div>
   </div>
 
   <!-- ===================== LISTADO ===================== -->
@@ -152,7 +158,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -177,6 +183,7 @@ const T={
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Escanea o pega el código…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte + generar QR', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería',
     carPhoto:'📷 Foto del carro', binLbl:'📦 Bin', binPh:'Ej. A-14', backCars:'← Carros', vinFichaBtn:'📋 Ficha del VIN', specSearchPh:'🔎 Buscar dato…', partsTitle:'Partes del carro', addPartFab:'Parte', noPhoto:'Sin foto', closeLbl:'Cerrar', tapForParts:'Toca para ver el carro y sus partes',
+    searchCarPh:'🔎 Buscar carro…', noCarsMatch:'Ningún carro coincide.', editLbl:'✏️ Editar', deleteLbl:'🗑️ Eliminar', editPart:'✏️ Editar parte', deletePart:'🗑️ Eliminar parte', saveChanges:'Guardar cambios', confirmDelCar:'¿Eliminar este carro? No se puede deshacer.', confirmDelPart:'¿Eliminar esta parte? No se puede deshacer.', carHasParts:'Este carro tiene N parte(s). Elimina o mueve sus partes primero.',
     seeQR:'⬇️ Ver/descargar QR', tagSold:'Vendido', tagPublished:'Publicado', tagAvailable:'Disponible', noLoc:'sin ubicación',
     listerHint:'Partes listas para publicar. Toca una para copiar los campos, ver precios "sold" y marcar publicada.', noToPublish:'No hay partes por publicar.', ebayTitleLbl:'Título eBay:', copy:'Copiar', copied:'¡Copiado!', seeSold:'💲 Ver "sold" en eBay', markPublished:'✓ Marcar publicada', markSold:'Marcar vendida', priceAsk:'¿A qué precio la publicaste? (opcional, en $)', confirmSold:'¿Marcar esta parte como vendida?',
     scanTitle:'📦 Escanear / buscar parte', scanHint:'Escanea el QR (o pega/teclea el código) para ver dónde está y cambiar su ubicación.', searchBtn:'Buscar', scanCam:'📷 Escanear con cámara', saveNewLoc:'Guardar nueva ubicación', notFoundPart:'No encontré esa parte.', codeLbl:'Código', locSaved:'✓ Ubicación guardada', noCamera:'Este dispositivo no soporta escaneo por cámara. Usa el lector físico o teclea el código.', camErr:'No se pudo abrir la cámara: ', installHint:'Para instalar: menú del navegador (⋮) → "Agregar a inicio" / "Instalar app".',
@@ -189,6 +196,7 @@ const T={
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Scan or paste the code…',
     addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part + generate QR', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery',
     carPhoto:'📷 Car photo', binLbl:'📦 Bin', binPh:'e.g. A-14', backCars:'← Cars', vinFichaBtn:'📋 VIN details', specSearchPh:'🔎 Search detail…', partsTitle:'Car parts', addPartFab:'Part', noPhoto:'No photo', closeLbl:'Close', tapForParts:'Tap to open the car and its parts',
+    searchCarPh:'🔎 Search car…', noCarsMatch:'No car matches.', editLbl:'✏️ Edit', deleteLbl:'🗑️ Delete', editPart:'✏️ Edit part', deletePart:'🗑️ Delete part', saveChanges:'Save changes', confirmDelCar:'Delete this car? This cannot be undone.', confirmDelPart:'Delete this part? This cannot be undone.', carHasParts:'This car has N part(s). Delete or move its parts first.',
     seeQR:'⬇️ View/download QR', tagSold:'Sold', tagPublished:'Published', tagAvailable:'Available', noLoc:'no location',
     listerHint:'Parts ready to list. Tap one to copy the fields, see "sold" prices and mark as published.', noToPublish:'No parts to publish.', ebayTitleLbl:'eBay title:', copy:'Copy', copied:'Copied!', seeSold:'💲 See "sold" on eBay', markPublished:'✓ Mark published', markSold:'Mark sold', priceAsk:'What price did you list it at? (optional, in $)', confirmSold:'Mark this part as sold?',
     scanTitle:'📦 Scan / find part', scanHint:'Scan the QR (or paste/type the code) to see where it is and change its location.', searchBtn:'Search', scanCam:'📷 Scan with camera', saveNewLoc:'Save new location', notFoundPart:"Couldn't find that part.", codeLbl:'Code', locSaved:'✓ Location saved', noCamera:'This device does not support camera scanning. Use the hardware scanner or type the code.', camErr:'Could not open camera: ', installHint:'To install: browser menu (⋮) → "Add to Home screen" / "Install app".',
@@ -242,7 +250,7 @@ const ROLE_BY_EMAIL={
   'empaque@legacymotorsgarage.com':'packager'
 };
 let role='', myEmail='';
-let vehicles=[], parts=[], _selVeh='', _carView='';
+let vehicles=[], parts=[], _selVeh='', _carView='', _restoredCar=false;
 
 // ---- AUTH ----
 window.doLogin=async function(){
@@ -264,7 +272,11 @@ onAuthStateChanged(auth,(user)=>{
     document.getElementById('who').textContent = email+' · '+roleLabel(role);
     buildTabs();
     if(!_listening){ _listening=true; startListening(); }
-    setView(role==='owner'?'yard':(role==='yard'?'yard':role==='lister'?'lister':'pack'));
+    const canTabs=(role==='owner'||role==='warehouse');
+    const allowed = canTabs?['yard','lister','pack']:(role==='yard'?['yard']:role==='lister'?['lister']:['pack']);
+    const def = (canTabs||role==='yard')?'yard':(role==='lister'?'lister':'pack');
+    let saved=''; try{ saved=localStorage.getItem('lmg_wh_view')||''; }catch(e){}
+    setView(allowed.indexOf(saved)>=0?saved:def);
   } else {
     _carView=''; const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
     const vc=document.getElementById('view-car'); if(vc) vc.style.display='none'; closeModal();
@@ -286,7 +298,7 @@ function buildTabs(){
     .map(([k,l])=>`<div class="tab${_view===k?' on':''}" onclick="setView('${k}')">${l}</div>`).join('');
 }
 window.setView=function(k){
-  _view=k; buildTabs();
+  _view=k; try{ localStorage.setItem('lmg_wh_view',k); }catch(e){} buildTabs();
   document.getElementById('view-yard').style.display   = k==='yard'?'':'none';
   document.getElementById('view-lister').style.display = k==='lister'?'':'none';
   document.getElementById('view-pack').style.display   = k==='pack'?'':'none';
@@ -297,7 +309,10 @@ window.setView=function(k){
 // ---- DATA ----
 let _listening=false;
 function startListening(){
-  onSnapshot(collection(db,'dismantle_vehicles'), s=>{ vehicles=s.docs.map(d=>({id:d.id,...d.data()})); if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); }, e=>console.log('veh',e));
+  onSnapshot(collection(db,'dismantle_vehicles'), s=>{ vehicles=s.docs.map(d=>({id:d.id,...d.data()}));
+    if(!_restoredCar){ _restoredCar=true; let cid=''; try{ cid=localStorage.getItem('lmg_wh_car')||''; }catch(e){}
+      if(cid && vehicles.find(v=>v.id===cid) && (role==='owner'||role==='warehouse'||role==='yard')){ openCar(cid); return; } }
+    if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); }, e=>console.log('veh',e));
   onSnapshot(collection(db,'parts'), s=>{ parts=s.docs.map(d=>({id:d.id,...d.data()})); if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); }, e=>console.log('parts',e));
 }
 
@@ -410,10 +425,21 @@ function carThumb(v,size){ const s=size||64; const photo=(v.photoURLs&&v.photoUR
     ? `<img src="${photo}" style="width:${s}px;height:${s}px;object-fit:cover;border-radius:12px;border:1px solid var(--border);flex:0 0 auto;">`
     : `<div style="width:${s}px;height:${s}px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:${Math.round(s*0.4)}px;flex:0 0 auto;">🚗</div>`;
 }
+let _carsOpen=false;
+window.toggleCarsList=function(){
+  _carsOpen=!_carsOpen;
+  document.getElementById('cars-body').style.display=_carsOpen?'':'none';
+  const a=document.getElementById('cars-arrow'); if(a) a.textContent=_carsOpen?'▴':'▾';
+  if(_carsOpen){ renderVehicles(); const s=document.getElementById('veh-search'); if(s) s.focus(); }
+};
 function renderVehicles(){
+  const cnt=document.getElementById('cars-count'); if(cnt) cnt.textContent='('+vehicles.length+')';
   const box=document.getElementById('veh-list'); if(!box) return;
-  const list=vehicles.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-  if(!list.length){ box.innerHTML='<div class="sub" style="padding:8px 2px;">'+t('noCarsYet')+'</div>'; return; }
+  if(!vehicles.length){ box.innerHTML='<div class="sub" style="padding:8px 2px;">'+t('noCarsYet')+'</div>'; return; }
+  let list=vehicles.slice().sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const q=((document.getElementById('veh-search')||{}).value||'').trim().toLowerCase();
+  if(q){ const w=q.split(/\s+/); list=list.filter(v=>{ const hay=(vehLabel(v)+' '+(v.vin||'')+' '+(v.color||'')+' '+(v.engine||'')).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); }); }
+  if(!list.length){ box.innerHTML='<div class="sub" style="padding:8px 2px;">'+t('noCarsMatch')+'</div>'; return; }
   box.innerHTML=list.map(v=>{
     const vp=parts.filter(p=>p.vehicleId===v.id);
     return `<div class="card" style="margin-bottom:8px;display:flex;gap:12px;align-items:center;cursor:pointer;" onclick="openCar('${v.id}')">
@@ -429,7 +455,7 @@ function renderVehicles(){
 
 // ===================== PÁGINA COMPLETA DEL CARRO =====================
 window.openCar=function(id){
-  _carView=id;
+  _carView=id; try{ localStorage.setItem('lmg_wh_car',id); }catch(e){}
   document.getElementById('tabs').style.display='none';
   ['view-yard','view-lister','view-pack'].forEach(v=>{ const e=document.getElementById(v); if(e) e.style.display='none'; });
   document.getElementById('view-car').style.display='';
@@ -437,7 +463,7 @@ window.openCar=function(id){
   renderCarDetail(); window.scrollTo(0,0);
 };
 window.closeCar=function(){
-  _carView=''; closeModal();
+  _carView=''; try{ localStorage.removeItem('lmg_wh_car'); }catch(e){} closeModal();
   document.getElementById('view-car').style.display='none';
   document.getElementById('fab-part').style.display='none';
   buildTabs(); setView(_view||'yard');
@@ -463,6 +489,10 @@ function renderCarDetail(){
         ${specBtn}
       </div>
     </div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="btn ghost sm" style="flex:1;" onclick="openCarEdit('${v.id}')">${t('editLbl')}</button>
+      <button class="btn ghost sm" style="flex:1;color:var(--red);border-color:var(--red);" onclick="deleteCar('${v.id}')">${t('deleteLbl')}</button>
+    </div>
     <div style="height:1px;background:var(--border);margin:18px 0;"></div>
     <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin:0 2px 8px;">${t('partsTitle')} (${vp.length})</div>
     <div>${ vp.length ? vp.map(detailPartCard).join('') : '<div class="sub" style="padding:6px 2px;">'+t('noPartsYet')+'</div>' }</div>
@@ -471,7 +501,7 @@ function renderCarDetail(){
 function detailPartCard(p){
   const photo=(p.photoURLs||[]).find(u=>u && !/00_QR/.test(u)) || '';
   const thumb= photo?`<img src="${photo}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex:0 0 auto;">`:`<div style="width:56px;height:56px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">🔧</div>`;
-  return `<div class="part" style="display:flex;gap:10px;align-items:center;">
+  return `<div class="part" style="display:flex;gap:10px;align-items:center;cursor:pointer;" onclick="openPartEdit('${p.id}')">
     ${thumb}
     <div style="flex:1;min-width:0;"><div style="font-weight:700;">${p.name||''}</div><div class="sub">📦 ${locText(p)}</div></div>
     ${statusTag(p.status)}
@@ -514,6 +544,65 @@ window.openPartModal=function(vid){
     ${addPartFormHtml(vid)}`;
   document.getElementById('modal').style.display='block';
   _partFiles[vid]=[]; renderPartPhotos(vid);
+};
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ---- Editar / eliminar CARRO ----
+window.openCarEdit=function(id){
+  const v=vehicles.find(x=>x.id===id); if(!v) return;
+  document.getElementById('modal-inner').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-weight:800;">${t('editLbl')}</div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>
+    <div class="row2"><div><label>${t('year')}</label><input id="ec-year" value="${esc(v.year)}"></div><div><label>${t('make')}</label><input id="ec-make" value="${esc(v.make)}"></div><div><label>${t('model')}</label><input id="ec-model" value="${esc(v.model)}"></div></div>
+    <div class="row2"><div><label>${t('miles')}</label><input id="ec-miles" type="number" value="${esc(v.miles)}"></div><div><label>${t('engine')}</label><input id="ec-engine" value="${esc(v.engine)}"></div></div>
+    <div class="row2"><div><label>${t('color')}</label><input id="ec-color" value="${esc(v.color)}"></div><div><label>${t('colorCode')}</label><input id="ec-colorcode" value="${esc(v.colorCode)}"></div></div>
+    <label>VIN</label><input id="ec-vin" value="${esc(v.vin)}" style="text-transform:uppercase;">
+    <button class="btn" style="width:100%;margin-top:12px;" onclick="saveCarEdit('${id}')">${t('saveChanges')}</button>`;
+  document.getElementById('modal').style.display='block';
+};
+window.saveCarEdit=async function(id){
+  const g=x=>(document.getElementById(x).value||'').trim();
+  try{ await updateDoc(doc(db,'dismantle_vehicles',id),{ year:g('ec-year'), make:titleCase(g('ec-make')), model:titleCase(g('ec-model')), miles:g('ec-miles'), engine:g('ec-engine'), color:titleCase(g('ec-color')), colorCode:g('ec-colorcode').toUpperCase(), vin:g('ec-vin').toUpperCase() });
+    closeModal(); if(_carView) renderCarDetail();
+  }catch(e){ alert(t('error')+e.message); }
+};
+window.deleteCar=async function(id){
+  const vp=parts.filter(p=>p.vehicleId===id);
+  if(vp.length){ alert(t('carHasParts').replace('N',vp.length)); return; }
+  if(!confirm(t('confirmDelCar'))) return;
+  try{ await deleteDoc(doc(db,'dismantle_vehicles',id)); closeCar(); }catch(e){ alert(t('error')+e.message); }
+};
+
+// ---- Editar / eliminar PARTE ----
+window.openPartEdit=function(id){
+  const p=parts.find(x=>x.id===id); if(!p) return;
+  const oldBin=(p.location&&p.location.bin)||((p.location&&(p.location.rack||p.location.toper))?((p.location.rack||'')+(p.location.toper?'-'+p.location.toper:'')):'');
+  const photos=(p.photoURLs||[]).map(u=>`<img src="${u}" onclick="openPhoto('${u}')" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;">`).join('');
+  document.getElementById('modal-inner').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-weight:800;">${t('editPart')}</div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>
+    <label>${t('whichPart')}</label><input id="epa-name" value="${esc(p.name)}">
+    <div class="row2"><div><label>${t('condition')}</label><select id="epa-cond">${condOptions()}</select></div><div><label>${t('partNum')}</label><input id="epa-num" value="${esc(p.partNumber)}"></div></div>
+    <label>${t('binLbl')}</label><input id="epa-bin" value="${esc(oldBin)}" placeholder="${t('binPh')}">
+    <div class="thumbs" style="margin-top:10px;">${photos}</div>
+    <div style="margin-top:6px;"><a href="${p.qrURL||''}" target="_blank">${t('seeQR')}</a></div>
+    <button class="btn" style="width:100%;margin-top:12px;" onclick="savePartEdit('${id}')">${t('saveChanges')}</button>
+    <button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--red);border-color:var(--red);" onclick="deletePart('${id}')">${t('deletePart')}</button>`;
+  document.getElementById('modal').style.display='block';
+  const sel=document.getElementById('epa-cond'); if(sel) sel.value=p.condition||'';
+};
+window.savePartEdit=async function(id){
+  const p=parts.find(x=>x.id===id)||{};
+  const name=(document.getElementById('epa-name').value||'').trim(); if(!name){ alert(t('alertPart')); return; }
+  const cond=document.getElementById('epa-cond').value;
+  const num=(document.getElementById('epa-num').value||'').trim();
+  const bin=(document.getElementById('epa-bin').value||'').trim().toUpperCase();
+  const ebayTitle=[p.vYear,p.vMake,p.vModel,p.vTrim||'',name,(num?'OEM '+num:''),'-',cond].filter(Boolean).join(' ').replace(' - -',' -');
+  try{ await updateDoc(doc(db,'parts',id),{ name, condition:cond, partNumber:num, location:{bin}, ebayTitle });
+    closeModal(); if(_carView) renderCarDetail();
+  }catch(e){ alert(t('error')+e.message); }
+};
+window.deletePart=async function(id){
+  if(!confirm(t('confirmDelPart'))) return;
+  try{ await deleteDoc(doc(db,'parts',id)); closeModal(); if(_carView) renderCarDetail(); }catch(e){ alert(t('error')+e.message); }
 };
 
 function addPartFormHtml(vid){
