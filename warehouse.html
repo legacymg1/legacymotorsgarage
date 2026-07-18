@@ -483,16 +483,12 @@ function renderCarDetail(){
     <button class="btn ghost sm" style="margin-bottom:12px;" onclick="closeCar()">${t('backCars')}</button>
     <div class="card" style="display:flex;gap:14px;align-items:flex-start;">
       ${photoEl}
-      <div style="flex:1;min-width:0;">
-        <div class="title" style="font-size:20px;margin-bottom:4px;">${vehLabel(v)}</div>
+      <div style="flex:1;min-width:0;cursor:pointer;" onclick="openCarEdit('${v.id}')">
+        <div class="title" style="font-size:20px;margin-bottom:4px;">${vehLabel(v)} <span style="font-size:13px;color:var(--faint);font-weight:600;">✏️</span></div>
         ${info}
-        ${specBtn}
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:10px;">
-      <button class="btn ghost sm" style="flex:1;" onclick="openCarEdit('${v.id}')">${t('editLbl')}</button>
-      <button class="btn ghost sm" style="flex:1;color:var(--red);border-color:var(--red);" onclick="deleteCar('${v.id}')">${t('deleteLbl')}</button>
-    </div>
+    ${specBtn}
     <div style="height:1px;background:var(--border);margin:18px 0;"></div>
     <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin:0 2px 8px;">${t('partsTitle')} (${vp.length})</div>
     <div>${ vp.length ? vp.map(detailPartCard).join('') : '<div class="sub" style="padding:6px 2px;">'+t('noPartsYet')+'</div>' }</div>
@@ -546,6 +542,7 @@ window.openPartModal=function(vid){
   _partFiles[vid]=[]; renderPartPhotos(vid);
 };
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function isDeleter(){ return myEmail==='ev@legacymotorsgarage.com'; }   // quien puede borrar (regla Firestore: isOwner)
 
 // ---- Editar / eliminar CARRO ----
 let _editCarKeep=[], _editCarNew=[];
@@ -566,7 +563,8 @@ window.openCarEdit=function(id){
     <input type="file" id="ec-cam" accept="image/*" capture="environment" multiple style="display:none" onchange="addEditCarPhotos(this)">
     <input type="file" id="ec-photos" accept="image/*" multiple style="display:none" onchange="addEditCarPhotos(this)">
     <div id="ec-prev" class="thumbs"></div>
-    <button class="btn" id="ec-save" style="width:100%;margin-top:12px;" onclick="saveCarEdit('${id}')">${t('saveChanges')}</button>`;
+    <button class="btn" id="ec-save" style="width:100%;margin-top:12px;" onclick="saveCarEdit('${id}')">${t('saveChanges')}</button>
+    ${isDeleter()?`<button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--red);border-color:var(--red);" onclick="deleteCar('${id}')">${t('deleteLbl')}</button>`:''}`;
   document.getElementById('modal').style.display='block';
   renderEditCarPhotos();
 };
@@ -620,7 +618,7 @@ window.openPartEdit=function(id){
     <div id="epa-prev" class="thumbs"></div>
     ${_editPartQR?`<div style="margin-top:8px;"><a href="${_editPartQR}" target="_blank">${t('seeQR')}</a></div>`:''}
     <button class="btn" id="epa-save" style="width:100%;margin-top:12px;" onclick="savePartEdit('${id}')">${t('saveChanges')}</button>
-    <button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--red);border-color:var(--red);" onclick="deletePart('${id}')">${t('deletePart')}</button>`;
+    ${isDeleter()?`<button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--red);border-color:var(--red);" onclick="deletePart('${id}')">${t('deletePart')}</button>`:''}`;
   document.getElementById('modal').style.display='block';
   const sel=document.getElementById('epa-cond'); if(sel) sel.value=p.condition||'';
   renderEditPartPhotos();
