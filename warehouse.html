@@ -155,6 +155,10 @@
 <div id="modal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);padding:14px;overflow:auto;" onclick="if(event.target===this)closeModal()">
   <div id="modal-inner" class="card" style="max-width:600px;margin:20px auto;"></div>
 </div>
+<!-- Modal secundario (etiqueta) — encima del formulario, sin destruirlo -->
+<div id="modal2" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.7);padding:14px;overflow:auto;" onclick="if(event.target===this)closeModal2()">
+  <div id="modal2-inner" class="card" style="max-width:520px;margin:20px auto;"></div>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -185,6 +189,7 @@ const T={
     carPhoto:'📷 Foto del carro', binLbl:'📦 Bin', binPh:'Ej. A-14', backCars:'← Carros', vinFichaBtn:'📋 Ficha del VIN', specSearchPh:'🔎 Buscar dato…', partsTitle:'Partes del carro', addPartFab:'Parte', noPhoto:'Sin foto', closeLbl:'Cerrar', tapForParts:'Toca para ver el carro y sus partes',
     searchCarPh:'🔎 Buscar carro…', noCarsMatch:'Ningún carro coincide.', editLbl:'✏️ Editar', deleteLbl:'🗑️ Eliminar', editPart:'✏️ Editar parte', deletePart:'🗑️ Eliminar parte', saveChanges:'Guardar cambios', confirmDelCar:'¿Eliminar este carro? No se puede deshacer.', confirmDelPart:'¿Eliminar esta parte? No se puede deshacer.', carHasParts:'Este carro tiene N parte(s). Elimina o mueve sus partes primero.',
     printLabel:'🖨️ Imprimir etiqueta', labelTitle:'Etiqueta', labelShare:'📤 Compartir a la impresora', labelHint:'Elige la app de Rongta para imprimir. Si no aparece, mantén presionada la imagen, guárdala y ábrela en la app de Rongta.', labelNoShare:'Tu dispositivo no deja compartir el archivo. Mantén presionada la imagen para guardarla y ábrela en la app de Rongta.', makingLabel:'Generando etiqueta…',
+    genLabelBtn:'🖨️ Generar e imprimir QR', labelBeforePhotos:'Imprime el QR y pégalo en la parte ANTES de tomar las fotos, así el QR sale en las fotos.',
     seeQR:'⬇️ Ver/descargar QR', tagSold:'Vendido', tagPublished:'Publicado', tagAvailable:'Disponible', noLoc:'sin ubicación',
     listerHint:'Partes listas para publicar. Toca una para copiar los campos, ver precios "sold" y marcar publicada.', noToPublish:'No hay partes por publicar.', ebayTitleLbl:'Título eBay:', copy:'Copiar', copied:'¡Copiado!', seeSold:'💲 Ver "sold" en eBay', markPublished:'✓ Marcar publicada', markSold:'Marcar vendida', priceAsk:'¿A qué precio la publicaste? (opcional, en $)', confirmSold:'¿Marcar esta parte como vendida?',
     scanTitle:'📦 Escanear / buscar parte', scanHint:'Escanea el QR (o pega/teclea el código) para ver dónde está y cambiar su ubicación.', searchBtn:'Buscar', scanCam:'📷 Escanear con cámara', saveNewLoc:'Guardar nueva ubicación', notFoundPart:'No encontré esa parte.', codeLbl:'Código', locSaved:'✓ Ubicación guardada', noCamera:'Este dispositivo no soporta escaneo por cámara. Usa el lector físico o teclea el código.', camErr:'No se pudo abrir la cámara: ', installHint:'Para instalar: menú del navegador (⋮) → "Agregar a inicio" / "Instalar app".',
@@ -199,6 +204,7 @@ const T={
     carPhoto:'📷 Car photo', binLbl:'📦 Bin', binPh:'e.g. A-14', backCars:'← Cars', vinFichaBtn:'📋 VIN details', specSearchPh:'🔎 Search detail…', partsTitle:'Car parts', addPartFab:'Part', noPhoto:'No photo', closeLbl:'Close', tapForParts:'Tap to open the car and its parts',
     searchCarPh:'🔎 Search car…', noCarsMatch:'No car matches.', editLbl:'✏️ Edit', deleteLbl:'🗑️ Delete', editPart:'✏️ Edit part', deletePart:'🗑️ Delete part', saveChanges:'Save changes', confirmDelCar:'Delete this car? This cannot be undone.', confirmDelPart:'Delete this part? This cannot be undone.', carHasParts:'This car has N part(s). Delete or move its parts first.',
     printLabel:'🖨️ Print label', labelTitle:'Label', labelShare:'📤 Share to printer', labelHint:'Pick the Rongta app to print. If it is not listed, long-press the image, save it, and open it in the Rongta app.', labelNoShare:'Your device cannot share the file. Long-press the image to save it and open it in the Rongta app.', makingLabel:'Building label…',
+    genLabelBtn:'🖨️ Generate & print QR', labelBeforePhotos:'Print the QR and stick it on the part BEFORE taking the photos, so the QR shows in them.',
     seeQR:'⬇️ View/download QR', tagSold:'Sold', tagPublished:'Published', tagAvailable:'Available', noLoc:'no location',
     listerHint:'Parts ready to list. Tap one to copy the fields, see "sold" prices and mark as published.', noToPublish:'No parts to publish.', ebayTitleLbl:'eBay title:', copy:'Copy', copied:'Copied!', seeSold:'💲 See "sold" on eBay', markPublished:'✓ Mark published', markSold:'Mark sold', priceAsk:'What price did you list it at? (optional, in $)', confirmSold:'Mark this part as sold?',
     scanTitle:'📦 Scan / find part', scanHint:'Scan the QR (or paste/type the code) to see where it is and change its location.', searchBtn:'Search', scanCam:'📷 Scan with camera', saveNewLoc:'Save new location', notFoundPart:"Couldn't find that part.", codeLbl:'Code', locSaved:'✓ Location saved', noCamera:'This device does not support camera scanning. Use the hardware scanner or type the code.', camErr:'Could not open camera: ', installHint:'To install: browser menu (⋮) → "Add to Home screen" / "Install app".',
@@ -540,6 +546,7 @@ window.closeModal=function(){ const m=document.getElementById('modal'); if(m) m.
 // Agregar parte (botón flotante) → formulario en modal
 window.openPartModal=function(vid){
   if(!vid){ vid=_carView; } if(!vid) return;
+  _newPartId='part_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
   document.getElementById('modal-inner').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
       <div style="font-weight:800;">${t('addPart')}</div>
@@ -691,13 +698,22 @@ async function makeLabel(p){
     const dataUrl=c.toDataURL('image/png');
     const blob=await new Promise(r=>c.toBlob(r,'image/png'));
     _labelFile=blob?new File([blob],'etiqueta_'+p.id+'.png',{type:'image/png'}):null;
-    document.getElementById('modal-inner').innerHTML=`
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🖨️ ${t('labelTitle')}</div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>
+    document.getElementById('modal2-inner').innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🖨️ ${t('labelTitle')}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
       <img src="${dataUrl}" style="width:100%;max-width:260px;display:block;margin:0 auto;border:1px solid var(--border);border-radius:8px;background:#fff;">
       <button class="btn" style="width:100%;margin-top:14px;" onclick="shareLabel()">${t('labelShare')}</button>
       <div class="sub" style="margin-top:10px;">${t('labelHint')}</div>`;
-    document.getElementById('modal').style.display='block';
+    document.getElementById('modal2').style.display='block';
   }catch(e){ alert(t('error')+e.message); }
+};
+window.closeModal2=function(){ const m=document.getElementById('modal2'); if(m) m.style.display='none'; const mi=document.getElementById('modal2-inner'); if(mi) mi.innerHTML=''; };
+// Generar/imprimir el QR ANTES de las fotos (usa el ID fijo _newPartId; el título/bin actuales del form)
+window.printNewPart=function(vid){
+  const v=vehicles.find(x=>x.id===vid)||{}; const sp=v.spec||{};
+  const name=(document.getElementById('p-name-'+vid).value||'').trim();
+  const bin=(document.getElementById('p-bin-'+vid).value||'').trim().toUpperCase();
+  const num=(document.getElementById('p-num-'+vid).value||'').trim();
+  makeLabel({ id:_newPartId, name, partNumber:num, location:{bin}, vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vTrim:sp.trim||'' });
 };
 window.shareLabel=async function(){
   if(!_labelFile){ return; }
@@ -714,6 +730,8 @@ function addPartFormHtml(vid){
       <div><label>${t('partNum')}</label><input id="p-num-${vid}" placeholder="${t('oemPh')}"></div>
     </div>
     <label>${t('binLbl')}</label><input id="p-bin-${vid}" placeholder="${t('binPh')}">
+    <button type="button" class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="printNewPart('${vid}')">${t('genLabelBtn')}</button>
+    <div class="sub" style="margin-top:6px;">${t('labelBeforePhotos')}</div>
     <label>${t('photos')}</label>
     <div style="display:flex;gap:8px;">
       <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('p-cam-${vid}').click()">${t('takePhoto')}</button>
@@ -726,6 +744,7 @@ function addPartFormHtml(vid){
 }
 // Fotos de la parte se acumulan en memoria (cámara agrega una por una + galería)
 const _partFiles={};
+let _newPartId='';   // ID fijo desde que se abre el form → el QR se genera antes de las fotos y coincide al guardar
 window.addPartPhotos=function(vid,inp){
   (_partFiles[vid]=_partFiles[vid]||[]);
   Array.from(inp.files||[]).forEach(f=>_partFiles[vid].push(f));
@@ -761,7 +780,7 @@ window.savePart=async function(vid){
   if(!name){ alert(t('alertPart')); return; }
   const v=vehicles.find(x=>x.id===vid); if(!v){ alert(t('carNotFound')); return; }
   const btn=document.getElementById('p-save-'+vid); btn.disabled=true; btn.textContent=t('savingPart');
-  const id='part_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+  const id=_newPartId || ('part_'+Date.now()+'_'+Math.random().toString(36).slice(2,5));   // mismo ID del QR ya impreso
   try{
     const files=(_partFiles[vid]||[]);
     const photoURLs=[];
@@ -783,9 +802,8 @@ window.savePart=async function(vid){
       name, partNumber:num, condition:cond, notes:'', photoURLs, qrURL, ebayTitle,
       status:'disponible', priceCents:null, location:{bin},
       createdAt:new Date().toISOString(), createdBy:myEmail });
-    _partFiles[vid]=[];
-    if(_carView) renderCarDetail();
-    await makeLabel({ id, name, partNumber:num, location:{bin}, vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vTrim:sp.trim||'' });   // etiqueta lista apenas se crea
+    _partFiles[vid]=[]; _newPartId='';
+    closeModal(); if(_carView) renderCarDetail();
   }catch(e){ alert(t('error')+e.message); btn.disabled=false; btn.textContent=t('savePart'); }
 };
 
