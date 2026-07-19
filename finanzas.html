@@ -1229,6 +1229,7 @@ window.renderCorte = function(){
     else if(t.type==='expense'||t.type==='expense_reversal') data[d].exp.push(t);
   });
   const sumC=arr=>arr.reduce((s,t)=>s+((t.type==='expense_reversal'?-1:1)*(Number(t.amountCents)||0)),0);
+  const sumA=arr=>arr.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
   const dIn=sumC(data.dealer.inc), dEx=sumC(data.dealer.exp), pIn=sumC(data.parts.inc), pEx=sumC(data.parts.exp);
   const _lc=lastClosing(); const carried={dealer:0,parts:0};   // fondo que dejó el corte anterior (ambas cajas; compat con cortes viejos de una sola)
   if(_lc){ if(_lc.fondoDealerCents!=null || _lc.fondoPartsCents!=null){ carried.dealer=_lc.fondoDealerCents||0; carried.parts=_lc.fondoPartsCents||0; } else if((_lc.fondoCents||0)>0){ carried[_lc.fondoDept||'dealer']=_lc.fondoCents; } }
@@ -1243,13 +1244,17 @@ window.renderCorte = function(){
   let html='<div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:6px;">'+periodoTxt+'</div>';
   const subT=(label,net)=>'<div style="display:flex;justify-content:space-between;background:var(--surface2);border-radius:10px;padding:11px 12px;margin:8px 0 10px;font-weight:800;font-size:14px;"><span>'+label+'</span><span style="color:'+(net>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(net)+'</span></div>';
   const fondoLine=amt=>'<div style="display:flex;justify-content:space-between;background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.35);border-radius:10px;padding:10px 12px;margin:16px 0 4px;font-weight:700;"><span>💰 Fondo del corte anterior</span><span style="color:#f0c040;">+'+centsToUSD(amt)+'</span></div>';
+  const devsOf=d=>data[d].exp.filter(t=>t.type==='expense_reversal');
+  const gastosOf=d=>data[d].exp.filter(t=>t.type==='expense');
   if(carried.dealer>0) html+=fondoLine(carried.dealer);
   html+=listBlock('📥 Ingresos Dealer','#3ecf8e',data.dealer.inc,dIn);
-  html+=listBlock('📤 Egresos Dealer','#ff6b6b',data.dealer.exp,dEx);
+  if(devsOf('dealer').length) html+=listBlock('↩️ Devoluciones Dealer','#f0c040',devsOf('dealer'),sumA(devsOf('dealer')));
+  html+=listBlock('📤 Gastos Dealer','#ff6b6b',gastosOf('dealer'),sumA(gastosOf('dealer')));
   html+=subT('🚗 Subtotal Dealer',dNet);
   if(carried.parts>0) html+=fondoLine(carried.parts);
   html+=listBlock('📥 Ingresos Partes','#3ecf8e',data.parts.inc,pIn);
-  html+=listBlock('📤 Egresos Partes','#ff6b6b',data.parts.exp,pEx);
+  if(devsOf('parts').length) html+=listBlock('↩️ Devoluciones Partes','#f0c040',devsOf('parts'),sumA(devsOf('parts')));
+  html+=listBlock('📤 Gastos Partes','#ff6b6b',gastosOf('parts'),sumA(gastosOf('parts')));
   html+=subT('🔧 Subtotal Partes',pNet);
   // ----- CUADRE ENTRE SOCIOS (cuenta interna) -----
   const owe=Math.round((dNet-pNet)/2);
