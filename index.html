@@ -14713,6 +14713,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
+try{ storage.maxUploadRetryTime = 240000; storage.maxOperationRetryTime = 120000; }catch(e){}   // aguanta conexiones lentas del yonque/celular
 
 const STAFF_EMAILS=['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];
 const OWNER_EMAIL='ev@legacymotorsgarage.com';
@@ -15104,16 +15105,21 @@ window.saveCar = async function(){
       progress.style.display='block';
       progress.textContent='Subiendo '+photoFiles.length+' foto(s)...';
       let _done=0;
-      // Convert + upload ALL photos in parallel (much faster); Promise.all keeps their order
-      const uploads = [...photoFiles].map(async (file, i) => {
-        const conv = await toJpeg(file);
+      // Una por una con reintentos → estable en conexión mala (parallel saturaba y una falla tumbaba todo)
+      const _newUrls=[]; const _fileArr=[...photoFiles];
+      for(let i=0;i<_fileArr.length;i++){
+        const conv = await toJpeg(_fileArr[i]);
         const r = ref(storage, `inventory/${id}/${Date.now()}_${i}_${conv.name}`);
-        await uploadBytes(r, conv);
-        const url = await getDownloadURL(r);
-        _done++; progress.textContent = 'Subidas '+_done+' de '+photoFiles.length+' fotos...';
-        return url;
-      });
-      const _newUrls = await Promise.all(uploads);
+        let ok=false;
+        for(let attempt=1; attempt<=3 && !ok; attempt++){
+          try{
+            progress.textContent = 'Subiendo foto '+(i+1)+' de '+_fileArr.length+(attempt>1?(' (reintento '+attempt+')'):'')+'...';
+            await uploadBytes(r, conv); ok=true;
+          }catch(err){ if(attempt===3) throw err; await new Promise(res=>setTimeout(res, 1500*attempt)); }
+        }
+        _newUrls.push(await getDownloadURL(r));
+        _done++; progress.textContent = 'Subidas '+_done+' de '+_fileArr.length+' fotos...';
+      }
       photos.push(..._newUrls);
     }
     
