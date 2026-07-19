@@ -394,6 +394,7 @@
       <button class="btn btn-ghost" onclick="closeMovEdit()">Cancelar</button>
       <button class="btn btn-primary" id="me-save" onclick="saveMovEdit()">Guardar</button>
     </div>
+    <button class="btn btn-ghost" id="me-delete" onclick="deleteMov()" style="width:100%;margin-top:8px;color:#ff6b6b;border-color:rgba(255,107,107,0.5);display:none;">🗑 Eliminar movimiento</button>
     <div id="me-readonly" style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;display:none;">Solo lectura: este movimiento es de la bolsa de tu socio.</div>
   </div>
 </div>
@@ -1813,9 +1814,20 @@ window.openMovEdit=function(id){
   ['me-amount','me-date','me-note','me-cat','me-receipt','me-private'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
   document.getElementById('me-save').style.display = canEdit?'':'none';
   document.getElementById('me-readonly').style.display = canEdit?'none':'block';
+  document.getElementById('me-delete').style.display = isOwnerUser()?'':'none';   // borrar = solo dueño (regla Firestore)
   document.getElementById('movedit-overlay').classList.add('open');
 };
 window.closeMovEdit=function(){ document.getElementById('movedit-overlay').classList.remove('open'); _movId=null; _movTx=null; };
+window.deleteMov=async function(){
+  if(!_movId){ return; }
+  if(!isOwnerUser()){ alert('Solo el dueño puede eliminar movimientos.'); return; }
+  const tx=_movTx||{}; const inc = tx.type==='income';
+  if(!confirm('¿Eliminar este '+(inc?'ingreso':'gasto')+' de '+centsToUSD(tx.amountCents||0)+' definitivamente?\n\nNo se puede deshacer.'+(inc?'':'\n\n(Si solo quieres cancelarlo dejando registro, usa Reversar ↩ o Devolución.)'))) return;
+  const btn=document.getElementById('me-delete'); if(btn){ btn.disabled=true; btn.textContent='Eliminando…'; }
+  try{ await deleteDoc(doc(db,'transactions',_movId)); closeMovEdit(); }
+  catch(e){ alert('Error al eliminar: '+e.message); }
+  if(btn){ btn.disabled=false; btn.textContent='🗑 Eliminar movimiento'; }
+};
 window.meReceiptPreview=function(){
   const f=document.getElementById('me-receipt').files[0]; const box=document.getElementById('me-receipt-preview');
   box.innerHTML = f ? `<div style="font-size:12px;color:var(--muted);">📎 ${f.name} (se guarda al presionar Guardar)</div>` : '';
