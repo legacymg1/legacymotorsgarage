@@ -2000,7 +2000,13 @@ function txDesc(t){
   if(t.type==='cash_sale') return 'Venta contado · '+(t.clientName||'cliente');
   if(t.type==='income') return (t.note||t.category||'Ingreso')+(t.clientName?' · '+t.clientName:(t.source_name?' · '+t.source_name:''))+(t.saleType==='pagos'?' · enganche':'');
   if(t.type==='expense') return (t.note||t.category||'Gasto')+(t.vendor?' · '+t.vendor:'')+(t.carLabel?' · '+t.carLabel:'');
-  if(t.type==='expense_reversal') return t.esDevolucion ? ('↩️ Devolución: '+(t.origDesc||t.category||'gasto')) : 'Reversa de gasto';
+  if(t.type==='expense_reversal'){
+    var isDev = t.esDevolucion || (t.note && t.note.indexOf('Devoluci')===0) || (String(t.entryId||t.id||'').indexOf('dev_')===0);
+    if(!isDev) return 'Reversa de gasto';
+    var d = t.origDesc;
+    if(!d){ var o=txns.find(function(x){return (x.entryId||x.id)===t.reversalOf;}); if(o) d=(o.note||o.category||'gasto')+(o.vendor?(' · '+o.vendor):'')+(o.carLabel?(' · '+o.carLabel):''); }
+    return '↩️ Devolución: '+(d||t.category||'gasto');
+  }
   if(t.type==='transfer') return t.dir==='in' ? ('↔ Traspaso desde '+(DEPT_NAME[t.fromDept]||t.fromDept)) : ('↔ Traspaso a '+(DEPT_NAME[t.toDept]||t.toDept));
   return t.category||t.type;
 }
