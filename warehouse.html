@@ -1267,15 +1267,15 @@ window.ebayTestConn=async function(btn){
 };
 // Abre una URL de eBay en la mitad DERECHA de la pantalla (misma ventana reusada).
 // En la app instalada (standalone) los popups posicionados se bloquean → respaldo en pestaña normal.
+// Abre una URL de eBay en una ventana pegada a la mitad DERECHA de la pantalla (lado a lado con la app).
+// Nota: no se puede EMBEBER eBay dentro de la app (eBay bloquea iframes con X-Frame-Options); esto es lo más cercano.
 function openBeside(url){
-  // En la app instalada (standalone) los popups posicionados se bloquean → abre en pestaña/navegador normal
-  const standalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;
-  if(standalone){ window.open(url,'_blank'); return; }
   try{
     const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
     const w=Math.floor(sw/2), aL=(window.screen&&screen.availLeft)||0, aT=(window.screen&&screen.availTop)||0, left=aL+sw-w;
-    const win=window.open(url,'lmg_ebay','popup=yes,width='+w+',height='+sh+',left='+left+',top='+aT);
-    if(win){ try{ win.focus(); }catch(e){} return; }
+    const feat='popup=yes,width='+w+',height='+sh+',left='+left+',top='+aT;
+    const win=window.open(url,'lmg_ebay',feat);
+    if(win){ try{ win.moveTo(left,aT); win.resizeTo(w,sh); win.focus(); }catch(e){} return; }
   }catch(e){}
   window.open(url,'_blank');   // respaldo: pestaña/navegador normal
 }
