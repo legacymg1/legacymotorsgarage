@@ -502,7 +502,7 @@ async function buildInventoryItem(p){
   const d = p.ebayDraft || {};
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
   const { catId } = await resolveCategory(p);
-  const vin = await loadVehicleVin(p);
+  const vin = (p.vVin && String(p.vVin).trim()) ? String(p.vVin).trim() : await loadVehicleVin(p);   // artículo rápido guarda su VIN; carro normal se lee de dismantle_vehicles
   const desc = buildListingDescription(p, vin);   // descripción pro con formato
   const condDesc = ((d.conditionNote || d.description || "").trim()).slice(0, 990);   // campo aparte de eBay (máx 1000)
   const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 24);
