@@ -50,6 +50,7 @@
   .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;}
   .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
   #quick-item-btn{display:none;} body.owner-nav #quick-item-btn{display:flex;}   /* Artículo rápido: SOLO dueños */
+  #ebay-test-btn{display:none;} body.owner-nav #ebay-test-btn{display:inline-block;}   /* Prueba eBay: SOLO dueños */
   a{color:var(--gold);}
   #print-area{display:none;}
   @media print{
@@ -158,6 +159,7 @@
 
   <!-- ===================== LISTADO ===================== -->
   <div id="view-lister" style="display:none;">
+    <button id="ebay-test-btn" onclick="ebayTestConn(this)" class="btn ghost sm" style="margin-bottom:10px;">🧪 Probar conexión eBay</button>
     <div id="taximetro" style="margin-bottom:10px;"></div>
     <div class="sub" style="margin-bottom:10px;" data-i18n="listerHint">Partes listas para publicar.</div>
     <input id="lister-search" data-i18n-ph="searchPartPh" placeholder="🔎 Buscar parte / carro…" oninput="renderLister()" style="margin-bottom:12px;">
@@ -1181,6 +1183,16 @@ window.renderLister=function(){
   box.innerHTML=html;
 };
 window.copyText=function(btn,txt){ navigator.clipboard&&navigator.clipboard.writeText(txt); btn.textContent=t('copied'); setTimeout(()=>btn.textContent=t('copy'),1200); };
+// 🧪 Prueba de conexión a eBay (llama al backend ebayTest) — solo dueños
+window.ebayTestConn=async function(btn){
+  const o=btn.textContent; btn.disabled=true; btn.textContent='🧪 Probando…';
+  try{
+    const r=await httpsCallable(functions,'ebayTest')(); const d=r.data||{};
+    if(d.ack==='Success') alert('✅ ¡eBay conectado!\n\nUsuario: '+(d.userId||'?')+'\nBuen estado: '+(d.goodStanding||'?'));
+    else alert('⚠️ eBay respondió: '+(d.ack||'?')+'\n\n'+(d.error||'(sin detalle)'));
+  }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
+  btn.disabled=false; btn.textContent=o;
+};
 // Abre una URL de eBay en la mitad DERECHA de la pantalla (misma ventana reusada)
 function openBeside(url){
   const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
