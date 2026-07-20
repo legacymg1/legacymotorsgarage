@@ -238,6 +238,7 @@ async function resolveSpecs(p, catId){
     const n = name.toLowerCase();
     for (const k of Object.keys(is)) { if (k.toLowerCase() === n && is[k]) return [is[k]]; }              // match directo con lo de la IA
     if (/manufacturer part number|^mpn$/.test(n)) { const v = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber || is["Manufacturer Part Number"]; return v ? [v] : null; }
+    if (/oe\s*\/?\s*oem|^oem\s*(part\s*)?(number|no)|^oe\s*(part\s*)?(number|no)/.test(n)) { const v = d.suggestedPartNumber || (d.interchange && d.interchange[0]) || (d.partNumbers && d.partNumbers[0]) || is["OE/OEM Part Number"]; return v ? [v] : null; }
     if (/(interchange|superseded|other|alternative).*(part )?number/.test(n) && d.interchange && d.interchange.length) return d.interchange;
     if (/^brand$/.test(n) && is.Brand) return [is.Brand];
     if (/placement/.test(n)) { const v = is["Placement on Vehicle"] || is.Placement; return v ? [v] : null; }
@@ -615,6 +616,7 @@ Condition: ${ctx.condition}
 
 Fill AS MANY of these EXACT fields as you can, from the photos + your knowledge of this specific part. Rules:
 - Where a field lists allowed values, you MUST copy one of them verbatim.
+- ALWAYS fill "Manufacturer Part Number" and "OE/OEM Part Number" when a field with that name is listed, using the verified numbers above: "Manufacturer Part Number" = the part maker's own number (e.g. the number stamped on the part); "OE/OEM Part Number" = the vehicle-maker OEM number. If only one number is known, use it for both.
 - Estimate weight/length/height/width ONLY if reasonable from the photos; otherwise omit.
 - Do NOT include vehicle fitment/compatibility lists here.
 - Prefer known facts over guesses; omit a field rather than invent.
