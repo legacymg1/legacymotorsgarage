@@ -75,6 +75,95 @@ exports.ebayTest = onCall({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EB
   };
 });
 
+// ---- Helpers Trading API (XML) ----
+function xesc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function ebayTags(text, tag){ const out = []; const re = new RegExp("<" + tag + ">([\\s\\S]*?)</" + tag + ">", "g"); let m; while ((m = re.exec(text))) out.push(m[1]); return out; }
+async function ebayXml(callName, inner){
+  const body = `<?xml version="1.0" encoding="utf-8"?>
+<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">
+<RequesterCredentials><eBayAuthToken>${EBAY_AUTH_TOKEN.value()}</eBayAuthToken></RequesterCredentials>
+${inner}
+</${callName}Request>`;
+  const r = await fetch("https://api.ebay.com/ws/api.dll", {
+    method: "POST",
+    headers: {
+      "X-EBAY-API-CALL-NAME": callName,
+      "X-EBAY-API-SITEID": "0",
+      "X-EBAY-API-COMPATIBILITY-LEVEL": "1193",
+      "X-EBAY-API-APP-NAME": EBAY_APP_ID.value(),
+      "X-EBAY-API-DEV-NAME": EBAY_DEV_ID.value(),
+      "X-EBAY-API-CERT-NAME": EBAY_CERT_ID.value(),
+      "Content-Type": "text/xml",
+    },
+    body,
+  });
+  return await r.text();
+}
+
+// 🧪 Verificar anuncio (VerifyAddFixedPriceItem) — arma el anuncio y eBay lo VALIDA sin publicarlo. Cero riesgo.
+const EBAY_SECRETS = [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN];
+exports.ebayVerifyListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const partId = request.data && request.data.partId;
+  if (!partId) throw new HttpsError("invalid-argument", "Falta partId.");
+  const snap = await admin.firestore().collection("parts").doc(partId).get();
+  if (!snap.exists) throw new HttpsError("not-found", "Parte no encontrada.");
+  const p = snap.data();
+  const d = p.ebayDraft || {};
+
+  const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
+  const desc = (d.description || p.name || "");
+  const price = (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
+  const condMap = { "New": "1000", "Used": "3000", "For parts or not working": "7000" };
+  const condId = condMap[d.condition || p.condition] || "3000";
+
+  // Categoría sugerida por eBay a partir del título
+  let catId = "";
+  try { catId = ebayTags(await ebayXml("GetSuggestedCategories", `<Query>${xesc(title)}</Query>`), "CategoryID")[0] || ""; } catch (e) {}
+  if (!catId) catId = "6030"; // fallback: Car & Truck Parts
+
+  const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 12);
+  const picXml = pics.length ? `<PictureDetails>${pics.map((u) => `<PictureURL>${xesc(u)}</PictureURL>`).join("")}</PictureDetails>` : "";
+
+  const specs = [];
+  const is = d.itemSpecifics || {};
+  Object.keys(is).forEach((k) => { if (is[k]) specs.push([k, is[k]]); });
+  if (!is["Manufacturer Part Number"]) { const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber; if (mpn) specs.push(["Manufacturer Part Number", mpn]); }
+  const specsXml = specs.length ? `<ItemSpecifics>${specs.map(([n, v]) => `<NameValueList><Name>${xesc(n)}</Name><Value>${xesc(String(v))}</Value></NameValueList>`).join("")}</ItemSpecifics>` : "";
+
+  const inner = `<Item>
+  <Title>${xesc(title)}</Title>
+  <Description>${xesc(desc)}</Description>
+  <PrimaryCategory><CategoryID>${catId}</CategoryID></PrimaryCategory>
+  <StartPrice>${price}</StartPrice>
+  <ConditionID>${condId}</ConditionID>
+  <Country>US</Country>
+  <Currency>USD</Currency>
+  <DispatchTimeMax>3</DispatchTimeMax>
+  <ListingDuration>GTC</ListingDuration>
+  <ListingType>FixedPriceItem</ListingType>
+  <Quantity>1</Quantity>
+  <Location>Porterville, CA</Location>
+  <PostalCode>93257</PostalCode>
+  ${picXml}
+  ${specsXml}
+  <ReturnPolicy><ReturnsAcceptedOption>ReturnsNotAccepted</ReturnsAcceptedOption></ReturnPolicy>
+  <ShippingDetails>
+    <ShippingType>Flat</ShippingType>
+    <ShippingServiceOptions>
+      <ShippingServicePriority>1</ShippingServicePriority>
+      <ShippingService>USPSPriority</ShippingService>
+      <ShippingServiceCost>15.00</ShippingServiceCost>
+    </ShippingServiceOptions>
+  </ShippingDetails>
+</Item>`;
+
+  const resp = await ebayXml("VerifyAddFixedPriceItem", inner);
+  const ack = (resp.match(/<Ack>([\s\S]*?)<\/Ack>/) || [])[1] || "unknown";
+  const errors = ebayTags(resp, "LongMessage").slice(0, 6);
+  return { ack, categoryId: catId, title, price, condId, photos: pics.length, errors };
+});
+
 // 📦 Descargar todas las fotos de una parte (SIN el QR) en un ZIP — para que la esposa
 // las suba a eBay desde Windows/Chrome (baja a Descargas → eBay las elige del explorador).
 exports.zipPartPhotos = onCall({ timeoutSeconds: 120, memory: "512MiB" }, async (request) => {
