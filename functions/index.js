@@ -83,6 +83,11 @@ exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 240, me
 
   const veh = [p.vYear, p.vMake, p.vModel, p.vTrim].filter(Boolean).join(" ");
   const feedback = (request.data && request.data.feedback ? String(request.data.feedback) : "").trim().slice(0, 500);
+  // Modelo (para comparar Sonnet vs Haiku) + modo "no guardar" (comparación no pisa el borrador bueno)
+  const MODELS = { sonnet: "claude-sonnet-5", haiku: "claude-haiku-4-5" };
+  const reqModel = (request.data && request.data.model) || "";
+  const MODEL = MODELS[reqModel] || (Object.values(MODELS).indexOf(reqModel) >= 0 ? reqModel : "claude-sonnet-5");
+  const doSave = !(request.data && request.data.save === false);
   let prompt = `You are an expert US used auto-parts lister for eBay Motors.
 This part was removed from a "${veh || "vehicle"}" — BUT that stated vehicle may be wrong; trust the actual part number over it.
 The seller labeled it: "${p.name || ""}". Stated condition: "${p.condition || "Used"}".
@@ -111,7 +116,6 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
   const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
   const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
 
-  const MODEL = "claude-sonnet-5";
   let text = "", usage = {};
   try {
     const msg = await client.messages.create({
@@ -130,8 +134,10 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
   const inTok = usage.input_tokens || 0, outTok = usage.output_tokens || 0;
   const cacheWrite = usage.cache_creation_input_tokens || 0, cacheRead = usage.cache_read_input_tokens || 0;
   const searches = (usage.server_tool_use && usage.server_tool_use.web_search_requests) || 0;
-  // Sonnet: entrada $3/M · escritura caché $3.75/M · lectura caché $0.30/M · salida $15/M · búsqueda $0.01
-  const costUsd = +(((inTok / 1e6) * 3) + ((cacheWrite / 1e6) * 3.75) + ((cacheRead / 1e6) * 0.30) + ((outTok / 1e6) * 15) + (searches * 0.01)).toFixed(5);
+  // Precio por modelo: entrada $/M, salida $/M. Caché: escritura = entrada×1.25, lectura = entrada×0.10. Búsqueda $0.01.
+  const PRICES = { "claude-sonnet-5": { in: 3, out: 15 }, "claude-haiku-4-5": { in: 1, out: 5 } };
+  const pr = PRICES[MODEL] || PRICES["claude-sonnet-5"];
+  const costUsd = +(((inTok / 1e6) * pr.in) + ((cacheWrite / 1e6) * pr.in * 1.25) + ((cacheRead / 1e6) * pr.in * 0.10) + ((outTok / 1e6) * pr.out) + (searches * 0.01)).toFixed(5);
 
   let draft;
   try {
@@ -148,6 +154,6 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
   draft.costUsd = costUsd;   // costo estimado de ESTA generación (para el análisis de costos)
   if (feedback) draft.lastFeedback = feedback;
 
-  await db.collection("parts").doc(partId).update({ ebayDraft: draft, ebayDraftAt: draft.generatedAt });
+  if (doSave) await db.collection("parts").doc(partId).update({ ebayDraft: draft, ebayDraftAt: draft.generatedAt });
   return draft;
 });
