@@ -379,6 +379,7 @@
     </div>
     <div class="field"><label>Categoría</label><select id="me-cat"></select></div>
     <div class="field"><label>Concepto / qué fue</label><input id="me-note" placeholder="Ej. balatas, radio, motor…"></div>
+    <div class="field" id="me-car-wrap"><label>🚗 Carro (a qué carro pertenece este gasto)</label><select id="me-car"></select></div>
     <div class="field" id="me-private-wrap" style="margin-top:2px;display:none;">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;">
         <input type="checkbox" id="me-private" style="width:20px;height:20px;flex-shrink:0;">
@@ -1812,11 +1813,23 @@ window.openMovEdit=function(id){
   document.getElementById('me-cat').innerHTML = list.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
   document.getElementById('me-private-wrap').style.display = inc?'':'none';
   document.getElementById('me-private').checked = tx.private===true;
+  // Selector de carro: solo para GASTOS (los ingresos se ligan a cliente, no a carro)
+  const carWrap=document.getElementById('me-car-wrap');
+  if(inc){ carWrap.style.display='none'; }
+  else {
+    carWrap.style.display='';
+    const opts=['<option value="">— Sin carro —</option>'];
+    [...inventory].sort((a,b)=>(parseInt(b.inventoryNum)||0)-(parseInt(a.inventoryNum)||0)).forEach(c=>{
+      const sr=(tx.carId===c.id)?' selected':'';
+      opts.push(`<option value="${c.id}"${sr}>#${c.inventoryNum||'?'} · ${c.year||''} ${c.make||''} ${c.model||''}</option>`);
+    });
+    document.getElementById('me-car').innerHTML=opts.join('');
+  }
   const curBox=document.getElementById('me-receipt-cur');
   curBox.innerHTML = tx.receiptURL ? `<a href="${tx.receiptURL}" target="_blank" style="color:var(--gold);font-size:13px;">📎 Ver recibo actual</a>` : `<span style="color:var(--faint);font-size:13px;">Sin recibo — toma o sube la foto abajo 👇</span>`;
   document.getElementById('me-receipt').value='';
   document.getElementById('me-receipt-preview').innerHTML='';
-  ['me-amount','me-date','me-note','me-cat','me-receipt','me-private'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
+  ['me-amount','me-date','me-note','me-cat','me-receipt','me-private','me-car'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
   document.getElementById('me-save').style.display = canEdit?'':'none';
   document.getElementById('me-readonly').style.display = canEdit?'none':'block';
   document.getElementById('me-delete').style.display = isOwnerUser()?'':'none';   // borrar = solo dueño (regla Firestore)
@@ -1849,6 +1862,12 @@ window.saveMovEdit=async function(){
   try{
     const upd={ amountCents:Math.round(amount*100), date, category, note };
     if(_movTx.type==='income') upd.private=document.getElementById('me-private').checked;
+    else {   // GASTO: guarda a qué carro pertenece
+      const carSel=document.getElementById('me-car');
+      const carId=carSel.value;
+      upd.carId=carId;
+      upd.carLabel=carId?(carSel.options[carSel.selectedIndex].text.replace(/^#\S+ · /,'').trim()):'';
+    }
     const file=document.getElementById('me-receipt').files[0];
     if(file){
       btn.textContent='Subiendo recibo…';
