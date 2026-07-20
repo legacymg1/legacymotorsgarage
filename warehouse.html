@@ -89,7 +89,11 @@
   <!-- ===================== CAPTURA ===================== -->
   <div id="view-yard" style="display:none;">
     <div class="card" style="margin-bottom:14px;">
-      <div style="font-weight:800;margin-bottom:6px;" data-i18n="addCar">➕ Carro a desmantelar</div>
+      <div onclick="toggleAddCar()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
+        <span style="font-weight:800;" data-i18n="addCar">➕ Carro a desmantelar</span>
+        <span id="addcar-arrow" class="gold" style="font-size:18px;">▴</span>
+      </div>
+      <div id="addcar-body" style="margin-top:8px;">
       <label>VIN</label>
       <input id="v-vin" data-i18n-ph="vinPh" placeholder="1FT... (17 dígitos)" style="text-transform:uppercase;" onkeydown="if(event.key==='Enter')decodeVin()">
       <div class="row2" style="margin-top:8px;">
@@ -124,6 +128,7 @@
       <input type="file" id="v-photos" accept="image/*" multiple style="display:none" onchange="addCarPhotos(this)">
       <div id="v-prev" class="thumbs"></div>
       <button class="btn" style="width:100%;margin-top:12px;" id="v-save" onclick="saveVehicle()" data-i18n="saveCar">Guardar carro</button>
+      </div>
     </div>
     <button id="cars-toggle" onclick="toggleCarsList()" class="card" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:800;color:var(--text);">
       <span>🚗 <span data-i18n="carsDismantling">Carros en desmantelamiento</span> <span id="cars-count" class="muted" style="font-weight:600;"></span></span>
@@ -475,6 +480,12 @@ function carThumb(v,size){ const s=size||64; const photo=(v.photoURLs&&v.photoUR
     ? `<img src="${photo}" style="width:${s}px;height:${s}px;object-fit:cover;border-radius:12px;border:1px solid var(--border);flex:0 0 auto;">`
     : `<div style="width:${s}px;height:${s}px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:${Math.round(s*0.4)}px;flex:0 0 auto;">🚗</div>`;
 }
+let _addCarOpen=true;
+window.toggleAddCar=function(){
+  _addCarOpen=!_addCarOpen;
+  const b=document.getElementById('addcar-body'); if(b) b.style.display=_addCarOpen?'':'none';
+  const a=document.getElementById('addcar-arrow'); if(a) a.textContent=_addCarOpen?'▴':'▾';
+};
 let _carsOpen=false;
 window.toggleCarsList=function(){
   _carsOpen=!_carsOpen;
