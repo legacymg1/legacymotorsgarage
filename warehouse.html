@@ -1222,7 +1222,7 @@ window.ebayTestConn=async function(btn){
       httpsCallable(functions,'ebayOauthTest')().then(r=>r.data).catch(e=>({error:(e&&e.message)||e})),
     ]);
     const trad = (a&&a.ack==='Success') ? ('✅ Trading: '+(a.userId||'?')) : ('⚠️ Trading: '+((a&&(a.ack||a.error))||'?'));
-    const oauth = (b&&b.ok) ? '✅ OAuth (publicar): OK · sell.inventory activo' : ('⚠️ OAuth: status '+((b&&b.status)||'?')+'\n'+((b&&b.body)||b&&b.error||''));
+    const oauth = (b&&b.ok) ? ('✅ OAuth (publicar): OK · '+(b.scope||'sell.inventory')) : ('⚠️ OAuth: '+((b&&b.body)||b&&b.error||('status '+((b&&b.status)||'?'))));
     alert(trad+'\n\n'+oauth);
   }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
   btn.disabled=false; btn.textContent=o;
