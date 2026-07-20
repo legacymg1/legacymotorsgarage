@@ -40,7 +40,7 @@ exports.ebayAccountDeletion = onRequest((req, res) => {
 });
 
 // 🔑 OAuth callback: eBay redirige aquí con ?code=... tras el consentimiento. Intercambia el code por refresh token y lo muestra.
-const EBAY_RUNAME = "PLACEHOLDER_RUNAME";   // se reemplaza con el RuName real tras crearlo en el portal
+const EBAY_RUNAME = "legacy_motors_g-legacymo-legacy-xpjkv";   // RuName de eBay (identificador del redirect, no secreto)
 exports.ebayOAuthCallback = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID] }, async (req, res) => {
   const code = req.query.code;
   if (!code) { res.status(400).send("Falta ?code — abre el enlace de consentimiento de eBay primero."); return; }
