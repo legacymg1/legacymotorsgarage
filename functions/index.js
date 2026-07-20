@@ -66,17 +66,21 @@ If unsure of a value use an empty string. NEVER invent part numbers you cannot s
   const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
   const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
 
-  let text = "";
+  const MODEL = "claude-sonnet-5";
+  let text = "", usage = {};
   try {
     const msg = await client.messages.create({
-      model: "claude-sonnet-5",
+      model: MODEL,
       max_tokens: 1024,
       messages: [{ role: "user", content: [...images, { type: "text", text: prompt }] }],
     });
+    usage = msg.usage || {};
     text = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
   } catch (e) {
     throw new HttpsError("internal", "IA: " + (e.message || "error"));
   }
+  const inTok = usage.input_tokens || 0, outTok = usage.output_tokens || 0;
+  const costUsd = +(((inTok / 1e6) * 3) + ((outTok / 1e6) * 15)).toFixed(5); // estimación (precio ~Sonnet)
 
   let draft;
   try {
@@ -87,6 +91,9 @@ If unsure of a value use an empty string. NEVER invent part numbers you cannot s
   }
   draft.generatedAt = new Date().toISOString();
   draft.by = (request.auth.token && request.auth.token.email) || "";
+  draft.model = MODEL;
+  draft.tokens = { input: inTok, output: outTok };
+  draft.costUsd = costUsd;   // costo estimado de ESTA generación (para el análisis de costos)
   if (feedback) draft.lastFeedback = feedback;
 
   await db.collection("parts").doc(partId).update({ ebayDraft: draft, ebayDraftAt: draft.generatedAt });
