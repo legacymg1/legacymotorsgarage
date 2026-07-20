@@ -119,7 +119,7 @@ async function ebayCategorySuggest(query){
   });
   const j = await r.json();
   const sugg = j.categorySuggestions || [];
-  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => /motors|parts\s*&\s*accessories|car\s*&\s*truck/i.test(a.categoryName || ""));
+  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => /ebay motors|car\s*&\s*truck/i.test(a.categoryName || ""));
   const pick = sugg.find(isMotors) || sugg[0];
   return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: sugg.find(isMotors) ? "motors" : (sugg.length ? "nonmotors" : "empty") };
 }
@@ -152,13 +152,10 @@ async function buildEbayItem(p, priceUsd){
   const condMap = { "New": "1000", "Used": "3000", "For parts or not working": "7000" };
   const condId = condMap[d.condition || p.condition] || "3000";
 
-  // Categoría: la que la IA resolvió al Generar (d.ebayCategoryId). Si no hay, busca con la frase de la IA (o vehículo+nombre).
-  let catAck = "", catId = d.ebayCategoryId || "";
-  if (catId) { catAck = "ai:" + (d.ebayCategoryAck || "stored"); }
-  else {
-    const catQuery = d.ebayCategory || [p.vYear, p.vMake, p.vModel, p.name].filter(Boolean).join(" ") || title;
-    try { const c = await ebayCategorySuggest(catQuery); catId = c.id; catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
-  }
+  // Categoría: resuelve desde la frase de la IA con SESGO automotriz ("car truck") y filtro estricto de eBay Motors
+  const catQuery = "car truck " + (d.ebayCategory || [p.vYear, p.vMake, p.vModel, p.name].filter(Boolean).join(" ") || title);
+  let catAck = "", catId = "";
+  try { const c = await ebayCategorySuggest(catQuery); catId = c.id; catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
   if (!catId) catId = "6030";
 
   const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 12);
