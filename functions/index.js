@@ -122,39 +122,36 @@ async function ebayCategorySuggest(query){
   return c ? c.categoryId : "";
 }
 
-// 🧪 Verificar anuncio (VerifyAddFixedPriceItem) — arma el anuncio y eBay lo VALIDA sin publicarlo. Cero riesgo.
 const EBAY_SECRETS = [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN];
-exports.ebayVerifyListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120 }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
-  const partId = request.data && request.data.partId;
+
+async function loadPart(partId){
   if (!partId) throw new HttpsError("invalid-argument", "Falta partId.");
   const snap = await admin.firestore().collection("parts").doc(partId).get();
   if (!snap.exists) throw new HttpsError("not-found", "Parte no encontrada.");
-  const p = snap.data();
-  const d = p.ebayDraft || {};
+  return Object.assign({ id: partId }, snap.data());
+}
 
+// Arma el <Item> XML del anuncio a partir de la parte (compartido por Verificar y Publicar)
+async function buildEbayItem(p, priceUsd){
+  const d = p.ebayDraft || {};
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
   const desc = (d.description || p.name || "");
-  const price = (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
+  const price = priceUsd ? Number(priceUsd).toFixed(2) : (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
   const condMap = { "New": "1000", "Used": "3000", "For parts or not working": "7000" };
   const condId = condMap[d.condition || p.condition] || "3000";
-
-  // Categoría LEAF vía Taxonomy API (getCategorySuggestions con app token client-credentials)
   let catAck = "", catId = "";
   try { catId = await ebayCategorySuggest(title); catAck = catId ? "ok" : "empty"; } catch (e) { catAck = "err:" + (e.message || e); }
-  if (!catId) catId = "6030"; // fallback padre (daría error si la sugerencia falla)
-
+  if (!catId) catId = "6030";
   const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 12);
   const picXml = pics.length ? `<PictureDetails>${pics.map((u) => `<PictureURL>${xesc(u)}</PictureURL>`).join("")}</PictureDetails>` : "";
-
   const specs = [];
   const is = d.itemSpecifics || {};
-  const skipSpec = /fitment|fits|compatib/i;   // eBay: fitment libre >65 chars falla; la compatibilidad va estructurada, no como specific
+  const skipSpec = /fitment|fits|compatib/i;
   Object.keys(is).forEach((k) => { if (is[k] && !skipSpec.test(k)) specs.push([k, String(is[k]).slice(0, 65)]); });
   if (!is["Manufacturer Part Number"]) { const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber; if (mpn) specs.push(["Manufacturer Part Number", String(mpn).slice(0, 65)]); }
   const specsXml = specs.length ? `<ItemSpecifics>${specs.map(([n, v]) => `<NameValueList><Name>${xesc(n)}</Name><Value>${xesc(String(v))}</Value></NameValueList>`).join("")}</ItemSpecifics>` : "";
-
   const inner = `<Item>
+  <SKU>${xesc(p.id || p.entryId || "")}</SKU>
   <Title>${xesc(title)}</Title>
   <Description>${xesc(desc)}</Description>
   <PrimaryCategory><CategoryID>${catId}</CategoryID></PrimaryCategory>
@@ -180,11 +177,35 @@ exports.ebayVerifyListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120 
     </ShippingServiceOptions>
   </ShippingDetails>
 </Item>`;
+  return { inner, catId, catAck, title, price, condId, photos: pics.length };
+}
 
-  const resp = await ebayXml("VerifyAddFixedPriceItem", inner);
+// 🧪 Verificar anuncio (VerifyAddFixedPriceItem) — valida sin publicar. Cero riesgo.
+exports.ebayVerifyListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const p = await loadPart(request.data && request.data.partId);
+  const it = await buildEbayItem(p, request.data && request.data.priceUsd);
+  const resp = await ebayXml("VerifyAddFixedPriceItem", it.inner);
   const ack = (resp.match(/<Ack>([\s\S]*?)<\/Ack>/) || [])[1] || "unknown";
+  return { ack, categoryId: it.catId, catAck: it.catAck, title: it.title, price: it.price, condId: it.condId, photos: it.photos, errors: ebayTags(resp, "LongMessage").slice(0, 6) };
+});
+
+// 🚀 Publicar anuncio EN VIVO (AddFixedPriceItem) — crea el anuncio real. El front pide confirmación + precio.
+exports.ebayPublishListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const p = await loadPart(request.data && request.data.partId);
+  const priceUsd = request.data && request.data.priceUsd;
+  const it = await buildEbayItem(p, priceUsd);
+  const resp = await ebayXml("AddFixedPriceItem", it.inner);
+  const ack = (resp.match(/<Ack>([\s\S]*?)<\/Ack>/) || [])[1] || "unknown";
+  const itemId = ebayTags(resp, "ItemID")[0] || "";
   const errors = ebayTags(resp, "LongMessage").slice(0, 6);
-  return { ack, categoryId: catId, catAck, title, price, condId, photos: pics.length, errors };
+  if ((ack === "Success" || ack === "Warning") && itemId) {
+    const upd = { ebayItemId: itemId, ebayListedAt: new Date().toISOString(), status: "publicado" };
+    if (priceUsd) upd.priceCents = Math.round(Number(priceUsd) * 100);
+    await admin.firestore().collection("parts").doc(p.id).update(upd);
+  }
+  return { ack, itemId, categoryId: it.catId, price: it.price, errors };
 });
 
 // 📦 Descargar todas las fotos de una parte (SIN el QR) en un ZIP — para que la esposa
