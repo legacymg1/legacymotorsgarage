@@ -39,6 +39,32 @@ exports.ebayAccountDeletion = onRequest((req, res) => {
   res.status(200).send("ok");
 });
 
+// 🔑 OAuth callback: eBay redirige aquí con ?code=... tras el consentimiento. Intercambia el code por refresh token y lo muestra.
+const EBAY_RUNAME = "PLACEHOLDER_RUNAME";   // se reemplaza con el RuName real tras crearlo en el portal
+exports.ebayOAuthCallback = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID] }, async (req, res) => {
+  const code = req.query.code;
+  if (!code) { res.status(400).send("Falta ?code — abre el enlace de consentimiento de eBay primero."); return; }
+  try {
+    const basic = Buffer.from(EBAY_APP_ID.value() + ":" + EBAY_CERT_ID.value()).toString("base64");
+    const r = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
+      method: "POST",
+      headers: { "Authorization": "Basic " + basic, "Content-Type": "application/x-www-form-urlencoded" },
+      body: "grant_type=authorization_code&code=" + encodeURIComponent(String(code)) + "&redirect_uri=" + encodeURIComponent(EBAY_RUNAME),
+    });
+    const j = await r.json();
+    if (j.refresh_token) {
+      const days = Math.round((j.refresh_token_expires_in || 0) / 86400);
+      res.status(200).send(`<!doctype html><html><body style="font-family:-apple-system,sans-serif;max-width:640px;margin:40px auto;padding:0 20px;">
+        <h2>✅ Autorización exitosa</h2>
+        <p>Copia este <b>refresh token</b> y pégalo en <b>Secret Manager</b> con el nombre <code>EBAY_OAUTH_REFRESH</code>:</p>
+        <textarea readonly style="width:100%;height:120px;font-size:12px;" onclick="this.select()">${j.refresh_token}</textarea>
+        <p style="color:#666;">Válido ~${days} días. No lo compartas.</p>`);
+    } else {
+      res.status(200).send("<pre style='white-space:pre-wrap;'>" + JSON.stringify(j, null, 2) + "</pre>");
+    }
+  } catch (e) { res.status(500).send("Error: " + (e.message || e)); }
+});
+
 // 🧪 Prueba de credenciales eBay (Trading API GetUser) — confirma que App ID/Dev ID/Cert ID + token funcionan. NO toca anuncios.
 exports.ebayTest = onCall({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN], timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
