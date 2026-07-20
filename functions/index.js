@@ -338,6 +338,7 @@ async function ebayRest(method, path, token, body){
       "Authorization": "Bearer " + token,
       "Content-Type": "application/json",
       "Accept": "application/json",
+      "Accept-Language": "en-US",
       "Content-Language": "en-US",
       "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
     },
