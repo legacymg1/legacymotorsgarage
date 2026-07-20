@@ -119,7 +119,7 @@ async function ebayCategorySuggest(query){
   });
   const j = await r.json();
   const sugg = j.categorySuggestions || [];
-  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => ["6000", "6028", "6030"].indexOf(a.categoryId) >= 0);
+  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => /motors|parts\s*&\s*accessories|car\s*&\s*truck/i.test(a.categoryName || ""));
   const pick = sugg.find(isMotors) || sugg[0];
   return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: sugg.find(isMotors) ? "motors" : (sugg.length ? "nonmotors" : "empty") };
 }
@@ -152,10 +152,13 @@ async function buildEbayItem(p, priceUsd){
   const condMap = { "New": "1000", "Used": "3000", "For parts or not working": "7000" };
   const condId = condMap[d.condition || p.condition] || "3000";
 
-  // Categoría: busca con enfoque automotriz (vehículo + nombre) y prefiere una bajo eBay Motors
-  const catQuery = [p.vYear, p.vMake, p.vModel, p.name].filter(Boolean).join(" ") || title;
-  let catAck = "", catId = "";
-  try { const c = await ebayCategorySuggest(catQuery); catId = c.id; catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
+  // Categoría: la que la IA resolvió al Generar (d.ebayCategoryId). Si no hay, busca con la frase de la IA (o vehículo+nombre).
+  let catAck = "", catId = d.ebayCategoryId || "";
+  if (catId) { catAck = "ai:" + (d.ebayCategoryAck || "stored"); }
+  else {
+    const catQuery = d.ebayCategory || [p.vYear, p.vMake, p.vModel, p.name].filter(Boolean).join(" ") || title;
+    try { const c = await ebayCategorySuggest(catQuery); catId = c.id; catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
+  }
   if (!catId) catId = "6030";
 
   const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 12);
@@ -286,7 +289,7 @@ exports.zipPartPhotos = onCall({ timeoutSeconds: 120, memory: "512MiB" }, async 
 });
 
 // 🤖 IA: lee las fotos de una parte y arma el anuncio de eBay (título + descripción + OEM + specifics)
-exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 240, memory: "512MiB" }, async (request) => {
+exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY, EBAY_APP_ID, EBAY_CERT_ID], timeoutSeconds: 240, memory: "512MiB" }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const partId = request.data && request.data.partId;
   if (!partId) throw new HttpsError("invalid-argument", "Falta partId.");
@@ -335,6 +338,7 @@ STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these
  "interchange": ["interchange/alternate numbers found via web search; [] if none"],
  "fitsVehicles": "short verified list of vehicles it fits (from web search)",
  "fitmentNote": "" ,
+ "ebayCategory": "the exact eBay Motors category for this part as a short phrase — the specific PART TYPE, e.g. 'Mass Air Flow Sensor', 'Fuel Injector', 'Headlight Assembly', 'Alternator' — so eBay's category search lands on the right Car & Truck Parts category, NOT a generic one",
  "condition": "Used" | "For parts or not working" | "New",
  "itemSpecifics": {"Brand": "", "Manufacturer Part Number": "", "Type": "<what kind of part, e.g. Mass Air Flow Sensor>", "Placement on Vehicle": "", "Warranty": "", "Country/Region of Manufacture": "", "Superseded Part Number": ""},
  (fill as MANY itemSpecifics as you can from the photos and your knowledge — buyers filter by these; leave a value "" only if truly unknown)
@@ -387,6 +391,9 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
   draft.searches = searches;
   draft.costUsd = costUsd;   // costo estimado de ESTA generación (para el análisis de costos)
   if (feedback) draft.lastFeedback = feedback;
+
+  // Resuelve la categoría de eBay Motors desde la frase que dio la IA (getCategorySuggestions + filtro Motors) y la guarda en el draft
+  try { const c = await ebayCategorySuggest(draft.ebayCategory || draft.title || ""); if (c.id) { draft.ebayCategoryId = c.id; draft.ebayCategoryAck = c.ack; } } catch (e) {}
 
   if (doSave) await db.collection("parts").doc(partId).update({ ebayDraft: draft, ebayDraftAt: draft.generatedAt });
   return draft;
