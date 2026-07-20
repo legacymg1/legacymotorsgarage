@@ -1019,9 +1019,6 @@ function semaforoTag(s){
   return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px;background:'+c+'22;color:'+c+';border:1px solid '+c+'66;white-space:nowrap;"><span style="width:8px;height:8px;border-radius:50%;background:'+c+';"></span>'+lbl+'</span>';
 }
 function listerCard(p){
-  // Búsqueda "sold": usa el título que vamos a poner (IA) si existe; Vendidos + Usados por defecto
-  const soldQ = (p.ebayDraft && p.ebayDraft.title) ? p.ebayDraft.title : [p.vYear,p.vMake,p.vModel,p.name].filter(Boolean).join(' ');
-  const sold='https://www.ebay.com/sch/i.html?_nkw='+encodeURIComponent(soldQ)+'&LH_Sold=1&LH_Complete=1&LH_ItemCondition=3000';
   const fotos=(p.photoURLs||[]).slice(0,5).map(u=>`<img src="${u}" onclick="openPhoto('${u}')" style="cursor:pointer;">`).join('');
   return `<div class="part">
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="font-weight:700;min-width:0;">${p.vehicleLabel} · ${p.name}</div>${semaforoTag(p.status)}</div>
@@ -1046,7 +1043,7 @@ function listerCard(p){
     </div>`}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn sm" onclick="prepEbay('${p.id}',this)">${p.ebayDraft?t('ebayRegen'):t('ebayPrep')}</button>
-      <a class="btn green sm" href="${sold}" target="_blank" style="text-decoration:none;">${t('seeSold')}</a>
+      <button class="btn green sm" onclick="openSoldBeside('${p.id}')">${t('seeSold')}</button>
       <button class="btn sm" style="background:#0b5cd6;color:#fff;" onclick="openEbayNew('${p.id}',this)">${t('ebayNewSide')}</button>
       ${(p.photoURLs&&p.photoURLs.filter(u=>u&&!/00_QR/.test(u)).length)?`<button class="btn ghost sm" onclick="dlPhotos('${p.id}',this)">${t('dlPhotos')}</button>`:''}
       ${p.status==='disponible'?`<button class="btn ghost sm" onclick="markPublished('${p.id}')">${t('markPublished')}</button>`:(p.status==='publicado'?`<button class="btn ghost sm" onclick="markSold('${p.id}')">${t('markSold')}</button>`:'')}
@@ -1071,15 +1068,24 @@ window.renderLister=function(){
   box.innerHTML=html;
 };
 window.copyText=function(btn,txt){ navigator.clipboard&&navigator.clipboard.writeText(txt); btn.textContent=t('copied'); setTimeout(()=>btn.textContent=t('copy'),1200); };
-// 🆕 Abrir "crear anuncio" de eBay en la mitad DERECHA de la pantalla + copiar el título (Ctrl+V en eBay)
+// Abre una URL de eBay en la mitad DERECHA de la pantalla (misma ventana reusada)
+function openBeside(url){
+  const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
+  const w=Math.floor(sw/2), aL=(window.screen&&screen.availLeft)||0, aT=(window.screen&&screen.availTop)||0, left=aL+sw-w;
+  window.open(url,'lmg_ebay','popup=yes,width='+w+',height='+sh+',left='+left+',top='+aT);
+}
+// 💲 Ver "sold" (Vendidos + Usados) a la derecha
+window.openSoldBeside=function(id){
+  const p=parts.find(x=>x.id===id); if(!p) return;
+  const q=(p.ebayDraft&&p.ebayDraft.title)?p.ebayDraft.title:[p.vYear,p.vMake,p.vModel,p.name].filter(Boolean).join(' ');
+  openBeside('https://www.ebay.com/sch/i.html?_nkw='+encodeURIComponent(q)+'&LH_Sold=1&LH_Complete=1&LH_ItemCondition=3000');
+};
+// 🆕 Abrir "crear anuncio" de eBay a la derecha + copiar el título (Ctrl+V en eBay)
 window.openEbayNew=function(id,btn){
   const p=parts.find(x=>x.id===id); if(!p) return;
   const title=(p.ebayDraft&&p.ebayDraft.title)||p.ebayTitle||[p.vYear,p.vMake,p.vModel,p.name].filter(Boolean).join(' ');
   try{ if(navigator.clipboard) navigator.clipboard.writeText(title); }catch(e){}
-  const url='https://www.ebay.com/sl/prelist/suggest?query='+encodeURIComponent(title);
-  const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
-  const w=Math.floor(sw/2), aL=(window.screen&&screen.availLeft)||0, aT=(window.screen&&screen.availTop)||0, left=aL+sw-w;
-  window.open(url,'lmg_ebay','popup=yes,width='+w+',height='+sh+',left='+left+',top='+aT);
+  openBeside('https://www.ebay.com/sl/prelist/suggest?query='+encodeURIComponent(title));
   if(btn){ const o=btn.textContent; btn.textContent=t('ebayOpened'); setTimeout(()=>{ btn.textContent=o; }, 1800); }
 };
 // ⬇️ Descargar fotos (sin QR) en ZIP → para subirlas a eBay desde Windows/Chrome
