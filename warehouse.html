@@ -49,6 +49,7 @@
   .thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;} .thumbs img{width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
   .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;}
   .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
+  #quick-item-btn{display:none;} body.owner-nav #quick-item-btn{display:flex;}   /* Artículo rápido: SOLO dueños */
   a{color:var(--gold);}
   #print-area{display:none;}
   @media print{
@@ -133,7 +134,7 @@
       <button class="btn" style="width:100%;margin-top:12px;" id="v-save" onclick="saveVehicle()" data-i18n="saveCar">Guardar carro</button>
       </div>
     </div>
-    <button onclick="openQuickItem()" class="card" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:800;color:var(--gold);margin-bottom:14px;border-color:rgba(240,192,64,0.4);">
+    <button id="quick-item-btn" onclick="openQuickItem()" class="card" style="width:100%;text-align:left;justify-content:space-between;align-items:center;cursor:pointer;font-weight:800;color:var(--gold);margin-bottom:14px;border-color:rgba(240,192,64,0.4);">
       <span>⚡ <span data-i18n="quickItemBtn">Artículo rápido (sin carro)</span></span>
       <span class="gold" style="font-size:18px;">＋</span>
     </button>
