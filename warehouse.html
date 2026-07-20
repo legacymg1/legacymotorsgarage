@@ -50,7 +50,7 @@
   .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;}
   .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
   #quick-item-btn{display:none;} body.owner-nav #quick-item-btn{display:flex;}   /* Artículo rápido: SOLO dueños */
-  #ebay-test-btn{display:none;} body.owner-nav #ebay-test-btn{display:inline-block;}   /* Prueba eBay: SOLO dueños */
+  #ebay-test-btn,#ebay-setup-btn{display:none;} body.owner-nav #ebay-test-btn,body.owner-nav #ebay-setup-btn{display:inline-block;}   /* Prueba/Config eBay: SOLO dueños */
   a{color:var(--gold);}
   #print-area{display:none;}
   @media print{
@@ -160,6 +160,7 @@
   <!-- ===================== LISTADO ===================== -->
   <div id="view-lister" style="display:none;">
     <button id="ebay-test-btn" onclick="ebayTestConn(this)" class="btn ghost sm" style="margin-bottom:10px;">🧪 Probar conexión eBay</button>
+    <button id="ebay-setup-btn" onclick="ebaySetup(this)" class="btn ghost sm" style="margin-bottom:10px;">⚙️ Configurar eBay (1 vez)</button>
     <div id="taximetro" style="margin-bottom:10px;"></div>
     <div class="sub" style="margin-bottom:10px;" data-i18n="listerHint">Partes listas para publicar.</div>
     <input id="lister-search" data-i18n-ph="searchPartPh" placeholder="🔎 Buscar parte / carro…" oninput="renderLister()" style="margin-bottom:12px;">
@@ -1136,8 +1137,8 @@ function listerCard(p){
     </div>`}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn sm" onclick="prepEbay('${p.id}',this)">${p.ebayDraft?t('ebayRegen'):t('ebayPrep')}</button>
-      ${(role==='owner'||role==='lister')?`<button class="btn ghost sm" onclick="ebayVerify('${p.id}',this)">🧪 Verificar en eBay</button>`:''}
-      ${(role==='owner'||role==='lister')?`<button class="btn sm" style="background:var(--gold);color:#0b0e14;" onclick="ebayPublish('${p.id}',this)">🚀 Publicar en eBay</button>`:''}
+      ${(role==='owner'||role==='lister')?`<button class="btn sm" style="background:var(--gold);color:#0b0e14;" onclick="ebayDraft('${p.id}',this)">📝 Crear borrador en eBay</button>`:''}
+      ${(role==='owner'||role==='lister')&&p.ebayOfferId?`<button class="btn green sm" onclick="ebayPubOffer('${p.id}',this)">🚀 Publicar (en vivo)</button>`:''}
       <button class="btn green sm" onclick="openSoldBeside('${p.id}')">${t('seeSold')}</button>
       <button class="btn sm" style="background:#0b5cd6;color:#fff;" onclick="openEbayNew('${p.id}',this)">${t('ebayNewSide')}</button>
       ${(p.photoURLs&&p.photoURLs.filter(u=>u&&!/00_QR/.test(u)).length)?`<button class="btn ghost sm" onclick="dlPhotos('${p.id}',this)">${t('dlPhotos')}</button>`:''}
@@ -1200,6 +1201,52 @@ window.ebayPublish=async function(id,btn){
     else alert('⚠️ eBay no publicó ('+d.ack+'):\n- '+((d.errors||['sin detalle']).join('\n- ')));
   }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
   btn.disabled=false; btn.textContent=o;
+};
+// ⚙️ Configurar la cuenta de eBay para la API (una vez): ubicación + políticas. Solo dueños.
+window.ebaySetup=async function(btn){
+  if(!confirm('⚙️ Esto configura tu cuenta de eBay para la API:\n• Crea la ubicación de envío (Porterville, CA 93257)\n• Crea/usa las políticas de pago, envío ($15 USPS Priority) y devolución (30 días)\n\nSe hace UNA sola vez. ¿Continuar?')) return;
+  const o=btn.textContent; btn.disabled=true; btn.textContent='⚙️ Configurando…';
+  try{
+    const r=await httpsCallable(functions,'ebaySellerSetup')(); const d=r.data||{};
+    if(d.ok){
+      alert('✅ ¡Cuenta configurada!\n\nUbicación: '+((d.cfg&&d.cfg.locationKey)||'?')+'\nEnvío: '+(d.cfg.fulfillmentPolicyId?'✅':'❌')+'\nPago: '+(d.cfg.paymentPolicyId?'✅':'❌')+'\nDevolución: '+(d.cfg.returnPolicyId?'✅':'❌')+'\n\nYa puedes crear borradores.');
+    } else {
+      const errs=[]; ['location','policies'].forEach(k=>{const s=d[k]; if(s){['err','fulfillmentErr','paymentErr','returnErr'].forEach(f=>{if(s[f]) errs.push(f+': '+(Array.isArray(s[f])?s[f].join(' | '):s[f]));});}});
+      if(d.errors) errs.push(...d.errors);
+      alert('⚠️ Falta algo en la configuración:\n\n'+(errs.length?errs.join('\n\n'):JSON.stringify(d).slice(0,400))+'\n\n(Si dice que la cuenta no está en "Business Policies", hay que activarlas en eBay — dime y te guío.)');
+    }
+  }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
+  btn.disabled=false; btn.textContent=o;
+};
+// 📝 Crear BORRADOR en eBay (Inventory API, sin publicar) — pide precio. Solo dueños/lister.
+window.ebayDraft=async function(id,btn){
+  const p=parts.find(x=>x.id===id);
+  const cur=(p&&p.priceCents!=null)?(p.priceCents/100):'';
+  const priceStr=prompt('💵 Precio de venta en eBay ($):', cur);
+  if(priceStr===null) return;
+  const price=Number(priceStr); if(!price||price<=0){ alert('Precio inválido'); return; }
+  const o=btn.textContent; btn.disabled=true; btn.textContent='📝 Creando borrador…';
+  try{
+    const r=await httpsCallable(functions,'ebayCreateDraft')({partId:id, priceUsd:price}); const d=r.data||{};
+    if(d.ok){
+      alert('✅ ¡Borrador creado en eBay!\n\nTítulo: '+d.title+'\nCategoría: '+d.categoryId+'\nItem specifics: '+d.aspects+'\nFotos: '+d.photos+'\nPrecio: $'+d.price+'\n\nRevísalo en eBay (Seller Hub → Listings → Drafts). Cuando esté OK, pica "🚀 Publicar (en vivo)".');
+    } else {
+      const hint=d.step==='setup'?'\n\n👉 Primero pica "⚙️ Configurar eBay (1 vez)".':'';
+      alert('⚠️ No se creó el borrador (paso: '+(d.step||'?')+'):\n- '+((d.errors||['sin detalle']).join('\n- '))+hint);
+    }
+  }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
+  btn.disabled=false; btn.textContent=o; renderLister();
+};
+// 🚀 Publicar la oferta EN VIVO (después de revisar el borrador). Solo dueños/lister.
+window.ebayPubOffer=async function(id,btn){
+  if(!confirm('⚠️ Esto PUBLICA el borrador EN VIVO en eBay (aplica tarifa de eBay como siempre).\n\n¿Publicar ahora?')) return;
+  const o=btn.textContent; btn.disabled=true; btn.textContent='🚀 Publicando…';
+  try{
+    const r=await httpsCallable(functions,'ebayPublishOffer')({partId:id}); const d=r.data||{};
+    if(d.ok){ alert('✅ ¡PUBLICADO EN EBAY!\n\nItemID: '+(d.listingId||'?')+(d.listingId?('\nVer: https://www.ebay.com/itm/'+d.listingId):'')+'\n\nLa parte pasó a Publicadas.'); }
+    else alert('⚠️ eBay no publicó (paso: '+(d.step||'?')+'):\n- '+((d.errors||['sin detalle']).join('\n- ')));
+  }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
+  btn.disabled=false; btn.textContent=o; renderLister();
 };
 // 🧪 Verificar anuncio en eBay (VerifyAddFixedPriceItem) — valida sin publicar. Solo dueños.
 window.ebayVerify=async function(id,btn){
