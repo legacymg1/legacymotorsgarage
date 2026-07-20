@@ -467,11 +467,44 @@ exports.ebaySellerSetup = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
 });
 
 // Arma el payload JSON (inventory item) para el Inventory API
+// Lee el VIN del carro de donde salió la parte (colección vehicles)
+async function loadVehicleVin(p){
+  if (!p.vehicleId) return "";
+  try { const vs = await admin.firestore().collection("vehicles").doc(p.vehicleId).get(); return vs.exists ? (vs.data().vin || "") : ""; } catch (e) { return ""; }
+}
+
+// 📝 Descripción PRO con formato (HTML): condición + fitment + números + interchange + carro/VIN + cierre de gracias.
+// Se usa en cada anuncio para que todas se vean iguales de fregonas y completas.
+function buildListingDescription(p, vin){
+  const d = p.ebayDraft || {};
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const overview = (d.description || p.name || "").trim();
+  const cond = (d.conditionNote || "").trim();
+  const fits = (d.fitsVehicles || "").trim();
+  const nums = [...(d.partNumbers || []), d.suggestedPartNumber].filter(Boolean);
+  const inter = (d.interchange || []).filter(Boolean);
+  const veh = [p.vYear, p.vMake, p.vModel, p.vTrim].filter(Boolean).join(" ");
+  const out = [];
+  if (overview) out.push(`<p style="font-size:15px;line-height:1.55;margin:0 0 12px;">${esc(overview)}</p>`);
+  if (cond) out.push(`<p style="font-size:14px;line-height:1.5;margin:0 0 12px;"><b>🔎 Condition:</b> ${esc(cond)}</p>`);
+  const li = [];
+  if (fits) li.push(`<li>✅ <b>Verified Fitment:</b> ${esc(fits)}</li>`);
+  if (nums.length) li.push(`<li>🔩 <b>Part Number(s):</b> ${esc(nums.join(", "))}</li>`);
+  if (inter.length) li.push(`<li>🔄 <b>Interchange / Compatible Numbers:</b> ${esc(inter.join(", "))}</li>`);
+  if (veh) li.push(`<li>🚗 <b>Pulled From:</b> ${esc(veh)}${vin ? ` &nbsp;·&nbsp; <b>VIN:</b> ${esc(vin)}` : ""}</li>`);
+  if (li.length) out.push(`<ul style="font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">${li.join("")}</ul>`);
+  out.push(`<hr style="border:none;border-top:1px solid #ddd;margin:14px 0;">`);
+  out.push(`<p style="font-size:14px;line-height:1.6;margin:0;">📦 <b>Fast shipping</b> from Porterville, California — carefully packed.<br>❓ Not 100% sure it fits? <b>Message us your VIN before buying</b> and we'll confirm the fit for you.<br>🙏 <b>Thank you for considering Legacy Motors Garage</b> — we genuinely appreciate your business and stand behind every part we sell!</p>`);
+  return out.join("\n");
+}
+
 async function buildInventoryItem(p){
   const d = p.ebayDraft || {};
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
-  const desc = (d.description || p.name || "");
   const { catId } = await resolveCategory(p);
+  const vin = await loadVehicleVin(p);
+  const desc = buildListingDescription(p, vin);   // descripción pro con formato
+  const condDesc = ((d.conditionNote || d.description || "").trim()).slice(0, 990);   // campo aparte de eBay (máx 1000)
   const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 24);
   const specs = await resolveSpecs(p, catId);
   const aspects = {};
@@ -486,6 +519,7 @@ async function buildInventoryItem(p){
     condition: ebayCondEnum(d.condition || p.condition),
     product,
   };
+  if (condDesc) invItem.conditionDescription = condDesc;   // Condition description (campo separado de eBay)
   return { sku: String(p.id), invItem, title, desc, catId, photos: pics.length, aspects: Object.keys(aspects).length };
 }
 
@@ -693,10 +727,11 @@ STEP 2 — USE WEB SEARCH to: (a) verify the real OEM/manufacturer part number, 
 STEP 2b — MANY PARTS HAVE NO READABLE NUMBER. When you cannot read a part number on the part, still DETERMINE the OEM number it SHOULD be: use web search with the vehicle (${veh || "the stated vehicle"}) + the part name + what you see in the photos to find the most likely correct OEM/manufacturer part number for THIS exact part on THIS vehicle. Put that in "suggestedPartNumber" (single best number) and briefly say how sure you are in "fitmentNote". If the exact number depends on trim/engine/options you cannot see, give the best candidate and say so — a strong lead the human will verify. Only leave it empty if you truly cannot narrow it down at all.
 STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these keys:
 {"title": "<=80 char keyword-rich eBay title with VERIFIED fitment",
- "description": "2-4 sentences that COMPLEMENT eBay's auto-generated description (do NOT write generic catalog filler): focus on THIS specific used part — its real condition & visible wear, the VERIFIED fitment, and interchange numbers. This is a seller's condition/fitment note.",
+ "description": "2-3 punchy sentences selling THIS specific used OEM part: what it is, why it's a great genuine-OEM buy, and the VERIFIED fitment. Confident and professional, no generic filler. (A separate condition note and the fitment/number lists are added automatically after — do NOT list numbers here.)",
+ "conditionNote": "2-3 honest sentences describing THIS exact used part's real condition and any visible wear, scuffs, or damage seen in the photos — this fills eBay's Condition Description field. Be specific and truthful.",
  "partNumbers": ["numbers you actually READ on the part; [] if none"],
  "suggestedPartNumber": "best OEM number this part SHOULD be (from web search) when none was readable; '' if you truly cannot determine one",
- "interchange": ["interchange/alternate numbers found via web search; [] if none"],
+ "interchange": ["ALL interchange/alternate/superseded numbers found via web search — be thorough, more numbers = more buyers find it; [] if none"],
  "fitsVehicles": "short verified list of vehicles it fits (from web search)",
  "fitmentNote": "" ,
  "ebayCategory": "the exact eBay Motors category for this part as a short phrase — the specific PART TYPE, e.g. 'Mass Air Flow Sensor', 'Fuel Injector', 'Headlight Assembly', 'Alternator' — so eBay's category search lands on the right Car & Truck Parts category, NOT a generic one",
