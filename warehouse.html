@@ -406,6 +406,8 @@ function startListening(){
   onSnapshot(collection(db,'parts'), s=>{ parts=s.docs.map(d=>({id:d.id,...d.data()}));
     if(_pendingScan && role){ const pid=_pendingScan; _pendingScan=''; try{ history.replaceState({},'',location.pathname); }catch(e){} closeCar(); setView('pack'); const inp=document.getElementById('scan-input'); if(inp) inp.value=pid; scanLookup(); return; }
     if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); if(_view==='pack') renderPending(); }, e=>console.log('parts',e));
+  // Taxímetro acumulado (contador real del gasto del bot)
+  onSnapshot(doc(db,'config','aiUsage'), s=>{ _aiUsage = (s&&s.exists&&s.exists()) ? s.data() : null; if(_view==='lister') renderTaximetro(); }, e=>console.log('aiUsage',e));
 }
 
 // ---- VIN decode (NHTSA, GRATIS) — captura la ficha completa ----
@@ -1154,12 +1156,18 @@ function listerCard(p){
   </div>`;
 }
 // 🧮 Taxímetro del bot (SOLO informativo, solo dueños) — NO toca Finanzas. Finanzas = la recarga, no el consumo.
+let _aiUsage=null;   // contador acumulado real (config/aiUsage) — nunca baja aunque regeneres
 function renderTaximetro(){
   const box=document.getElementById('taximetro'); if(!box) return;
   if(role!=='owner'){ box.innerHTML=''; return; }
-  const ym=(new Date().toISOString()).slice(0,7);   // YYYY-MM actual
   let total=0, mes=0, n=0;
-  parts.forEach(p=>{ const d=p.ebayDraft; if(d&&typeof d.costUsd==='number'){ total+=d.costUsd; n++; if((d.generatedAt||'').slice(0,7)===ym) mes+=d.costUsd; } });
+  if(_aiUsage && (_aiUsage.totalCount||0)>0){   // ACUMULADO real: cada generación suma, nunca baja
+    const ym=(new Date().toISOString()).slice(0,7).replace('-','_');   // 2026_07
+    total=_aiUsage.totalUsd||0; n=_aiUsage.totalCount||0; mes=_aiUsage['m_'+ym+'_usd']||0;
+  } else {   // respaldo: suma de la última generación de cada parte (pre-acumulado)
+    const ym=(new Date().toISOString()).slice(0,7);
+    parts.forEach(p=>{ const d=p.ebayDraft; if(d&&typeof d.costUsd==='number'){ total+=d.costUsd; n++; if((d.generatedAt||'').slice(0,7)===ym) mes+=d.costUsd; } });
+  }
   if(!n){ box.innerHTML=''; return; }
   const f=v=>'$'+(v<1?v.toFixed(3):v.toFixed(2));
   box.innerHTML=`<div class="card" style="padding:12px 14px;background:linear-gradient(135deg,rgba(240,192,64,0.10),rgba(62,207,142,0.06));border-color:rgba(240,192,64,0.35);">
