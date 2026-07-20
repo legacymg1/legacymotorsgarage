@@ -1276,6 +1276,9 @@ window.ebayTestConn=async function(btn){
 // Abre una URL de eBay en la mitad DERECHA de la pantalla (misma ventana reusada).
 // En la app instalada (standalone) los popups posicionados se bloquean → respaldo en pestaña normal.
 function openBeside(url){
+  // En la app instalada (standalone) los popups posicionados se bloquean → abre en pestaña/navegador normal
+  const standalone=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;
+  if(standalone){ window.open(url,'_blank'); return; }
   try{
     const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
     const w=Math.floor(sw/2), aL=(window.screen&&screen.availLeft)||0, aT=(window.screen&&screen.availTop)||0, left=aL+sw-w;
@@ -1284,6 +1287,7 @@ function openBeside(url){
   }catch(e){}
   window.open(url,'_blank');   // respaldo: pestaña/navegador normal
 }
+window.openBeside=openBeside;   // expuesto global para los onclick inline (el <script> es módulo)
 // 💲 Ver "sold" (Vendidos + Usados) a la derecha
 window.openSoldBeside=function(id){
   const p=parts.find(x=>x.id===id); if(!p) return;
