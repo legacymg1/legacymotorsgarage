@@ -370,13 +370,14 @@ async function ebayEnsureLocation(token){
   let r = await ebayRest("GET", "/sell/inventory/v1/location/" + EBAY_LOC_KEY, token);
   if (r.ok) return { key: EBAY_LOC_KEY, existed: true };
   const body = {
-    location: { address: { addressLine1: "Warehouse", city: "Porterville", stateOrProvince: "CA", postalCode: "93257", country: "US" } },
+    location: { address: { addressLine1: "649 W Olive Ave", city: "Porterville", stateOrProvince: "CA", postalCode: "93257", country: "US" } },
+    locationInstructions: "Ships from here",
     name: "Legacy Motors Garage",
     merchantLocationStatus: "ENABLED",
     locationTypes: ["WAREHOUSE"],
   };
   r = await ebayRest("POST", "/sell/inventory/v1/location/" + EBAY_LOC_KEY, token, body);
-  return { key: EBAY_LOC_KEY, existed: false, created: r.ok, err: r.ok ? null : ebayRestErrors(r) };
+  return { key: EBAY_LOC_KEY, existed: false, created: r.ok, status: r.status, err: r.ok ? null : ebayRestErrors(r), raw: r.ok ? null : (r.text || "").slice(0, 400) };
 }
 
 // Asegura las 3 políticas (envío/pago/devolución). Usa las existentes o crea unas por defecto.
@@ -440,7 +441,15 @@ exports.ebaySellerSetup = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
   };
   await admin.firestore().collection("config").doc("ebay").set(cfg, { merge: true });
   const ready = !!(cfg.fulfillmentPolicyId && cfg.paymentPolicyId && cfg.returnPolicyId && cfg.locationKey);
-  return { ok: ready, location: loc, policies: pol, cfg };
+  // Aggrega TODOS los errores en una lista plana y legible para el frontend
+  const errors = [];
+  const push = (label, v) => { if (!v) return; errors.push(label + ": " + (Array.isArray(v) ? v.join(" | ") : String(v))); };
+  if (!loc.existed && !loc.created) { push("Ubicación (HTTP " + (loc.status || "?") + ")", loc.err); push("Ubicación raw", loc.raw); }
+  push("Políticas (no opted-in)", pol.err);
+  push("Envío", pol.fulfillmentErr);
+  push("Pago", pol.paymentErr);
+  push("Devolución", pol.returnErr);
+  return { ok: ready, location: loc, policies: pol, cfg, errors };
 });
 
 // Arma el payload JSON (inventory item) para el Inventory API
