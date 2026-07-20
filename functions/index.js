@@ -16,7 +16,7 @@ exports.ping = onCall((request) => ({
 }));
 
 // 🤖 IA: lee las fotos de una parte y arma el anuncio de eBay (título + descripción + OEM + specifics)
-exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 120, memory: "512MiB" }, async (request) => {
+exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 240, memory: "512MiB" }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const partId = request.data && request.data.partId;
   if (!partId) throw new HttpsError("invalid-argument", "Falta partId.");
@@ -45,17 +45,21 @@ exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 120, me
   const veh = [p.vYear, p.vMake, p.vModel, p.vTrim].filter(Boolean).join(" ");
   const feedback = (request.data && request.data.feedback ? String(request.data.feedback) : "").trim().slice(0, 500);
   let prompt = `You are an expert US used auto-parts lister for eBay Motors.
-This part was removed from a ${veh || "vehicle"}.
+This part was removed from a "${veh || "vehicle"}" — BUT that stated vehicle may be wrong; trust the actual part number over it.
 The seller labeled it: "${p.name || ""}". Stated condition: "${p.condition || "Used"}".
-Study the photos carefully. Read any OEM / part / interchange numbers stamped on the part or on labels.
-Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these keys:
-{"title": "<=80 char keyword-rich eBay title, e.g. Year Make Model PartName OEM#",
- "description": "2-4 sentences: what it is, fitment, condition, any visible wear/damage",
- "partNumbers": ["OEM/interchange numbers you can actually read; [] if none"],
+STEP 1 — Read the photos carefully. Identify the part and read ALL numbers stamped/labeled on it. IGNORE connector pin numbers (e.g. "5 4 3 2 1" printed by the plug) — those are NOT part numbers.
+STEP 2 — USE WEB SEARCH to: (a) verify the real OEM/manufacturer part number, (b) find which vehicles it ACTUALLY fits, and (c) find interchange / superseded numbers (widens buyers). If the read part number does NOT fit the stated vehicle, note it in "fitmentNote".
+STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these keys:
+{"title": "<=80 char keyword-rich eBay title with VERIFIED fitment",
+ "description": "2-4 sentences: what it is, verified fitment, condition, visible wear",
+ "partNumbers": ["numbers you actually READ on the part; [] if none"],
+ "interchange": ["interchange/alternate numbers found via web search; [] if none"],
+ "fitsVehicles": "short verified list of vehicles it fits (from web search)",
+ "fitmentNote": "" ,
  "condition": "Used" | "For parts or not working" | "New",
  "itemSpecifics": {"Brand": "", "Manufacturer Part Number": "", "Placement on Vehicle": "", "Fitment": ""},
  "confidence": "high" | "medium" | "low"}
-If unsure of a value use an empty string. NEVER invent part numbers you cannot see.`;
+Never invent part numbers you cannot see. Base fitment on web search, not guesses. Put a warning in "fitmentNote" if the part does not match the stated vehicle.`;
 
   if (feedback) {
     prompt += `\n\nThe user REVIEWED a previous AI draft and gave this correction/instruction (in Spanish or English): "${feedback}". Apply it precisely — the user is the human expert who is looking at the real part.`;
@@ -71,7 +75,8 @@ If unsure of a value use an empty string. NEVER invent part numbers you cannot s
   try {
     const msg = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 2048,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
       messages: [{ role: "user", content: [...images, { type: "text", text: prompt }] }],
     });
     usage = msg.usage || {};
@@ -80,7 +85,8 @@ If unsure of a value use an empty string. NEVER invent part numbers you cannot s
     throw new HttpsError("internal", "IA: " + (e.message || "error"));
   }
   const inTok = usage.input_tokens || 0, outTok = usage.output_tokens || 0;
-  const costUsd = +(((inTok / 1e6) * 3) + ((outTok / 1e6) * 15)).toFixed(5); // estimación (precio ~Sonnet)
+  const searches = (usage.server_tool_use && usage.server_tool_use.web_search_requests) || 0;
+  const costUsd = +(((inTok / 1e6) * 3) + ((outTok / 1e6) * 15) + (searches * 0.01)).toFixed(5); // ~Sonnet + $0.01/búsqueda
 
   let draft;
   try {
@@ -93,6 +99,7 @@ If unsure of a value use an empty string. NEVER invent part numbers you cannot s
   draft.by = (request.auth.token && request.auth.token.email) || "";
   draft.model = MODEL;
   draft.tokens = { input: inTok, output: outTok };
+  draft.searches = searches;
   draft.costUsd = costUsd;   // costo estimado de ESTA generación (para el análisis de costos)
   if (feedback) draft.lastFeedback = feedback;
 
