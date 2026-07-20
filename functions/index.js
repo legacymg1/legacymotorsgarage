@@ -15,6 +15,43 @@ exports.ping = onCall((request) => ({
   uid: request.auth ? request.auth.uid : null,
 }));
 
+// 📦 Descargar todas las fotos de una parte (SIN el QR) en un ZIP — para que la esposa
+// las suba a eBay desde Windows/Chrome (baja a Descargas → eBay las elige del explorador).
+exports.zipPartPhotos = onCall({ timeoutSeconds: 120, memory: "512MiB" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const partId = request.data && request.data.partId;
+  if (!partId) throw new HttpsError("invalid-argument", "Falta partId.");
+
+  const db = admin.firestore();
+  const snap = await db.collection("parts").doc(partId).get();
+  if (!snap.exists) throw new HttpsError("not-found", "Parte no encontrada.");
+  const p = snap.data();
+
+  // Fotos reales (excluye el QR — se queda interno)
+  const urls = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u));
+  if (!urls.length) throw new HttpsError("failed-precondition", "La parte no tiene fotos.");
+
+  const JSZip = require("jszip");
+  const zip = new JSZip();
+  const base = (p.name || "parte").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40) || "parte";
+  let n = 0;
+  for (const u of urls) {
+    try {
+      const r = await fetch(u);
+      if (!r.ok) continue;
+      const ct = (r.headers.get("content-type") || "image/jpeg").split(";")[0];
+      const ext = /png/.test(ct) ? "png" : /webp/.test(ct) ? "webp" : "jpg";
+      const buf = Buffer.from(await r.arrayBuffer());
+      n += 1;
+      zip.file(base + "_" + String(n).padStart(2, "0") + "." + ext, buf);
+    } catch (e) { /* saltar la que falle */ }
+  }
+  if (!n) throw new HttpsError("internal", "No se pudieron leer las fotos.");
+
+  const zipBuf = await zip.generateAsync({ type: "nodebuffer", compression: "STORE" });
+  return { filename: base + "_fotos.zip", count: n, zipBase64: zipBuf.toString("base64") };
+});
+
 // 🤖 IA: lee las fotos de una parte y arma el anuncio de eBay (título + descripción + OEM + specifics)
 exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 240, memory: "512MiB" }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
