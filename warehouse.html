@@ -1211,9 +1211,8 @@ window.ebaySetup=async function(btn){
     if(d.ok){
       alert('✅ ¡Cuenta configurada!\n\nUbicación: '+((d.cfg&&d.cfg.locationKey)||'?')+'\nEnvío: '+(d.cfg.fulfillmentPolicyId?'✅':'❌')+'\nPago: '+(d.cfg.paymentPolicyId?'✅':'❌')+'\nDevolución: '+(d.cfg.returnPolicyId?'✅':'❌')+'\n\nYa puedes crear borradores.');
     } else {
-      const errs=[]; ['location','policies'].forEach(k=>{const s=d[k]; if(s){['err','fulfillmentErr','paymentErr','returnErr'].forEach(f=>{if(s[f]) errs.push(f+': '+(Array.isArray(s[f])?s[f].join(' | '):s[f]));});}});
-      if(d.errors) errs.push(...d.errors);
-      alert('⚠️ Falta algo en la configuración:\n\n'+(errs.length?errs.join('\n\n'):JSON.stringify(d).slice(0,400))+'\n\n(Si dice que la cuenta no está en "Business Policies", hay que activarlas en eBay — dime y te guío.)');
+      const errs=(d.errors&&d.errors.length)?d.errors:[JSON.stringify(d).slice(0,500)];
+      alert('⚠️ Falta algo en la configuración:\n\n'+errs.join('\n\n')+'\n\n(Si menciona "Business Policies"/"opt in", hay que activarlas en eBay — dime y te guío.)');
     }
   }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
   btn.disabled=false; btn.textContent=o;
