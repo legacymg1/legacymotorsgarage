@@ -205,27 +205,23 @@ async function loadPart(partId){
   return Object.assign({ id: partId }, snap.data());
 }
 
-// Arma el <Item> XML del anuncio a partir de la parte (compartido por Verificar y Publicar)
-async function buildEbayItem(p, priceUsd){
+// Resuelve la CATEGORÍA de eBay Motors desde la frase de la IA (sesgo "car truck" + filtro estricto Motors)
+async function resolveCategory(p){
   const d = p.ebayDraft || {};
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
-  const desc = (d.description || p.name || "");
-  const price = priceUsd ? Number(priceUsd).toFixed(2) : (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
-  const condMap = { "New": "1000", "Used": "3000", "For parts or not working": "7000" };
-  const condId = condMap[d.condition || p.condition] || "3000";
-
-  // Categoría: resuelve desde la frase de la IA con SESGO automotriz ("car truck") y filtro estricto de eBay Motors
   const catQuery = "car truck " + (d.ebayCategory || [p.vYear, p.vMake, p.vModel, p.name].filter(Boolean).join(" ") || title);
   let catAck = "", catId = "";
   try { const c = await ebayCategorySuggest(catQuery); catId = c.id; catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
   if (!catId) catId = "6030";
+  return { catId, catAck };
+}
 
-  const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 12);
-  const picXml = pics.length ? `<PictureDetails>${pics.map((u) => `<PictureURL>${xesc(u)}</PictureURL>`).join("")}</PictureDetails>` : "";
-
-  // Item specifics: pide a eBay los aspectos de ESA categoría y llénalos con lo que tenemos (como lo haría a mano)
+// Resuelve los ITEM SPECIFICS (compartido por el camino XML/Trading y el JSON/Inventory).
+// Pide a eBay los aspectos de ESA categoría y los llena con lo que tenemos (como a mano). Devuelve [{name, values:[...]}].
+async function resolveSpecs(p, catId){
+  const d = p.ebayDraft || {};
   const is = d.itemSpecifics || {};
-  const specs = [];   // {name, values:[...]}
+  const specs = [];
   const seen = new Set();
   const addSpec = (name, values) => {
     if (!name || !values) return;
@@ -251,6 +247,24 @@ async function buildEbayItem(p, priceUsd){
   aspects.forEach((a) => addSpec(a.name, dataFor(a.name)));                                                // llena los campos que eBay pide
   Object.keys(is).forEach((k) => { if (is[k] && !/fitment|fits|compatib/i.test(k)) addSpec(k, [is[k]]); }); // + cualquier extra de la IA
   if (!seen.has("manufacturer part number") && !seen.has("mpn")) { const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber; if (mpn) addSpec("Manufacturer Part Number", [mpn]); }
+  return specs;
+}
+
+// Arma el <Item> XML del anuncio a partir de la parte (compartido por Verificar y Publicar)
+async function buildEbayItem(p, priceUsd){
+  const d = p.ebayDraft || {};
+  const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
+  const desc = (d.description || p.name || "");
+  const price = priceUsd ? Number(priceUsd).toFixed(2) : (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
+  const condMap = { "New": "1000", "Used": "3000", "For parts or not working": "7000" };
+  const condId = condMap[d.condition || p.condition] || "3000";
+
+  const { catId, catAck } = await resolveCategory(p);
+
+  const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 12);
+  const picXml = pics.length ? `<PictureDetails>${pics.map((u) => `<PictureURL>${xesc(u)}</PictureURL>`).join("")}</PictureDetails>` : "";
+
+  const specs = await resolveSpecs(p, catId);
   const specsXml = specs.length ? `<ItemSpecifics>${specs.map((s) => `<NameValueList><Name>${xesc(s.name)}</Name>${s.values.map((v) => `<Value>${xesc(v)}</Value>`).join("")}</NameValueList>`).join("")}</ItemSpecifics>` : "";
   const inner = `<Item>
   <SKU>${xesc(p.id || p.entryId || "")}</SKU>
@@ -308,6 +322,214 @@ exports.ebayPublishListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120
     await admin.firestore().collection("parts").doc(p.id).update(upd);
   }
   return { ack, itemId, categoryId: it.catId, price: it.price, errors };
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🅱️  FLUJO DE BORRADOR (OAuth + Inventory API REST) — publicar con 1 clic + revisión humana
+// ═══════════════════════════════════════════════════════════════════════════
+
+const EBAY_LOC_KEY = "LMG_PORTERVILLE";
+
+// Llamada REST genérica a las APIs de vender de eBay (Inventory/Account). token = access token de usuario.
+async function ebayRest(method, path, token, body){
+  const r = await fetch("https://api.ebay.com" + path, {
+    method,
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Content-Language": "en-US",
+      "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let json = null, text = "";
+  try { text = await r.text(); json = text ? JSON.parse(text) : null; } catch (e) {}
+  return { status: r.status, ok: r.status >= 200 && r.status < 300, json, text };
+}
+
+// Extrae mensajes de error legibles de una respuesta REST de eBay
+function ebayRestErrors(r){
+  const e = r.json && r.json.errors;
+  if (Array.isArray(e) && e.length) return e.map((x) => (x.message || x.longMessage || "error") + (x.parameters ? (" [" + x.parameters.map((q) => q.value).join(", ") + "]") : "")).slice(0, 6);
+  return [(r.text || "").slice(0, 300) || ("HTTP " + r.status)];
+}
+
+// Condición → enum del Inventory API (distinto de los IDs del Trading API)
+function ebayCondEnum(c){
+  const s = String(c || "").toLowerCase();
+  if (/new/.test(s)) return "NEW";
+  if (/parts|not working/.test(s)) return "FOR_PARTS_OR_NOT_WORKING";
+  if (/fair|acceptable/.test(s)) return "USED_GOOD";
+  if (/good/.test(s)) return "USED_VERY_GOOD";
+  return "USED_EXCELLENT";
+}
+
+// Asegura la ubicación de inventario (ship-from). Se crea una sola vez.
+async function ebayEnsureLocation(token){
+  let r = await ebayRest("GET", "/sell/inventory/v1/location/" + EBAY_LOC_KEY, token);
+  if (r.ok) return { key: EBAY_LOC_KEY, existed: true };
+  const body = {
+    location: { address: { addressLine1: "Warehouse", city: "Porterville", stateOrProvince: "CA", postalCode: "93257", country: "US" } },
+    name: "Legacy Motors Garage",
+    merchantLocationStatus: "ENABLED",
+    locationTypes: ["WAREHOUSE"],
+  };
+  r = await ebayRest("POST", "/sell/inventory/v1/location/" + EBAY_LOC_KEY, token, body);
+  return { key: EBAY_LOC_KEY, existed: false, created: r.ok, err: r.ok ? null : ebayRestErrors(r) };
+}
+
+// Asegura las 3 políticas (envío/pago/devolución). Usa las existentes o crea unas por defecto.
+async function ebayEnsurePolicies(token){
+  const out = {};
+  // Envío (Fulfillment)
+  let r = await ebayRest("GET", "/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_US", token);
+  if (!r.ok) return { optedIn: false, err: ebayRestErrors(r) };
+  let list = (r.json && r.json.fulfillmentPolicies) || [];
+  if (list.length) out.fulfillmentPolicyId = list[0].fulfillmentPolicyId;
+  else {
+    const c = await ebayRest("POST", "/sell/account/v1/fulfillment_policy", token, {
+      name: "LMG Flat USPS Priority", marketplaceId: "EBAY_US",
+      categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
+      handlingTime: { value: 3, unit: "DAY" },
+      shippingOptions: [{ optionType: "DOMESTIC", costType: "FLAT_RATE",
+        shippingServices: [{ sortOrder: 1, shippingCarrierCode: "USPS", shippingServiceCode: "USPSPriority",
+          shippingCost: { value: "15.0", currency: "USD" }, freeShipping: false, buyerResponsibleForShipping: false }] }],
+    });
+    if (c.ok) out.fulfillmentPolicyId = c.json.fulfillmentPolicyId; else out.fulfillmentErr = ebayRestErrors(c);
+  }
+  // Pago (Payment)
+  r = await ebayRest("GET", "/sell/account/v1/payment_policy?marketplace_id=EBAY_US", token);
+  list = (r.json && r.json.paymentPolicies) || [];
+  if (list.length) out.paymentPolicyId = list[0].paymentPolicyId;
+  else {
+    const c = await ebayRest("POST", "/sell/account/v1/payment_policy", token, {
+      name: "LMG Payment", marketplaceId: "EBAY_US",
+      categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }], immediatePay: true,
+    });
+    if (c.ok) out.paymentPolicyId = c.json.paymentPolicyId; else out.paymentErr = ebayRestErrors(c);
+  }
+  // Devolución (Return)
+  r = await ebayRest("GET", "/sell/account/v1/return_policy?marketplace_id=EBAY_US", token);
+  list = (r.json && r.json.returnPolicies) || [];
+  if (list.length) out.returnPolicyId = list[0].returnPolicyId;
+  else {
+    const c = await ebayRest("POST", "/sell/account/v1/return_policy", token, {
+      name: "LMG Returns 30d", marketplaceId: "EBAY_US",
+      categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
+      returnsAccepted: true, returnPeriod: { value: 30, unit: "DAY" }, returnShippingCostPayer: "BUYER",
+    });
+    if (c.ok) out.returnPolicyId = c.json.returnPolicyId; else out.returnErr = ebayRestErrors(c);
+  }
+  return out;
+}
+
+// ⚙️ Configurar cuenta de eBay para la API (una sola vez): ubicación + políticas. Guarda IDs en config/ebay.
+exports.ebaySellerSetup = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const a = await ebayUserAccessToken();
+  if (!a.token) return { ok: false, step: "token", errors: [(a.raw && a.raw.error_description) || "sin token"] };
+  const loc = await ebayEnsureLocation(a.token);
+  const pol = await ebayEnsurePolicies(a.token);
+  const cfg = {
+    locationKey: loc.key,
+    fulfillmentPolicyId: pol.fulfillmentPolicyId || null,
+    paymentPolicyId: pol.paymentPolicyId || null,
+    returnPolicyId: pol.returnPolicyId || null,
+    updatedAt: new Date().toISOString(),
+  };
+  await admin.firestore().collection("config").doc("ebay").set(cfg, { merge: true });
+  const ready = !!(cfg.fulfillmentPolicyId && cfg.paymentPolicyId && cfg.returnPolicyId && cfg.locationKey);
+  return { ok: ready, location: loc, policies: pol, cfg };
+});
+
+// Arma el payload JSON (inventory item) para el Inventory API
+async function buildInventoryItem(p){
+  const d = p.ebayDraft || {};
+  const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
+  const desc = (d.description || p.name || "");
+  const { catId } = await resolveCategory(p);
+  const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 24);
+  const specs = await resolveSpecs(p, catId);
+  const aspects = {};
+  specs.forEach((s) => { aspects[s.name] = s.values; });
+  const is = d.itemSpecifics || {};
+  const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber || is["Manufacturer Part Number"];
+  const brand = is.Brand || "Unbranded";
+  const product = { title, description: desc, aspects, imageUrls: pics, brand };
+  if (mpn) product.mpn = mpn;
+  const invItem = {
+    availability: { shipToLocationAvailability: { quantity: 1 } },
+    condition: ebayCondEnum(d.condition || p.condition),
+    product,
+  };
+  return { sku: String(p.id), invItem, title, desc, catId, photos: pics.length, aspects: Object.keys(aspects).length };
+}
+
+// 📝 Crear BORRADOR en eBay (Inventory API: inventory item + oferta SIN publicar). No sale en vivo.
+exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const p = await loadPart(request.data && request.data.partId);
+  const priceUsd = request.data && request.data.priceUsd;
+  const a = await ebayUserAccessToken();
+  if (!a.token) return { ok: false, step: "token", errors: [(a.raw && a.raw.error_description) || "sin token"] };
+
+  const cfgSnap = await admin.firestore().collection("config").doc("ebay").get();
+  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+  if (!cfg.fulfillmentPolicyId || !cfg.paymentPolicyId || !cfg.returnPolicyId || !cfg.locationKey) {
+    return { ok: false, step: "setup", errors: ["Falta configurar la cuenta. Corre '⚙️ Configurar eBay' primero."] };
+  }
+
+  const b = await buildInventoryItem(p);
+  const price = priceUsd ? Number(priceUsd).toFixed(2) : (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
+
+  // 1) Inventory item (idempotente por SKU)
+  const inv = await ebayRest("PUT", "/sell/inventory/v1/inventory_item/" + encodeURIComponent(b.sku), a.token, b.invItem);
+  if (!inv.ok) return { ok: false, step: "inventory_item", status: inv.status, errors: ebayRestErrors(inv) };
+
+  // 2) Oferta SIN publicar = borrador. Reusa la oferta si ya existe para este SKU.
+  let offerId = "";
+  const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(b.sku) + "&marketplace_id=EBAY_US", a.token);
+  if (exist.ok && exist.json && exist.json.offers && exist.json.offers.length) offerId = exist.json.offers[0].offerId;
+  const offerBody = {
+    sku: b.sku, marketplaceId: "EBAY_US", format: "FIXED_PRICE", availableQuantity: 1,
+    categoryId: b.catId, listingDescription: b.desc,
+    listingPolicies: { fulfillmentPolicyId: cfg.fulfillmentPolicyId, paymentPolicyId: cfg.paymentPolicyId, returnPolicyId: cfg.returnPolicyId },
+    pricingSummary: { price: { value: price, currency: "USD" } },
+    merchantLocationKey: cfg.locationKey,
+  };
+  let offer;
+  if (offerId) offer = await ebayRest("PUT", "/sell/inventory/v1/offer/" + offerId, a.token, offerBody);
+  else offer = await ebayRest("POST", "/sell/inventory/v1/offer", a.token, offerBody);
+  if (!offer.ok) return { ok: false, step: "offer", status: offer.status, errors: ebayRestErrors(offer) };
+  if (!offerId) offerId = offer.json && offer.json.offerId;
+
+  const upd = { ebayOfferId: offerId, ebayDraftCat: b.catId, ebayDraftAt: new Date().toISOString(), status: "borrador" };
+  if (priceUsd) upd.priceCents = Math.round(Number(priceUsd) * 100);
+  await admin.firestore().collection("parts").doc(p.id).update(upd);
+
+  return { ok: true, offerId, categoryId: b.catId, title: b.title, price, photos: b.photos, aspects: b.aspects };
+});
+
+// 🚀 Publicar la oferta EN VIVO (después de que la revisen). 1 clic → anuncio real.
+exports.ebayPublishOffer = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const p = await loadPart(request.data && request.data.partId);
+  let offerId = p.ebayOfferId;
+  const a = await ebayUserAccessToken();
+  if (!a.token) return { ok: false, step: "token", errors: [(a.raw && a.raw.error_description) || "sin token"] };
+  if (!offerId) {
+    const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(String(p.id)) + "&marketplace_id=EBAY_US", a.token);
+    if (exist.ok && exist.json && exist.json.offers && exist.json.offers.length) offerId = exist.json.offers[0].offerId;
+  }
+  if (!offerId) return { ok: false, step: "offer", errors: ["No hay borrador para esta parte. Crea el borrador primero."] };
+  const r = await ebayRest("POST", "/sell/inventory/v1/offer/" + offerId + "/publish", a.token);
+  if (!r.ok) return { ok: false, step: "publish", status: r.status, errors: ebayRestErrors(r) };
+  const listingId = r.json && r.json.listingId;
+  await admin.firestore().collection("parts").doc(p.id).update({
+    ebayItemId: listingId || "", ebayListedAt: new Date().toISOString(), status: "publicado",
+  });
+  return { ok: true, listingId };
 });
 
 // 📦 Descargar todas las fotos de una parte (SIN el QR) en un ZIP — para que la esposa
