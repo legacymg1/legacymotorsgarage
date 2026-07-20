@@ -156,7 +156,7 @@
       <div style="font-weight:800;margin-bottom:6px;" data-i18n="scanTitle">📦 Escanear / buscar parte</div>
       <div class="sub" style="margin-bottom:8px;" data-i18n="scanHint">Escanea el QR para ver dónde está.</div>
       <div class="row2">
-        <input id="scan-input" data-i18n-ph="scanPh" placeholder="Escanea o pega el código…" onkeydown="if(event.key==='Enter')scanLookup()">
+        <input id="scan-input" name="scancode" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-i18n-ph="scanPh" placeholder="Escanea o pega el código…" onkeydown="if(event.key==='Enter')scanLookup()">
         <button class="btn sm" style="flex:0 0 auto;" onclick="scanLookup()" data-i18n="searchBtn">Buscar</button>
       </div>
       <button class="btn ghost sm" style="margin-top:8px;" onclick="startCamScan()" data-i18n="scanCam">📷 Escanear con cámara</button>
