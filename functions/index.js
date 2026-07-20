@@ -86,17 +86,19 @@ This part was removed from a "${veh || "vehicle"}" — BUT that stated vehicle m
 The seller labeled it: "${p.name || ""}". Stated condition: "${p.condition || "Used"}".
 STEP 1 — Read the photos carefully. Identify the part and read ALL numbers stamped/labeled on it. IGNORE connector pin numbers (e.g. "5 4 3 2 1" printed by the plug) — those are NOT part numbers.
 STEP 2 — USE WEB SEARCH to: (a) verify the real OEM/manufacturer part number, (b) find which vehicles it ACTUALLY fits, and (c) find interchange / superseded numbers (widens buyers). If the read part number does NOT fit the stated vehicle, note it in "fitmentNote".
+STEP 2b — MANY PARTS HAVE NO READABLE NUMBER. When you cannot read a part number on the part, still DETERMINE the OEM number it SHOULD be: use web search with the vehicle (${veh || "the stated vehicle"}) + the part name + what you see in the photos to find the most likely correct OEM/manufacturer part number for THIS exact part on THIS vehicle. Put that in "suggestedPartNumber" (single best number) and briefly say how sure you are in "fitmentNote". If the exact number depends on trim/engine/options you cannot see, give the best candidate and say so — a strong lead the human will verify. Only leave it empty if you truly cannot narrow it down at all.
 STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these keys:
 {"title": "<=80 char keyword-rich eBay title with VERIFIED fitment",
  "description": "2-4 sentences: what it is, verified fitment, condition, visible wear",
  "partNumbers": ["numbers you actually READ on the part; [] if none"],
+ "suggestedPartNumber": "best OEM number this part SHOULD be (from web search) when none was readable; '' if you truly cannot determine one",
  "interchange": ["interchange/alternate numbers found via web search; [] if none"],
  "fitsVehicles": "short verified list of vehicles it fits (from web search)",
  "fitmentNote": "" ,
  "condition": "Used" | "For parts or not working" | "New",
  "itemSpecifics": {"Brand": "", "Manufacturer Part Number": "", "Placement on Vehicle": "", "Fitment": ""},
  "confidence": "high" | "medium" | "low"}
-Never invent part numbers you cannot see. Base fitment on web search, not guesses. Put a warning in "fitmentNote" if the part does not match the stated vehicle.`;
+Never invent a number you READ (partNumbers must be real reads). But suggestedPartNumber is EXPECTED to be a researched best-guess — provide it whenever you reasonably can. Base fitment on web search, not guesses. Put a warning in "fitmentNote" if the part does not match the stated vehicle.`;
 
   if (feedback) {
     prompt += `\n\nThe user REVIEWED a previous AI draft and gave this correction/instruction (in Spanish or English): "${feedback}". Apply it precisely — the user is the human expert who is looking at the real part.`;
