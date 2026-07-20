@@ -631,7 +631,7 @@
   <div class="modal" style="max-width:920px;width:100%;">
     <div class="modal-title">🧮 COTIZADOR DE PAGOS</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Simula el pago de uno o varios carros para que el cliente se lleve el presupuesto impreso. Es informativo, no es un contrato.</div>
-    <div class="form-group"><label class="form-label">Cliente (para el presupuesto)</label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente (opcional)"></div>
+    <div class="form-group"><label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">Cliente (para el presupuesto)<span onclick="cotNueva()" style="color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;">🆕 Cotización nueva</span></label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente (opcional)" oninput="cotSaveDraft()"></div>
     <div class="form-group"><label class="form-label">Agregar carro del inventario</label>
       <div style="position:relative;">
         <input class="form-input" id="cot-car-search" placeholder="🔍 Busca por # inventario, marca, modelo o VIN..." autocomplete="off" oninput="cotFilterCars()" onfocus="cotFilterCars()" onkeydown="cotCarKey(event)" onblur="setTimeout(()=>{const b=document.getElementById('cot-car-results');if(b)b.style.display='none';},200)">
@@ -1435,14 +1435,37 @@ window.renderAppointments=function(){
 
 // ===================== COTIZADOR / SIMULADOR DE PAGOS =====================
 let cotInventory=[]; let cotOpts=[]; let cotSeq=0;
+// Guarda el cotizador en el equipo para que NO se pierda si la app se recarga
+function cotSaveDraft(){
+  try{ localStorage.setItem('cotDraft', JSON.stringify({ cust:(document.getElementById('cot-customer')||{}).value||'', opts:cotOpts, seq:cotSeq, ts:Date.now() })); }catch(e){}
+}
+function cotClearDraft(){ try{ localStorage.removeItem('cotDraft'); }catch(e){} }
+window.cotSaveDraft=cotSaveDraft;   // expuesto para el oninput inline del campo cliente
 window.openCotizador=function(){
-  document.getElementById('cot-customer').value='';
   document.getElementById('cot-car-search').value='';
   document.getElementById('cot-car-results').style.display='none';
-  cotOpts=[]; cotSeq=0;
-  getDocs(collection(db,'inventory')).then(snap=>{ cotInventory=snap.docs.map(d=>({id:d.id,...d.data()})); }).catch(()=>{});
-  cotAddBlank();
+  if(cotInventory.length===0){ getDocs(collection(db,'inventory')).then(snap=>{ cotInventory=snap.docs.map(d=>({id:d.id,...d.data()})); }).catch(()=>{}); }
+  // Restaura un borrador reciente (si la app se recargó a media cotización, no se pierde)
+  let draft=null; try{ draft=JSON.parse(localStorage.getItem('cotDraft')||'null'); }catch(e){}
+  const recent = draft && draft.opts && draft.opts.length && (Date.now()-(draft.ts||0) < 6*3600*1000);
+  if(recent){
+    cotOpts=draft.opts; cotSeq=draft.seq||cotOpts.length;
+    document.getElementById('cot-customer').value=draft.cust||'';
+    renderCotOptions();
+  } else {
+    document.getElementById('cot-customer').value='';
+    cotOpts=[]; cotSeq=0;
+    cotAddBlank();
+  }
   document.getElementById('cot-modal').classList.add('active');
+};
+// 🆕 Empezar una cotización nueva (borra el borrador guardado)
+window.cotNueva=function(){
+  if(cotOpts.length && !confirm('¿Empezar una cotización nueva? Se borra lo que tienes aquí.')) return;
+  cotClearDraft();
+  document.getElementById('cot-customer').value='';
+  document.getElementById('cot-car-search').value='';
+  cotOpts=[]; cotSeq=0; cotAddBlank();
 };
 let _cotFiltered=[];
 window.cotFilterCars=function(){
@@ -1472,7 +1495,7 @@ window.cotCarKey=function(e){
 window.cotAddBlank=function(){ cotOpts.push({id:++cotSeq, car:'', vin:'', miles:'', price:0, down:0, tax:0, dmv:0, numpay:52, freq:'weekly'}); renderCotOptions(); };
 window.cotDup=function(i){ const o=cotOpts[i]; if(!o) return; cotOpts.splice(i+1,0,{...o,id:++cotSeq}); renderCotOptions(); };
 window.cotRemove=function(i){ cotOpts.splice(i,1); renderCotOptions(); };
-window.cotSet=function(i,field,val){ if(!cotOpts[i]) return; cotOpts[i][field]=(field==='car'||field==='vin'||field==='freq'||field==='miles')?val:(Number(val)||0); cotUpdateResult(i); };
+window.cotSet=function(i,field,val){ if(!cotOpts[i]) return; cotOpts[i][field]=(field==='car'||field==='vin'||field==='freq'||field==='miles')?val:(Number(val)||0); cotUpdateResult(i); cotSaveDraft(); };
 function cotCalc(o){
   const docFee=70;
   const price=Number(o.price)||0, down=Number(o.down)||0, tax=Number(o.tax)||0, dmv=Number(o.dmv)||0;
@@ -1538,6 +1561,7 @@ function renderCotOptions(){
       <div id="cot-res-${i}" style="margin-top:6px;"></div>
     </div>`).join('');
   cotOpts.forEach((o,i)=>cotUpdateResult(i));
+  cotSaveDraft();
 }
 window.printCotizacion=function(){
   if(!cotOpts.length){ alert('Agrega al menos una opción.'); return; }
