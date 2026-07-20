@@ -978,7 +978,9 @@ function semaforoTag(s){
   return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px;background:'+c+'22;color:'+c+';border:1px solid '+c+'66;white-space:nowrap;"><span style="width:8px;height:8px;border-radius:50%;background:'+c+';"></span>'+lbl+'</span>';
 }
 function listerCard(p){
-  const sold='https://www.ebay.com/sch/i.html?_nkw='+encodeURIComponent([p.vYear,p.vMake,p.vModel,p.name].filter(Boolean).join(' '))+'&LH_Sold=1&LH_Complete=1';
+  // Búsqueda "sold": usa el título que vamos a poner (IA) si existe; Vendidos + Usados por defecto
+  const soldQ = (p.ebayDraft && p.ebayDraft.title) ? p.ebayDraft.title : [p.vYear,p.vMake,p.vModel,p.name].filter(Boolean).join(' ');
+  const sold='https://www.ebay.com/sch/i.html?_nkw='+encodeURIComponent(soldQ)+'&LH_Sold=1&LH_Complete=1&LH_ItemCondition=3000';
   const fotos=(p.photoURLs||[]).slice(0,5).map(u=>`<img src="${u}" onclick="openPhoto('${u}')" style="cursor:pointer;">`).join('');
   return `<div class="part">
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="font-weight:700;min-width:0;">${p.vehicleLabel} · ${p.name}</div>${semaforoTag(p.status)}</div>
