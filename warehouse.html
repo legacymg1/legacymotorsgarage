@@ -62,7 +62,10 @@
 </head>
 <body>
 
-<div id="install-bar" onclick="installApp()" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px;text-align:center;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.45);" data-i18n="installApp">📲 Instalar Warehouse como app</div>
+<div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
+  <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Warehouse como app</span>
+  <button onclick="dismissInstall(event)" title="Cerrar" style="position:absolute;top:50%;right:8px;transform:translateY(-50%);background:rgba(0,0,0,.18);color:#0b0e14;border:none;border-radius:50%;width:26px;height:26px;font-size:14px;font-weight:800;cursor:pointer;line-height:1;">✕</button>
+</div>
 
 <div id="login">
   <div class="card" style="max-width:360px;width:100%;">
@@ -284,7 +287,8 @@ function carStatusLabel(v){ const c=CAR_STATUS.find(x=>x.v===v); return c?(L==='
 // ---- PWA: service worker + botón instalar ----
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw-warehouse.js').catch(e=>console.log('sw',e)); }
 let _deferredPrompt=null;
-window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); _deferredPrompt=e; const b=document.getElementById('install-bar'); if(b) b.style.display=''; });
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); _deferredPrompt=e; let dis=false; try{ dis=localStorage.getItem('lmg_wh_install_dismissed')==='1'; }catch(_){} const b=document.getElementById('install-bar'); if(b && !dis) b.style.display=''; });
+window.dismissInstall=function(ev){ if(ev){ ev.stopPropagation(); } const b=document.getElementById('install-bar'); if(b) b.style.display='none'; try{ localStorage.setItem('lmg_wh_install_dismissed','1'); }catch(_){} };
 window.addEventListener('appinstalled', ()=>{ const b=document.getElementById('install-bar'); if(b) b.style.display='none'; _deferredPrompt=null; });
 window.installApp=async function(){
   if(_deferredPrompt){ _deferredPrompt.prompt(); await _deferredPrompt.userChoice; _deferredPrompt=null; const b=document.getElementById('install-bar'); if(b) b.style.display='none'; }
