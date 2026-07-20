@@ -43,7 +43,8 @@ exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 120, me
   if (!images.length) throw new HttpsError("failed-precondition", "La parte no tiene fotos para analizar.");
 
   const veh = [p.vYear, p.vMake, p.vModel, p.vTrim].filter(Boolean).join(" ");
-  const prompt = `You are an expert US used auto-parts lister for eBay Motors.
+  const feedback = (request.data && request.data.feedback ? String(request.data.feedback) : "").trim().slice(0, 500);
+  let prompt = `You are an expert US used auto-parts lister for eBay Motors.
 This part was removed from a ${veh || "vehicle"}.
 The seller labeled it: "${p.name || ""}". Stated condition: "${p.condition || "Used"}".
 Study the photos carefully. Read any OEM / part / interchange numbers stamped on the part or on labels.
@@ -55,6 +56,11 @@ Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these keys:
  "itemSpecifics": {"Brand": "", "Manufacturer Part Number": "", "Placement on Vehicle": "", "Fitment": ""},
  "confidence": "high" | "medium" | "low"}
 If unsure of a value use an empty string. NEVER invent part numbers you cannot see.`;
+
+  if (feedback) {
+    prompt += `\n\nThe user REVIEWED a previous AI draft and gave this correction/instruction (in Spanish or English): "${feedback}". Apply it precisely — the user is the human expert who is looking at the real part.`;
+    if (p.ebayDraft) prompt += `\nThe previous draft was: ${JSON.stringify({ title: p.ebayDraft.title, description: p.ebayDraft.description, partNumbers: p.ebayDraft.partNumbers })}.`;
+  }
 
   const AnthropicMod = require("@anthropic-ai/sdk");
   const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
@@ -81,6 +87,7 @@ If unsure of a value use an empty string. NEVER invent part numbers you cannot s
   }
   draft.generatedAt = new Date().toISOString();
   draft.by = (request.auth.token && request.auth.token.email) || "";
+  if (feedback) draft.lastFeedback = feedback;
 
   await db.collection("parts").doc(partId).update({ ebayDraft: draft, ebayDraftAt: draft.generatedAt });
   return draft;
