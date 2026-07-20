@@ -1137,6 +1137,7 @@ function listerCard(p){
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn sm" onclick="prepEbay('${p.id}',this)">${p.ebayDraft?t('ebayRegen'):t('ebayPrep')}</button>
       ${role==='owner'?`<button class="btn ghost sm" onclick="ebayVerify('${p.id}',this)">🧪 Verificar en eBay</button>`:''}
+      ${role==='owner'?`<button class="btn sm" style="background:var(--gold);color:#0b0e14;" onclick="ebayPublish('${p.id}',this)">🚀 Publicar en eBay</button>`:''}
       <button class="btn green sm" onclick="openSoldBeside('${p.id}')">${t('seeSold')}</button>
       <button class="btn sm" style="background:#0b5cd6;color:#fff;" onclick="openEbayNew('${p.id}',this)">${t('ebayNewSide')}</button>
       ${(p.photoURLs&&p.photoURLs.filter(u=>u&&!/00_QR/.test(u)).length)?`<button class="btn ghost sm" onclick="dlPhotos('${p.id}',this)">${t('dlPhotos')}</button>`:''}
@@ -1184,6 +1185,22 @@ window.renderLister=function(){
   box.innerHTML=html;
 };
 window.copyText=function(btn,txt){ navigator.clipboard&&navigator.clipboard.writeText(txt); btn.textContent=t('copied'); setTimeout(()=>btn.textContent=t('copy'),1200); };
+// 🚀 Publicar anuncio EN VIVO en eBay (AddFixedPriceItem) — pide precio + confirmación. Solo dueños.
+window.ebayPublish=async function(id,btn){
+  const p=parts.find(x=>x.id===id);
+  const cur=(p&&p.priceCents!=null)?(p.priceCents/100):'';
+  const priceStr=prompt('💵 Precio de venta en eBay ($):', cur);
+  if(priceStr===null) return;
+  const price=Number(priceStr); if(!price||price<=0){ alert('Precio inválido'); return; }
+  if(!confirm('⚠️ Esto PUBLICA el anuncio EN VIVO en eBay (aplica tarifa de eBay como siempre).\n\nPrecio: $'+price.toFixed(2)+'\n\n¿Publicar ahora?')) return;
+  const o=btn.textContent; btn.disabled=true; btn.textContent='🚀 Publicando…';
+  try{
+    const r=await httpsCallable(functions,'ebayPublishListing')({partId:id, priceUsd:price}); const d=r.data||{};
+    if((d.ack==='Success'||d.ack==='Warning')&&d.itemId) alert('✅ ¡PUBLICADO EN EBAY!\n\nItemID: '+d.itemId+'\nVer: https://www.ebay.com/itm/'+d.itemId+'\n\nLa parte pasó a Publicadas.');
+    else alert('⚠️ eBay no publicó ('+d.ack+'):\n- '+((d.errors||['sin detalle']).join('\n- ')));
+  }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
+  btn.disabled=false; btn.textContent=o;
+};
 // 🧪 Verificar anuncio en eBay (VerifyAddFixedPriceItem) — valida sin publicar. Solo dueños.
 window.ebayVerify=async function(id,btn){
   const o=btn.textContent; btn.disabled=true; btn.textContent='🧪 Verificando…';
