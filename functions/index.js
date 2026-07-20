@@ -383,9 +383,12 @@ async function ebayEnsureLocation(token){
 // Asegura las 3 políticas (envío/pago/devolución). Usa las existentes o crea unas por defecto.
 async function ebayEnsurePolicies(token){
   const out = {};
+  // 0) Opt-in a Business Policies (requisito de la API). Idempotente: si ya está, eBay lo ignora.
+  const opt = await ebayRest("POST", "/sell/account/v1/program/opt_in", token, { programType: "SELLING_POLICY_MANAGEMENT" });
+  out.optIn = opt.ok ? "ok" : (ebayRestErrors(opt)[0] || "").slice(0, 120);
   // Envío (Fulfillment)
   let r = await ebayRest("GET", "/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_US", token);
-  if (!r.ok) return { optedIn: false, err: ebayRestErrors(r) };
+  if (!r.ok) return { optedIn: false, err: ebayRestErrors(r), raw: (r.text || "").slice(0, 400), optIn: out.optIn };
   let list = (r.json && r.json.fulfillmentPolicies) || [];
   if (list.length) out.fulfillmentPolicyId = list[0].fulfillmentPolicyId;
   else {
@@ -445,7 +448,9 @@ exports.ebaySellerSetup = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
   const errors = [];
   const push = (label, v) => { if (!v) return; errors.push(label + ": " + (Array.isArray(v) ? v.join(" | ") : String(v))); };
   if (!loc.existed && !loc.created) { push("Ubicación (HTTP " + (loc.status || "?") + ")", loc.err); push("Ubicación raw", loc.raw); }
-  push("Políticas (no opted-in)", pol.err);
+  if (pol.optIn && pol.optIn !== "ok") push("Opt-in Business Policies", pol.optIn);
+  push("Políticas (GET falló)", pol.err);
+  push("Políticas raw", pol.raw);
   push("Envío", pol.fulfillmentErr);
   push("Pago", pol.paymentErr);
   push("Devolución", pol.returnErr);
