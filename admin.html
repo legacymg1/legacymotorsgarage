@@ -1127,6 +1127,17 @@ function startListening() {
     document.getElementById('sync-status').className = 'sync-status offline';
   });
   startApptListening();
+  startInvListening();
+}
+// Inventario en vivo para el cotizador (siempre listo, sin depender del getDocs de una vez)
+function startInvListening(){
+  try{
+    onSnapshot(collection(db,'inventory'), (snap)=>{
+      cotInventory = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      const box=document.getElementById('cot-car-results');
+      if(box && box.style.display!=='none') cotFilterCars();   // refresca el desplegable si está abierto
+    }, (e)=>{ console.error('inventory listener', e); });
+  }catch(e){ console.error('startInvListening', e); }
 }
 
 // ===================== CITAS / APPOINTMENTS =====================
