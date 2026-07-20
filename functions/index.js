@@ -89,7 +89,7 @@ STEP 2 — USE WEB SEARCH to: (a) verify the real OEM/manufacturer part number, 
 STEP 2b — MANY PARTS HAVE NO READABLE NUMBER. When you cannot read a part number on the part, still DETERMINE the OEM number it SHOULD be: use web search with the vehicle (${veh || "the stated vehicle"}) + the part name + what you see in the photos to find the most likely correct OEM/manufacturer part number for THIS exact part on THIS vehicle. Put that in "suggestedPartNumber" (single best number) and briefly say how sure you are in "fitmentNote". If the exact number depends on trim/engine/options you cannot see, give the best candidate and say so — a strong lead the human will verify. Only leave it empty if you truly cannot narrow it down at all.
 STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these keys:
 {"title": "<=80 char keyword-rich eBay title with VERIFIED fitment",
- "description": "2-4 sentences: what it is, verified fitment, condition, visible wear",
+ "description": "2-4 sentences that COMPLEMENT eBay's auto-generated description (do NOT write generic catalog filler): focus on THIS specific used part — its real condition & visible wear, the VERIFIED fitment, and interchange numbers. This is a seller's condition/fitment note.",
  "partNumbers": ["numbers you actually READ on the part; [] if none"],
  "suggestedPartNumber": "best OEM number this part SHOULD be (from web search) when none was readable; '' if you truly cannot determine one",
  "interchange": ["interchange/alternate numbers found via web search; [] if none"],
