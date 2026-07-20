@@ -467,10 +467,10 @@ exports.ebaySellerSetup = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
 });
 
 // Arma el payload JSON (inventory item) para el Inventory API
-// Lee el VIN del carro de donde salió la parte (colección vehicles)
+// Lee el VIN del carro de donde salió la parte (colección dismantle_vehicles de la yarda)
 async function loadVehicleVin(p){
   if (!p.vehicleId) return "";
-  try { const vs = await admin.firestore().collection("vehicles").doc(p.vehicleId).get(); return vs.exists ? (vs.data().vin || "") : ""; } catch (e) { return ""; }
+  try { const vs = await admin.firestore().collection("dismantle_vehicles").doc(p.vehicleId).get(); return vs.exists ? (vs.data().vin || "") : ""; } catch (e) { return ""; }
 }
 
 // 📝 Descripción PRO con formato (HTML): condición + fitment + números + interchange + carro/VIN + cierre de gracias.
@@ -813,6 +813,19 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
     } catch (e) { /* si falla, se queda con los specifics de la 1ª pasada */ }
   }
 
-  if (doSave) await db.collection("parts").doc(partId).update({ ebayDraft: draft, ebayDraftAt: draft.generatedAt });
+  if (doSave) {
+    await db.collection("parts").doc(partId).update({ ebayDraft: draft, ebayDraftAt: draft.generatedAt });
+    // 🧮 Taxímetro ACUMULATIVO real: cada generación suma a un total que NUNCA baja (aunque regeneres).
+    // (El costo por-parte se pisa al regenerar; esto lleva el gasto verdadero para auditar.)
+    try {
+      const ym = (draft.generatedAt || "").slice(0, 7).replace("-", "_");   // 2026_07
+      const inc = admin.firestore.FieldValue.increment;
+      await db.collection("config").doc("aiUsage").set({
+        totalUsd: inc(draft.costUsd || 0), totalCount: inc(1),
+        ["m_" + ym + "_usd"]: inc(draft.costUsd || 0), ["m_" + ym + "_count"]: inc(1),
+        updatedAt: draft.generatedAt,
+      }, { merge: true });
+    } catch (e) { /* el taxímetro es informativo; no romper la generación por esto */ }
+  }
   return draft;
 });
