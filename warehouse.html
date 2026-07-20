@@ -1141,7 +1141,6 @@ function listerCard(p){
       ${(role==='owner'||role==='lister')&&p.ebayOfferId?`<button class="btn sm" style="background:#0b5cd6;color:#fff;" onclick="openBeside('https://www.ebay.com/sh/lst/drafts')">📂 Ver borrador en eBay</button>`:''}
       ${(role==='owner'||role==='lister')&&p.ebayOfferId?`<button class="btn green sm" onclick="ebayPubOffer('${p.id}',this)">🚀 Publicar (en vivo)</button>`:''}
       <button class="btn green sm" onclick="openSoldBeside('${p.id}')">${t('seeSold')}</button>
-      ${(p.photoURLs&&p.photoURLs.filter(u=>u&&!/00_QR/.test(u)).length)?`<button class="btn ghost sm" onclick="dlPhotos('${p.id}',this)">${t('dlPhotos')}</button>`:''}
       ${p.status==='disponible'?`<button class="btn ghost sm" onclick="markPublished('${p.id}')">${t('markPublished')}</button>`:(p.status==='publicado'?`<button class="btn ghost sm" style="color:var(--muted);" onclick="unpublish('${p.id}')">${t('unpublishBtn')}</button>`:'')}
     </div>
   </div>`;
@@ -1292,19 +1291,6 @@ window.openSoldBeside=function(id){
   openBeside('https://www.ebay.com/sch/i.html?_nkw='+encodeURIComponent(q)+'&LH_Sold=1&LH_Complete=1&LH_ItemCondition=3000');
 };
 // ⬇️ Descargar fotos (sin QR) en ZIP → para subirlas a eBay desde Windows/Chrome
-window.dlPhotos=async function(id,btn){
-  const orig=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent=t('dlWorking'); }
-  try{
-    const r=await httpsCallable(functions,'zipPartPhotos')({partId:id});
-    const d=r.data||{};
-    const bin=atob(d.zipBase64||''); const arr=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-    const url=URL.createObjectURL(new Blob([arr],{type:'application/zip'}));
-    const a=document.createElement('a'); a.href=url; a.download=d.filename||'fotos.zip'; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),4000);
-    if(btn){ btn.textContent='✓ '+(d.count||0); setTimeout(()=>{ btn.disabled=false; btn.textContent=orig; }, 2000); }
-  }catch(e){ alert((e&&e.message)||e); if(btn){ btn.disabled=false; btn.textContent=orig; } }
-};
 window.copyDraft=function(btn,id,field){
   const p=parts.find(x=>x.id===id); const d=(p&&p.ebayDraft)||{};
   const txt = field==='pn' ? (d.partNumbers||[]).join(', ') : (d[field]||'');
