@@ -401,30 +401,37 @@ function renderVSpec(s){
 function titleCase(s){ return String(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); }
 
 // Escanear el VIN con la cámara/lector (código de barras del carro) → rellena y decodifica
-let _vinCamStream=null;
+let _vinCamStream=null, _vinReader=null;
+// Cargadores de librerías de escaneo (iPhone no tiene BarcodeDetector). El service worker cachea jsdelivr.
+async function ensureJsQR(){ if(window.jsQR) return; await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+async function ensureZXing(){ if(window.ZXing && window.ZXing.BrowserMultiFormatReader) return; await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
 window.scanVin=async function(){
   const vid=document.getElementById('vin-cam'); const msg=document.getElementById('v-decode-msg');
-  if(!('BarcodeDetector' in window)){ alert(t('noCamera')); const f=document.getElementById('v-vin'); if(f) f.focus(); return; }
+  document.getElementById('vin-cam-wrap').style.display=''; msg.textContent=t('vinScanPoint');
+  const hit=raw=>{ raw=(raw||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(raw.length>17) raw=raw.slice(-17); if(raw.length<11) return false; document.getElementById('v-vin').value=raw; stopVinCam(); msg.textContent=''; decodeVin(); return true; };
   try{
-    _vinCamStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-    vid.srcObject=_vinCamStream; document.getElementById('vin-cam-wrap').style.display=''; await vid.play();
-    msg.textContent=t('vinScanPoint');
-    const det=new window.BarcodeDetector();   // todos los formatos soportados (VIN suele ser Code39/PDF417/DataMatrix)
-    const tick=async()=>{
-      if(!_vinCamStream) return;
-      try{
-        const codes=await det.detect(vid);
-        if(codes && codes.length){
-          let raw=(codes[0].rawValue||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-          if(raw.length>17) raw=raw.slice(-17);   // el sticker a veces trae extra; el VIN son 17 (al final)
-          document.getElementById('v-vin').value=raw; stopVinCam(); msg.textContent=''; decodeVin(); return;
-        }
-      }catch(e){}
-      requestAnimationFrame(tick);
-    }; tick();
-  }catch(e){ msg.textContent=''; alert(t('camErr')+e.message); }
+    if('BarcodeDetector' in window){
+      _vinCamStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+      vid.srcObject=_vinCamStream; await vid.play();
+      const det=new window.BarcodeDetector();   // todos los formatos (VIN suele ser Code39/PDF417/DataMatrix)
+      const tick=async()=>{ if(!_vinCamStream) return; try{ const codes=await det.detect(vid); if(codes&&codes.length && hit(codes[0].rawValue)) return; }catch(e){} requestAnimationFrame(tick); }; tick();
+    } else {
+      // iPhone → ZXing
+      await ensureZXing();
+      _vinReader=new window.ZXing.BrowserMultiFormatReader();
+      const cb=(result)=>{ if(result) hit(result.getText()); };
+      try{ await _vinReader.decodeFromConstraints({video:{facingMode:'environment'}}, vid, cb); }
+      catch(e){ await _vinReader.decodeFromVideoDevice(undefined, vid, cb); }
+    }
+  }catch(e){ stopVinCam(); msg.textContent=''; alert(t('noCamera')); const f=document.getElementById('v-vin'); if(f) f.focus(); }
 };
-window.stopVinCam=function(){ if(_vinCamStream){ _vinCamStream.getTracks().forEach(tr=>tr.stop()); _vinCamStream=null; } const w=document.getElementById('vin-cam-wrap'); if(w) w.style.display='none'; const m=document.getElementById('v-decode-msg'); if(m && m.textContent===t('vinScanPoint')) m.textContent=''; };
+window.stopVinCam=function(){
+  if(_vinCamStream){ _vinCamStream.getTracks().forEach(tr=>tr.stop()); _vinCamStream=null; }
+  if(_vinReader){ try{ _vinReader.reset(); }catch(e){} _vinReader=null; }
+  const vid=document.getElementById('vin-cam'); if(vid){ try{ vid.srcObject=null; }catch(e){} }
+  const w=document.getElementById('vin-cam-wrap'); if(w) w.style.display='none';
+  const m=document.getElementById('v-decode-msg'); if(m && m.textContent===t('vinScanPoint')) m.textContent='';
+};
 function stopVinCam(){ window.stopVinCam(); }
 
 // Fotos del carro (cámara una por una + galería), se acumulan igual que las partes
@@ -938,24 +945,30 @@ window.saveLoc=async function(id){
 let _camStream=null;
 window.startCamScan=async function(){
   const vid=document.getElementById('cam');
-  if(!('BarcodeDetector' in window)){ alert(t('noCamera')); return; }
+  document.getElementById('cam-wrap').style.display='';
   try{
     _camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-    vid.srcObject=_camStream; document.getElementById('cam-wrap').style.display=''; await vid.play();
-    const det=new window.BarcodeDetector({formats:['qr_code']});
-    const tick=async()=>{
-      if(!_camStream) return;
-      try{ const codes=await det.detect(vid); if(codes&&codes.length){ document.getElementById('scan-input').value=codes[0].rawValue; stopCam(); scanLookup(); return; } }catch(e){}
-      requestAnimationFrame(tick);
-    }; tick();
-  }catch(e){ alert(t('camErr')+e.message); }
+    vid.srcObject=_camStream; await vid.play();
+    if('BarcodeDetector' in window){
+      const det=new window.BarcodeDetector({formats:['qr_code']});
+      const tick=async()=>{ if(!_camStream) return; try{ const codes=await det.detect(vid); if(codes&&codes.length){ document.getElementById('scan-input').value=codes[0].rawValue; stopCam(); scanLookup(); return; } }catch(e){} requestAnimationFrame(tick); }; tick();
+    } else {
+      // iPhone → jsQR sobre los cuadros del video
+      await ensureJsQR();
+      const cv=document.createElement('canvas'); const cx=cv.getContext('2d',{willReadFrequently:true});
+      const tick=()=>{ if(!_camStream) return;
+        if(vid.videoWidth){ try{ cv.width=vid.videoWidth; cv.height=vid.videoHeight; cx.drawImage(vid,0,0,cv.width,cv.height); const img=cx.getImageData(0,0,cv.width,cv.height); const res=window.jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'}); if(res&&res.data){ document.getElementById('scan-input').value=res.data; stopCam(); scanLookup(); return; } }catch(e){} }
+        requestAnimationFrame(tick);
+      }; tick();
+    }
+  }catch(e){ stopCam(); alert(t('camErr')+e.message); }
 };
-window.stopCam=function(){ if(_camStream){ _camStream.getTracks().forEach(t=>t.stop()); _camStream=null; } const w=document.getElementById('cam-wrap'); if(w) w.style.display='none'; };
+window.stopCam=function(){ if(_camStream){ _camStream.getTracks().forEach(t=>t.stop()); _camStream=null; } const vid=document.getElementById('cam'); if(vid){ try{ vid.srcObject=null; }catch(e){} } const w=document.getElementById('cam-wrap'); if(w) w.style.display='none'; };
 function stopCam(){ window.stopCam(); }
 
 // Cerrar la cámara al tocar fuera del recuadro del video
 document.addEventListener('click', function(ev){
-  if(_vinCamStream){ const w=document.getElementById('vin-cam-wrap'); if(w && !w.contains(ev.target) && !(ev.target.closest && ev.target.closest('[onclick*="scanVin"]'))) window.stopVinCam(); }
+  if(_vinCamStream||_vinReader){ const w=document.getElementById('vin-cam-wrap'); if(w && !w.contains(ev.target) && !(ev.target.closest && ev.target.closest('[onclick*="scanVin"]'))) window.stopVinCam(); }
   if(_camStream){ const w=document.getElementById('cam-wrap'); if(w && !w.contains(ev.target) && !(ev.target.closest && ev.target.closest('[onclick*="startCamScan"]'))) window.stopCam(); }
 }, true);
 
