@@ -213,6 +213,7 @@ const T={
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Escanea o pega el código…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte + generar QR', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería',
     carPhoto:'📷 Foto del carro', binLbl:'📦 Bin', binPh:'Ej. A-14', backCars:'← Carros', vinFichaBtn:'📋 Ficha del VIN', specSearchPh:'🔎 Buscar dato…', partsTitle:'Partes del carro', addPartFab:'Parte', noPhoto:'Sin foto', closeLbl:'Cerrar', tapForParts:'Toca para ver el carro y sus partes',
+    titleBtn:'📄 Título', titleModalTitle:'📄 Título / Papeles del carro', titleHint:'Foto del título, lien, o la hoja del DMV que comprueba que el carro es de Legacy. Solo tú y tu socio ven esto.', noTitleYet:'Aún no hay título/papeles. Agrega la foto ↑', savingTitle:'Guardando…',
     searchCarPh:'🔎 Buscar carro…', noCarsMatch:'Ningún carro coincide.', editLbl:'✏️ Editar', deleteLbl:'🗑️ Eliminar', editPart:'✏️ Editar parte', deletePart:'🗑️ Eliminar parte', saveChanges:'Guardar cambios', confirmDelCar:'¿Eliminar este carro? No se puede deshacer.', confirmDelPart:'¿Eliminar esta parte? No se puede deshacer.', carHasParts:'Este carro tiene N parte(s). Elimina o mueve sus partes primero.',
     printLabel:'🖨️ Imprimir etiqueta', labelTitle:'Etiqueta', labelShare:'📤 Compartir a la impresora', labelHint:'Elige la app de Rongta para imprimir. Si no aparece, mantén presionada la imagen, guárdala y ábrela en la app de Rongta.', labelNoShare:'Tu dispositivo no deja compartir el archivo. Mantén presionada la imagen para guardarla y ábrela en la app de Rongta.', makingLabel:'Generando etiqueta…',
     genLabelBtn:'🖨️ Generar e imprimir QR', labelBeforePhotos:'Imprime el QR y pégalo en la parte ANTES de tomar las fotos, así el QR sale en las fotos.', labelPrint:'🖨️ Imprimir', labelPrintHint:'Se abre la vista de impresión — desde ahí comparte a la app de Rongta (o elige la impresora).', copyQrLink:'📋 Copiar link (QR nativo RLabel)', copiedLink:'✓ Copiado — pégalo en el QR de RLabel',
@@ -228,6 +229,7 @@ const T={
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Scan or paste the code…',
     addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part + generate QR', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery',
     carPhoto:'📷 Car photo', binLbl:'📦 Bin', binPh:'e.g. A-14', backCars:'← Cars', vinFichaBtn:'📋 VIN details', specSearchPh:'🔎 Search detail…', partsTitle:'Car parts', addPartFab:'Part', noPhoto:'No photo', closeLbl:'Close', tapForParts:'Tap to open the car and its parts',
+    titleBtn:'📄 Title', titleModalTitle:'📄 Car title / papers', titleHint:'Photo of the title, lien, or DMV sheet proving Legacy owns the car. Only you and your partner can see this.', noTitleYet:'No title/papers yet. Add the photo ↑', savingTitle:'Saving…',
     searchCarPh:'🔎 Search car…', noCarsMatch:'No car matches.', editLbl:'✏️ Edit', deleteLbl:'🗑️ Delete', editPart:'✏️ Edit part', deletePart:'🗑️ Delete part', saveChanges:'Save changes', confirmDelCar:'Delete this car? This cannot be undone.', confirmDelPart:'Delete this part? This cannot be undone.', carHasParts:'This car has N part(s). Delete or move its parts first.',
     printLabel:'🖨️ Print label', labelTitle:'Label', labelShare:'📤 Share to printer', labelHint:'Pick the Rongta app to print. If it is not listed, long-press the image, save it, and open it in the Rongta app.', labelNoShare:'Your device cannot share the file. Long-press the image to save it and open it in the Rongta app.', makingLabel:'Building label…',
     genLabelBtn:'🖨️ Generate & print QR', labelBeforePhotos:'Print the QR and stick it on the part BEFORE taking the photos, so the QR shows in them.', labelPrint:'🖨️ Print', labelPrintHint:'The print view opens — from there share to the Rongta app (or pick the printer).', copyQrLink:'📋 Copy link (RLabel native QR)', copiedLink:'✓ Copied — paste it into the RLabel QR',
@@ -526,7 +528,10 @@ function renderCarDetail(){
     : `<div style="width:110px;height:110px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:44px;flex:0 0 auto;">🚗</div>`;
   const info=[ v.vin?('VIN '+v.vin):'', v.miles?(Number(v.miles).toLocaleString()+' mi'):'', v.engine||'', [v.color,v.colorCode].filter(Boolean).join(' · ') ]
     .filter(Boolean).map(x=>`<div class="sub" style="margin:2px 0;">${x}</div>`).join('');
-  const specBtn = (v.spec&&v.spec.all&&v.spec.all.length) ? `<button class="btn ghost sm" style="margin-top:10px;" onclick="openSpecModal('${v.id}')">${t('vinFichaBtn')} (${v.spec.all.length})</button>` : '';
+  const specBtn = (v.spec&&v.spec.all&&v.spec.all.length) ? `<button class="btn ghost sm" onclick="openSpecModal('${v.id}')">${t('vinFichaBtn')} (${v.spec.all.length})</button>` : '';
+  // 📄 Título/papeles — SOLO dueños (tú e Ivan), no el empleado de captura
+  const titleBtn = (role==='owner') ? `<button class="btn ghost sm" onclick="openTitleModal('${v.id}')">${t('titleBtn')}${(v.titleURLs&&v.titleURLs.length)?' ✓':''}</button>` : '';
+  const btnRow = (specBtn||titleBtn) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${specBtn}${titleBtn}</div>` : '';
   box.innerHTML=`
     <button class="btn ghost sm" style="margin-bottom:12px;" onclick="closeCar()">${t('backCars')}</button>
     <div class="card" style="display:flex;gap:14px;align-items:flex-start;">
@@ -536,7 +541,7 @@ function renderCarDetail(){
         ${info}
       </div>
     </div>
-    ${specBtn}
+    ${btnRow}
     <div style="height:1px;background:var(--border);margin:18px 0;"></div>
     <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);margin:0 2px 8px;">${t('partsTitle')} (${vp.length})</div>
     <div>${ vp.length ? vp.map(detailPartCard).join('') : '<div class="sub" style="padding:6px 2px;">'+t('noPartsYet')+'</div>' }</div>
@@ -642,6 +647,47 @@ window.deleteCar=async function(id){
   if(vp.length){ alert(t('carHasParts').replace('N',vp.length)); return; }
   if(!confirm(t('confirmDelCar'))) return;
   try{ await deleteDoc(doc(db,'dismantle_vehicles',id)); closeCar(); }catch(e){ alert(t('error')+e.message); }
+};
+
+// ---- 📄 Título / papeles del carro (SOLO dueños) ----
+let _titleKeep=[], _titleNew=[];
+window.openTitleModal=function(id){
+  if(role!=='owner') return;   // seguridad extra
+  const v=vehicles.find(x=>x.id===id); if(!v) return;
+  _titleKeep=(v.titleURLs||[]).slice(); _titleNew=[];
+  document.getElementById('modal-inner').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-weight:800;">${t('titleModalTitle')}</div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>
+    <div class="sub" style="margin-bottom:10px;">${t('titleHint')}</div>
+    <div style="display:flex;gap:8px;">
+      <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('tt-cam').click()">${t('takePhoto')}</button>
+      <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('tt-photos').click()">${t('fromGallery')}</button>
+    </div>
+    <input type="file" id="tt-cam" accept="image/*" capture="environment" multiple style="display:none" onchange="addTitlePhotos(this)">
+    <input type="file" id="tt-photos" accept="image/*" multiple style="display:none" onchange="addTitlePhotos(this)">
+    <div id="tt-prev" class="thumbs" style="margin-top:10px;"></div>
+    <button class="btn" id="tt-save" style="width:100%;margin-top:12px;" onclick="saveTitle('${id}')">${t('saveChanges')}</button>`;
+  document.getElementById('modal').style.display='block';
+  renderTitlePhotos();
+};
+window.addTitlePhotos=function(inp){ Array.from(inp.files||[]).forEach(f=>_titleNew.push(f)); inp.value=''; renderTitlePhotos(); };
+window.removeTitleKeep=function(i){ _titleKeep.splice(i,1); renderTitlePhotos(); };
+window.removeTitleNew=function(i){ _titleNew.splice(i,1); renderTitlePhotos(); };
+function renderTitlePhotos(){
+  const box=document.getElementById('tt-prev'); if(!box) return;
+  const ex=_titleKeep.map((u,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${u}" onclick="openPhoto('${u}')" style="width:72px;height:72px;object-fit:cover;border-radius:8px;cursor:pointer;"><button type="button" onclick="event.stopPropagation();removeTitleKeep(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
+  const nw=_titleNew.map((f,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${URL.createObjectURL(f)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--gold);"><button type="button" onclick="removeTitleNew(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
+  box.innerHTML=(ex+nw) || ('<div class="sub">'+t('noTitleYet')+'</div>');
+}
+window.saveTitle=async function(id){
+  if(role!=='owner') return;
+  const btn=document.getElementById('tt-save'); if(btn){ btn.disabled=true; btn.textContent=t('savingTitle'); }
+  try{
+    const newURLs=[];
+    for(const f of _titleNew){ const jpg=await toJpeg(f); const r=ref(storage,'dismantle_vehicles/'+id+'/title/'+Date.now()+'_'+(jpg.name||'titulo.jpg')); await uploadBytes(r,jpg); newURLs.push(await getDownloadURL(r)); }
+    const titleURLs=_titleKeep.concat(newURLs);
+    await updateDoc(doc(db,'dismantle_vehicles',id),{ titleURLs, titleBy:myEmail, titleAt:new Date().toISOString() });
+    _titleNew=[]; closeModal(); if(_carView) renderCarDetail();
+  }catch(e){ alert(t('error')+e.message); if(btn){ btn.disabled=false; btn.textContent=t('saveChanges'); } }
 };
 
 // ---- Editar / eliminar PARTE ----
