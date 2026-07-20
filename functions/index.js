@@ -116,7 +116,9 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
       model: MODEL,
       max_tokens: 2048,
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
-      messages: [{ role: "user", content: [...images, { type: "text", text: prompt }] }],
+      // cache_control en el ÚLTIMO bloque → cachea fotos+prompt. Las búsquedas web re-leen ese prefijo
+      // desde caché (~10% del costo) en vez de re-procesar las fotos cada vez. Baja mucho el gasto.
+      messages: [{ role: "user", content: [...images, { type: "text", text: prompt, cache_control: { type: "ephemeral" } }] }],
     });
     usage = msg.usage || {};
     text = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
@@ -124,8 +126,10 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
     throw new HttpsError("internal", "IA: " + (e.message || "error"));
   }
   const inTok = usage.input_tokens || 0, outTok = usage.output_tokens || 0;
+  const cacheWrite = usage.cache_creation_input_tokens || 0, cacheRead = usage.cache_read_input_tokens || 0;
   const searches = (usage.server_tool_use && usage.server_tool_use.web_search_requests) || 0;
-  const costUsd = +(((inTok / 1e6) * 3) + ((outTok / 1e6) * 15) + (searches * 0.01)).toFixed(5); // ~Sonnet + $0.01/búsqueda
+  // Sonnet: entrada $3/M · escritura caché $3.75/M · lectura caché $0.30/M · salida $15/M · búsqueda $0.01
+  const costUsd = +(((inTok / 1e6) * 3) + ((cacheWrite / 1e6) * 3.75) + ((cacheRead / 1e6) * 0.30) + ((outTok / 1e6) * 15) + (searches * 0.01)).toFixed(5);
 
   let draft;
   try {
@@ -137,7 +141,7 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
   draft.generatedAt = new Date().toISOString();
   draft.by = (request.auth.token && request.auth.token.email) || "";
   draft.model = MODEL;
-  draft.tokens = { input: inTok, output: outTok };
+  draft.tokens = { input: inTok, output: outTok, cacheWrite, cacheRead };
   draft.searches = searches;
   draft.costUsd = costUsd;   // costo estimado de ESTA generación (para el análisis de costos)
   if (feedback) draft.lastFeedback = feedback;
