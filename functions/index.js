@@ -117,18 +117,19 @@ exports.ebayVerifyListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120 
   const condMap = { "New": "1000", "Used": "3000", "For parts or not working": "7000" };
   const condId = condMap[d.condition || p.condition] || "3000";
 
-  // Categoría sugerida por eBay a partir del título
-  let catId = "";
-  try { catId = ebayTags(await ebayXml("GetSuggestedCategories", `<Query>${xesc(title)}</Query>`), "CategoryID")[0] || ""; } catch (e) {}
-  if (!catId) catId = "6030"; // fallback: Car & Truck Parts
+  // Categoría sugerida por eBay a partir del título (deben ser leaf)
+  let catAck = "", catIds = [];
+  try { const cx = await ebayXml("GetSuggestedCategories", `<Query>${xesc(title)}</Query>`); catAck = (cx.match(/<Ack>([\s\S]*?)<\/Ack>/) || [])[1] || ""; catIds = ebayTags(cx, "CategoryID"); } catch (e) { catAck = "err:" + (e.message || e); }
+  const catId = catIds[0] || "6030"; // fallback: Car & Truck Parts (padre → daría error)
 
   const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 12);
   const picXml = pics.length ? `<PictureDetails>${pics.map((u) => `<PictureURL>${xesc(u)}</PictureURL>`).join("")}</PictureDetails>` : "";
 
   const specs = [];
   const is = d.itemSpecifics || {};
-  Object.keys(is).forEach((k) => { if (is[k]) specs.push([k, is[k]]); });
-  if (!is["Manufacturer Part Number"]) { const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber; if (mpn) specs.push(["Manufacturer Part Number", mpn]); }
+  const skipSpec = /fitment|fits|compatib/i;   // eBay: fitment libre >65 chars falla; la compatibilidad va estructurada, no como specific
+  Object.keys(is).forEach((k) => { if (is[k] && !skipSpec.test(k)) specs.push([k, String(is[k]).slice(0, 65)]); });
+  if (!is["Manufacturer Part Number"]) { const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber; if (mpn) specs.push(["Manufacturer Part Number", String(mpn).slice(0, 65)]); }
   const specsXml = specs.length ? `<ItemSpecifics>${specs.map(([n, v]) => `<NameValueList><Name>${xesc(n)}</Name><Value>${xesc(String(v))}</Value></NameValueList>`).join("")}</ItemSpecifics>` : "";
 
   const inner = `<Item>
@@ -161,7 +162,7 @@ exports.ebayVerifyListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120 
   const resp = await ebayXml("VerifyAddFixedPriceItem", inner);
   const ack = (resp.match(/<Ack>([\s\S]*?)<\/Ack>/) || [])[1] || "unknown";
   const errors = ebayTags(resp, "LongMessage").slice(0, 6);
-  return { ack, categoryId: catId, title, price, condId, photos: pics.length, errors };
+  return { ack, categoryId: catId, catAck, catCount: catIds.length, catFirst: catIds.slice(0, 4), title, price, condId, photos: pics.length, errors };
 });
 
 // 📦 Descargar todas las fotos de una parte (SIN el QR) en un ZIP — para que la esposa
