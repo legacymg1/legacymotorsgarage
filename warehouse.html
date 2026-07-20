@@ -472,7 +472,7 @@ function stopVinCam(){ window.stopVinCam(); }
 
 // Fotos del carro (cámara una por una + galería), se acumulan igual que las partes
 let _carFiles=[];
-window.addCarPhotos=function(inp){ Array.from(inp.files||[]).forEach(f=>_carFiles.push(f)); inp.value=''; renderCarPhotos(); };
+window.addCarPhotos=async function(inp){ await pushImgs(_carFiles, inp, renderCarPhotos); };
 window.removeCarPhoto=function(i){ _carFiles.splice(i,1); renderCarPhotos(); };
 function renderCarPhotos(){
   const box=document.getElementById('v-prev'); if(!box) return;
@@ -716,7 +716,7 @@ window.openCarEdit=function(id){
   document.getElementById('modal').style.display='block';
   renderEditCarPhotos();
 };
-window.addEditCarPhotos=function(inp){ Array.from(inp.files||[]).forEach(f=>_editCarNew.push(f)); inp.value=''; renderEditCarPhotos(); };
+window.addEditCarPhotos=async function(inp){ await pushImgs(_editCarNew, inp, renderEditCarPhotos); };
 window.removeEditCarKeep=function(i){ _editCarKeep.splice(i,1); renderEditCarPhotos(); };
 window.removeEditCarNew=function(i){ _editCarNew.splice(i,1); renderEditCarPhotos(); };
 function renderEditCarPhotos(){
@@ -766,7 +766,7 @@ window.openTitleModal=function(id){
   document.getElementById('modal').style.display='block';
   renderTitlePhotos();
 };
-window.addTitlePhotos=function(inp){ Array.from(inp.files||[]).forEach(f=>_titleNew.push(f)); inp.value=''; renderTitlePhotos(); };
+window.addTitlePhotos=async function(inp){ await pushImgs(_titleNew, inp, renderTitlePhotos); };
 window.removeTitleKeep=function(i){ _titleKeep.splice(i,1); renderTitlePhotos(); };
 window.removeTitleNew=function(i){ _titleNew.splice(i,1); renderTitlePhotos(); };
 function renderTitlePhotos(){
@@ -817,7 +817,7 @@ window.openPartEdit=function(id){
   const sel=document.getElementById('epa-cond'); if(sel) sel.value=p.condition||'';
   renderEditPartPhotos();
 };
-window.addEditPartPhotos=function(inp){ Array.from(inp.files||[]).forEach(f=>_editPartNew.push(f)); inp.value=''; renderEditPartPhotos(); };
+window.addEditPartPhotos=async function(inp){ await pushImgs(_editPartNew, inp, renderEditPartPhotos); };
 window.removeEditPartKeep=function(i){ _editPartKeep.splice(i,1); renderEditPartPhotos(); };
 window.removeEditPartNew=function(i){ _editPartNew.splice(i,1); renderEditPartPhotos(); };
 function renderEditPartPhotos(){
@@ -1019,11 +1019,9 @@ function addQuickItemFormHtml(){
 // Fotos de la parte se acumulan en memoria (cámara agrega una por una + galería)
 const _partFiles={};
 let _newPartId='';   // ID fijo desde que se abre el form → el QR se genera antes de las fotos y coincide al guardar
-window.addPartPhotos=function(vid,inp){
-  (_partFiles[vid]=_partFiles[vid]||[]);
-  Array.from(inp.files||[]).forEach(f=>_partFiles[vid].push(f));
-  inp.value='';   // permite volver a tomar/elegir la misma foto
-  renderPartPhotos(vid);
+window.addPartPhotos=async function(vid,inp){
+  _partFiles[vid]=_partFiles[vid]||[];
+  await pushImgs(_partFiles[vid], inp, ()=>renderPartPhotos(vid));   // convierte HEIC→JPEG
 };
 window.removePartPhoto=function(vid,i){ if(_partFiles[vid]) _partFiles[vid].splice(i,1); renderPartPhotos(vid); };
 function renderPartPhotos(vid){
@@ -1034,6 +1032,16 @@ function renderPartPhotos(vid){
     +arr.map((f,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${URL.createObjectURL(f)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;"><button type="button" onclick="removePartPhoto('${vid}',${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
 }
 
+// 🍎 Apple guarda las fotos en HEIC — Chrome NO lo muestra (sale "imagen rota"). Convierte HEIC→JPEG al agregar.
+async function ensureHeic(){ if(window.heic2any) return; await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+async function normalizeImg(f){
+  const heic=/heic|heif/i.test(f.type||'')||/\.(heic|heif)$/i.test(f.name||'');
+  if(!heic) return f;
+  try{ await ensureHeic(); const b=await window.heic2any({blob:f,toType:'image/jpeg',quality:0.85}); const jpg=Array.isArray(b)?b[0]:b; return new File([jpg],(f.name||'foto').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}); }
+  catch(e){ return f; }
+}
+// Agrega archivos a un array (convirtiendo HEIC uno por uno), re-renderizando conforme entran
+async function pushImgs(arr, inp, render){ const list=Array.from(inp.files||[]); inp.value=''; for(const f of list){ arr.push(await normalizeImg(f)); render(); } }
 async function toJpeg(file){
   try{
     const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(file); });
