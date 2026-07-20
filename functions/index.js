@@ -164,27 +164,37 @@ async function ebayCategoryAspects(catId){
 const EBAY_SECRETS = [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN];
 
 // 🔑 Access token de USUARIO (refresh_token grant) — para las APIs REST de vender (Inventory/Account). Scopes sell.inventory + sell.account.
-async function ebayUserAccessToken(){
+async function ebayUserAccessToken(scope){
+  const rt = (EBAY_OAUTH_REFRESH.value() || "").trim();  // limpia espacios/saltos si se pegó con basura
   const basic = Buffer.from(EBAY_APP_ID.value() + ":" + EBAY_CERT_ID.value()).toString("base64");
+  const scopes = scope || "https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account";
   const r = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
     method: "POST",
     headers: { "Authorization": "Basic " + basic, "Content-Type": "application/x-www-form-urlencoded" },
-    body: "grant_type=refresh_token&refresh_token=" + encodeURIComponent(EBAY_OAUTH_REFRESH.value()) +
-          "&scope=" + encodeURIComponent("https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account"),
+    body: "grant_type=refresh_token&refresh_token=" + encodeURIComponent(rt) +
+          "&scope=" + encodeURIComponent(scopes),
   });
-  const j = await r.json();
-  return j.access_token || "";
+  const j = await r.json().catch(() => ({}));
+  return { token: j.access_token || "", raw: j };
 }
 
 // 🧪 Prueba OAuth: confirma que el refresh token da un access token con permiso sell.inventory.
 exports.ebayOauthTest = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
-  const tok = await ebayUserAccessToken();
-  if (!tok) return { ok: false, status: 0, body: "No se obtuvo access token (¿refresh token mal pegado en Secret Manager?)" };
-  const r = await fetch("https://api.ebay.com/sell/inventory/v1/location?limit=1", { headers: { "Authorization": "Bearer " + tok } });
+  let a = await ebayUserAccessToken();  // intenta ambos scopes
+  let scopeNote = "sell.inventory + sell.account";
+  if (!a.token) {  // reintenta con solo sell.inventory (por si no se consintió sell.account)
+    const b = await ebayUserAccessToken("https://api.ebay.com/oauth/api_scope/sell.inventory");
+    if (b.token) { a = b; scopeNote = "solo sell.inventory (sell.account NO consentido)"; }
+  }
+  if (!a.token) {
+    const err = a.raw || {};
+    return { ok: false, status: 0, body: "Token error: " + (err.error || "?") + " — " + (err.error_description || "sin detalle") };
+  }
+  const r = await fetch("https://api.ebay.com/sell/inventory/v1/location?limit=1", { headers: { "Authorization": "Bearer " + a.token } });
   const status = r.status;
   let body = ""; try { body = await r.text(); } catch (e) {}
-  return { ok: status >= 200 && status < 300, status, body: (body || "").slice(0, 300) };
+  return { ok: status >= 200 && status < 300, status, scope: scopeNote, body: (body || "").slice(0, 300) };
 });
 
 async function loadPart(partId){
