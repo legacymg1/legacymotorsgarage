@@ -1136,6 +1136,7 @@ function listerCard(p){
     </div>`}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn sm" onclick="prepEbay('${p.id}',this)">${p.ebayDraft?t('ebayRegen'):t('ebayPrep')}</button>
+      ${role==='owner'?`<button class="btn ghost sm" onclick="ebayVerify('${p.id}',this)">🧪 Verificar en eBay</button>`:''}
       <button class="btn green sm" onclick="openSoldBeside('${p.id}')">${t('seeSold')}</button>
       <button class="btn sm" style="background:#0b5cd6;color:#fff;" onclick="openEbayNew('${p.id}',this)">${t('ebayNewSide')}</button>
       ${(p.photoURLs&&p.photoURLs.filter(u=>u&&!/00_QR/.test(u)).length)?`<button class="btn ghost sm" onclick="dlPhotos('${p.id}',this)">${t('dlPhotos')}</button>`:''}
@@ -1183,6 +1184,17 @@ window.renderLister=function(){
   box.innerHTML=html;
 };
 window.copyText=function(btn,txt){ navigator.clipboard&&navigator.clipboard.writeText(txt); btn.textContent=t('copied'); setTimeout(()=>btn.textContent=t('copy'),1200); };
+// 🧪 Verificar anuncio en eBay (VerifyAddFixedPriceItem) — valida sin publicar. Solo dueños.
+window.ebayVerify=async function(id,btn){
+  const o=btn.textContent; btn.disabled=true; btn.textContent='🧪 Verificando…';
+  try{
+    const r=await httpsCallable(functions,'ebayVerifyListing')({partId:id}); const d=r.data||{};
+    const av=(d.errors&&d.errors.length)?('\n\nAvisos/errores:\n- '+d.errors.join('\n- ')):'';
+    if(d.ack==='Success'||d.ack==='Warning') alert('✅ eBay VALIDÓ el anuncio ('+d.ack+')\n\nCategoría: '+d.categoryId+'\nPrecio: $'+d.price+'\nFotos: '+d.photos+av+'\n\n(No se publicó — solo validación.)');
+    else alert('⚠️ eBay lo rechazó ('+d.ack+'):'+ (av||'\n(sin detalle)'));
+  }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
+  btn.disabled=false; btn.textContent=o;
+};
 // 🧪 Prueba de conexión a eBay (llama al backend ebayTest) — solo dueños
 window.ebayTestConn=async function(btn){
   const o=btn.textContent; btn.disabled=true; btn.textContent='🧪 Probando…';
