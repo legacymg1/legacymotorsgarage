@@ -9,6 +9,10 @@ admin.initializeApp();
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
 
 const ANTHROPIC_KEY = defineSecret("ANTHROPIC_KEY");
+const EBAY_APP_ID = defineSecret("EBAY_APP_ID");
+const EBAY_DEV_ID = defineSecret("EBAY_DEV_ID");
+const EBAY_CERT_ID = defineSecret("EBAY_CERT_ID");
+const EBAY_AUTH_TOKEN = defineSecret("EBAY_AUTH_TOKEN");
 
 // Prueba: confirma que el backend está vivo.
 exports.ping = onCall((request) => ({
@@ -33,6 +37,42 @@ exports.ebayAccountDeletion = onRequest((req, res) => {
   // POST: aviso de borrado de cuenta — acusamos recibo. (Aquí borraríamos datos de ese usuario si guardáramos alguno.)
   try { console.log("eBay account deletion notice:", JSON.stringify(req.body || {})); } catch (e) {}
   res.status(200).send("ok");
+});
+
+// 🧪 Prueba de credenciales eBay (Trading API GetUser) — confirma que App ID/Dev ID/Cert ID + token funcionan. NO toca anuncios.
+exports.ebayTest = onCall({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN], timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const body = `<?xml version="1.0" encoding="utf-8"?>
+<GetUserRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials><eBayAuthToken>${EBAY_AUTH_TOKEN.value()}</eBayAuthToken></RequesterCredentials>
+  <DetailLevel>ReturnSummary</DetailLevel>
+</GetUserRequest>`;
+  let text = "";
+  try {
+    const r = await fetch("https://api.ebay.com/ws/api.dll", {
+      method: "POST",
+      headers: {
+        "X-EBAY-API-CALL-NAME": "GetUser",
+        "X-EBAY-API-SITEID": "0",
+        "X-EBAY-API-COMPATIBILITY-LEVEL": "1193",
+        "X-EBAY-API-APP-NAME": EBAY_APP_ID.value(),
+        "X-EBAY-API-DEV-NAME": EBAY_DEV_ID.value(),
+        "X-EBAY-API-CERT-NAME": EBAY_CERT_ID.value(),
+        "Content-Type": "text/xml",
+      },
+      body,
+    });
+    text = await r.text();
+  } catch (e) {
+    throw new HttpsError("internal", "No se pudo contactar a eBay: " + (e.message || e));
+  }
+  const pick = (tag) => { const m = text.match(new RegExp("<" + tag + ">([\\s\\S]*?)</" + tag + ">")); return m ? m[1] : ""; };
+  return {
+    ack: pick("Ack") || "unknown",
+    userId: pick("UserID"),
+    goodStanding: pick("eBayGoodStanding"),
+    error: pick("LongMessage") || pick("ShortMessage"),
+  };
 });
 
 // 📦 Descargar todas las fotos de una parte (SIN el QR) en un ZIP — para que la esposa
