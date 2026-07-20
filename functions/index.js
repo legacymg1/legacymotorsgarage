@@ -110,16 +110,28 @@ async function ebayAppToken(){
   const j = await r.json();
   return j.access_token || "";
 }
-// Sugerencia de categoría LEAF (Taxonomy API) para un query de texto
+// Sugerencia de categoría LEAF (Taxonomy API). Prefiere una bajo eBay Motors (ancestro 6000).
 async function ebayCategorySuggest(query){
   const tok = await ebayAppToken();
-  if (!tok) return "";
+  if (!tok) return { id: "", ack: "notoken" };
   const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_suggestions?q=" + encodeURIComponent(query), {
     headers: { "Authorization": "Bearer " + tok },
   });
   const j = await r.json();
-  const c = j.categorySuggestions && j.categorySuggestions[0] && j.categorySuggestions[0].category;
-  return c ? c.categoryId : "";
+  const sugg = j.categorySuggestions || [];
+  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => ["6000", "6028", "6030"].indexOf(a.categoryId) >= 0);
+  const pick = sugg.find(isMotors) || sugg[0];
+  return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: sugg.find(isMotors) ? "motors" : (sugg.length ? "nonmotors" : "empty") };
+}
+// Aspectos (item specifics) que eBay pide para una categoría
+async function ebayCategoryAspects(catId){
+  const tok = await ebayAppToken();
+  if (!tok) return [];
+  const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=" + encodeURIComponent(catId), {
+    headers: { "Authorization": "Bearer " + tok },
+  });
+  const j = await r.json();
+  return (j.aspects || []).map((a) => ({ name: a.localizedAspectName, required: !!(a.aspectConstraint && a.aspectConstraint.aspectRequired) }));
 }
 
 const EBAY_SECRETS = [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN];
@@ -139,17 +151,45 @@ async function buildEbayItem(p, priceUsd){
   const price = priceUsd ? Number(priceUsd).toFixed(2) : (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
   const condMap = { "New": "1000", "Used": "3000", "For parts or not working": "7000" };
   const condId = condMap[d.condition || p.condition] || "3000";
+
+  // Categoría: busca con enfoque automotriz (vehículo + nombre) y prefiere una bajo eBay Motors
+  const catQuery = [p.vYear, p.vMake, p.vModel, p.name].filter(Boolean).join(" ") || title;
   let catAck = "", catId = "";
-  try { catId = await ebayCategorySuggest(title); catAck = catId ? "ok" : "empty"; } catch (e) { catAck = "err:" + (e.message || e); }
+  try { const c = await ebayCategorySuggest(catQuery); catId = c.id; catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
   if (!catId) catId = "6030";
+
   const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 12);
   const picXml = pics.length ? `<PictureDetails>${pics.map((u) => `<PictureURL>${xesc(u)}</PictureURL>`).join("")}</PictureDetails>` : "";
-  const specs = [];
+
+  // Item specifics: pide a eBay los aspectos de ESA categoría y llénalos con lo que tenemos (como lo haría a mano)
   const is = d.itemSpecifics || {};
-  const skipSpec = /fitment|fits|compatib/i;
-  Object.keys(is).forEach((k) => { if (is[k] && !skipSpec.test(k)) specs.push([k, String(is[k]).slice(0, 65)]); });
-  if (!is["Manufacturer Part Number"]) { const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber; if (mpn) specs.push(["Manufacturer Part Number", String(mpn).slice(0, 65)]); }
-  const specsXml = specs.length ? `<ItemSpecifics>${specs.map(([n, v]) => `<NameValueList><Name>${xesc(n)}</Name><Value>${xesc(String(v))}</Value></NameValueList>`).join("")}</ItemSpecifics>` : "";
+  const specs = [];   // {name, values:[...]}
+  const seen = new Set();
+  const addSpec = (name, values) => {
+    if (!name || !values) return;
+    const vals = (Array.isArray(values) ? values : [values]).map((v) => String(v).trim().slice(0, 65)).filter(Boolean).slice(0, 30);
+    const k = name.toLowerCase();
+    if (!vals.length || seen.has(k)) return;
+    seen.add(k); specs.push({ name, values: vals });
+  };
+  const dataFor = (name) => {
+    const n = name.toLowerCase();
+    for (const k of Object.keys(is)) { if (k.toLowerCase() === n && is[k]) return [is[k]]; }              // match directo con lo de la IA
+    if (/manufacturer part number|^mpn$/.test(n)) { const v = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber || is["Manufacturer Part Number"]; return v ? [v] : null; }
+    if (/(interchange|superseded|other|alternative).*(part )?number/.test(n) && d.interchange && d.interchange.length) return d.interchange;
+    if (/^brand$/.test(n) && is.Brand) return [is.Brand];
+    if (/placement/.test(n)) { const v = is["Placement on Vehicle"] || is.Placement; return v ? [v] : null; }
+    if (/warranty/.test(n)) return ["No Warranty"];
+    if (/^type$/.test(n) && p.name) return [p.name];
+    if (/non-domestic|modified item|custom bundle|^bundle/.test(n)) return ["No"];
+    return null;
+  };
+  let aspects = [];
+  try { aspects = await ebayCategoryAspects(catId); } catch (e) {}
+  aspects.forEach((a) => addSpec(a.name, dataFor(a.name)));                                                // llena los campos que eBay pide
+  Object.keys(is).forEach((k) => { if (is[k] && !/fitment|fits|compatib/i.test(k)) addSpec(k, [is[k]]); }); // + cualquier extra de la IA
+  if (!seen.has("manufacturer part number") && !seen.has("mpn")) { const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber; if (mpn) addSpec("Manufacturer Part Number", [mpn]); }
+  const specsXml = specs.length ? `<ItemSpecifics>${specs.map((s) => `<NameValueList><Name>${xesc(s.name)}</Name>${s.values.map((v) => `<Value>${xesc(v)}</Value>`).join("")}</NameValueList>`).join("")}</ItemSpecifics>` : "";
   const inner = `<Item>
   <SKU>${xesc(p.id || p.entryId || "")}</SKU>
   <Title>${xesc(title)}</Title>
@@ -296,7 +336,8 @@ STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these
  "fitsVehicles": "short verified list of vehicles it fits (from web search)",
  "fitmentNote": "" ,
  "condition": "Used" | "For parts or not working" | "New",
- "itemSpecifics": {"Brand": "", "Manufacturer Part Number": "", "Placement on Vehicle": "", "Fitment": ""},
+ "itemSpecifics": {"Brand": "", "Manufacturer Part Number": "", "Type": "<what kind of part, e.g. Mass Air Flow Sensor>", "Placement on Vehicle": "", "Warranty": "", "Country/Region of Manufacture": "", "Superseded Part Number": ""},
+ (fill as MANY itemSpecifics as you can from the photos and your knowledge — buyers filter by these; leave a value "" only if truly unknown)
  "confidence": "high" | "medium" | "low"}
 Never invent a number you READ (partNumbers must be real reads). But suggestedPartNumber is EXPECTED to be a researched best-guess — provide it whenever you reasonably can. Base fitment on web search, not guesses. Put a warning in "fitmentNote" if the part does not match the stated vehicle.`;
 
