@@ -1136,8 +1136,8 @@ function listerCard(p){
     </div>`}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
       <button class="btn sm" onclick="prepEbay('${p.id}',this)">${p.ebayDraft?t('ebayRegen'):t('ebayPrep')}</button>
-      ${role==='owner'?`<button class="btn ghost sm" onclick="ebayVerify('${p.id}',this)">🧪 Verificar en eBay</button>`:''}
-      ${role==='owner'?`<button class="btn sm" style="background:var(--gold);color:#0b0e14;" onclick="ebayPublish('${p.id}',this)">🚀 Publicar en eBay</button>`:''}
+      ${(role==='owner'||role==='lister')?`<button class="btn ghost sm" onclick="ebayVerify('${p.id}',this)">🧪 Verificar en eBay</button>`:''}
+      ${(role==='owner'||role==='lister')?`<button class="btn sm" style="background:var(--gold);color:#0b0e14;" onclick="ebayPublish('${p.id}',this)">🚀 Publicar en eBay</button>`:''}
       <button class="btn green sm" onclick="openSoldBeside('${p.id}')">${t('seeSold')}</button>
       <button class="btn sm" style="background:#0b5cd6;color:#fff;" onclick="openEbayNew('${p.id}',this)">${t('ebayNewSide')}</button>
       ${(p.photoURLs&&p.photoURLs.filter(u=>u&&!/00_QR/.test(u)).length)?`<button class="btn ghost sm" onclick="dlPhotos('${p.id}',this)">${t('dlPhotos')}</button>`:''}
