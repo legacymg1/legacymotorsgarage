@@ -1,8 +1,9 @@
 // Legacy DMS — backend (Cloud Functions v2)
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 
 admin.initializeApp();
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
@@ -14,6 +15,25 @@ exports.ping = onCall((request) => ({
   ok: true, msg: "backend vivo 🚀", at: new Date().toISOString(),
   uid: request.auth ? request.auth.uid : null,
 }));
+
+// 🔔 eBay Marketplace Account Deletion/Closure — endpoint requerido para habilitar el keyset de Producción.
+// GET con challenge_code → responde SHA-256(challengeCode + verificationToken + endpointUrl).
+// POST (aviso real de borrado) → 200 OK (no guardamos PII de usuarios de eBay, solo confirmamos).
+const EBAY_VERIFY_TOKEN = "LMGebay2026vTkn7q3Zx9Rb2Kp8Wm4Nc6Yh1Fj0Ld5Sg";   // 44 chars, va IGUAL en el portal de eBay
+const EBAY_DELETION_ENDPOINT = "https://us-central1-legacy-motors-garage.cloudfunctions.net/ebayAccountDeletion";
+exports.ebayAccountDeletion = onRequest((req, res) => {
+  if (req.method === "GET") {
+    const challengeCode = req.query.challenge_code;
+    if (!challengeCode) { res.status(400).json({ error: "missing challenge_code" }); return; }
+    const h = crypto.createHash("sha256");
+    h.update(String(challengeCode)); h.update(EBAY_VERIFY_TOKEN); h.update(EBAY_DELETION_ENDPOINT);
+    res.status(200).json({ challengeResponse: h.digest("hex") });
+    return;
+  }
+  // POST: aviso de borrado de cuenta — acusamos recibo. (Aquí borraríamos datos de ese usuario si guardáramos alguno.)
+  try { console.log("eBay account deletion notice:", JSON.stringify(req.body || {})); } catch (e) {}
+  res.status(200).send("ok");
+});
 
 // 📦 Descargar todas las fotos de una parte (SIN el QR) en un ZIP — para que la esposa
 // las suba a eBay desde Windows/Chrome (baja a Descargas → eBay las elige del explorador).
