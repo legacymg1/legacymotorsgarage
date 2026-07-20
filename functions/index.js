@@ -63,8 +63,9 @@ exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 240, me
   if (!snap.exists) throw new HttpsError("not-found", "Parte no encontrada.");
   const p = snap.data();
 
-  // Fotos reales (sin el QR), máximo 5
-  const urls = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 5);
+  // Fotos reales (sin el QR), máximo 8 — cubre los ~7 típicos por post para NO perder
+  // la foto del número/etiqueta si va al final. Con caché el costo extra por foto es mínimo.
+  const urls = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 8);
   const images = [];
   for (const u of urls) {
     try {
