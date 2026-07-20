@@ -99,6 +99,28 @@ ${inner}
   });
   return await r.text();
 }
+// Token de aplicación (client-credentials) con App ID + Cert ID — para las APIs REST públicas (Taxonomy)
+async function ebayAppToken(){
+  const basic = Buffer.from(EBAY_APP_ID.value() + ":" + EBAY_CERT_ID.value()).toString("base64");
+  const r = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
+    method: "POST",
+    headers: { "Authorization": "Basic " + basic, "Content-Type": "application/x-www-form-urlencoded" },
+    body: "grant_type=client_credentials&scope=" + encodeURIComponent("https://api.ebay.com/oauth/api_scope"),
+  });
+  const j = await r.json();
+  return j.access_token || "";
+}
+// Sugerencia de categoría LEAF (Taxonomy API) para un query de texto
+async function ebayCategorySuggest(query){
+  const tok = await ebayAppToken();
+  if (!tok) return "";
+  const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_suggestions?q=" + encodeURIComponent(query), {
+    headers: { "Authorization": "Bearer " + tok },
+  });
+  const j = await r.json();
+  const c = j.categorySuggestions && j.categorySuggestions[0] && j.categorySuggestions[0].category;
+  return c ? c.categoryId : "";
+}
 
 // 🧪 Verificar anuncio (VerifyAddFixedPriceItem) — arma el anuncio y eBay lo VALIDA sin publicarlo. Cero riesgo.
 const EBAY_SECRETS = [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN];
@@ -117,10 +139,10 @@ exports.ebayVerifyListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120 
   const condMap = { "New": "1000", "Used": "3000", "For parts or not working": "7000" };
   const condId = condMap[d.condition || p.condition] || "3000";
 
-  // Categoría sugerida por eBay a partir del título (deben ser leaf)
-  let catAck = "", catIds = [];
-  try { const cx = await ebayXml("GetSuggestedCategories", `<Query>${xesc(title)}</Query>`); catAck = (cx.match(/<Ack>([\s\S]*?)<\/Ack>/) || [])[1] || ""; catIds = ebayTags(cx, "CategoryID"); } catch (e) { catAck = "err:" + (e.message || e); }
-  const catId = catIds[0] || "6030"; // fallback: Car & Truck Parts (padre → daría error)
+  // Categoría LEAF vía Taxonomy API (getCategorySuggestions con app token client-credentials)
+  let catAck = "", catId = "";
+  try { catId = await ebayCategorySuggest(title); catAck = catId ? "ok" : "empty"; } catch (e) { catAck = "err:" + (e.message || e); }
+  if (!catId) catId = "6030"; // fallback padre (daría error si la sugerencia falla)
 
   const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 12);
   const picXml = pics.length ? `<PictureDetails>${pics.map((u) => `<PictureURL>${xesc(u)}</PictureURL>`).join("")}</PictureDetails>` : "";
@@ -162,7 +184,7 @@ exports.ebayVerifyListing = onCall({ secrets: EBAY_SECRETS, timeoutSeconds: 120 
   const resp = await ebayXml("VerifyAddFixedPriceItem", inner);
   const ack = (resp.match(/<Ack>([\s\S]*?)<\/Ack>/) || [])[1] || "unknown";
   const errors = ebayTags(resp, "LongMessage").slice(0, 6);
-  return { ack, categoryId: catId, catAck, catCount: catIds.length, catFirst: catIds.slice(0, 4), title, price, condId, photos: pics.length, errors };
+  return { ack, categoryId: catId, catAck, title, price, condId, photos: pics.length, errors };
 });
 
 // 📦 Descargar todas las fotos de una parte (SIN el QR) en un ZIP — para que la esposa
