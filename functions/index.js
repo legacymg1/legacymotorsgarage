@@ -349,11 +349,14 @@ async function ebayRest(method, path, token, body){
   return { status: r.status, ok: r.status >= 200 && r.status < 300, json, text };
 }
 
-// Extrae mensajes de error legibles de una respuesta REST de eBay
+// Extrae mensajes de error legibles de una respuesta REST de eBay (con errorId + parámetros)
 function ebayRestErrors(r){
   const e = r.json && r.json.errors;
-  if (Array.isArray(e) && e.length) return e.map((x) => (x.message || x.longMessage || "error") + (x.parameters ? (" [" + x.parameters.map((q) => q.value).join(", ") + "]") : "")).slice(0, 6);
-  return [(r.text || "").slice(0, 300) || ("HTTP " + r.status)];
+  if (Array.isArray(e) && e.length) return e.map((x) => {
+    const params = (x.parameters || []).map((q) => (q.name ? q.name + "=" : "") + q.value).join(", ");
+    return (x.message || x.longMessage || "error") + (x.errorId ? (" (id " + x.errorId + ")") : "") + (params ? (" [" + params + "]") : "");
+  }).slice(0, 6);
+  return [(r.text || "").slice(0, 400) || ("HTTP " + r.status)];
 }
 
 // Condición → enum del Inventory API (distinto de los IDs del Trading API)
