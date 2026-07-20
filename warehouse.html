@@ -1208,7 +1208,7 @@ window.ebayVerify=async function(id,btn){
     const r=await httpsCallable(functions,'ebayVerifyListing')({partId:id}); const d=r.data||{};
     const av=(d.errors&&d.errors.length)?('\n\nAvisos/errores:\n- '+d.errors.join('\n- ')):'';
     const diag='\n\n[diag] categoría: '+d.catAck+' → '+d.categoryId;
-    if(d.ack==='Success'||d.ack==='Warning') alert('✅ eBay VALIDÓ el anuncio ('+d.ack+')\n\nCategoría: '+d.categoryId+'\nPrecio: $'+d.price+'\nFotos: '+d.photos+av+'\n\n(No se publicó — solo validación.)');
+    if(d.ack==='Success'||d.ack==='Warning') alert('✅ eBay VALIDÓ el anuncio ('+d.ack+')'+diag+'\nPrecio: $'+d.price+'\nFotos: '+d.photos+av+'\n\n(No se publicó — solo validación.)');
     else alert('⚠️ eBay lo rechazó ('+d.ack+'):'+ (av||'\n(sin detalle)')+diag);
   }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
   btn.disabled=false; btn.textContent=o;
