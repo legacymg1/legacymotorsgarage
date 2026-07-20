@@ -159,7 +159,11 @@ async function ebayCategoryAspects(catId){
     headers: { "Authorization": "Bearer " + tok },
   });
   const j = await r.json();
-  return (j.aspects || []).map((a) => ({ name: a.localizedAspectName, required: !!(a.aspectConstraint && a.aspectConstraint.aspectRequired) }));
+  return (j.aspects || []).map((a) => ({
+    name: a.localizedAspectName,
+    required: !!(a.aspectConstraint && a.aspectConstraint.aspectRequired),
+    values: (a.aspectValues || []).map((v) => v.localizedValue).filter(Boolean).slice(0, 40),
+  }));
 }
 
 const EBAY_SECRETS = [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN];
@@ -587,6 +591,62 @@ exports.zipPartPhotos = onCall({ timeoutSeconds: 120, memory: "512MiB" }, async 
   return { filename: base + "_fotos.zip", count: n, zipBase64: zipBuf.toString("base64") };
 });
 
+// Pone un punto de caché tras la ÚLTIMA imagen → las fotos quedan cacheadas y se reusan
+// en la 2ª pasada (llenado de specifics) a ~10% del costo. Evita pagar las fotos dos veces.
+function withImgBreakpoint(images){
+  return images.map((im, i) => (i === images.length - 1 ? Object.assign({}, im, { cache_control: { type: "ephemeral" } }) : im));
+}
+
+// 🤖 2ª pasada IA (barata, sin búsqueda web): llena los item specifics EXACTOS que eBay pide
+// para ESA categoría, eligiendo de los valores permitidos. Reusa las fotos cacheadas.
+async function aiFillAspects(client, model, images, ctx, aspects){
+  const useful = (aspects || []).filter((a) => a.name && !/fitment|compatib|^fits/i.test(a.name)).slice(0, 40);
+  if (!useful.length) return { specifics: {}, cost: 0 };
+  const list = useful.map((a) => {
+    const vals = (a.values && a.values.length) ? ` — pick one of: ${a.values.slice(0, 25).join(" | ")}` : "";
+    return `- ${a.name}${a.required ? " (REQUIRED)" : ""}${vals}`;
+  }).join("\n");
+  const prompt = `Fill eBay Motors item specifics for this USED auto part.
+Part: ${ctx.title}
+Vehicle: ${ctx.veh}
+Verified OEM/part numbers: ${ctx.numbers || "n/a"}
+Interchange: ${ctx.interchange || "n/a"}
+Condition: ${ctx.condition}
+
+Fill AS MANY of these EXACT fields as you can, from the photos + your knowledge of this specific part. Rules:
+- Where a field lists allowed values, you MUST copy one of them verbatim.
+- Estimate weight/length/height/width ONLY if reasonable from the photos; otherwise omit.
+- Do NOT include vehicle fitment/compatibility lists here.
+- Prefer known facts over guesses; omit a field rather than invent.
+
+FIELDS:
+${list}
+
+Return ONLY valid JSON: an object mapping each EXACT field name to a string value. Include only fields you can determine. Example: {"Material":"Plastic","Placement on Vehicle":"Front","Country/Region of Manufacture":"Japan","Connector Type":"5 Pin"}`;
+  let text = "", usage = {};
+  try {
+    const msg = await client.messages.create({
+      model, max_tokens: 1024,
+      messages: [{ role: "user", content: [...withImgBreakpoint(images), { type: "text", text: prompt, cache_control: { type: "ephemeral" } }] }],
+    });
+    usage = msg.usage || {};
+    text = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  } catch (e) { return { specifics: {}, cost: 0, err: e.message }; }
+  let obj = {};
+  try { const m = text.match(/\{[\s\S]*\}/); obj = JSON.parse(m ? m[0] : text); } catch (e) {}
+  const specifics = {};
+  Object.keys(obj || {}).forEach((k) => {
+    let v = obj[k];
+    if (Array.isArray(v)) v = v[0];
+    if (v != null && typeof v !== "object" && String(v).trim()) specifics[k] = String(v).trim().slice(0, 65);
+  });
+  const inTok = usage.input_tokens || 0, outTok = usage.output_tokens || 0, cw = usage.cache_creation_input_tokens || 0, cr = usage.cache_read_input_tokens || 0;
+  const PRICES = { "claude-sonnet-5": { in: 3, out: 15 }, "claude-haiku-4-5": { in: 1, out: 5 } };
+  const pr = PRICES[model] || PRICES["claude-sonnet-5"];
+  const cost = +(((inTok / 1e6) * pr.in) + ((cw / 1e6) * pr.in * 1.25) + ((cr / 1e6) * pr.in * 0.10) + ((outTok / 1e6) * pr.out)).toFixed(5);
+  return { specifics, cost, count: Object.keys(specifics).length };
+}
+
 // 🤖 IA: lee las fotos de una parte y arma el anuncio de eBay (título + descripción + OEM + specifics)
 exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY, EBAY_APP_ID, EBAY_CERT_ID], timeoutSeconds: 240, memory: "512MiB" }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
@@ -661,7 +721,7 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
       // cache_control en el ÚLTIMO bloque → cachea fotos+prompt. Las búsquedas web re-leen ese prefijo
       // desde caché (~10% del costo) en vez de re-procesar las fotos cada vez. Baja mucho el gasto.
-      messages: [{ role: "user", content: [...images, { type: "text", text: prompt, cache_control: { type: "ephemeral" } }] }],
+      messages: [{ role: "user", content: [...withImgBreakpoint(images), { type: "text", text: prompt, cache_control: { type: "ephemeral" } }] }],
     });
     usage = msg.usage || {};
     text = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
@@ -693,6 +753,28 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
 
   // Resuelve la categoría de eBay Motors desde la frase que dio la IA (getCategorySuggestions + filtro Motors) y la guarda en el draft
   try { const c = await ebayCategorySuggest(draft.ebayCategory || draft.title || ""); if (c.id) { draft.ebayCategoryId = c.id; draft.ebayCategoryAck = c.ack; } } catch (e) {}
+
+  // 2ª pasada CONSCIENTE DE LA CATEGORÍA: trae los campos EXACTOS de esa categoría de eBay y los llena.
+  // Reusa las fotos cacheadas (barato). Los valores verificados de la 1ª pasada (MPN, marca) mandan sobre estos.
+  if (draft.ebayCategoryId) {
+    try {
+      const aspects = await ebayCategoryAspects(draft.ebayCategoryId);
+      const ctx = {
+        title: draft.title || p.name || "",
+        veh,
+        numbers: [...(draft.partNumbers || []), draft.suggestedPartNumber].filter(Boolean).join(", "),
+        interchange: (draft.interchange || []).join(", "),
+        condition: draft.condition || p.condition || "Used",
+      };
+      const filled = await aiFillAspects(client, MODEL, images, ctx, aspects);
+      // Solo los valores CON contenido de la 1ª pasada mandan; los vacíos NO deben pisar lo que llenó la 2ª pasada
+      const firstPass = {};
+      Object.keys(draft.itemSpecifics || {}).forEach((k) => { const v = draft.itemSpecifics[k]; if (v != null && String(v).trim()) firstPass[k] = v; });
+      draft.itemSpecifics = Object.assign({}, filled.specifics, firstPass);
+      draft.aspectsFilled = Object.keys(draft.itemSpecifics).length;
+      if (filled.cost) { draft.aspectFillCost = filled.cost; draft.costUsd = +((draft.costUsd || 0) + filled.cost).toFixed(5); }
+    } catch (e) { /* si falla, se queda con los specifics de la 1ª pasada */ }
+  }
 
   if (doSave) await db.collection("parts").doc(partId).update({ ebayDraft: draft, ebayDraftAt: draft.generatedAt });
   return draft;
