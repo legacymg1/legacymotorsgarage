@@ -138,7 +138,11 @@
       <span id="cars-arrow" class="gold">▾</span>
     </button>
     <div id="cars-body" style="display:none;margin-top:10px;">
-      <input id="veh-search" oninput="renderVehicles()" data-i18n-ph="searchCarPh" placeholder="🔎 Buscar carro…" style="margin-bottom:10px;">
+      <div id="veh-search-wrap" style="position:relative;margin-bottom:10px;">
+        <input id="veh-search" oninput="whSearch()" onfocus="whSearch()" autocomplete="off" data-i18n-ph="searchCarPh" placeholder="🔎 Buscar carro o producto…" style="margin-bottom:0;padding-right:40px;">
+        <button id="veh-x" type="button" onclick="whSearchClear()" style="display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;font-size:14px;font-weight:800;line-height:1;cursor:pointer;">✕</button>
+        <div id="veh-dd" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:12px;max-height:62vh;overflow:auto;box-shadow:0 14px 34px rgba(0,0,0,.55);"></div>
+      </div>
       <div id="veh-list"></div>
     </div>
   </div>
@@ -518,9 +522,7 @@ function renderVehicles(){
   if(!vehicles.length){ box.innerHTML='<div class="sub" style="padding:8px 2px;">'+t('noCarsYet')+'</div>'; return; }
   // Ordena por actividad más reciente: el carro con partes agregadas más recientemente sube (en el que se trabaja hoy)
   const lastActivity=v=>{ let latest=v.createdAt||''; parts.forEach(p=>{ if(p.vehicleId===v.id){ const t=p.createdAt||''; if(t>latest) latest=t; } }); return latest; };
-  let list=vehicles.slice().sort((a,b)=>lastActivity(b).localeCompare(lastActivity(a)));
-  const q=((document.getElementById('veh-search')||{}).value||'').trim().toLowerCase();
-  if(q){ const w=q.split(/\s+/); list=list.filter(v=>{ const hay=(vehLabel(v)+' '+(v.vin||'')+' '+(v.color||'')+' '+(v.engine||'')).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); }); }
+  const list=vehicles.slice().sort((a,b)=>lastActivity(b).localeCompare(lastActivity(a)));
   if(!list.length){ box.innerHTML='<div class="sub" style="padding:8px 2px;">'+t('noCarsMatch')+'</div>'; return; }
   box.innerHTML=list.map(v=>{
     const vp=parts.filter(p=>p.vehicleId===v.id);
@@ -535,6 +537,44 @@ function renderVehicles(){
     </div>`;
   }).join('');
 }
+
+// ---- 🔎 Buscador global: carros + productos, con miniaturas y dropdown ----
+window.whSearch=function(){
+  const inp=document.getElementById('veh-search'), dd=document.getElementById('veh-dd'), xb=document.getElementById('veh-x');
+  if(!inp||!dd) return;
+  const q=(inp.value||'').trim().toLowerCase();
+  if(xb) xb.style.display = q?'':'none';
+  if(!q){ dd.style.display='none'; dd.innerHTML=''; return; }
+  const w=q.split(/\s+/), match=hay=>{ hay=(hay||'').toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); };
+  const cars=vehicles.filter(v=>match(vehLabel(v)+' '+(v.vin||'')+' '+(v.color||'')+' '+(v.engine||''))).slice(0,8);
+  const prods=parts.filter(p=>match((p.name||'')+' '+(p.partNumber||'')+' '+(p.ebayTitle||'')+' '+(p.vehicleLabel||'')+' '+((p.location&&p.location.bin)||''))).slice(0,25);
+  const H=txt=>'<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);padding:9px 12px 4px;">'+txt+'</div>';
+  const row=(inner,onclk)=>'<div style="display:flex;gap:10px;align-items:center;padding:9px 12px;cursor:pointer;border-top:1px solid var(--border);" onclick="'+onclk+'">'+inner+'</div>';
+  let html='';
+  if(cars.length){ html+=H(t('carsDismantling'))+cars.map(v=>row(
+    carThumb(v,44)+'<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+vehLabel(v)+'</div><div class="sub">'+(v.vin?'VIN '+v.vin.slice(-6):'')+(v.color?' · '+esc(v.color):'')+'</div></div><span class="gold" style="flex:0 0 auto;">▸</span>',
+    "whPick('car','"+v.id+"')")).join(''); }
+  if(prods.length){ html+=H(t('partsTitle'))+prods.map(p=>{ const u=(p.photoURLs||[]).find(x=>x&&!/00_QR/.test(x))||'';
+    const th=u?'<img src="'+u+'" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex:0 0 auto;">':'<div style="width:44px;height:44px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">🔧</div>';
+    return row(th+'<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(p.name||'')+(p.partNumber?' · '+esc(p.partNumber):'')+'</div><div class="sub">'+esc(p.vehicleLabel||'')+((p.location&&p.location.bin)?' · 📍 '+esc(p.location.bin):'')+'</div></div>'+statusTag(p.status),
+    "whPick('part','"+p.id+"')"); }).join(''); }
+  if(!html) html='<div class="sub" style="padding:12px;">'+t('noCarsMatch')+'</div>';
+  dd.innerHTML=html; dd.style.display='';
+};
+window.whPick=function(kind,id){
+  const dd=document.getElementById('veh-dd'); if(dd) dd.style.display='none';
+  if(kind==='car') openCar(id); else openPartEdit(id);
+};
+window.whSearchClear=function(){
+  const inp=document.getElementById('veh-search'); if(inp) inp.value='';
+  const xb=document.getElementById('veh-x'); if(xb) xb.style.display='none';
+  const dd=document.getElementById('veh-dd'); if(dd){ dd.style.display='none'; dd.innerHTML=''; }
+};
+// Tocar fuera → cierra el dropdown SIN borrar lo escrito (al volver a tocar el input reabre)
+document.addEventListener('click',function(e){
+  const dd=document.getElementById('veh-dd'); if(!dd||dd.style.display==='none') return;
+  const wrap=document.getElementById('veh-search-wrap'); if(wrap && !wrap.contains(e.target)) dd.style.display='none';
+});
 
 // ===================== PÁGINA COMPLETA DEL CARRO =====================
 window.openCar=function(id){
@@ -751,6 +791,7 @@ window.openPartEdit=function(id){
     <input type="file" id="epa-photos" accept="image/*" multiple style="display:none" onchange="addEditPartPhotos(this)">
     <div id="epa-prev" class="thumbs"></div>
     <button class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="printPartLabel('${id}')">${t('printLabel')}</button>
+    <button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="copyScanLink('${id}',this)">${t('copyQrLink')}</button>
     ${_editPartQR?`<div style="margin-top:8px;text-align:center;"><a href="${_editPartQR}" target="_blank">${t('seeQR')}</a></div>`:''}
     <button class="btn" id="epa-save" style="width:100%;margin-top:12px;" onclick="savePartEdit('${id}')">${t('saveChanges')}</button>
     ${isDeleter()?`<button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--red);border-color:var(--red);" onclick="deletePart('${id}')">${t('deletePart')}</button>`:''}`;
@@ -1064,7 +1105,8 @@ window.scanLookup=function(){
     const okId=_pendingConfirm;
     if(p && p.id===okId){ _pendingConfirm=''; sellPart(okId, p); inp.focus(); return; }
     box.innerHTML='<div class="card" style="border-color:var(--red);"><div class="red" style="font-weight:800;font-size:15px;">'+t('wrongPart')+' '+(p?(p.vehicleLabel+' · '+p.name):raw)+'</div><div class="sub" style="margin-top:6px;">'+t('keepScan')+'</div><button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="exitReloc()">'+t('closeResult')+'</button></div>';
-    inp.focus(); return;
+    inp.focus(); try{ startCamScan(); }catch(e){}   // sigue escuchando con la cámara hasta que sea la correcta
+    return;
   }
   if(!p){ box.innerHTML='<div class="card"><div class="red">'+t('notFoundPart')+'</div><div class="sub">'+t('codeLbl')+': '+raw+'</div></div>'; inp.focus(); return; }
   // MODO REUBICAR: cambiar el bin (función aparte de la tarea diaria)
@@ -1093,6 +1135,7 @@ window.startConfirmSell=function(id){
   _pendingConfirm=id;
   document.getElementById('pack-result').innerHTML='<div class="card" style="border-color:var(--gold);"><div style="font-weight:800;font-size:16px;">'+t('confirmScanTitle')+'</div><div class="sub" style="margin-top:6px;">'+t('confirmScanHint')+'</div><button class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="exitReloc()">'+t('closeResult')+'</button></div>';
   const s=document.getElementById('scan-input'); if(s){ s.value=''; s.focus(); }
+  try{ startCamScan(); }catch(e){}   // abre la cámara de una para re-escanear y confirmar
 };
 async function sellPart(id, p){
   try{ await updateDoc(doc(db,'parts',id),{status:'vendido',soldAt:new Date().toISOString(),packPending:false});
@@ -1106,7 +1149,7 @@ window.startReloc=function(){
   document.getElementById('pack-result').innerHTML='<div class="card" style="border-color:var(--gold);"><div style="font-weight:800;">'+t('relocMode')+'</div><div class="sub" style="margin-top:6px;">'+t('relocHint')+'</div></div>';
   const s=document.getElementById('scan-input'); if(s){ s.value=''; s.focus(); }
 };
-window.exitReloc=function(){ _packMode='find'; _pendingConfirm=''; document.getElementById('pack-result').innerHTML=''; const s=document.getElementById('scan-input'); if(s) s.focus(); };
+window.exitReloc=function(){ _packMode='find'; _pendingConfirm=''; try{ stopCam(); }catch(e){} document.getElementById('pack-result').innerHTML=''; const s=document.getElementById('scan-input'); if(s) s.focus(); };
 window.saveLoc=async function(id){
   const bin=(document.getElementById('pk-bin').value||'').trim().toUpperCase();
   try{ await updateDoc(doc(db,'parts',id),{location:{bin}}); document.getElementById('pack-result').innerHTML='<div class="card green">'+t('locSaved')+': '+t('binLbl')+' '+(bin||'?')+'</div>'; const s=document.getElementById('scan-input'); if(s) s.focus(); }
