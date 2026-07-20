@@ -634,7 +634,7 @@
     <div class="form-group"><label class="form-label">Cliente (para el presupuesto)</label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente (opcional)"></div>
     <div class="form-group"><label class="form-label">Agregar carro del inventario</label>
       <div style="position:relative;">
-        <input class="form-input" id="cot-car-search" placeholder="🔍 Busca por # inventario, marca, modelo o VIN..." autocomplete="off" oninput="cotFilterCars()" onfocus="cotFilterCars()" onblur="setTimeout(()=>{const b=document.getElementById('cot-car-results');if(b)b.style.display='none';},200)">
+        <input class="form-input" id="cot-car-search" placeholder="🔍 Busca por # inventario, marca, modelo o VIN..." autocomplete="off" oninput="cotFilterCars()" onfocus="cotFilterCars()" onkeydown="cotCarKey(event)" onblur="setTimeout(()=>{const b=document.getElementById('cot-car-results');if(b)b.style.display='none';},200)">
         <div id="cot-car-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--navy2);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:240px;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,0.5);"></div>
       </div>
     </div>
@@ -1444,6 +1444,7 @@ window.openCotizador=function(){
   cotAddBlank();
   document.getElementById('cot-modal').classList.add('active');
 };
+let _cotFiltered=[];
 window.cotFilterCars=function(){
   const q=(document.getElementById('cot-car-search').value||'').toLowerCase();
   const terms=q.trim().split(/\s+/).filter(Boolean);
@@ -1451,6 +1452,7 @@ window.cotFilterCars=function(){
   let items=cotInventory.slice();
   if(terms.length) items=items.filter(c=>{ const hay=((c.inventoryNum||'')+' '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.color||'')+' '+(c.vin||'')).toLowerCase(); return terms.every(x=>hay.includes(x)); });
   items=items.slice(0,30);
+  _cotFiltered=items;   // guarda las coincidencias actuales (para Enter)
   let html='';
   if(!items.length) html='<div style="padding:9px 12px;color:var(--muted);font-size:13px;">Sin coincidencias — o escribe el carro a mano abajo.</div>';
   else items.forEach(c=>{ const label=[c.year,c.make,c.model].filter(Boolean).join(' '); html+=`<div onmousedown="cotAddFromCar('${c.id}')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);"><div style="font-weight:600;">#${c.inventoryNum||'?'} · ${label}</div><div style="font-size:12px;color:var(--muted);">${c.price?formatMoney(c.price):'sin precio'}${c.vin?' · …'+String(c.vin).slice(-6):''}</div></div>`; });
@@ -1462,6 +1464,10 @@ window.cotAddFromCar=function(id){
   document.getElementById('cot-car-search').value='';
   cotOpts.push({ id:++cotSeq, car:[c.year,c.make,c.model].filter(Boolean).join(' '), vin:c.vin||'', miles:c.miles||'', price:Number(c.price)||0, down:0, tax:0, dmv:0, numpay:52, freq:'weekly' });
   renderCotOptions();
+};
+// Enter en el buscador → agrega la primera coincidencia (como los demás buscadores)
+window.cotCarKey=function(e){
+  if(e.key==='Enter'){ e.preventDefault(); if(_cotFiltered.length) cotAddFromCar(_cotFiltered[0].id); }
 };
 window.cotAddBlank=function(){ cotOpts.push({id:++cotSeq, car:'', vin:'', miles:'', price:0, down:0, tax:0, dmv:0, numpay:52, freq:'weekly'}); renderCotOptions(); };
 window.cotDup=function(i){ const o=cotOpts[i]; if(!o) return; cotOpts.splice(i+1,0,{...o,id:++cotSeq}); renderCotOptions(); };
