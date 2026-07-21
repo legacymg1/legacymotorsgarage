@@ -350,18 +350,21 @@ const EBAY_LOC_KEY = "LMG_PORTERVILLE";
 
 // Llamada REST genérica a las APIs de vender de eBay (Inventory/Account). token = access token de usuario.
 async function ebayRest(method, path, token, body){
-  const r = await fetch("https://api.ebay.com" + path, {
-    method,
-    headers: {
-      "Authorization": "Bearer " + token,
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-      "Accept-Language": "en-US",
-      "Content-Language": "en-US",
-      "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let r;
+  try {
+    r = await fetch("https://api.ebay.com" + path, {
+      method,
+      headers: {
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Accept-Language": "en-US",
+        "Content-Language": "en-US",
+        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) { return { status: 0, ok: false, json: null, text: "red/fetch: " + (e.message || e) }; }
   let json = null, text = "";
   try { text = await r.text(); json = text ? JSON.parse(text) : null; } catch (e) {}
   return { status: r.status, ok: r.status >= 200 && r.status < 300, json, text };
@@ -566,68 +569,76 @@ exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const p = await loadPart(request.data && request.data.partId);
   const priceUsd = request.data && request.data.priceUsd;
-  const a = await ebayUserAccessToken();
-  if (!a.token) return { ok: false, step: "token", errors: [(a.raw && a.raw.error_description) || "sin token"] };
+  try {
+    const a = await ebayUserAccessToken();
+    if (!a.token) return { ok: false, step: "token", errors: [(a.raw && a.raw.error_description) || "sin token"] };
 
-  const cfgSnap = await admin.firestore().collection("config").doc("ebay").get();
-  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
-  if (!cfg.fulfillmentPolicyId || !cfg.paymentPolicyId || !cfg.returnPolicyId || !cfg.locationKey) {
-    return { ok: false, step: "setup", errors: ["Falta configurar la cuenta. Corre '⚙️ Configurar eBay' primero."] };
+    const cfgSnap = await admin.firestore().collection("config").doc("ebay").get();
+    const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+    if (!cfg.fulfillmentPolicyId || !cfg.paymentPolicyId || !cfg.returnPolicyId || !cfg.locationKey) {
+      return { ok: false, step: "setup", errors: ["Falta configurar la cuenta. Corre '⚙️ Configurar eBay' primero."] };
+    }
+
+    const b = await buildInventoryItem(p);
+    const price = priceUsd ? Number(priceUsd).toFixed(2) : (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
+
+    // 1) Inventory item (idempotente por SKU)
+    const inv = await ebayRest("PUT", "/sell/inventory/v1/inventory_item/" + encodeURIComponent(b.sku), a.token, b.invItem);
+    if (!inv.ok) return { ok: false, step: "inventory_item", status: inv.status, errors: ebayRestErrors(inv) };
+
+    // 2) Oferta SIN publicar = borrador. Reusa la oferta si ya existe para este SKU.
+    let offerId = "";
+    const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(b.sku) + "&marketplace_id=EBAY_US", a.token);
+    if (exist.ok && exist.json && exist.json.offers && exist.json.offers.length) offerId = exist.json.offers[0].offerId;
+    const offerBody = {
+      sku: b.sku, marketplaceId: "EBAY_US", format: "FIXED_PRICE", availableQuantity: 1,
+      categoryId: b.catId, listingDescription: b.desc,
+      listingPolicies: {
+        fulfillmentPolicyId: cfg.fulfillmentPolicyId, paymentPolicyId: cfg.paymentPolicyId, returnPolicyId: cfg.returnPolicyId,
+        bestOfferTerms: { bestOfferEnabled: true },   // ✅ aceptar ofertas en todos los anuncios
+      },
+      pricingSummary: { price: { value: price, currency: "USD" } },
+      merchantLocationKey: cfg.locationKey,
+    };
+    let offer;
+    if (offerId) offer = await ebayRest("PUT", "/sell/inventory/v1/offer/" + offerId, a.token, offerBody);
+    else offer = await ebayRest("POST", "/sell/inventory/v1/offer", a.token, offerBody);
+    if (!offer.ok) return { ok: false, step: "offer", status: offer.status, errors: ebayRestErrors(offer) };
+    if (!offerId) offerId = offer.json && offer.json.offerId;
+
+    const upd = { ebayOfferId: offerId, ebayDraftCat: b.catId, ebayDraftAt: new Date().toISOString(), status: "borrador" };
+    if (priceUsd) upd.priceCents = Math.round(Number(priceUsd) * 100);
+    await admin.firestore().collection("parts").doc(p.id).update(upd);
+
+    return { ok: true, offerId, categoryId: b.catId, title: b.title, price, photos: b.photos, aspects: b.aspects };
+  } catch (e) {
+    return { ok: false, step: "exception", errors: ["Error interno: " + (e && e.message ? e.message : String(e))] };
   }
-
-  const b = await buildInventoryItem(p);
-  const price = priceUsd ? Number(priceUsd).toFixed(2) : (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
-
-  // 1) Inventory item (idempotente por SKU)
-  const inv = await ebayRest("PUT", "/sell/inventory/v1/inventory_item/" + encodeURIComponent(b.sku), a.token, b.invItem);
-  if (!inv.ok) return { ok: false, step: "inventory_item", status: inv.status, errors: ebayRestErrors(inv) };
-
-  // 2) Oferta SIN publicar = borrador. Reusa la oferta si ya existe para este SKU.
-  let offerId = "";
-  const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(b.sku) + "&marketplace_id=EBAY_US", a.token);
-  if (exist.ok && exist.json && exist.json.offers && exist.json.offers.length) offerId = exist.json.offers[0].offerId;
-  const offerBody = {
-    sku: b.sku, marketplaceId: "EBAY_US", format: "FIXED_PRICE", availableQuantity: 1,
-    categoryId: b.catId, listingDescription: b.desc,
-    listingPolicies: {
-      fulfillmentPolicyId: cfg.fulfillmentPolicyId, paymentPolicyId: cfg.paymentPolicyId, returnPolicyId: cfg.returnPolicyId,
-      bestOfferTerms: { bestOfferEnabled: true },   // ✅ aceptar ofertas en todos los anuncios
-    },
-    pricingSummary: { price: { value: price, currency: "USD" } },
-    merchantLocationKey: cfg.locationKey,
-  };
-  let offer;
-  if (offerId) offer = await ebayRest("PUT", "/sell/inventory/v1/offer/" + offerId, a.token, offerBody);
-  else offer = await ebayRest("POST", "/sell/inventory/v1/offer", a.token, offerBody);
-  if (!offer.ok) return { ok: false, step: "offer", status: offer.status, errors: ebayRestErrors(offer) };
-  if (!offerId) offerId = offer.json && offer.json.offerId;
-
-  const upd = { ebayOfferId: offerId, ebayDraftCat: b.catId, ebayDraftAt: new Date().toISOString(), status: "borrador" };
-  if (priceUsd) upd.priceCents = Math.round(Number(priceUsd) * 100);
-  await admin.firestore().collection("parts").doc(p.id).update(upd);
-
-  return { ok: true, offerId, categoryId: b.catId, title: b.title, price, photos: b.photos, aspects: b.aspects };
 });
 
 // 🚀 Publicar la oferta EN VIVO (después de que la revisen). 1 clic → anuncio real.
 exports.ebayPublishOffer = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const p = await loadPart(request.data && request.data.partId);
-  let offerId = p.ebayOfferId;
-  const a = await ebayUserAccessToken();
-  if (!a.token) return { ok: false, step: "token", errors: [(a.raw && a.raw.error_description) || "sin token"] };
-  if (!offerId) {
-    const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(String(p.id)) + "&marketplace_id=EBAY_US", a.token);
-    if (exist.ok && exist.json && exist.json.offers && exist.json.offers.length) offerId = exist.json.offers[0].offerId;
+  try {
+    let offerId = p.ebayOfferId;
+    const a = await ebayUserAccessToken();
+    if (!a.token) return { ok: false, step: "token", errors: [(a.raw && a.raw.error_description) || "sin token"] };
+    if (!offerId) {
+      const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(String(p.stickerNum || p.id)) + "&marketplace_id=EBAY_US", a.token);
+      if (exist.ok && exist.json && exist.json.offers && exist.json.offers.length) offerId = exist.json.offers[0].offerId;
+    }
+    if (!offerId) return { ok: false, step: "offer", errors: ["No hay borrador para esta parte. Crea el borrador primero."] };
+    const r = await ebayRest("POST", "/sell/inventory/v1/offer/" + offerId + "/publish", a.token);
+    if (!r.ok) return { ok: false, step: "publish", status: r.status, errors: ebayRestErrors(r) };
+    const listingId = r.json && r.json.listingId;
+    await admin.firestore().collection("parts").doc(p.id).update({
+      ebayItemId: listingId || "", ebayListedAt: new Date().toISOString(), status: "publicado",
+    });
+    return { ok: true, listingId };
+  } catch (e) {
+    return { ok: false, step: "exception", errors: ["Error interno: " + (e && e.message ? e.message : String(e))] };
   }
-  if (!offerId) return { ok: false, step: "offer", errors: ["No hay borrador para esta parte. Crea el borrador primero."] };
-  const r = await ebayRest("POST", "/sell/inventory/v1/offer/" + offerId + "/publish", a.token);
-  if (!r.ok) return { ok: false, step: "publish", status: r.status, errors: ebayRestErrors(r) };
-  const listingId = r.json && r.json.listingId;
-  await admin.firestore().collection("parts").doc(p.id).update({
-    ebayItemId: listingId || "", ebayListedAt: new Date().toISOString(), status: "publicado",
-  });
-  return { ok: true, listingId };
 });
 
 // 📦 Descargar todas las fotos de una parte (SIN el QR) en un ZIP — para que la esposa
