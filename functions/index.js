@@ -147,7 +147,7 @@ async function ebayCategorySuggest(query){
   });
   const j = await r.json();
   const sugg = j.categorySuggestions || [];
-  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => /ebay motors|car\s*&\s*truck|parts\s*&\s*accessories/i.test(a.categoryName || ""));
+  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => /ebay motors|car\s*&\s*truck/i.test(a.categoryName || ""));   // SOLO Motors (no "Heavy Equipment Parts & Accessories" de Business & Industrial)
   const pick = sugg.find(isMotors);   // SOLO Motors — NUNCA "Everything Else"; si no hay, devuelve vacío y el que llama reintenta/hace fallback
   return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: pick ? "motors" : (sugg.length ? "nonmotors" : "empty") };
 }
