@@ -1338,7 +1338,7 @@ window.ebayDraft=async function(id,btn){
   try{
     const r=await httpsCallable(functions,'ebayCreateDraft')({partId:id, priceUsd:price}); const d=r.data||{};
     if(d.ok){
-      showMsg(t('eDraftOk')+'\n\n'+t('eTitleW')+': '+d.title+'\n'+t('eCatW')+': '+d.categoryId+'\n'+t('eSpecsW')+': '+d.aspects+'\n'+t('ePhotosW')+': '+d.photos+'\n'+t('ePriceW')+': $'+d.price+'\n\n'+t('eDraftOkEnd'));
+      showMsg(t('eDraftOk')+'\n\n'+t('eTitleW')+': '+d.title+'\n'+t('eCatW')+': '+d.categoryId+' ['+(d.categoryAck||'')+']\n'+t('eSpecsW')+': '+d.aspects+'\n'+t('ePhotosW')+': '+d.photos+'\n'+t('ePriceW')+': $'+d.price+'\n\n'+t('eDraftOkEnd'));
     } else {
       const hint=d.step==='setup'?('\n\n'+t('eSetupFirst')):'';
       showMsg(t('eDraftFail')+' ('+t('eStep')+': '+(d.step||'?')+'):\n- '+((d.errors||[t('eNoDetail')]).join('\n- '))+hint);
