@@ -260,11 +260,14 @@ async function resolveCategory(p){
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
   const partType = d.ebayCategory || is["Type"] || p.name || "";
   // 1) MATCH dentro de las hojas de Car & Truck Parts (Motors) — confiable, nunca se sale a bicicletas/herramientas
+  let leafDbg = "";
   try {
     const leaves = await getMotorsLeaves();
+    leafDbg = "leaves=" + leaves.length;
     const hit = matchMotorsLeaf(leaves, partType, p.name);
     if (hit) return { catId: hit.id, catAck: "leaf:" + hit.name };
-  } catch (e) {}
+    if (leaves.length) leafDbg += " sample:" + leaves.slice(0, 3).map((l) => l.name).join(",");
+  } catch (e) { leafDbg = "leafErr:" + (e.message || e); }
   // 2) Fallback: get_category_suggestions (por si el match no encontró)
   const veh = [p.vYear, p.vMake, p.vModel].filter(Boolean).join(" ");
   const queries = [d.ebayCategory || "", partType || "", title, [veh, partType].filter(Boolean).join(" ")].filter((q) => q && q.trim());
@@ -273,7 +276,7 @@ async function resolveCategory(p){
     try { const c = await ebayCategorySuggest(q); dbgList.push("«" + q.slice(0, 22) + "» " + (c.dbg || "").slice(0, 120)); if (c.id) { catId = c.id; catAck = "motors:" + q.slice(0, 30); break; } catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
   }
   if (!catId && d.ebayCategoryId) { catId = d.ebayCategoryId; catAck = "draft"; }
-  if (!catId) { catId = "6030"; catAck += " (nada) " + dbgList.join(" | ").slice(0, 200); }
+  if (!catId) { catId = "6030"; catAck += " [" + leafDbg + "]"; }
   return { catId, catAck };
 }
 
