@@ -215,24 +215,29 @@ async function loadPart(partId){
 // y se queda con la PRIMERA que sea de Motors. Si ninguna acierta, cae a Car & Truck Parts general.
 // Trae TODAS las hojas (categorías finales) del árbol "Car & Truck Parts & Accessories" (6030) de eBay Motors.
 // get_category_suggestions es malo con autopartes (manda bicicletas/herramientas) → buscamos SOLO dentro de Motors.
-let _motorsLeaves = null;
+let _motorsLeaves = null, _motorsDbg = "";
 async function ebayMotorsLeaves(){
   const tok = await ebayAppToken();
-  if (!tok) return [];
-  const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=6030", { headers: { "Authorization": "Bearer " + tok } });
-  const j = await r.json();
-  const leaves = [];
-  const walk = (node) => {
-    if (!node) return;
-    const cat = node.category || {};
-    const kids = node.childCategoryTreeNodes || [];
-    if (node.leafCategoryTreeNode === true || kids.length === 0) {
-      if (cat.categoryId && cat.categoryName) leaves.push({ id: cat.categoryId, name: cat.categoryName });
+  if (!tok) { _motorsDbg = "notoken"; return []; }
+  const roots = ["33559", "6030"];   // "Car & Truck Parts & Accessories": ID nuevo primero, viejo de respaldo
+  for (const root of roots) {
+    const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=" + root, { headers: { "Authorization": "Bearer " + tok } });
+    const txt = await r.text(); let j = {}; try { j = JSON.parse(txt); } catch (e) {}
+    if (j.categorySubtreeNode) {
+      const leaves = [];
+      const walk = (node) => {
+        if (!node) return;
+        const cat = node.category || {};
+        const kids = node.childCategoryTreeNodes || [];
+        if (node.leafCategoryTreeNode === true || kids.length === 0) { if (cat.categoryId && cat.categoryName) leaves.push({ id: cat.categoryId, name: cat.categoryName }); }
+        kids.forEach(walk);
+      };
+      walk(j.categorySubtreeNode);
+      if (leaves.length) { _motorsDbg = "root=" + root + " n=" + leaves.length; return leaves; }
     }
-    kids.forEach(walk);
-  };
-  walk(j.categorySubtreeNode);
-  return leaves;
+    _motorsDbg = "root=" + root + " http=" + r.status + " " + txt.slice(0, 100);
+  }
+  return [];
 }
 async function getMotorsLeaves(){
   if (_motorsLeaves && _motorsLeaves.length) return _motorsLeaves;
@@ -263,10 +268,9 @@ async function resolveCategory(p){
   let leafDbg = "";
   try {
     const leaves = await getMotorsLeaves();
-    leafDbg = "leaves=" + leaves.length;
+    leafDbg = "leaves=" + leaves.length + " (" + _motorsDbg + ")";
     const hit = matchMotorsLeaf(leaves, partType, p.name);
     if (hit) return { catId: hit.id, catAck: "leaf:" + hit.name };
-    if (leaves.length) leafDbg += " sample:" + leaves.slice(0, 3).map((l) => l.name).join(",");
   } catch (e) { leafDbg = "leafErr:" + (e.message || e); }
   // 2) Fallback: get_category_suggestions (por si el match no encontró)
   const veh = [p.vYear, p.vMake, p.vModel].filter(Boolean).join(" ");
