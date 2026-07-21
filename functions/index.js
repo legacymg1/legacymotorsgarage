@@ -273,6 +273,9 @@ function matchMotorsLeaf(leaves, partType, name){
 async function resolveCategory(p){
   const d = p.ebayDraft || {};
   const is = d.itemSpecifics || {};
+  // 👑 MANDA la categoría que la IA YA usó para llenar los item specifics (draft.ebayCategoryId).
+  // Si no, al publicar podríamos caer en otra categoría y eBay descarta los specifics que no aplican → salen vacíos.
+  if (d.ebayCategoryId) return { catId: String(d.ebayCategoryId), catAck: "draft:" + (d.ebayCategoryAck || "") };
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
   const partType = d.ebayCategory || is["Type"] || p.name || "";
   // get_category_suggestions EN EL ÁRBOL 100 (eBay Motors) → la mejor sugerencia ya es la categoría correcta de Motors.
