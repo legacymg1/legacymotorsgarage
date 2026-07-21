@@ -149,7 +149,10 @@ async function ebayCategorySuggest(query){
   const sugg = j.categorySuggestions || [];
   const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => /ebay motors|car\s*&\s*truck/i.test(a.categoryName || ""));   // SOLO Motors (no "Heavy Equipment Parts & Accessories" de Business & Industrial)
   const pick = sugg.find(isMotors);   // SOLO Motors — NUNCA "Everything Else"; si no hay, devuelve vacío y el que llama reintenta/hace fallback
-  return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: pick ? "motors" : (sugg.length ? "nonmotors" : "empty") };
+  // DEBUG: nombre + ancestros del PRIMER sugerido (para ver por qué se rechaza)
+  const top = sugg[0];
+  const dbg = top ? (((top.category && top.category.categoryName) || "?") + " « " + (top.categoryTreeNodeAncestors || []).map((a) => a.categoryName).join(" < ")) : "sin-sugerencias";
+  return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: pick ? "motors" : (sugg.length ? "nonmotors" : "empty"), dbg };
 }
 // Aspectos (item specifics) que eBay pide para una categoría
 async function ebayCategoryAspects(catId){
@@ -226,13 +229,13 @@ async function resolveCategory(p){
     [veh, d.ebayCategory || partType || p.name].filter(Boolean).join(" "),   // 4) carro + tipo
     "car truck " + (d.ebayCategory || partType || p.name || ""),   // 5) sesgo Motors explícito
   ].filter((q) => q && q.trim());
-  let catAck = "none", catId = "";
+  let catAck = "none", catId = "", dbg0 = "";
   for (const q of queries) {
-    try { const c = await ebayCategorySuggest(q); if (c.id) { catId = c.id; catAck = "motors:" + q.slice(0, 40); break; } catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
+    try { const c = await ebayCategorySuggest(q); if (!dbg0) dbg0 = (c.dbg || ""); if (c.id) { catId = c.id; catAck = "motors:" + q.slice(0, 40); break; } catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
   }
   // Respaldo: la categoría que ya resolvió la IA (draft.ebayCategoryId) — es una hoja válida de la Taxonomy.
   if (!catId && d.ebayCategoryId) { catId = d.ebayCategoryId; catAck = "draft"; }
-  if (!catId) catId = "6030";   // último recurso (raro con el reorden de arriba)
+  if (!catId) { catId = "6030"; catAck += " || TOP: " + dbg0; }   // debug: qué devolvió eBay
   return { catId, catAck };
 }
 
