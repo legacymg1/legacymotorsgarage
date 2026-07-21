@@ -213,28 +213,67 @@ async function loadPart(partId){
 
 // Resuelve la CATEGORÍA de eBay Motors. Intenta VARIAS búsquedas (frase IA → tipo de parte → nombre+carro)
 // y se queda con la PRIMERA que sea de Motors. Si ninguna acierta, cae a Car & Truck Parts general.
+// Trae TODAS las hojas (categorías finales) del árbol "Car & Truck Parts & Accessories" (6030) de eBay Motors.
+// get_category_suggestions es malo con autopartes (manda bicicletas/herramientas) → buscamos SOLO dentro de Motors.
+let _motorsLeaves = null;
+async function ebayMotorsLeaves(){
+  const tok = await ebayAppToken();
+  if (!tok) return [];
+  const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=6030", { headers: { "Authorization": "Bearer " + tok } });
+  const j = await r.json();
+  const leaves = [];
+  const walk = (node) => {
+    if (!node) return;
+    const cat = node.category || {};
+    const kids = node.childCategoryTreeNodes || [];
+    if (node.leafCategoryTreeNode === true || kids.length === 0) {
+      if (cat.categoryId && cat.categoryName) leaves.push({ id: cat.categoryId, name: cat.categoryName });
+    }
+    kids.forEach(walk);
+  };
+  walk(j.categorySubtreeNode);
+  return leaves;
+}
+async function getMotorsLeaves(){
+  if (_motorsLeaves && _motorsLeaves.length) return _motorsLeaves;
+  try { _motorsLeaves = await ebayMotorsLeaves(); } catch (e) { _motorsLeaves = []; }
+  return _motorsLeaves || [];
+}
+// Elige la hoja de Motors cuyo NOMBRE coincide mejor con el tipo de parte
+function matchMotorsLeaf(leaves, partType, name){
+  if (!leaves || !leaves.length) return null;
+  const words = (String(partType || "") + " " + String(name || "")).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+  if (!words.length) return null;
+  let best = null, bestScore = 0;
+  for (const l of leaves) {
+    const n = l.name.toLowerCase();
+    let s = 0;
+    for (const w of words) if (n.includes(w)) s += (w.length >= 4 ? 2 : 1);
+    if (s > bestScore) { bestScore = s; best = l; }
+  }
+  return bestScore >= 2 ? best : null;
+}
+
 async function resolveCategory(p){
   const d = p.ebayDraft || {};
   const is = d.itemSpecifics || {};
-  const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);   // ← faltaba definir esto (rompía el borrador)
-  const partType = is["Type"] || d.ebayCategory || p.name || "";
+  const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
+  const partType = d.ebayCategory || is["Type"] || p.name || "";
+  // 1) MATCH dentro de las hojas de Car & Truck Parts (Motors) — confiable, nunca se sale a bicicletas/herramientas
+  try {
+    const leaves = await getMotorsLeaves();
+    const hit = matchMotorsLeaf(leaves, partType, p.name);
+    if (hit) return { catId: hit.id, catAck: "leaf:" + hit.name };
+  } catch (e) {}
+  // 2) Fallback: get_category_suggestions (por si el match no encontró)
   const veh = [p.vYear, p.vMake, p.vModel].filter(Boolean).join(" ");
-  // Consultas en orden de preferencia. El TIPO DE PARTE va primero (ej. "Mass Air Flow Sensor"):
-  // eBay lo mapea directo a la categoría final de Motors. Luego título y respaldos.
-  const queries = [
-    d.ebayCategory || "",                                          // 1) frase de la IA sola (ej. "Fuel Sensor") — la más precisa
-    partType || "",                                                // 2) tipo de parte
-    title,                                                         // 3) título completo (como el editor de eBay)
-    [veh, d.ebayCategory || partType || p.name].filter(Boolean).join(" "),   // 4) carro + tipo
-    "car truck " + (d.ebayCategory || partType || p.name || ""),   // 5) sesgo Motors explícito
-  ].filter((q) => q && q.trim());
+  const queries = [d.ebayCategory || "", partType || "", title, [veh, partType].filter(Boolean).join(" ")].filter((q) => q && q.trim());
   let catAck = "none", catId = "", dbgList = [];
   for (const q of queries) {
-    try { const c = await ebayCategorySuggest(q); dbgList.push("«" + q.slice(0, 22) + "» " + (c.dbg || "").slice(0, 140)); if (c.id) { catId = c.id; catAck = "motors:" + q.slice(0, 40); break; } catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
+    try { const c = await ebayCategorySuggest(q); dbgList.push("«" + q.slice(0, 22) + "» " + (c.dbg || "").slice(0, 120)); if (c.id) { catId = c.id; catAck = "motors:" + q.slice(0, 30); break; } catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
   }
-  // Respaldo: la categoría que ya resolvió la IA (draft.ebayCategoryId) — es una hoja válida de la Taxonomy.
   if (!catId && d.ebayCategoryId) { catId = d.ebayCategoryId; catAck = "draft"; }
-  if (!catId) { catId = "6030"; catAck += "\n\nDEBUG:\n" + dbgList.join("\n"); }   // qué devolvió eBay en cada búsqueda
+  if (!catId) { catId = "6030"; catAck += " (nada) " + dbgList.join(" | ").slice(0, 200); }
   return { catId, catAck };
 }
 
