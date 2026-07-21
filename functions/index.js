@@ -543,7 +543,7 @@ function buildPackage(p){
 async function buildInventoryItem(p){
   const d = p.ebayDraft || {};
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
-  const { catId } = await resolveCategory(p);
+  const { catId, catAck } = await resolveCategory(p);
   const vin = (p.vVin && String(p.vVin).trim()) ? String(p.vVin).trim() : await loadVehicleVin(p);   // artículo rápido guarda su VIN; carro normal se lee de dismantle_vehicles
   const desc = buildListingDescription(p, vin);   // descripción pro con formato
   const condDesc = ((d.conditionNote || d.description || "").trim()).slice(0, 990);   // campo aparte de eBay (máx 1000)
@@ -564,7 +564,7 @@ async function buildInventoryItem(p){
   };
   if (condDesc) invItem.conditionDescription = condDesc;   // Condition description (campo separado de eBay)
   const sku = String(p.stickerNum || p.id);   // SKU = número de estampa (humano-legible, único por parte activa); respaldo al id interno
-  return { sku, invItem, title, desc, catId, photos: pics.length, aspects: Object.keys(aspects).length };
+  return { sku, invItem, title, desc, catId, catAck, photos: pics.length, aspects: Object.keys(aspects).length };
 }
 
 // 📝 Crear BORRADOR en eBay (Inventory API: inventory item + oferta SIN publicar). No sale en vivo.
@@ -619,7 +619,7 @@ exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
     if (priceUsd) upd.priceCents = Math.round(Number(priceUsd) * 100);
     await admin.firestore().collection("parts").doc(p.id).update(upd);
 
-    return { ok: true, offerId, categoryId: b.catId, title: b.title, price, photos: b.photos, aspects: b.aspects };
+    return { ok: true, offerId, categoryId: b.catId, categoryAck: b.catAck, title: b.title, price, photos: b.photos, aspects: b.aspects };
   } catch (e) {
     return { ok: false, step: "exception", errors: ["Error interno: " + (e && e.message ? e.message : String(e))] };
   }
