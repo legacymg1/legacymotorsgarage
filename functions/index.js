@@ -573,7 +573,10 @@ async function loadVehicleMake(p){
 function buildListingDescription(p, vin){
   const d = p.ebayDraft || {};
   const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const overview = (d.description || p.name || "").trim();
+  // Sanitiza: si un borrador viejo guardó JSON crudo o ```json en la descripción, no lo mostramos.
+  let ov = (d.description || "").trim();
+  if (/```|^\s*[{\[]|"\s*:\s*"|"title"\s*:/.test(ov)) ov = "";
+  const overview = ov || (p.name || "").trim();
   const cond = (d.conditionNote || "").trim();
   const fits = (d.fitsVehicles || "").trim();
   const nums = [...(d.partNumbers || []), d.suggestedPartNumber].filter(Boolean);
@@ -929,10 +932,16 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
 
   let draft;
   try {
-    const m = text.match(/\{[\s\S]*\}/);
-    draft = JSON.parse(m ? m[0] : text);
+    const stripFence = (s) => s.replace(/```+\s*json/gi, "").replace(/```+/g, "").trim();  // quita ```json … ```
+    const tryParse = (s) => { try { return JSON.parse(s); } catch (e) { return null; } };
+    const cleaned = stripFence(text);
+    draft = tryParse(cleaned)
+         || (cleaned.match(/\{[\s\S]*\}/) && tryParse(cleaned.match(/\{[\s\S]*\}/)[0]))
+         || (text.match(/\{[\s\S]*\}/) && tryParse(text.match(/\{[\s\S]*\}/)[0]));
+    if (!draft) throw new Error("no-json");
   } catch (e) {
-    draft = { title: (p.ebayTitle || p.name || ""), description: text.slice(0, 500), partNumbers: [], condition: p.condition || "Used", itemSpecifics: {}, confidence: "low", raw: text.slice(0, 800) };
+    // Nunca metemos el texto crudo (con ```json) a la descripción — mejor el nombre de la parte.
+    draft = { title: (p.ebayTitle || p.name || ""), description: (p.name || ""), partNumbers: [], condition: p.condition || "Used", itemSpecifics: {}, confidence: "low", raw: text.slice(0, 800) };
   }
   draft.generatedAt = new Date().toISOString();
   draft.by = (request.auth.token && request.auth.token.email) || "";
