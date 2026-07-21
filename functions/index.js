@@ -236,7 +236,10 @@ async function ebayMotorsLeaves(){
     kids.forEach((k) => walk(k, nowIn));
   };
   walk(j.rootCategoryNode, false);
-  _motorsDbg = "tree n=" + leaves.length;
+  const top = (j.rootCategoryNode && j.rootCategoryNode.childCategoryTreeNodes) || [];
+  const motorsNode = top.find((n) => /motor/i.test((n.category && n.category.categoryName) || ""));
+  const motorsKids = motorsNode ? (motorsNode.childCategoryTreeNodes || []).map((n) => (n.category && n.category.categoryName) || "?").join(",") : "no-motors-node";
+  _motorsDbg = "n=" + leaves.length + " top=" + top.length + " | Motors kids: " + motorsKids.slice(0, 180);
   return leaves;
 }
 async function getMotorsLeaves(){
