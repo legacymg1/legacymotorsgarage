@@ -147,9 +147,9 @@ async function ebayCategorySuggest(query){
   });
   const j = await r.json();
   const sugg = j.categorySuggestions || [];
-  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => /ebay motors|car\s*&\s*truck/i.test(a.categoryName || ""));
-  const pick = sugg.find(isMotors) || sugg[0];
-  return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: sugg.find(isMotors) ? "motors" : (sugg.length ? "nonmotors" : "empty") };
+  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => /ebay motors|car\s*&\s*truck|parts\s*&\s*accessories/i.test(a.categoryName || ""));
+  const pick = sugg.find(isMotors);   // SOLO Motors — NUNCA "Everything Else"; si no hay, devuelve vacío y el que llama reintenta/hace fallback
+  return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: pick ? "motors" : (sugg.length ? "nonmotors" : "empty") };
 }
 // Aspectos (item specifics) que eBay pide para una categoría
 async function ebayCategoryAspects(catId){
@@ -209,14 +209,25 @@ async function loadPart(partId){
   return Object.assign({ id: partId }, snap.data());
 }
 
-// Resuelve la CATEGORÍA de eBay Motors desde la frase de la IA (sesgo "car truck" + filtro estricto Motors)
+// Resuelve la CATEGORÍA de eBay Motors. Intenta VARIAS búsquedas (frase IA → tipo de parte → nombre+carro)
+// y se queda con la PRIMERA que sea de Motors. Si ninguna acierta, cae a Car & Truck Parts general.
 async function resolveCategory(p){
   const d = p.ebayDraft || {};
-  const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
-  const catQuery = "car truck " + (d.ebayCategory || [p.vYear, p.vMake, p.vModel, p.name].filter(Boolean).join(" ") || title);
-  let catAck = "", catId = "";
-  try { const c = await ebayCategorySuggest(catQuery); catId = c.id; catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
-  if (!catId) catId = "6030";
+  const is = d.itemSpecifics || {};
+  const partType = is["Type"] || d.ebayCategory || p.name || "";
+  const veh = [p.vYear, p.vMake, p.vModel].filter(Boolean).join(" ");
+  // Consultas en orden de preferencia (todas con sesgo "car truck" para empujar a Motors)
+  const queries = [
+    d.ebayCategory ? ("car truck " + d.ebayCategory) : "",
+    partType ? ("car truck " + partType) : "",
+    "car truck " + [veh, p.name].filter(Boolean).join(" "),
+    "car truck part " + (p.name || partType || ""),
+  ].filter((q) => q && q.trim());
+  let catAck = "none", catId = "";
+  for (const q of queries) {
+    try { const c = await ebayCategorySuggest(q); if (c.id) { catId = c.id; catAck = "motors:" + q.slice(0, 40); break; } catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
+  }
+  if (!catId) catId = "6030";   // último recurso: Car & Truck Parts general (Motors, no "Everything Else")
   return { catId, catAck };
 }
 
