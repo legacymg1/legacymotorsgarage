@@ -1297,6 +1297,22 @@ window.renderLister=function(){
   box.innerHTML=html;
 };
 window.copyText=function(btn,txt){ navigator.clipboard&&navigator.clipboard.writeText(txt); btn.textContent=t('copied'); setTimeout(()=>btn.textContent=t('copy'),1200); };
+// 💬 Cuadro de mensaje COPIABLE (los alert nativos del iPhone no dejan copiar). Texto seleccionable + botón Copiar.
+window.showMsg=function(text){
+  const prev=document.getElementById('msgbox-ov'); if(prev) prev.remove();
+  const ov=document.createElement('div'); ov.id='msgbox-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  const box=document.createElement('div');
+  box.style.cssText='background:var(--surface,#161a22);border:1px solid var(--border,#2a2f3a);border-radius:14px;max-width:560px;width:100%;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.5);';
+  const ta=document.createElement('textarea'); ta.readOnly=true; ta.value=text||'';
+  ta.style.cssText='width:100%;box-sizing:border-box;height:42vh;background:var(--surface2,#0f131a);color:var(--text,#e8ecf3);border:1px solid var(--border,#2a2f3a);border-radius:10px;padding:12px;font-size:14px;line-height:1.5;resize:none;-webkit-user-select:text;user-select:text;';
+  const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-top:12px;';
+  const cp=document.createElement('button'); cp.className='btn'; cp.style.flex='1'; cp.textContent='📋 Copiar';
+  cp.onclick=()=>{ try{ ta.focus(); ta.select(); ta.setSelectionRange(0,ta.value.length); if(navigator.clipboard) navigator.clipboard.writeText(ta.value); else document.execCommand('copy'); }catch(e){} cp.textContent='✓ Copiado'; setTimeout(()=>cp.textContent='📋 Copiar',1500); };
+  const cl=document.createElement('button'); cl.className='btn ghost'; cl.style.flex='1'; cl.textContent='Cerrar';
+  cl.onclick=()=>ov.remove();
+  row.appendChild(cp); row.appendChild(cl); box.appendChild(ta); box.appendChild(row); ov.appendChild(box); document.body.appendChild(ov);
+};
 // ⚙️ Configurar la cuenta de eBay para la API (una vez): ubicación + políticas. Solo dueños.
 window.ebaySetup=async function(btn){
   if(!confirm(t('eSetupConfirm'))) return;
@@ -1304,12 +1320,12 @@ window.ebaySetup=async function(btn){
   try{
     const r=await httpsCallable(functions,'ebaySellerSetup')(); const d=r.data||{};
     if(d.ok){
-      alert(t('eSetupOk')+'\n\n'+t('eLoc')+': '+((d.cfg&&d.cfg.locationKey)||'?')+'\n'+t('eShip')+': '+(d.cfg.fulfillmentPolicyId?'✅':'❌')+'\n'+t('ePay')+': '+(d.cfg.paymentPolicyId?'✅':'❌')+'\n'+t('eRet')+': '+(d.cfg.returnPolicyId?'✅':'❌')+'\n\n'+t('eSetupOkEnd'));
+      showMsg(t('eSetupOk')+'\n\n'+t('eLoc')+': '+((d.cfg&&d.cfg.locationKey)||'?')+'\n'+t('eShip')+': '+(d.cfg.fulfillmentPolicyId?'✅':'❌')+'\n'+t('ePay')+': '+(d.cfg.paymentPolicyId?'✅':'❌')+'\n'+t('eRet')+': '+(d.cfg.returnPolicyId?'✅':'❌')+'\n\n'+t('eSetupOkEnd'));
     } else {
-      const errs=(d.errors&&d.errors.length)?d.errors:[JSON.stringify(d).slice(0,500)];
-      alert(t('eSetupFail')+'\n\n'+errs.join('\n\n')+'\n\n'+t('eSetupFailHint'));
+      const errs=(d.errors&&d.errors.length)?d.errors:[JSON.stringify(d)];
+      showMsg(t('eSetupFail')+'\n\n'+errs.join('\n\n')+'\n\n'+t('eSetupFailHint'));
     }
-  }catch(e){ alert(t('eErr')+((e&&e.message)||e)); }
+  }catch(e){ showMsg(t('eErr')+((e&&e.message)||e)); }
   btn.disabled=false; btn.textContent=o;
 };
 // 📝 Crear BORRADOR en eBay (Inventory API, sin publicar) — pide precio. Solo dueños/lister.
@@ -1323,12 +1339,12 @@ window.ebayDraft=async function(id,btn){
   try{
     const r=await httpsCallable(functions,'ebayCreateDraft')({partId:id, priceUsd:price}); const d=r.data||{};
     if(d.ok){
-      alert(t('eDraftOk')+'\n\n'+t('eTitleW')+': '+d.title+'\n'+t('eCatW')+': '+d.categoryId+'\n'+t('eSpecsW')+': '+d.aspects+'\n'+t('ePhotosW')+': '+d.photos+'\n'+t('ePriceW')+': $'+d.price+'\n\n'+t('eDraftOkEnd'));
+      showMsg(t('eDraftOk')+'\n\n'+t('eTitleW')+': '+d.title+'\n'+t('eCatW')+': '+d.categoryId+'\n'+t('eSpecsW')+': '+d.aspects+'\n'+t('ePhotosW')+': '+d.photos+'\n'+t('ePriceW')+': $'+d.price+'\n\n'+t('eDraftOkEnd'));
     } else {
       const hint=d.step==='setup'?('\n\n'+t('eSetupFirst')):'';
-      alert(t('eDraftFail')+' ('+t('eStep')+': '+(d.step||'?')+'):\n- '+((d.errors||[t('eNoDetail')]).join('\n- '))+hint);
+      showMsg(t('eDraftFail')+' ('+t('eStep')+': '+(d.step||'?')+'):\n- '+((d.errors||[t('eNoDetail')]).join('\n- '))+hint);
     }
-  }catch(e){ alert(t('eErr')+((e&&e.message)||e)); }
+  }catch(e){ showMsg(t('eErr')+((e&&e.message)||e)); }
   btn.disabled=false; btn.textContent=o; renderLister();
 };
 // 🚀 Publicar la oferta EN VIVO (después de revisar el borrador). Solo dueños/lister.
@@ -1337,9 +1353,9 @@ window.ebayPubOffer=async function(id,btn){
   const o=btn.textContent; btn.disabled=true; btn.textContent=t('ePublishing');
   try{
     const r=await httpsCallable(functions,'ebayPublishOffer')({partId:id}); const d=r.data||{};
-    if(d.ok){ alert(t('ePublishedOk')+'\n\nItemID: '+(d.listingId||'?')+(d.listingId?('\n'+t('eViewW')+': https://www.ebay.com/itm/'+d.listingId):'')+'\n\n'+t('ePublishedEnd')); }
-    else alert(t('ePublishFail')+' ('+t('eStep')+': '+(d.step||'?')+'):\n- '+((d.errors||[t('eNoDetail')]).join('\n- ')));
-  }catch(e){ alert(t('eErr')+((e&&e.message)||e)); }
+    if(d.ok){ showMsg(t('ePublishedOk')+'\n\nItemID: '+(d.listingId||'?')+(d.listingId?('\n'+t('eViewW')+': https://www.ebay.com/itm/'+d.listingId):'')+'\n\n'+t('ePublishedEnd')); }
+    else showMsg(t('ePublishFail')+' ('+t('eStep')+': '+(d.step||'?')+'):\n- '+((d.errors||[t('eNoDetail')]).join('\n- ')));
+  }catch(e){ showMsg(t('eErr')+((e&&e.message)||e)); }
   btn.disabled=false; btn.textContent=o; renderLister();
 };
 // 🧪 Verificar anuncio en eBay (VerifyAddFixedPriceItem) — valida sin publicar. Solo dueños.
@@ -1349,9 +1365,9 @@ window.ebayVerify=async function(id,btn){
     const r=await httpsCallable(functions,'ebayVerifyListing')({partId:id}); const d=r.data||{};
     const av=(d.errors&&d.errors.length)?('\n\nAvisos/errores:\n- '+d.errors.join('\n- ')):'';
     const diag='\n\n[diag] categoría: '+d.catAck+' → '+d.categoryId;
-    if(d.ack==='Success'||d.ack==='Warning') alert('✅ eBay VALIDÓ el anuncio ('+d.ack+')'+diag+'\nPrecio: $'+d.price+'\nFotos: '+d.photos+av+'\n\n(No se publicó — solo validación.)');
-    else alert('⚠️ eBay lo rechazó ('+d.ack+'):'+ (av||'\n(sin detalle)')+diag);
-  }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
+    if(d.ack==='Success'||d.ack==='Warning') showMsg('✅ eBay VALIDÓ el anuncio ('+d.ack+')'+diag+'\nPrecio: $'+d.price+'\nFotos: '+d.photos+av+'\n\n(No se publicó — solo validación.)');
+    else showMsg('⚠️ eBay lo rechazó ('+d.ack+'):'+ (av||'\n(sin detalle)')+diag);
+  }catch(e){ showMsg('❌ Error: '+((e&&e.message)||e)); }
   btn.disabled=false; btn.textContent=o;
 };
 // 🧪 Prueba de conexión a eBay (Trading + OAuth) — solo dueños
@@ -1364,8 +1380,8 @@ window.ebayTestConn=async function(btn){
     ]);
     const trad = (a&&a.ack==='Success') ? ('✅ Trading: '+(a.userId||'?')) : ('⚠️ Trading: '+((a&&(a.ack||a.error))||'?'));
     const oauth = (b&&b.ok) ? ('✅ OAuth (publicar): OK · '+(b.scope||'sell.inventory')) : ('⚠️ OAuth: '+((b&&b.body)||b&&b.error||('status '+((b&&b.status)||'?'))));
-    alert(trad+'\n\n'+oauth);
-  }catch(e){ alert('❌ Error: '+((e&&e.message)||e)); }
+    showMsg(trad+'\n\n'+oauth);
+  }catch(e){ showMsg('❌ Error: '+((e&&e.message)||e)); }
   btn.disabled=false; btn.textContent=o;
 };
 // Abre una URL de eBay en la mitad DERECHA de la pantalla (misma ventana reusada).
