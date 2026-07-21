@@ -1372,16 +1372,11 @@ window.ebayTestConn=async function(btn){
 // En la app instalada (standalone) los popups posicionados se bloquean → respaldo en pestaña normal.
 // Abre una URL de eBay en una ventana pegada a la mitad DERECHA de la pantalla (lado a lado con la app).
 // Nota: no se puede EMBEBER eBay dentro de la app (eBay bloquea iframes con X-Frame-Options); esto es lo más cercano.
-function openBeside(url){
-  try{
-    const sw=(window.screen&&screen.availWidth)||1280, sh=(window.screen&&screen.availHeight)||800;
-    const w=Math.floor(sw/2), aL=(window.screen&&screen.availLeft)||0, aT=(window.screen&&screen.availTop)||0, left=aL+sw-w;
-    const feat='popup=yes,width='+w+',height='+sh+',left='+left+',top='+aT;
-    const win=window.open(url,'lmg_ebay',feat);
-    if(win){ try{ win.moveTo(left,aT); win.resizeTo(w,sh); win.focus(); }catch(e){} return; }
-  }catch(e){}
-  window.open(url,'_blank');   // respaldo: pestaña/navegador normal
-}
+// Abre eBay en una PESTAÑA NORMAL del navegador (barra de direcciones completa).
+// Antes se abría como popup posicionado, pero eBay bloquea el inicio de sesión en popups
+// y la app instalada no comparte la sesión → mejor pestaña normal donde ya estás logueado.
+// El "lado a lado" se logra acomodando las ventanas (Win+←/→ en Windows; en Mac el botón verde).
+function openBeside(url){ window.open(url,'_blank'); }
 window.openBeside=openBeside;   // expuesto global para los onclick inline (el <script> es módulo)
 // 💲 Ver "sold" (Vendidos + Usados) a la derecha
 window.openSoldBeside=function(id){
