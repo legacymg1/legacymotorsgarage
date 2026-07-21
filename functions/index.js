@@ -216,11 +216,13 @@ async function resolveCategory(p){
   const is = d.itemSpecifics || {};
   const partType = is["Type"] || d.ebayCategory || p.name || "";
   const veh = [p.vYear, p.vMake, p.vModel].filter(Boolean).join(" ");
-  // Consultas en orden de preferencia (todas con sesgo "car truck" para empujar a Motors)
+  // Consultas en orden de preferencia. El TÍTULO va primero: es lo que usa el editor de eBay
+  // y da la categoría más específica y correcta. Luego respaldos con sesgo "car truck" para Motors.
   const queries = [
-    d.ebayCategory ? ("car truck " + d.ebayCategory) : "",
-    partType ? ("car truck " + partType) : "",
-    "car truck " + [veh, p.name].filter(Boolean).join(" "),
+    title,                                                         // 1) título completo (como el editor de eBay)
+    d.ebayCategory ? (veh + " " + d.ebayCategory) : "",            // 2) carro + frase de categoría de la IA
+    partType ? (veh + " " + partType) : "",                        // 3) carro + tipo de parte
+    "car truck " + (d.ebayCategory || partType || p.name || ""),   // 4) sesgo Motors explícito
     "car truck part " + (p.name || partType || ""),
   ].filter((q) => q && q.trim());
   let catAck = "none", catId = "";
