@@ -952,7 +952,7 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
   if (feedback) draft.lastFeedback = feedback;
 
   // Resuelve la categoría de eBay Motors desde la frase que dio la IA (getCategorySuggestions + filtro Motors) y la guarda en el draft
-  try { const c = await ebayCategorySuggest(draft.ebayCategory || draft.title || ""); if (c.id) { draft.ebayCategoryId = c.id; draft.ebayCategoryAck = c.ack; } } catch (e) {}
+  try { const c = await ebayCategorySuggest(draft.ebayCategory || draft.title || ""); if (c.id) { draft.ebayCategoryId = c.id; draft.ebayCategoryAck = c.ack; draft.ebayCategoryName = c.dbg || ""; } } catch (e) {}
 
   // 2ª pasada CONSCIENTE DE LA CATEGORÍA: trae los campos EXACTOS de esa categoría de eBay y los llena.
   // Reusa las fotos cacheadas (barato). Los valores verificados de la 1ª pasada (MPN, marca) mandan sobre estos.
