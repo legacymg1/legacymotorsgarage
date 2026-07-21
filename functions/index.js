@@ -140,6 +140,7 @@ async function ebayAppToken(){
 }
 // Sugerencia de categoría LEAF (Taxonomy API). Prefiere una bajo eBay Motors (ancestro 6000).
 const EBAY_MOTORS_TREE = "100";   // ⚠️ Árbol de eBay MOTORS (US). Las autopartes NO están en el árbol 0 (sitio general).
+const EBAY_MP = "EBAY_MOTORS";    // ⚠️ Marketplace de autopartes. Con EBAY_US las categorías de Motors dan 25005 "invalid category".
 async function ebayCategorySuggest(query){
   const tok = await ebayAppToken();
   if (!tok) return { id: "", ack: "notoken" };
@@ -412,7 +413,7 @@ async function ebayRest(method, path, token, body){
         "Accept": "application/json",
         "Accept-Language": "en-US",
         "Content-Language": "en-US",
-        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+        "X-EBAY-C-MARKETPLACE-ID": EBAY_MP,
       },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -460,12 +461,12 @@ async function ebayEnsureLocation(token){
 // USA la mejor política que YA existe (según un test 'prefer'); crea una solo si NO hay ninguna.
 // (Evita pelear con eBay actualizando políticas — usa las que el vendedor ya tiene y son válidas.)
 async function ebayPickOrCreatePolicy(token, type, listKey, idKey, prefer, name, createBody){
-  const r = await ebayRest("GET", "/sell/account/v1/" + type + "_policy?marketplace_id=EBAY_US", token);
+  const r = await ebayRest("GET", "/sell/account/v1/" + type + "_policy?marketplace_id=" + EBAY_MP, token);
   if (!r.ok) return { err: ebayRestErrors(r), raw: (r.text || "").slice(0, 300) };
   const list = (r.json && r.json[listKey]) || [];
   const pick = list.find(prefer) || list.find((p) => /^LMG/i.test(p.name || "")) || list[0];
   if (pick) return { id: pick[idKey], name: pick.name || "" };
-  const c = await ebayRest("POST", "/sell/account/v1/" + type + "_policy", token, Object.assign({ name, marketplaceId: "EBAY_US" }, createBody));
+  const c = await ebayRest("POST", "/sell/account/v1/" + type + "_policy", token, Object.assign({ name, marketplaceId: EBAY_MP }, createBody));
   if (c.ok) return { id: c.json[idKey], name };
   return { err: ebayRestErrors(c), raw: (c.text || "").slice(0, 300) };
 }
@@ -646,10 +647,10 @@ exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
 
     // 2) Oferta SIN publicar = borrador. Reusa la oferta si ya existe para este SKU.
     let offerId = "";
-    const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(b.sku) + "&marketplace_id=EBAY_US", a.token);
+    const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(b.sku) + "&marketplace_id=" + EBAY_MP, a.token);
     if (exist.ok && exist.json && exist.json.offers && exist.json.offers.length) offerId = exist.json.offers[0].offerId;
     const offerBody = {
-      sku: b.sku, marketplaceId: "EBAY_US", format: "FIXED_PRICE", availableQuantity: 1,
+      sku: b.sku, marketplaceId: EBAY_MP, format: "FIXED_PRICE", availableQuantity: 1,
       categoryId: b.catId, listingDescription: b.desc,
       listingPolicies: {
         fulfillmentPolicyId: cfg.fulfillmentPolicyId, paymentPolicyId: cfg.paymentPolicyId, returnPolicyId: cfg.returnPolicyId,
@@ -683,7 +684,7 @@ exports.ebayPublishOffer = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OA
     const a = await ebayUserAccessToken();
     if (!a.token) return { ok: false, step: "token", errors: [(a.raw && a.raw.error_description) || "sin token"] };
     if (!offerId) {
-      const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(String(p.stickerNum || p.id)) + "&marketplace_id=EBAY_US", a.token);
+      const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(String(p.stickerNum || p.id)) + "&marketplace_id=" + EBAY_MP, a.token);
       if (exist.ok && exist.json && exist.json.offers && exist.json.offers.length) offerId = exist.json.offers[0].offerId;
     }
     if (!offerId) return { ok: false, step: "offer", errors: ["No hay borrador para esta parte. Crea el borrador primero."] };
