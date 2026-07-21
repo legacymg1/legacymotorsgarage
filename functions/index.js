@@ -647,9 +647,18 @@ exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
     if (!inv.ok) return { ok: false, step: "inventory_item", status: inv.status, errors: ebayRestErrors(inv) };
 
     // 2) Oferta SIN publicar = borrador. Reusa la oferta si ya existe para este SKU.
+    // Primero: borra ofertas viejas del MISMO SKU en OTROS marketplaces (p.ej. EBAY_US de pruebas)
+    // — si no, eBay bloquea Best Offer con "SKU en múltiples marketplaces" (25738).
     let offerId = "";
-    const exist = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(b.sku) + "&marketplace_id=" + EBAY_MP, a.token, undefined, EBAY_MP);
-    if (exist.ok && exist.json && exist.json.offers && exist.json.offers.length) offerId = exist.json.offers[0].offerId;
+    const allOff = await ebayRest("GET", "/sell/inventory/v1/offer?sku=" + encodeURIComponent(b.sku), a.token, undefined, EBAY_MP);
+    if (allOff.ok && allOff.json && allOff.json.offers) {
+      for (const o of allOff.json.offers) {
+        if (o.marketplaceId === EBAY_MP) { offerId = o.offerId; }
+        else if (o.offerId && o.status !== "PUBLISHED") {
+          await ebayRest("DELETE", "/sell/inventory/v1/offer/" + o.offerId, a.token, undefined, o.marketplaceId);
+        }
+      }
+    }
     const offerBody = {
       sku: b.sku, marketplaceId: EBAY_MP, format: "FIXED_PRICE", availableQuantity: 1,
       categoryId: b.catId, listingDescription: b.desc,
