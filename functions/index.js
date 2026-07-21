@@ -214,6 +214,7 @@ async function loadPart(partId){
 async function resolveCategory(p){
   const d = p.ebayDraft || {};
   const is = d.itemSpecifics || {};
+  const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);   // ← faltaba definir esto (rompía el borrador)
   const partType = is["Type"] || d.ebayCategory || p.name || "";
   const veh = [p.vYear, p.vMake, p.vModel].filter(Boolean).join(" ");
   // Consultas en orden de preferencia. El TÍTULO va primero: es lo que usa el editor de eBay
