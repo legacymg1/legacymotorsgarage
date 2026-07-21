@@ -1829,7 +1829,9 @@ window.openMovEdit=function(id){
   curBox.innerHTML = tx.receiptURL ? `<a href="${tx.receiptURL}" target="_blank" style="color:var(--gold);font-size:13px;">📎 Ver recibo actual</a>` : `<span style="color:var(--faint);font-size:13px;">Sin recibo — toma o sube la foto abajo 👇</span>`;
   document.getElementById('me-receipt').value='';
   document.getElementById('me-receipt-preview').innerHTML='';
-  ['me-amount','me-date','me-note','me-cat','me-receipt','me-private','me-car'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
+  const _owner=isOwnerUser();   // dinero (monto/fecha/categoría/nota): SOLO el dueño (regla Firestore). Socio: solo carro + recibo.
+  ['me-amount','me-date','me-note','me-cat','me-private'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=(!canEdit)||!_owner; });
+  ['me-car','me-receipt'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.disabled=!canEdit; });
   document.getElementById('me-save').style.display = canEdit?'':'none';
   document.getElementById('me-readonly').style.display = canEdit?'none':'block';
   document.getElementById('me-delete').style.display = isOwnerUser()?'':'none';   // borrar = solo dueño (regla Firestore)
@@ -1853,21 +1855,25 @@ window.meReceiptPreview=function(){
 window.saveMovEdit=async function(){
   if(!_movId||!_movTx) return;
   if(!canEditTx(_movId)){ alert('Solo puedes modificar los movimientos de tu bolsa.'); return; }
-  const amount=Number(document.getElementById('me-amount').value);
-  if(!amount||amount<=0){ alert('Pon un monto válido'); return; }
-  const date=document.getElementById('me-date').value; if(!date){ alert('Pon la fecha'); return; }
-  const category=document.getElementById('me-cat').value;
-  const note=document.getElementById('me-note').value.trim();
+  const owner=isOwnerUser();   // la regla de Firestore: solo el DUEÑO edita monto/fecha/categoría; el socio solo carro+recibo
   const btn=document.getElementById('me-save'); btn.disabled=true; btn.textContent='Guardando…';
   try{
-    const upd={ amountCents:Math.round(amount*100), date, category, note };
-    if(_movTx.type==='income') upd.private=document.getElementById('me-private').checked;
-    else {   // GASTO: guarda a qué carro pertenece
+    const upd={};
+    if(owner){   // el dueño puede editar el gasto completo
+      const amount=Number(document.getElementById('me-amount').value);
+      if(!amount||amount<=0){ alert('Pon un monto válido'); btn.disabled=false; btn.textContent='Guardar'; return; }
+      const date=document.getElementById('me-date').value; if(!date){ alert('Pon la fecha'); btn.disabled=false; btn.textContent='Guardar'; return; }
+      upd.amountCents=Math.round(amount*100); upd.date=date; upd.category=document.getElementById('me-cat').value; upd.note=document.getElementById('me-note').value.trim();
+      if(_movTx.type==='income') upd.private=document.getElementById('me-private').checked;
+    }
+    // Carro (solo gastos): lo pueden asignar el dueño Y el socio (la regla lo permite)
+    if(_movTx.type!=='income'){
       const carSel=document.getElementById('me-car');
       const carId=carSel.value;
       upd.carId=carId;
       upd.carLabel=carId?(carSel.options[carSel.selectedIndex].text.replace(/^#\S+ · /,'').trim()):'';
     }
+    // Recibo: ambos
     const file=document.getElementById('me-receipt').files[0];
     if(file){
       btn.textContent='Subiendo recibo…';
@@ -1876,7 +1882,7 @@ window.saveMovEdit=async function(){
       await uploadBytes(r,jpg);
       upd.receiptURL=await getDownloadURL(r);
     }
-    await updateDoc(doc(db,'transactions',_movId), upd);
+    if(Object.keys(upd).length) await updateDoc(doc(db,'transactions',_movId), upd);
     closeMovEdit();
   }catch(e){ alert('Error al guardar: '+e.message); }
   btn.disabled=false; btn.textContent='Guardar';
