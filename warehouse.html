@@ -140,8 +140,11 @@
       <span class="gold" style="font-size:18px;">＋</span>
     </button>
     <div id="loose-wrap" style="display:none;margin-bottom:14px;">
-      <div style="font-weight:800;margin:0 2px 8px;">📦 <span data-i18n="looseItems">Artículos sueltos</span> <span id="loose-count" class="muted" style="font-weight:600;"></span></div>
-      <div id="loose-list"></div>
+      <div onclick="toggleLoose()" style="font-weight:800;margin:0 2px 8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+        <span>📦 <span data-i18n="looseItems">Artículos sueltos</span> <span id="loose-count" class="muted" style="font-weight:600;"></span></span>
+        <span id="loose-caret" style="font-size:14px;color:var(--muted);">▸</span>
+      </div>
+      <div id="loose-list" style="display:none;"></div>
     </div>
     <button id="cars-toggle" onclick="toggleCarsList()" class="card" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:800;color:var(--text);">
       <span>🚗 <span data-i18n="carsDismantling">Carros en desmantelamiento</span> <span id="cars-count" class="muted" style="font-weight:600;"></span></span>
@@ -240,7 +243,7 @@ const T={
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Escanea o pega el código…',
-    addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería', fromFile:'📁 Archivo', photoStarHint:'⭐ mándala al frente · 🤖 el bot lee las 3 primeras', photoToFront:'Mandar al frente',
+    addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería', fromFile:'📁 Archivo', photoStarHint:'⭐ mándala al frente · 🤖 el bot lee las 2 primeras', photoToFront:'Mandar al frente',
     carPhoto:'📷 Foto del carro', binLbl:'📦 Bin', binPh:'Ej. A-14', backCars:'← Carros', vinFichaBtn:'📋 Ficha del VIN', specSearchPh:'🔎 Buscar dato…', partsTitle:'Partes del carro', addPartFab:'Parte', noPhoto:'Sin foto', closeLbl:'Cerrar', tapForParts:'Toca para ver el carro y sus partes',
     titleBtn:'📄 Título', titleModalTitle:'📄 Título / Papeles del carro', titleHint:'Foto del título, lien, o la hoja del DMV que comprueba que el carro es de Legacy. Solo tú y tu socio ven esto.', noTitleYet:'Aún no hay título/papeles. Agrega la foto ↑', savingTitle:'Guardando…', statusLbl:'Estado del carro', carCost:'💵 Costo del carro (lo que pagamos)',
     searchCarPh:'🔎 Buscar carro…', noCarsMatch:'Ningún carro coincide.', editLbl:'✏️ Editar', deleteLbl:'🗑️ Eliminar', editPart:'✏️ Editar parte', deletePart:'🗑️ Eliminar parte', saveChanges:'Guardar cambios', confirmDelCar:'¿Eliminar este carro? No se puede deshacer.', confirmDelPart:'¿Eliminar esta parte? No se puede deshacer.', carHasParts:'Este carro tiene N parte(s). Elimina o mueve sus partes primero.',
@@ -260,7 +263,7 @@ const T={
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Scan or paste the code…',
-    addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery', fromFile:'📁 File', photoStarHint:'⭐ send to front · 🤖 bot reads the first 3', photoToFront:'Send to front',
+    addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery', fromFile:'📁 File', photoStarHint:'⭐ send to front · 🤖 bot reads the first 2', photoToFront:'Send to front',
     carPhoto:'📷 Car photo', binLbl:'📦 Bin', binPh:'e.g. A-14', backCars:'← Cars', vinFichaBtn:'📋 VIN details', specSearchPh:'🔎 Search detail…', partsTitle:'Car parts', addPartFab:'Part', noPhoto:'No photo', closeLbl:'Close', tapForParts:'Tap to open the car and its parts',
     titleBtn:'📄 Title', titleModalTitle:'📄 Car title / papers', titleHint:'Photo of the title, lien, or DMV sheet proving Legacy owns the car. Only you and your partner can see this.', noTitleYet:'No title/papers yet. Add the photo ↑', savingTitle:'Saving…', statusLbl:'Car status', carCost:'💵 Car cost (what we paid)',
     searchCarPh:'🔎 Search car…', noCarsMatch:'No car matches.', editLbl:'✏️ Edit', deleteLbl:'🗑️ Delete', editPart:'✏️ Edit part', deletePart:'🗑️ Delete part', saveChanges:'Save changes', confirmDelCar:'Delete this car? This cannot be undone.', confirmDelPart:'Delete this part? This cannot be undone.', carHasParts:'This car has N part(s). Delete or move its parts first.',
@@ -564,6 +567,12 @@ window.toggleCarsList=function(){
   if(_carsOpen){ renderVehicles(); const s=document.getElementById('veh-search'); if(s) s.focus(); }
 };
 // 📦 Artículos sueltos (sin carro): SOLO dueños. Se editan tocándolos → openPartEdit.
+window.toggleLoose=function(){
+  const l=document.getElementById('loose-list'), c=document.getElementById('loose-caret'); if(!l) return;
+  const willOpen=(l.style.display==='none');
+  l.style.display=willOpen?'':'none';
+  if(c) c.textContent=willOpen?'▾':'▸';
+};
 function renderLoose(){
   const wrap=document.getElementById('loose-wrap'), box=document.getElementById('loose-list'); if(!wrap||!box) return;
   const list=(role==='owner') ? parts.filter(p=>p.standalone||!p.vehicleId).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')) : [];
@@ -1152,9 +1161,9 @@ function renderPartPhotos(vid){
   if(!arr.length){ box.innerHTML=''; return; }
   box.innerHTML='<div style="font-size:12px;color:var(--faint);margin:4px 0;">📷 '+arr.length+' '+t('photosReady')+' · '+t('photoStarHint')+'</div>'
     +arr.map((f,i)=>{
-      const botBadge = i<3 ? '<span style="position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);background:var(--gold);color:#0b0e14;border-radius:20px;font-size:9px;font-weight:800;padding:1px 6px;white-space:nowrap;">🤖</span>' : '';
+      const botBadge = i<2 ? '<span style="position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);background:var(--gold);color:#0b0e14;border-radius:20px;font-size:9px;font-weight:800;padding:1px 6px;white-space:nowrap;">🤖</span>' : '';
       const starBtn = i>0 ? `<button type="button" title="${t('photoToFront')}" onclick="starPartPhoto('${vid}',${i})" style="position:absolute;top:-6px;left:-6px;background:var(--gold);color:#0b0e14;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">⭐</button>` : '';
-      return `<span style="position:relative;display:inline-block;margin:8px 4px;"><img src="${URL.createObjectURL(f)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;${i<3?'outline:2px solid var(--gold);outline-offset:1px;':''}"><button type="button" onclick="removePartPhoto('${vid}',${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button>${starBtn}${botBadge}</span>`;
+      return `<span style="position:relative;display:inline-block;margin:8px 4px;"><img src="${URL.createObjectURL(f)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;${i<2?'outline:2px solid var(--gold);outline-offset:1px;':''}"><button type="button" onclick="removePartPhoto('${vid}',${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button>${starBtn}${botBadge}</span>`;
     }).join('');
 }
 // ⭐ Mueve una foto al FRENTE (el bot lee las 3 primeras). Así el muchacho elige cuáles lee el bot.
