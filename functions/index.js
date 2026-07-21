@@ -584,7 +584,13 @@ exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
     const price = priceUsd ? Number(priceUsd).toFixed(2) : (((p.priceCents != null ? p.priceCents : 999) / 100)).toFixed(2);
 
     // 1) Inventory item (idempotente por SKU)
-    const inv = await ebayRest("PUT", "/sell/inventory/v1/inventory_item/" + encodeURIComponent(b.sku), a.token, b.invItem);
+    let inv = await ebayRest("PUT", "/sell/inventory/v1/inventory_item/" + encodeURIComponent(b.sku), a.token, b.invItem);
+    if (!inv.ok && b.invItem.packageWeightAndSize) {
+      // eBay a veces truena (25001) por el peso/dimensiones → reintenta SIN eso para no bloquear
+      const bodyNoPkg = Object.assign({}, b.invItem); delete bodyNoPkg.packageWeightAndSize;
+      const inv2 = await ebayRest("PUT", "/sell/inventory/v1/inventory_item/" + encodeURIComponent(b.sku), a.token, bodyNoPkg);
+      if (inv2.ok) inv = inv2;
+    }
     if (!inv.ok) return { ok: false, step: "inventory_item", status: inv.status, errors: ebayRestErrors(inv) };
 
     // 2) Oferta SIN publicar = borrador. Reusa la oferta si ya existe para este SKU.
