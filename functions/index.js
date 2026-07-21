@@ -891,7 +891,7 @@ STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these
  "interchange": ["ALL interchange/alternate/superseded numbers found via web search — be thorough, more numbers = more buyers find it; [] if none"],
  "fitsVehicles": "short verified list of vehicles it fits (from web search)",
  "fitmentNote": "" ,
- "ebayCategory": "the exact eBay Motors category for this part as a short phrase — the specific PART TYPE, e.g. 'Mass Air Flow Sensor', 'Fuel Injector', 'Headlight Assembly', 'Alternator' — so eBay's category search lands on the right Car & Truck Parts category, NOT a generic one",
+ "ebayCategory": "the exact eBay Motors category for this part as a short phrase — the specific PART TYPE, e.g. 'Mass Air Flow Sensor', 'Fuel Injector', 'Headlight Assembly', 'Alternator' — so eBay's category search lands on the right Car & Truck Parts category, NOT a generic one. CRITICAL disambiguation: if the part is a piece of GLASS (windshield, door glass, quarter/vent glass, back/rear glass, sunroof glass), the phrase MUST contain the word 'Glass' (e.g. 'Exterior Door Glass', 'Quarter Glass', 'Rear Windshield') and must NEVER say just 'Window' — eBay maps 'Window' to window SWITCHES/REGULATORS, which is wrong for glass. Likewise: a side/rear-view MIRROR → 'Mirror'; a window MOTOR → 'Window Motor'; a window CRANK/REGULATOR → 'Window Regulator'. Pick the phrase for the ACTUAL physical part in the photos.",
  "condition": "Used" | "For parts or not working" | "New",
  "itemSpecifics": {"Brand": "", "Manufacturer Part Number": "", "Type": "<what kind of part, e.g. Mass Air Flow Sensor>", "Placement on Vehicle": "", "Warranty": "", "Country/Region of Manufacture": "", "Superseded Part Number": ""},
  (fill as MANY itemSpecifics as you can from the photos and your knowledge — buyers filter by these; leave a value "" only if truly unknown)
@@ -899,7 +899,7 @@ STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these
 Never invent a number you READ (partNumbers must be real reads). But suggestedPartNumber is EXPECTED to be a researched best-guess — provide it whenever you reasonably can. Base fitment on web search, not guesses. Put a warning in "fitmentNote" if the part does not match the stated vehicle.`;
 
   if (feedback) {
-    prompt += `\n\nThe user REVIEWED a previous AI draft and gave this correction/instruction (in Spanish or English): "${feedback}". Apply it precisely — the user is the human expert who is looking at the real part.`;
+    prompt += `\n\nThe user REVIEWED a previous AI draft and gave this correction/instruction (in Spanish or English): "${feedback}". Apply it precisely — the user is the human expert who is looking at the real part. If the correction names or implies a different part type or eBay category (e.g. "es un vidrio", "it's glass, not a switch"), UPDATE "ebayCategory" accordingly.`;
     if (p.ebayDraft) prompt += `\nThe previous draft was: ${JSON.stringify({ title: p.ebayDraft.title, description: p.ebayDraft.description, partNumbers: p.ebayDraft.partNumbers })}.`;
   }
 
