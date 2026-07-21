@@ -1303,8 +1303,9 @@ window.renderLister=function(){
   if(!all.length){ box.innerHTML='<div class="sub">'+t('noToPublish')+'</div>'; return; }
   const g={disponible:[],borrador:[],publicado:[],vendido:[]};
   all.forEach(p=>{ (g[p.status]||g.disponible).push(p); });
-  const byDate=(a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'');
-  g.disponible.sort(byDate); g.borrador.sort(byDate); g.publicado.sort(byDate); g.vendido.sort(byDate);
+  const byDate=(a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'');           // más nueva primero
+  const byDateAsc=(a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'');         // más antigua primero
+  g.disponible.sort(byDateAsc); g.borrador.sort(byDateAsc); g.publicado.sort(byDate); g.vendido.sort(byDate);
   const secHead=(color,label,n)=>'<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;margin:18px 2px 8px;"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+color+';"></span>'+label+' <span class="muted" style="font-weight:600;">('+n+')</span></div>';
   let html='';
   if(g.disponible.length) html+=secHead('#ff9800',t('secPendientes'),g.disponible.length)+g.disponible.map(listerCard).join('');
