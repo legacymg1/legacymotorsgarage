@@ -622,10 +622,13 @@ async function buildInventoryItem(p){
   const aspects = {};
   specs.forEach((s) => { aspects[s.name] = s.values; });
   const is = d.itemSpecifics || {};
-  const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber || is["Manufacturer Part Number"];
-  const brand = is.Brand || "Unbranded";
-  const product = { title, description: desc, aspects, imageUrls: pics, brand };
-  if (mpn) product.mpn = mpn;
+  // eBay exige Brand + MPN en muchas categorías de auto partes (error 25002 BrandMPN si faltan).
+  const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber || is["Manufacturer Part Number"] || is.MPN || "Does Not Apply";
+  const brand = is.Brand || d.brand || "Unbranded";
+  const product = { title, description: desc, aspects, imageUrls: pics, brand, mpn };
+  // También como item specifics (algunas categorías los quieren explícitos, con distintos nombres).
+  if (!aspects.Brand) aspects.Brand = [brand];
+  if (!aspects.MPN && !aspects["Manufacturer Part Number"]) aspects["Manufacturer Part Number"] = [mpn];
   const invItem = {
     availability: { shipToLocationAvailability: { quantity: 1 } },
     condition: ebayCondEnum(d.condition || p.condition),
