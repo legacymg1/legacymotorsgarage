@@ -389,51 +389,55 @@ async function ebayEnsureLocation(token){
   return { key: EBAY_LOC_KEY, existed: false, created: r.ok, status: r.status, err: r.ok ? null : ebayRestErrors(r), raw: r.ok ? null : (r.text || "").slice(0, 400) };
 }
 
-// Asegura las 3 políticas (envío/pago/devolución). Usa las existentes o crea unas por defecto.
-async function ebayEnsurePolicies(token){
+// Crea o ACTUALIZA una política. Prioriza el ID que ya conocemos (config) → así las políticas que
+// ya usan los borradores se actualizan en su lugar (los borradores heredan los cambios). Si no, busca la "LMG …" o crea.
+async function ebayUpsertPolicy(token, type, listKey, idKey, name, body, existingId){
+  const full = Object.assign({ name, marketplaceId: "EBAY_US" }, body);
+  if (existingId) {
+    const u = await ebayRest("PUT", "/sell/account/v1/" + type + "_policy/" + existingId, token, full);
+    if (u.ok) return { id: existingId };   // actualizada en su lugar
+    // si el PUT falla (p.ej. ya no existe), cae a buscar/crear abajo
+  }
+  const r = await ebayRest("GET", "/sell/account/v1/" + type + "_policy?marketplace_id=EBAY_US", token);
+  if (!r.ok) return { err: ebayRestErrors(r), raw: (r.text || "").slice(0, 300) };
+  const list = (r.json && r.json[listKey]) || [];
+  const mine = list.find((p) => /^LMG/i.test(p.name || ""));   // reusa/actualiza la nuestra si ya existe
+  if (mine) {
+    const u = await ebayRest("PUT", "/sell/account/v1/" + type + "_policy/" + mine[idKey], token, full);
+    if (u.ok) return { id: mine[idKey] };
+    return { err: ebayRestErrors(u) };
+  }
+  const c = await ebayRest("POST", "/sell/account/v1/" + type + "_policy", token, full);
+  if (c.ok) return { id: c.json[idKey] };
+  return { err: ebayRestErrors(c) };
+}
+
+// Asegura las 3 políticas (envío GRATIS / pago por eBay / SIN devoluciones). Actualiza las existentes en su lugar.
+async function ebayEnsurePolicies(token, cfg){
+  cfg = cfg || {};
   const out = {};
   // 0) Opt-in a Business Policies (requisito de la API). Idempotente: si ya está, eBay lo ignora.
   const opt = await ebayRest("POST", "/sell/account/v1/program/opt_in", token, { programType: "SELLING_POLICY_MANAGEMENT" });
   out.optIn = opt.ok ? "ok" : (ebayRestErrors(opt)[0] || "").slice(0, 120);
-  // Envío (Fulfillment)
-  let r = await ebayRest("GET", "/sell/account/v1/fulfillment_policy?marketplace_id=EBAY_US", token);
-  if (!r.ok) return { optedIn: false, err: ebayRestErrors(r), raw: (r.text || "").slice(0, 400), optIn: out.optIn };
-  let list = (r.json && r.json.fulfillmentPolicies) || [];
-  if (list.length) out.fulfillmentPolicyId = list[0].fulfillmentPolicyId;
-  else {
-    const c = await ebayRest("POST", "/sell/account/v1/fulfillment_policy", token, {
-      name: "LMG Flat USPS Priority", marketplaceId: "EBAY_US",
-      categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
-      handlingTime: { value: 3, unit: "DAY" },
-      shippingOptions: [{ optionType: "DOMESTIC", costType: "FLAT_RATE",
-        shippingServices: [{ sortOrder: 1, shippingCarrierCode: "USPS", shippingServiceCode: "USPSPriority",
-          shippingCost: { value: "15.0", currency: "USD" }, freeShipping: false, buyerResponsibleForShipping: false }] }],
-    });
-    if (c.ok) out.fulfillmentPolicyId = c.json.fulfillmentPolicyId; else out.fulfillmentErr = ebayRestErrors(c);
-  }
-  // Pago (Payment)
-  r = await ebayRest("GET", "/sell/account/v1/payment_policy?marketplace_id=EBAY_US", token);
-  list = (r.json && r.json.paymentPolicies) || [];
-  if (list.length) out.paymentPolicyId = list[0].paymentPolicyId;
-  else {
-    const c = await ebayRest("POST", "/sell/account/v1/payment_policy", token, {
-      name: "LMG Payment", marketplaceId: "EBAY_US",
-      categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }], immediatePay: true,
-    });
-    if (c.ok) out.paymentPolicyId = c.json.paymentPolicyId; else out.paymentErr = ebayRestErrors(c);
-  }
-  // Devolución (Return)
-  r = await ebayRest("GET", "/sell/account/v1/return_policy?marketplace_id=EBAY_US", token);
-  list = (r.json && r.json.returnPolicies) || [];
-  if (list.length) out.returnPolicyId = list[0].returnPolicyId;
-  else {
-    const c = await ebayRest("POST", "/sell/account/v1/return_policy", token, {
-      name: "LMG Returns 30d", marketplaceId: "EBAY_US",
-      categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
-      returnsAccepted: true, returnPeriod: { value: 30, unit: "DAY" }, returnShippingCostPayer: "BUYER",
-    });
-    if (c.ok) out.returnPolicyId = c.json.returnPolicyId; else out.returnErr = ebayRestErrors(c);
-  }
+  // Envío: GRATIS (USPS Priority), manejo 3 días
+  const ful = await ebayUpsertPolicy(token, "fulfillment", "fulfillmentPolicies", "fulfillmentPolicyId", "LMG Free Shipping", {
+    categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
+    handlingTime: { value: 3, unit: "DAY" },
+    shippingOptions: [{ optionType: "DOMESTIC", costType: "FLAT_RATE",
+      shippingServices: [{ sortOrder: 1, shippingCarrierCode: "USPS", shippingServiceCode: "USPSPriority",
+        freeShipping: true, buyerResponsibleForShipping: false }] }],
+  }, cfg.fulfillmentPolicyId);
+  if (ful.id) out.fulfillmentPolicyId = ful.id; else { out.fulfillmentErr = ful.err; out.raw = ful.raw; }
+  // Pago: contenedor de eBay Managed Payments (eBay maneja pagos + impuestos; NO cambia nada)
+  const pay = await ebayUpsertPolicy(token, "payment", "paymentPolicies", "paymentPolicyId", "LMG Payment", {
+    categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }], immediatePay: true,
+  }, cfg.paymentPolicyId);
+  if (pay.id) out.paymentPolicyId = pay.id; else out.paymentErr = pay.err;
+  // Devolución: NO se aceptan devoluciones
+  const ret = await ebayUpsertPolicy(token, "return", "returnPolicies", "returnPolicyId", "LMG No Returns", {
+    categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }], returnsAccepted: false,
+  }, cfg.returnPolicyId);
+  if (ret.id) out.returnPolicyId = ret.id; else out.returnErr = ret.err;
   return out;
 }
 
@@ -443,7 +447,8 @@ exports.ebaySellerSetup = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
   const a = await ebayUserAccessToken();
   if (!a.token) return { ok: false, step: "token", errors: [(a.raw && a.raw.error_description) || "sin token"] };
   const loc = await ebayEnsureLocation(a.token);
-  const pol = await ebayEnsurePolicies(a.token);
+  const cfgSnap0 = await admin.firestore().collection("config").doc("ebay").get();
+  const pol = await ebayEnsurePolicies(a.token, cfgSnap0.exists ? cfgSnap0.data() : {});
   const cfg = {
     locationKey: loc.key,
     fulfillmentPolicyId: pol.fulfillmentPolicyId || null,
