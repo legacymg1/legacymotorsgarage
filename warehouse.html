@@ -1320,7 +1320,8 @@ window.ebaySetup=async function(btn){
   try{
     const r=await httpsCallable(functions,'ebaySellerSetup')(); const d=r.data||{};
     if(d.ok){
-      showMsg(t('eSetupOk')+'\n\n'+t('eLoc')+': '+((d.cfg&&d.cfg.locationKey)||'?')+'\n'+t('eShip')+': '+(d.cfg.fulfillmentPolicyId?'✅':'❌')+'\n'+t('ePay')+': '+(d.cfg.paymentPolicyId?'✅':'❌')+'\n'+t('eRet')+': '+(d.cfg.returnPolicyId?'✅':'❌')+'\n\n'+t('eSetupOkEnd'));
+      const cf=d.cfg||{};
+      showMsg(t('eSetupOk')+'\n\n'+t('eLoc')+': '+(cf.locationKey||'?')+'\n'+t('eShip')+': '+(cf.fulfillmentName||(cf.fulfillmentPolicyId?'✅':'❌'))+'\n'+t('ePay')+': '+(cf.paymentName||(cf.paymentPolicyId?'✅':'❌'))+'\n'+t('eRet')+': '+(cf.returnName||(cf.returnPolicyId?'✅':'❌'))+'\n\n'+t('eSetupOkEnd'));
     } else {
       const errs=(d.errors&&d.errors.length)?d.errors:[JSON.stringify(d)];
       showMsg(t('eSetupFail')+'\n\n'+errs.join('\n\n')+'\n\n'+t('eSetupFailHint'));
