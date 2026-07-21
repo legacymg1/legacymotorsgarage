@@ -472,6 +472,25 @@ async function ebayPickOrCreatePolicy(token, type, listKey, idKey, prefer, name,
   return { err: ebayRestErrors(c), raw: (c.text || "").slice(0, 300) };
 }
 
+// Excluye Alaska/Hawái, Protectorados de EE.UU. (incluye Puerto Rico) y APO/FPO en la política de envío.
+async function ebayExcludeRegions(token, id){
+  try {
+    const g = await ebayRest("GET", "/sell/account/v1/fulfillment_policy/" + id, token);
+    if (!g.ok || !g.json) return "get_fail";
+    const pol = g.json;
+    const want = ["Alaska/Hawaii", "US Protectorates", "APO/FPO"];
+    const cur = ((pol.shipToLocations || {}).regionExcluded || []).map((r) => r.regionName);
+    if (want.every((w) => cur.includes(w))) return "already";
+    const merged = new Set(cur); want.forEach((w) => merged.add(w));
+    pol.shipToLocations = Object.assign({}, pol.shipToLocations, {
+      regionExcluded: Array.from(merged).map((regionName) => ({ regionName })),
+    });
+    delete pol.fulfillmentPolicyId;  // va en la URL, no en el body
+    const u = await ebayRest("PUT", "/sell/account/v1/fulfillment_policy/" + id, token, pol);
+    return u.ok ? "excluded" : ((ebayRestErrors(u)[0] || "put_fail").slice(0, 120));
+  } catch (e) { return "exc:" + String(e && e.message || e).slice(0, 80); }
+}
+
 // Asegura las 3 políticas: prefiere una de ENVÍO GRATIS, una de PAGO, y una de NO devoluciones — de las que ya tienes.
 async function ebayEnsurePolicies(token, cfg){
   const out = {};
@@ -485,7 +504,7 @@ async function ebayEnsurePolicies(token, cfg){
     shippingOptions: [{ optionType: "DOMESTIC", costType: "FLAT_RATE",
       shippingServices: [{ sortOrder: 1, shippingServiceCode: "USPSGroundAdvantage", freeShipping: true }] }],
   });
-  if (ful.id) { out.fulfillmentPolicyId = ful.id; out.fulfillmentName = ful.name; } else { out.fulfillmentErr = ful.err; out.raw = ful.raw; }
+  if (ful.id) { out.fulfillmentPolicyId = ful.id; out.fulfillmentName = ful.name; out.excludeRegions = await ebayExcludeRegions(token, ful.id); } else { out.fulfillmentErr = ful.err; out.raw = ful.raw; }
   // Pago: la que haya (eBay Managed Payments maneja pagos + impuestos igual)
   const pay = await ebayPickOrCreatePolicy(token, "payment", "paymentPolicies", "paymentPolicyId", () => false, "LMG Payment", {
     categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
