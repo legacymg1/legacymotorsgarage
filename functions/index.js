@@ -558,6 +558,12 @@ async function loadVehicleVin(p){
   if (!p.vehicleId) return "";
   try { const vs = await admin.firestore().collection("dismantle_vehicles").doc(p.vehicleId).get(); return vs.exists ? (vs.data().vin || "") : ""; } catch (e) { return ""; }
 }
+// Marca del carro (ej. Honda) — se usa como Brand por defecto en eBay para partes OEM. Artículo rápido trae vMake.
+async function loadVehicleMake(p){
+  if (p.vMake && String(p.vMake).trim()) return String(p.vMake).trim();
+  if (!p.vehicleId) return "";
+  try { const vs = await admin.firestore().collection("dismantle_vehicles").doc(p.vehicleId).get(); return vs.exists ? (vs.data().make || "") : ""; } catch (e) { return ""; }
+}
 
 // 📝 Descripción PRO con formato (HTML): condición + fitment + números + interchange + carro/VIN + cierre de gracias.
 // Se usa en cada anuncio para que todas se vean iguales de fregonas y completas.
@@ -624,7 +630,9 @@ async function buildInventoryItem(p){
   const is = d.itemSpecifics || {};
   // eBay exige Brand + MPN en muchas categorías de auto partes (error 25002 BrandMPN si faltan).
   const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber || is["Manufacturer Part Number"] || is.MPN || "Does Not Apply";
-  const brand = is.Brand || d.brand || "Unbranded";
+  // Brand: la que diga el bot, si no la MARCA DEL CARRO (ej. Honda) — es parte OEM. Nunca dejamos Brand vacío.
+  const carMake = await loadVehicleMake(p);
+  const brand = is.Brand || d.brand || carMake || "Unbranded";
   const product = { title, description: desc, aspects, imageUrls: pics, brand, mpn };
   // También como item specifics (algunas categorías los quieren explícitos, con distintos nombres).
   if (!aspects.Brand) aspects.Brand = [brand];
