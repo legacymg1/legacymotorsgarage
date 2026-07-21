@@ -402,55 +402,44 @@ async function ebayEnsureLocation(token){
   return { key: EBAY_LOC_KEY, existed: false, created: r.ok, status: r.status, err: r.ok ? null : ebayRestErrors(r), raw: r.ok ? null : (r.text || "").slice(0, 400) };
 }
 
-// Crea o ACTUALIZA una política. Prioriza el ID que ya conocemos (config) → así las políticas que
-// ya usan los borradores se actualizan en su lugar (los borradores heredan los cambios). Si no, busca la "LMG …" o crea.
-async function ebayUpsertPolicy(token, type, listKey, idKey, name, body, existingId){
-  const full = Object.assign({ name, marketplaceId: "EBAY_US" }, body);
-  if (existingId) {
-    const u = await ebayRest("PUT", "/sell/account/v1/" + type + "_policy/" + existingId, token, full);
-    if (u.ok) return { id: existingId };   // actualizada en su lugar
-    // si el PUT falla (p.ej. ya no existe), cae a buscar/crear abajo
-  }
+// USA la mejor política que YA existe (según un test 'prefer'); crea una solo si NO hay ninguna.
+// (Evita pelear con eBay actualizando políticas — usa las que el vendedor ya tiene y son válidas.)
+async function ebayPickOrCreatePolicy(token, type, listKey, idKey, prefer, name, createBody){
   const r = await ebayRest("GET", "/sell/account/v1/" + type + "_policy?marketplace_id=EBAY_US", token);
   if (!r.ok) return { err: ebayRestErrors(r), raw: (r.text || "").slice(0, 300) };
   const list = (r.json && r.json[listKey]) || [];
-  const mine = list.find((p) => /^LMG/i.test(p.name || ""));   // reusa/actualiza la nuestra si ya existe
-  if (mine) {
-    const u = await ebayRest("PUT", "/sell/account/v1/" + type + "_policy/" + mine[idKey], token, full);
-    if (u.ok) return { id: mine[idKey] };
-    return { err: ebayRestErrors(u) };
-  }
-  const c = await ebayRest("POST", "/sell/account/v1/" + type + "_policy", token, full);
-  if (c.ok) return { id: c.json[idKey] };
-  return { err: ebayRestErrors(c) };
+  const pick = list.find(prefer) || list.find((p) => /^LMG/i.test(p.name || "")) || list[0];
+  if (pick) return { id: pick[idKey], name: pick.name || "" };
+  const c = await ebayRest("POST", "/sell/account/v1/" + type + "_policy", token, Object.assign({ name, marketplaceId: "EBAY_US" }, createBody));
+  if (c.ok) return { id: c.json[idKey], name };
+  return { err: ebayRestErrors(c), raw: (c.text || "").slice(0, 300) };
 }
 
-// Asegura las 3 políticas (envío GRATIS / pago por eBay / SIN devoluciones). Actualiza las existentes en su lugar.
+// Asegura las 3 políticas: prefiere una de ENVÍO GRATIS, una de PAGO, y una de NO devoluciones — de las que ya tienes.
 async function ebayEnsurePolicies(token, cfg){
-  cfg = cfg || {};
   const out = {};
-  // 0) Opt-in a Business Policies (requisito de la API). Idempotente: si ya está, eBay lo ignora.
   const opt = await ebayRest("POST", "/sell/account/v1/program/opt_in", token, { programType: "SELLING_POLICY_MANAGEMENT" });
   out.optIn = opt.ok ? "ok" : (ebayRestErrors(opt)[0] || "").slice(0, 120);
-  // Envío: GRATIS (USPS Priority), manejo 3 días
-  const ful = await ebayUpsertPolicy(token, "fulfillment", "fulfillmentPolicies", "fulfillmentPolicyId", "LMG Free Shipping", {
+  // Envío: prefiere una que tenga FREE shipping
+  const isFree = (fp) => (fp.shippingOptions || []).some((o) => (o.shippingServices || []).some((s) => s.freeShipping === true));
+  const ful = await ebayPickOrCreatePolicy(token, "fulfillment", "fulfillmentPolicies", "fulfillmentPolicyId", isFree, "LMG Free Shipping", {
     categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
     handlingTime: { value: 3, unit: "DAY" },
     shippingOptions: [{ optionType: "DOMESTIC", costType: "FLAT_RATE",
-      shippingServices: [{ sortOrder: 1, shippingCarrierCode: "USPS", shippingServiceCode: "USPSPriority",
-        freeShipping: true, buyerResponsibleForShipping: false }] }],
-  }, cfg.fulfillmentPolicyId);
-  if (ful.id) out.fulfillmentPolicyId = ful.id; else { out.fulfillmentErr = ful.err; out.raw = ful.raw; }
-  // Pago: contenedor de eBay Managed Payments (eBay maneja pagos + impuestos; NO cambia nada)
-  const pay = await ebayUpsertPolicy(token, "payment", "paymentPolicies", "paymentPolicyId", "LMG Payment", {
-    categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }], immediatePay: true,
-  }, cfg.paymentPolicyId);
-  if (pay.id) out.paymentPolicyId = pay.id; else out.paymentErr = pay.err;
-  // Devolución: NO se aceptan devoluciones
-  const ret = await ebayUpsertPolicy(token, "return", "returnPolicies", "returnPolicyId", "LMG No Returns", {
+      shippingServices: [{ sortOrder: 1, shippingServiceCode: "USPSGroundAdvantage", freeShipping: true }] }],
+  });
+  if (ful.id) { out.fulfillmentPolicyId = ful.id; out.fulfillmentName = ful.name; } else { out.fulfillmentErr = ful.err; out.raw = ful.raw; }
+  // Pago: la que haya (eBay Managed Payments maneja pagos + impuestos igual)
+  const pay = await ebayPickOrCreatePolicy(token, "payment", "paymentPolicies", "paymentPolicyId", () => false, "LMG Payment", {
+    categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
+  });
+  if (pay.id) { out.paymentPolicyId = pay.id; out.paymentName = pay.name; } else { out.paymentErr = pay.err; }
+  // Devolución: prefiere una de NO returns
+  const noRet = (rp) => rp.returnsAccepted === false;
+  const ret = await ebayPickOrCreatePolicy(token, "return", "returnPolicies", "returnPolicyId", noRet, "LMG No Returns", {
     categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }], returnsAccepted: false,
-  }, cfg.returnPolicyId);
-  if (ret.id) out.returnPolicyId = ret.id; else out.returnErr = ret.err;
+  });
+  if (ret.id) { out.returnPolicyId = ret.id; out.returnName = ret.name; } else { out.returnErr = ret.err; }
   return out;
 }
 
@@ -467,6 +456,9 @@ exports.ebaySellerSetup = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
     fulfillmentPolicyId: pol.fulfillmentPolicyId || null,
     paymentPolicyId: pol.paymentPolicyId || null,
     returnPolicyId: pol.returnPolicyId || null,
+    fulfillmentName: pol.fulfillmentName || "",
+    paymentName: pol.paymentName || "",
+    returnName: pol.returnName || "",
     updatedAt: new Date().toISOString(),
   };
   await admin.firestore().collection("config").doc("ebay").set(cfg, { merge: true });
