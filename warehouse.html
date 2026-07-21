@@ -1163,8 +1163,23 @@ function renderPartPhotos(vid){
     +arr.map((f,i)=>{
       const botBadge = i<2 ? '<span style="position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);background:var(--gold);color:#0b0e14;border-radius:20px;font-size:9px;font-weight:800;padding:1px 6px;white-space:nowrap;">🤖</span>' : '';
       const starBtn = i>0 ? `<button type="button" title="${t('photoToFront')}" onclick="starPartPhoto('${vid}',${i})" style="position:absolute;top:-6px;left:-6px;background:var(--gold);color:#0b0e14;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">⭐</button>` : '';
-      return `<span style="position:relative;display:inline-block;margin:8px 4px;"><img src="${URL.createObjectURL(f)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;${i<2?'outline:2px solid var(--gold);outline-offset:1px;':''}"><button type="button" onclick="removePartPhoto('${vid}',${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button>${starBtn}${botBadge}</span>`;
+      return `<span style="position:relative;display:inline-block;margin:8px 4px;"><img src="${URL.createObjectURL(f)}" onclick="zoomPartPhoto('${vid}',${i})" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:zoom-in;${i<2?'outline:2px solid var(--gold);outline-offset:1px;':''}"><button type="button" onclick="removePartPhoto('${vid}',${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button>${starBtn}${botBadge}</span>`;
     }).join('');
+}
+// 🔍 Toca una foto en cola para verla GRANDE (confirmar que es la correcta y cuáles lee el bot).
+window.zoomPartPhoto=function(vid,i){
+  const arr=_partFiles[vid]; if(!arr||!arr[i]) return;
+  const isBot = i<2;
+  showBigPhoto(URL.createObjectURL(arr[i]), (i+1)+'/'+arr.length+(isBot?' · 🤖':''));
+};
+function showBigPhoto(src, label){
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;';
+  ov.onclick=()=>ov.remove();
+  ov.innerHTML='<img src="'+src+'" style="max-width:100%;max-height:82vh;object-fit:contain;border-radius:12px;">'
+    +(label?'<div style="color:#fff;font-weight:800;font-size:14px;">'+label+'</div>':'')
+    +'<div style="color:rgba(255,255,255,.55);font-size:12px;">'+(L==='es'?'toca para cerrar':'tap to close')+'</div>';
+  document.body.appendChild(ov);
 }
 // ⭐ Mueve una foto al FRENTE (el bot lee las 3 primeras). Así el muchacho elige cuáles lee el bot.
 window.starPartPhoto=function(vid,i){
