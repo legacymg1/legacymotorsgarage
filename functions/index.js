@@ -216,32 +216,40 @@ async function loadPart(partId){
 // Trae TODAS las hojas (categorías finales) del árbol "Car & Truck Parts & Accessories" (6030) de eBay Motors.
 // get_category_suggestions es malo con autopartes (manda bicicletas/herramientas) → buscamos SOLO dentro de Motors.
 let _motorsLeaves = null, _motorsDbg = "";
+// Baja el árbol COMPLETO de eBay y saca las HOJAS bajo "Car & Truck Parts" (por nombre, sin adivinar IDs muertos).
 async function ebayMotorsLeaves(){
   const tok = await ebayAppToken();
   if (!tok) { _motorsDbg = "notoken"; return []; }
-  const roots = ["33559", "6030"];   // "Car & Truck Parts & Accessories": ID nuevo primero, viejo de respaldo
-  for (const root of roots) {
-    const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_subtree?category_id=" + root, { headers: { "Authorization": "Bearer " + tok } });
-    const txt = await r.text(); let j = {}; try { j = JSON.parse(txt); } catch (e) {}
-    if (j.categorySubtreeNode) {
-      const leaves = [];
-      const walk = (node) => {
-        if (!node) return;
-        const cat = node.category || {};
-        const kids = node.childCategoryTreeNodes || [];
-        if (node.leafCategoryTreeNode === true || kids.length === 0) { if (cat.categoryId && cat.categoryName) leaves.push({ id: cat.categoryId, name: cat.categoryName }); }
-        kids.forEach(walk);
-      };
-      walk(j.categorySubtreeNode);
-      if (leaves.length) { _motorsDbg = "root=" + root + " n=" + leaves.length; return leaves; }
+  const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0", { headers: { "Authorization": "Bearer " + tok } });
+  if (!r.ok) { _motorsDbg = "tree http=" + r.status; return []; }
+  const j = await r.json();
+  const leaves = [];
+  const walk = (node, inParts) => {
+    if (!node) return;
+    const cat = node.category || {};
+    const name = (cat.categoryName || "").toLowerCase();
+    const nowIn = inParts || /car\s*&\s*truck parts/.test(name);   // entra a la rama de autopartes por nombre
+    const kids = node.childCategoryTreeNodes || [];
+    if (nowIn && (node.leafCategoryTreeNode === true || kids.length === 0)) {
+      if (cat.categoryId && cat.categoryName) leaves.push({ id: cat.categoryId, name: cat.categoryName });
     }
-    _motorsDbg = "root=" + root + " http=" + r.status + " " + txt.slice(0, 100);
-  }
-  return [];
+    kids.forEach((k) => walk(k, nowIn));
+  };
+  walk(j.rootCategoryNode, false);
+  _motorsDbg = "tree n=" + leaves.length;
+  return leaves;
 }
 async function getMotorsLeaves(){
   if (_motorsLeaves && _motorsLeaves.length) return _motorsLeaves;
-  try { _motorsLeaves = await ebayMotorsLeaves(); } catch (e) { _motorsLeaves = []; }
+  // Caché en Firestore (para no bajar el árbol completo en cada cold start)
+  try {
+    const snap = await admin.firestore().collection("config").doc("motorsCats").get();
+    if (snap.exists && Array.isArray(snap.data().leaves) && snap.data().leaves.length) { _motorsLeaves = snap.data().leaves; _motorsDbg = "cache n=" + _motorsLeaves.length; return _motorsLeaves; }
+  } catch (e) {}
+  try {
+    _motorsLeaves = await ebayMotorsLeaves();
+    if (_motorsLeaves.length) { try { await admin.firestore().collection("config").doc("motorsCats").set({ leaves: _motorsLeaves, updatedAt: new Date().toISOString() }); } catch (e) {} }
+  } catch (e) { _motorsLeaves = []; _motorsDbg = "err:" + (e.message || e); }
   return _motorsLeaves || [];
 }
 // Elige la hoja de Motors cuyo NOMBRE coincide mejor con el tipo de parte
