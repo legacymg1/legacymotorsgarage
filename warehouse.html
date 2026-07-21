@@ -182,6 +182,7 @@
         <button onclick="stopCam()" title="Cerrar" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;font-weight:800;cursor:pointer;line-height:1;">✕</button>
       </div>
       <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="startReloc()" data-i18n="relocMode">🔄 Reubicar producto</button>
+      <button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--gold);border-color:rgba(240,192,64,0.4);" onclick="openQuickAdd()" data-i18n="quickAddBtn">➕ Agregar parte (estampa + bin)</button>
     </div>
     <div id="pack-result"></div>
     <div id="pack-pending" style="margin-top:14px;"></div>
@@ -244,7 +245,7 @@ const T={
     titleBtn:'📄 Título', titleModalTitle:'📄 Título / Papeles del carro', titleHint:'Foto del título, lien, o la hoja del DMV que comprueba que el carro es de Legacy. Solo tú y tu socio ven esto.', noTitleYet:'Aún no hay título/papeles. Agrega la foto ↑', savingTitle:'Guardando…', statusLbl:'Estado del carro', carCost:'💵 Costo del carro (lo que pagamos)',
     searchCarPh:'🔎 Buscar carro…', noCarsMatch:'Ningún carro coincide.', editLbl:'✏️ Editar', deleteLbl:'🗑️ Eliminar', editPart:'✏️ Editar parte', deletePart:'🗑️ Eliminar parte', saveChanges:'Guardar cambios', confirmDelCar:'¿Eliminar este carro? No se puede deshacer.', confirmDelPart:'¿Eliminar esta parte? No se puede deshacer.', carHasParts:'Este carro tiene N parte(s). Elimina o mueve sus partes primero.',
     printLabel:'🖨️ Imprimir etiqueta', labelTitle:'Etiqueta', labelShare:'📤 Compartir a la impresora', labelHint:'Elige la app de Rongta para imprimir. Si no aparece, mantén presionada la imagen, guárdala y ábrela en la app de Rongta.', labelNoShare:'Tu dispositivo no deja compartir el archivo. Mantén presionada la imagen para guardarla y ábrela en la app de Rongta.', makingLabel:'Generando etiqueta…',
-    photoOrderTitle:'Orden de las fotos (para el bot):', photoOrderHint:'1ª foto: el NÚMERO / etiqueta de cerca y bien legible. 2ª foto: general de la pieza. Luego las demás que quieras para el anuncio. El bot lee solo las primeras — por eso el número va primero. (Si hay otro número importante, tómalo también entre las primeras.)', quickItemBtn:'Artículo rápido (sin carro)', looseItems:'Artículos sueltos', quickItemTitle:'Artículo rápido', quickItemHint:'Para partes que subes tú sin carro en el inventario (ej. estéreos). Genera el QR, imprime desde la máquina y sube las fotos. El carro es solo de referencia para el anuncio — opcional.', refVehicle:'Carro de referencia (opcional)', vinFillHint:'(opcional — llena los datos del carro solo, NO crea un carro)', trimLbl:'Versión', looseItem:'Artículo suelto', genLabelBtn:'🖨️ Generar e imprimir QR', labelBeforePhotos:'Imprime el QR y pégalo en la parte ANTES de tomar las fotos, así el QR sale en las fotos.', labelPrint:'🖨️ Imprimir', labelPrintHint:'Se abre la vista de impresión — desde ahí comparte a la app de Rongta (o elige la impresora).', copyQrLink:'📋 Copiar link (QR nativo RLabel)', copiedLink:'✓ Copiado — pégalo en el QR de RLabel',
+    photoOrderTitle:'Orden de las fotos (para el bot):', photoOrderHint:'1ª foto: el NÚMERO / etiqueta de cerca y bien legible. 2ª foto: general de la pieza. Luego las demás que quieras para el anuncio. El bot lee solo las primeras — por eso el número va primero. (Si hay otro número importante, tómalo también entre las primeras.)', quickItemBtn:'Artículo rápido (sin carro)', looseItems:'Artículos sueltos', quickItemTitle:'Artículo rápido', quickItemHint:'Para partes que subes tú sin carro en el inventario (ej. estéreos). Genera el QR, imprime desde la máquina y sube las fotos. El carro es solo de referencia para el anuncio — opcional.', refVehicle:'Carro de referencia (opcional)', vinFillHint:'(opcional — llena los datos del carro solo, NO crea un carro)', trimLbl:'Versión', stickerLbl:'Estampa (número)', stickerPh:'Número de la estampa (ej. 0042)', stickerDup:'⚠️ Ese número ya está en uso', stickerFree:'✓ número libre', stickerDupConfirm:'⚠️ Ese número de estampa ya está en una parte activa. ¿Guardar de todos modos?', quickAddBtn:'➕ Agregar parte (estampa + bin)', quickAddTitle:'➕ Agregar parte rápida', quickAddHint:'Para dar de alta piezas de topers viejos: solo estampa + bin. El nombre y las fotos se agregan después.', stickerReq:'Pon el número de la estampa.', looseItem:'Artículo suelto', genLabelBtn:'🖨️ Generar e imprimir QR', labelBeforePhotos:'Imprime el QR y pégalo en la parte ANTES de tomar las fotos, así el QR sale en las fotos.', labelPrint:'🖨️ Imprimir', labelPrintHint:'Se abre la vista de impresión — desde ahí comparte a la app de Rongta (o elige la impresora).', copyQrLink:'📋 Copiar link (QR nativo RLabel)', copiedLink:'✓ Copiado — pégalo en el QR de RLabel',
     seeQR:'⬇️ Ver/descargar QR', tagSold:'Vendido', tagPublished:'Publicado', tagDraft:'Borrador', tagAvailable:'Disponible', noLoc:'sin ubicación',
     listerHint:'Partes listas para publicar. Toca una para copiar los campos, ver precios "sold" y marcar publicada.', noToPublish:'No hay partes por publicar.', ebayTitleLbl:'Título eBay:', copy:'Copiar', copied:'¡Copiado!', seeSold:'💲 Ver "sold" en eBay', ebayNewSide:'🆕 eBay al lado', ebayOpened:'✓ Título copiado · pega con Ctrl+V', dlPhotos:'⬇️ Descargar fotos', dlWorking:'⬇️ Armando ZIP…', ebayPrep:'🤖 Preparar en eBay', ebayRegen:'🤖 Regenerar', ebayThinking:'🤖 Analizando fotos…', ebayDraftLbl:'Borrador de eBay (IA)', titleLbl:'Título', descLbl:'Descripción', fbPh:'¿Algo mal? Dile al bot… ej: el OEM es 12345, es lado izquierdo', fbBtn:'🔁 Corregir', secPendientes:'Pendientes de publicar', secBorrador:'Borrador en eBay (revisar y publicar)', secPublicadas:'Publicadas', secVendidas:'Vendidas', interLbl:'Intercambio', sugOem:'🔎 OEM sugerido (verificar)', fitsLbl:'Compatible con', taxiTitle:'Consumo del bot IA', taxiMonth:'Este mes', taxiTotal:'Total', taxiCount:'Análisis', taxiNote:'Solo informativo. No es un gasto en Finanzas — en Finanzas se registra la recarga de crédito, no el consumo.', markPublished:'✓ Marcar publicada', unpublishBtn:'↩️ Quitar publicada', tapOpen:'toca para ver', ebayTestBtn:'🧪 Probar conexión eBay', ebaySetupBtn:'⚙️ Configurar eBay (1 vez)', ebayCreateDraft:'📝 Crear borrador en eBay', ebayUpdateDraft:'🔄 Actualizar borrador', ebayViewDraft:'📂 Ver borrador en eBay', ebayPublishLive:'🚀 Publicar (en vivo)',
     eErr:'❌ Error: ', eNoDetail:'sin detalle', eStep:'paso',
@@ -264,7 +265,7 @@ const T={
     titleBtn:'📄 Title', titleModalTitle:'📄 Car title / papers', titleHint:'Photo of the title, lien, or DMV sheet proving Legacy owns the car. Only you and your partner can see this.', noTitleYet:'No title/papers yet. Add the photo ↑', savingTitle:'Saving…', statusLbl:'Car status', carCost:'💵 Car cost (what we paid)',
     searchCarPh:'🔎 Search car…', noCarsMatch:'No car matches.', editLbl:'✏️ Edit', deleteLbl:'🗑️ Delete', editPart:'✏️ Edit part', deletePart:'🗑️ Delete part', saveChanges:'Save changes', confirmDelCar:'Delete this car? This cannot be undone.', confirmDelPart:'Delete this part? This cannot be undone.', carHasParts:'This car has N part(s). Delete or move its parts first.',
     printLabel:'🖨️ Print label', labelTitle:'Label', labelShare:'📤 Share to printer', labelHint:'Pick the Rongta app to print. If it is not listed, long-press the image, save it, and open it in the Rongta app.', labelNoShare:'Your device cannot share the file. Long-press the image to save it and open it in the Rongta app.', makingLabel:'Building label…',
-    photoOrderTitle:'Photo order (for the bot):', photoOrderHint:'1st photo: the NUMBER / label, close-up and readable. 2nd photo: a general shot of the part. Then any others for the listing. The bot only reads the first ones — so the number goes first. (If there is another important number, take it among the first ones too.)', quickItemBtn:'Quick item (no car)', looseItems:'Loose items', quickItemTitle:'Quick item', quickItemHint:'For parts you list yourself with no car in inventory (e.g. stereos). Generate the QR, print from the machine and upload the photos. The car is just a reference for the listing — optional.', refVehicle:'Reference vehicle (optional)', vinFillHint:'(optional — fills the car info only, does NOT create a car)', trimLbl:'Trim', looseItem:'Loose item', genLabelBtn:'🖨️ Generate & print QR', labelBeforePhotos:'Print the QR and stick it on the part BEFORE taking the photos, so the QR shows in them.', labelPrint:'🖨️ Print', labelPrintHint:'The print view opens — from there share to the Rongta app (or pick the printer).', copyQrLink:'📋 Copy link (RLabel native QR)', copiedLink:'✓ Copied — paste it into the RLabel QR',
+    photoOrderTitle:'Photo order (for the bot):', photoOrderHint:'1st photo: the NUMBER / label, close-up and readable. 2nd photo: a general shot of the part. Then any others for the listing. The bot only reads the first ones — so the number goes first. (If there is another important number, take it among the first ones too.)', quickItemBtn:'Quick item (no car)', looseItems:'Loose items', quickItemTitle:'Quick item', quickItemHint:'For parts you list yourself with no car in inventory (e.g. stereos). Generate the QR, print from the machine and upload the photos. The car is just a reference for the listing — optional.', refVehicle:'Reference vehicle (optional)', vinFillHint:'(optional — fills the car info only, does NOT create a car)', trimLbl:'Trim', stickerLbl:'Sticker (number)', stickerPh:'Sticker number (e.g. 0042)', stickerDup:'⚠️ That number is already in use', stickerFree:'✓ number free', stickerDupConfirm:'⚠️ That sticker number is already on an active part. Save anyway?', quickAddBtn:'➕ Add part (sticker + bin)', quickAddTitle:'➕ Quick add part', quickAddHint:'To log parts from old totes: just sticker + bin. Add the name and photos later.', stickerReq:'Enter the sticker number.', looseItem:'Loose item', genLabelBtn:'🖨️ Generate & print QR', labelBeforePhotos:'Print the QR and stick it on the part BEFORE taking the photos, so the QR shows in them.', labelPrint:'🖨️ Print', labelPrintHint:'The print view opens — from there share to the Rongta app (or pick the printer).', copyQrLink:'📋 Copy link (RLabel native QR)', copiedLink:'✓ Copied — paste it into the RLabel QR',
     seeQR:'⬇️ View/download QR', tagSold:'Sold', tagPublished:'Published', tagDraft:'Draft', tagAvailable:'Available', noLoc:'no location',
     listerHint:'Parts ready to list. Tap one to copy the fields, see "sold" prices and mark as published.', noToPublish:'No parts to publish.', ebayTitleLbl:'eBay title:', copy:'Copy', copied:'Copied!', seeSold:'💲 See "sold" on eBay', ebayNewSide:'🆕 eBay beside', ebayOpened:'✓ Title copied · paste with Ctrl+V', dlPhotos:'⬇️ Download photos', dlWorking:'⬇️ Building ZIP…', ebayPrep:'🤖 Prepare for eBay', ebayRegen:'🤖 Regenerate', ebayThinking:'🤖 Analyzing photos…', ebayDraftLbl:'eBay draft (AI)', titleLbl:'Title', descLbl:'Description', fbPh:'Something wrong? Tell the bot… e.g. OEM is 12345, left side', fbBtn:'🔁 Fix', secPendientes:'To publish', secBorrador:'eBay draft (review & publish)', secPublicadas:'Published', secVendidas:'Sold', interLbl:'Interchange', sugOem:'🔎 Suggested OEM (verify)', fitsLbl:'Fits', taxiTitle:'AI bot usage', taxiMonth:'This month', taxiTotal:'Total', taxiCount:'Analyses', taxiNote:'Info only. Not a Finanzas expense — Finanzas logs the credit recharge, not the consumption.', markPublished:'✓ Mark published', unpublishBtn:'↩️ Undo published', tapOpen:'tap to view', ebayTestBtn:'🧪 Test eBay connection', ebaySetupBtn:'⚙️ Set up eBay (once)', ebayCreateDraft:'📝 Create eBay draft', ebayUpdateDraft:'🔄 Update draft', ebayViewDraft:'📂 View draft on eBay', ebayPublishLive:'🚀 Publish (live)',
     eErr:'❌ Error: ', eNoDetail:'no detail', eStep:'step',
@@ -728,6 +729,52 @@ window.openPartModal=function(vid){
   _partFiles[vid]=[]; renderPartPhotos(vid);
 };
 // ⚡ Artículo rápido: parte suelta SIN carro (ej. estéreos del dealer). Carro de referencia = opcional.
+// ➕ AGREGAR RÁPIDO (Empaque): dar de alta piezas de topers viejos con solo ESTAMPA + BIN (backfill).
+window.openQuickAdd=function(){
+  document.getElementById('modal-inner').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-weight:800;">${t('quickAddTitle')}</div>
+      <button class="btn ghost sm" onclick="closeModal()">✕</button>
+    </div>
+    <div class="sub" style="margin-bottom:10px;">${t('quickAddHint')}</div>
+    <label>🏷️ ${t('stickerLbl')}</label><input id="qa-sticker" inputmode="numeric" autocomplete="off" placeholder="${t('stickerPh')}" oninput="qaCheck()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('qa-bin').focus();}">
+    <div id="qa-sticker-msg" class="sub" style="margin:2px 0 6px;"></div>
+    <label>${t('binLbl')}</label><input id="qa-bin" autocomplete="off" placeholder="${t('binPh')}" onkeydown="if(event.key==='Enter'){event.preventDefault();saveQuickAdd();}">
+    <label>${t('whichPart')} <span style="color:var(--muted);font-weight:400;">(opcional)</span></label><input id="qa-name" placeholder="${t('whichPartPh')}">
+    <button class="btn" style="width:100%;margin-top:12px;" id="qa-save" onclick="saveQuickAdd()">${t('savePart')}</button>
+    <div id="qa-added" class="sub" style="margin-top:8px;"></div>`;
+  document.getElementById('modal').style.display='block';
+  setTimeout(()=>{ const s=document.getElementById('qa-sticker'); if(s) s.focus(); },100);
+};
+window.qaCheck=function(){
+  const el=document.getElementById('qa-sticker'); const msg=document.getElementById('qa-sticker-msg'); if(!el||!msg) return;
+  const num=(el.value||'').trim(); if(!num){ msg.textContent=''; return; }
+  const dup=parts.find(p=>(p.stickerNum||'')===num && p.status!=='vendido');
+  if(dup){ msg.innerHTML=t('stickerDup')+' — bin '+esc((dup.location&&dup.location.bin)||'?'); msg.style.color='#ff9800'; }
+  else { msg.textContent=t('stickerFree'); msg.style.color='#3ecf8e'; }
+};
+window.saveQuickAdd=async function(){
+  const sticker=(document.getElementById('qa-sticker').value||'').trim();
+  const bin=(document.getElementById('qa-bin').value||'').trim().toUpperCase();
+  const name=(document.getElementById('qa-name').value||'').trim();
+  if(!sticker){ alert(t('stickerReq')); return; }
+  const dup=parts.find(p=>(p.stickerNum||'')===sticker && p.status!=='vendido');
+  if(dup && !confirm(t('stickerDupConfirm')+'\n\nbin '+((dup.location&&dup.location.bin)||'?'))) return;
+  const btn=document.getElementById('qa-save'); if(btn){ btn.disabled=true; }
+  const id='part_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
+  const vlabel = name || t('looseItem');
+  try{
+    await setDoc(doc(db,'parts',id), { entryId:id, vehicleId:'', standalone:true, vehicleLabel:vlabel,
+      vYear:'', vMake:'', vModel:'', vMiles:'', vVin:'', vTrim:'', vEngine:'', vDrive:'', vTransmission:'', vBody:'', vSpec:null,
+      name:name, partNumber:'', stickerNum:sticker, condition:'Used', notes:'', photoURLs:[], qrURL:'', ebayTitle:name,
+      status:'disponible', priceCents:null, location:{bin}, createdAt:new Date().toISOString(), createdBy:myEmail });
+    const added=document.getElementById('qa-added'); if(added) added.innerHTML='✅ 🏷️ '+esc(sticker)+(name?(' · '+esc(name)):'')+' → 📍 '+esc(bin||'?');
+    // limpia estampa+nombre para el siguiente; MANTIENE el bin (mismo toper)
+    document.getElementById('qa-sticker').value=''; document.getElementById('qa-name').value=''; document.getElementById('qa-sticker-msg').textContent='';
+    const s=document.getElementById('qa-sticker'); if(s) s.focus();
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+  if(btn){ btn.disabled=false; }
+};
 window.openQuickItem=function(){
   _qvSpec=null;   // limpia la ficha del VIN anterior
   _newPartId='part_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
@@ -850,6 +897,7 @@ window.openPartEdit=function(id){
   _editPartNew=[];
   document.getElementById('modal-inner').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-weight:800;">${t('editPart')}</div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>
+    <label>🏷️ ${t('stickerLbl')}</label><input id="epa-sticker" value="${esc(p.stickerNum||'')}" inputmode="numeric" autocomplete="off" placeholder="${t('stickerPh')}">
     <label>${t('whichPart')}</label><input id="epa-name" value="${esc(p.name)}">
     <div class="row2"><div><label>${t('condition')}</label><select id="epa-cond">${condOptions()}</select></div><div><label>${t('partNum')}</label><input id="epa-num" value="${esc(p.partNumber)}"></div></div>
     <label>${t('binLbl')}</label><input id="epa-bin" value="${esc(oldBin)}" placeholder="${t('binPh')}">
@@ -885,13 +933,15 @@ window.savePartEdit=async function(id){
   const cond=document.getElementById('epa-cond').value;
   const num=(document.getElementById('epa-num').value||'').trim();
   const bin=(document.getElementById('epa-bin').value||'').trim().toUpperCase();
+  const stkEl=document.getElementById('epa-sticker'); const sticker=(stkEl?stkEl.value:'').trim();
+  if(sticker){ const dupS=parts.find(x=>x.id!==id && (x.stickerNum||'')===sticker && x.status!=='vendido'); if(dupS && !confirm(t('stickerDupConfirm')+'\n\nbin '+((dupS.location&&dupS.location.bin)||'?'))) return; }
   const ebayTitle=[p.vYear,p.vMake,p.vModel,p.vTrim||'',name,(num?'OEM '+num:''),'-',cond].filter(Boolean).join(' ').replace(' - -',' -');
   const btn=document.getElementById('epa-save'); if(btn){ btn.disabled=true; btn.textContent=t('savingPhotos'); }
   try{
     const newURLs=[];
     for(const f of _editPartNew){ const jpg=await toJpeg(f); const r=ref(storage,'parts/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); newURLs.push(await getDownloadURL(r)); }
     const photoURLs=_editPartKeep.concat(newURLs); if(_editPartQR) photoURLs.push(_editPartQR);   // QR siempre al final
-    await updateDoc(doc(db,'parts',id),{ name, condition:cond, partNumber:num, location:{bin}, ebayTitle, photoURLs });
+    await updateDoc(doc(db,'parts',id),{ name, condition:cond, partNumber:num, stickerNum:sticker, location:{bin}, ebayTitle, photoURLs });
     _editPartNew=[]; closeModal(); if(_carView) renderCarDetail();
   }catch(e){ alert(t('error')+e.message); if(btn){ btn.disabled=false; btn.textContent=t('saveChanges'); } }
 };
@@ -948,6 +998,16 @@ window.copyScanLink=function(id, btn){
   if(btn){ btn.textContent=t('copiedLink'); setTimeout(()=>{ btn.textContent=t('copyQrLink'); }, 1600); }
 };
 // Crea o actualiza la parte (misma función para "Generar QR" y "Guardar")
+// 🏷️ Aviso en vivo si el número de estampa ya está en una parte activa (no vendida)
+window.checkSticker=function(vid){
+  const el=document.getElementById('p-sticker-'+vid); const msg=document.getElementById('p-sticker-msg-'+vid);
+  if(!el||!msg) return;
+  const num=(el.value||'').trim();
+  if(!num){ msg.textContent=''; return; }
+  const dup=parts.find(p=>p.id!==_newPartId && (p.stickerNum||'')===num && p.status!=='vendido');
+  if(dup){ msg.innerHTML=t('stickerDup')+' — bin '+esc((dup.location&&dup.location.bin)||'?')+' · '+esc(dup.name||dup.vehicleLabel||''); msg.style.color='#ff9800'; }
+  else { msg.textContent=t('stickerFree'); msg.style.color='#3ecf8e'; }
+};
 // withPhotos=false → guarda datos + QR (queda escaneable YA). withPhotos=true → agrega las fotos encima.
 async function upsertPart(vid, withPhotos){
   const isQuick=(vid==='quick');
@@ -966,6 +1026,10 @@ async function upsertPart(vid, withPhotos){
   const cond=document.getElementById('p-cond-'+vid).value;
   const num=(document.getElementById('p-num-'+vid).value||'').trim();
   const bin=(document.getElementById('p-bin-'+vid).value||'').trim().toUpperCase();
+  const stkEl=document.getElementById('p-sticker-'+vid);
+  const sticker=(stkEl?stkEl.value:'').trim();
+  // Regla: no dos partes ACTIVAS con la misma estampa (avisa; se puede forzar)
+  if(sticker){ const dupS=parts.find(x=>x.id!==(_newPartId||'') && (x.stickerNum||'')===sticker && x.status!=='vendido'); if(dupS && !confirm(t('stickerDupConfirm')+'\n\nbin '+((dupS.location&&dupS.location.bin)||'?'))) return null; }
   const id=_newPartId || ('part_'+Date.now()+'_'+Math.random().toString(36).slice(2,5));
   _newPartId=id;
   const existing=parts.find(x=>x.id===id);
@@ -986,7 +1050,7 @@ async function upsertPart(vid, withPhotos){
   await setDoc(doc(db,'parts',id), { entryId:id, vehicleId:(isQuick?'':vid), standalone:isQuick, vehicleLabel:vlabel,
     vYear:v.year||'', vMake:v.make||'', vModel:v.model||'', vMiles:v.miles||'', vVin:(v.vin||''),
     vTrim:sp.trim||'', vEngine:v.engine||'', vDrive:sp.drive||'', vTransmission:sp.transmission||'', vBody:sp.bodyClass||'', vSpec:v.spec||null,
-    name, partNumber:num, condition:cond, notes:(existing&&existing.notes)||'', photoURLs, qrURL, ebayTitle,
+    name, partNumber:num, stickerNum:sticker, condition:cond, notes:(existing&&existing.notes)||'', photoURLs, qrURL, ebayTitle,
     status:(existing&&existing.status)||'disponible', priceCents:(existing&&existing.priceCents!=null)?existing.priceCents:null,
     location:{bin}, createdAt:(existing&&existing.createdAt)||new Date().toISOString(), createdBy:(existing&&existing.createdBy)||myEmail });
   return {id, name, num, bin, sp, v};
@@ -1019,14 +1083,14 @@ window.shareLabel=async function(){
 };
 
 function addPartFormHtml(vid){
-  return `<label>${t('whichPart')}</label><input id="p-name-${vid}" placeholder="${t('whichPartPh')}">
+  return `<label>🏷️ ${t('stickerLbl')}</label><input id="p-sticker-${vid}" inputmode="numeric" autocomplete="off" placeholder="${t('stickerPh')}" oninput="checkSticker('${vid}')">
+    <div id="p-sticker-msg-${vid}" class="sub" style="margin:2px 0 6px;"></div>
+    <label>${t('whichPart')}</label><input id="p-name-${vid}" placeholder="${t('whichPartPh')}">
     <div class="row2">
       <div><label>${t('condition')}</label><select id="p-cond-${vid}">${condOptions()}</select></div>
       <div><label>${t('partNum')}</label><input id="p-num-${vid}" placeholder="${t('oemPh')}"></div>
     </div>
     <label>${t('binLbl')}</label><input id="p-bin-${vid}" placeholder="${t('binPh')}">
-    <button type="button" id="p-genqr-${vid}" class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="printNewPart('${vid}')">${t('genLabelBtn')}</button>
-    <div class="sub" style="margin-top:6px;">${t('labelBeforePhotos')}</div>
     <label>${t('photos')}</label>
     <div style="background:rgba(240,192,64,0.12);border:1px solid rgba(240,192,64,0.4);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;line-height:1.45;">📸 <b>${t('photoOrderTitle')}</b><br>${t('photoOrderHint')}</div>
     <div style="display:flex;gap:8px;">
@@ -1042,6 +1106,8 @@ function addPartFormHtml(vid){
 function addQuickItemFormHtml(){
   const vid='quick';
   return `<div class="sub" style="margin-bottom:10px;">${t('quickItemHint')}</div>
+    <label>🏷️ ${t('stickerLbl')}</label><input id="p-sticker-${vid}" inputmode="numeric" autocomplete="off" placeholder="${t('stickerPh')}" oninput="checkSticker('${vid}')">
+    <div id="p-sticker-msg-${vid}" class="sub" style="margin:2px 0 6px;"></div>
     <label>${t('whichPart')}</label><input id="p-name-${vid}" placeholder="${t('whichPartPh')}">
     <div class="row2">
       <div><label>${t('condition')}</label><select id="p-cond-${vid}">${condOptions()}</select></div>
@@ -1063,8 +1129,6 @@ function addQuickItemFormHtml(){
       <div><input id="p-qmodel" placeholder="${t('model')}"></div>
       <div><input id="p-qtrim" placeholder="${t('trimLbl')}"></div>
     </div>
-    <button type="button" id="p-genqr-${vid}" class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="printNewPart('${vid}')">${t('genLabelBtn')}</button>
-    <div class="sub" style="margin-top:6px;">${t('labelBeforePhotos')}</div>
     <label>${t('photos')}</label>
     <div style="background:rgba(240,192,64,0.12);border:1px solid rgba(240,192,64,0.4);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;line-height:1.45;">📸 <b>${t('photoOrderTitle')}</b><br>${t('photoOrderHint')}</div>
     <div style="display:flex;gap:8px;">
@@ -1354,14 +1418,15 @@ function partPhotoBig(p){ const u=(p.photoURLs||[]).find(x=>x&&!/00_QR/.test(x))
 function packTextMatch(raw){
   const q=(raw||'').trim().toLowerCase(); if(!q) return [];
   const w=q.split(/\s+/);
-  return parts.filter(p=>{ const hay=((p.name||'')+' '+(p.partNumber||'')+' '+(p.ebayTitle||'')+' '+(p.vehicleLabel||'')+' '+((p.location&&p.location.bin)||'')).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); });
+  return parts.filter(p=>{ const hay=((p.stickerNum||'')+' '+(p.name||'')+' '+(p.partNumber||'')+' '+(p.ebayTitle||'')+' '+(p.vehicleLabel||'')+' '+((p.location&&p.location.bin)||'')).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); });
 }
 window.packPick=function(id){ const inp=document.getElementById('scan-input'); if(inp) inp.value=id; scanLookup(); };
 window.scanLookup=function(){
   const inp=document.getElementById('scan-input'); const raw=(inp.value||'').trim();
   if(!raw) return;
   const id=scanId(raw);
-  const exact=parts.find(x=>x.id===id || x.entryId===id);
+  // Resuelve por id/QR, o por número de ESTAMPA (prioriza la parte activa). La estampa es el identificador de hoy.
+  const exact=parts.find(x=>x.id===id || x.entryId===id) || parts.find(x=>(x.stickerNum||'')===raw && x.status!=='vendido') || parts.find(x=>(x.stickerNum||'')===raw);
   const box=document.getElementById('pack-result');
   // MODO CONFIRMAR: este escaneo debe coincidir con la parte (SOLO QR/código, no texto). Si no coincide, NO cancela — sigue escuchando.
   if(_pendingConfirm){
@@ -1397,7 +1462,10 @@ window.scanLookup=function(){
     ${partPhotoBig(p)}
     <div style="font-weight:800;font-size:19px;margin-top:10px;">${p.vehicleLabel} · ${p.name}</div>
     <div class="sub" style="margin:4px 0;">${condLabel(p.condition)}${p.partNumber?' · OEM '+p.partNumber:''}</div>
-    <div style="font-size:24px;font-weight:800;color:var(--gold);margin:10px 0;">📍 ${locText(p)}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0;">
+      ${p.stickerNum?`<div style="font-size:22px;font-weight:800;color:#fff;background:#0b5cd6;border-radius:10px;padding:6px 14px;">🏷️ ${esc(p.stickerNum)}</div>`:''}
+      <div style="font-size:24px;font-weight:800;color:var(--gold);">📍 ${locText(p)}</div>
+    </div>
     ${p.status!=='vendido'?`<button class="btn" style="width:100%;font-size:17px;padding:15px;" onclick="startConfirmSell('${p.id}')">${t('confirmSellBtn')}</button>`:''}
     <button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="markNotFound('${p.id}')">${t('notFoundBtn')}</button>
     <button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--muted);" onclick="cancelPack()">${t('cancelPack')}</button>
