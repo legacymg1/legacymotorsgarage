@@ -516,6 +516,32 @@ function buildListingDescription(p, vin){
   return out.join("\n");
 }
 
+// 📦 Peso y dimensiones del paquete (aprox). Lee lo que estimó la IA en los specifics; si no, usa defaults.
+function buildPackage(p){
+  const is = (p.ebayDraft || {}).itemSpecifics || {};
+  // Peso → siempre a LIBRAS (US)
+  let lbs = 2;   // default razonable para una parte chica/mediana
+  const wm = String(is["Item Weight"] || is["Weight"] || "").toLowerCase().match(/([\d.]+)\s*(kg|kilogram|g\b|gram|lb|lbs|pound|oz|ounce)/);
+  if (wm) {
+    let v = parseFloat(wm[1]); const u = wm[2];
+    if (/kg|kilogram/.test(u)) lbs = v * 2.20462;
+    else if (/^g\b|gram/.test(u)) lbs = v / 453.592;
+    else if (/oz|ounce/.test(u)) lbs = v / 16;
+    else lbs = v;
+  }
+  lbs = Math.max(0.3, +(lbs).toFixed(2));
+  // Dimensiones → pulgadas (lee del specific si existe: acepta "54 mm / 2.13 in", cm, in)
+  const dimOf = (name, def) => {
+    const s = String(is[name] || "").match(/([\d.]+)\s*(mm|cm|in|inch)?/i);
+    if (!s) return def;
+    let v = parseFloat(s[1]); const u = (s[2] || "in").toLowerCase();
+    if (/mm/.test(u)) v = v / 25.4; else if (/cm/.test(u)) v = v / 2.54;
+    return Math.max(1, Math.round(v));
+  };
+  const dimensions = { length: dimOf("Item Length", 9), width: dimOf("Item Width", 7), height: dimOf("Item Height", 5), unit: "INCH" };
+  return { weight: { value: lbs, unit: "POUND" }, dimensions };
+}
+
 async function buildInventoryItem(p){
   const d = p.ebayDraft || {};
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
@@ -535,6 +561,7 @@ async function buildInventoryItem(p){
   const invItem = {
     availability: { shipToLocationAvailability: { quantity: 1 } },
     condition: ebayCondEnum(d.condition || p.condition),
+    packageWeightAndSize: buildPackage(p),   // peso + dimensiones (aprox) para etiqueta/envío
     product,
   };
   if (condDesc) invItem.conditionDescription = condDesc;   // Condition description (campo separado de eBay)
