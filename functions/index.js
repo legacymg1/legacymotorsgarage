@@ -272,7 +272,7 @@ async function buildEbayItem(p, priceUsd){
   const specs = await resolveSpecs(p, catId);
   const specsXml = specs.length ? `<ItemSpecifics>${specs.map((s) => `<NameValueList><Name>${xesc(s.name)}</Name>${s.values.map((v) => `<Value>${xesc(v)}</Value>`).join("")}</NameValueList>`).join("")}</ItemSpecifics>` : "";
   const inner = `<Item>
-  <SKU>${xesc(p.id || p.entryId || "")}</SKU>
+  <SKU>${xesc(p.stickerNum || p.id || p.entryId || "")}</SKU>
   <Title>${xesc(title)}</Title>
   <Description>${xesc(desc)}</Description>
   <PrimaryCategory><CategoryID>${catId}</CategoryID></PrimaryCategory>
@@ -520,7 +520,8 @@ async function buildInventoryItem(p){
     product,
   };
   if (condDesc) invItem.conditionDescription = condDesc;   // Condition description (campo separado de eBay)
-  return { sku: String(p.id), invItem, title, desc, catId, photos: pics.length, aspects: Object.keys(aspects).length };
+  const sku = String(p.stickerNum || p.id);   // SKU = número de estampa (humano-legible, único por parte activa); respaldo al id interno
+  return { sku, invItem, title, desc, catId, photos: pics.length, aspects: Object.keys(aspects).length };
 }
 
 // 📝 Crear BORRADOR en eBay (Inventory API: inventory item + oferta SIN publicar). No sale en vivo.
