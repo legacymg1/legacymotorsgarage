@@ -217,20 +217,22 @@ async function resolveCategory(p){
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);   // ← faltaba definir esto (rompía el borrador)
   const partType = is["Type"] || d.ebayCategory || p.name || "";
   const veh = [p.vYear, p.vMake, p.vModel].filter(Boolean).join(" ");
-  // Consultas en orden de preferencia. El TÍTULO va primero: es lo que usa el editor de eBay
-  // y da la categoría más específica y correcta. Luego respaldos con sesgo "car truck" para Motors.
+  // Consultas en orden de preferencia. El TIPO DE PARTE va primero (ej. "Mass Air Flow Sensor"):
+  // eBay lo mapea directo a la categoría final de Motors. Luego título y respaldos.
   const queries = [
-    title,                                                         // 1) título completo (como el editor de eBay)
-    d.ebayCategory ? (veh + " " + d.ebayCategory) : "",            // 2) carro + frase de categoría de la IA
-    partType ? (veh + " " + partType) : "",                        // 3) carro + tipo de parte
-    "car truck " + (d.ebayCategory || partType || p.name || ""),   // 4) sesgo Motors explícito
-    "car truck part " + (p.name || partType || ""),
+    d.ebayCategory || "",                                          // 1) frase de la IA sola (ej. "Fuel Sensor") — la más precisa
+    partType || "",                                                // 2) tipo de parte
+    title,                                                         // 3) título completo (como el editor de eBay)
+    [veh, d.ebayCategory || partType || p.name].filter(Boolean).join(" "),   // 4) carro + tipo
+    "car truck " + (d.ebayCategory || partType || p.name || ""),   // 5) sesgo Motors explícito
   ].filter((q) => q && q.trim());
   let catAck = "none", catId = "";
   for (const q of queries) {
     try { const c = await ebayCategorySuggest(q); if (c.id) { catId = c.id; catAck = "motors:" + q.slice(0, 40); break; } catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
   }
-  if (!catId) catId = "6030";   // último recurso: Car & Truck Parts general (Motors, no "Everything Else")
+  // Respaldo: la categoría que ya resolvió la IA (draft.ebayCategoryId) — es una hoja válida de la Taxonomy.
+  if (!catId && d.ebayCategoryId) { catId = d.ebayCategoryId; catAck = "draft"; }
+  if (!catId) catId = "6030";   // último recurso (raro con el reorden de arriba)
   return { catId, catAck };
 }
 
