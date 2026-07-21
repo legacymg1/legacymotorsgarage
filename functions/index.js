@@ -139,25 +139,24 @@ async function ebayAppToken(){
   return j.access_token || "";
 }
 // Sugerencia de categoría LEAF (Taxonomy API). Prefiere una bajo eBay Motors (ancestro 6000).
+const EBAY_MOTORS_TREE = "100";   // ⚠️ Árbol de eBay MOTORS (US). Las autopartes NO están en el árbol 0 (sitio general).
 async function ebayCategorySuggest(query){
   const tok = await ebayAppToken();
   if (!tok) return { id: "", ack: "notoken" };
-  const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_suggestions?q=" + encodeURIComponent(query), {
+  const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/" + EBAY_MOTORS_TREE + "/get_category_suggestions?q=" + encodeURIComponent(query), {
     headers: { "Authorization": "Bearer " + tok },
   });
-  const j = await r.json();
+  const j = await r.json().catch(() => ({}));
   const sugg = j.categorySuggestions || [];
-  const isMotors = (s) => (s.categoryTreeNodeAncestors || []).some((a) => /ebay motors|car\s*&\s*truck/i.test(a.categoryName || ""));   // SOLO Motors (no "Heavy Equipment Parts & Accessories" de Business & Industrial)
-  const pick = sugg.find(isMotors);   // SOLO Motors — NUNCA "Everything Else"; si no hay, devuelve vacío y el que llama reintenta/hace fallback
-  // DEBUG: las primeras 5 sugerencias con sus ancestros (para ver si hay una de Motors escondida)
-  const dbg = sugg.length ? sugg.slice(0, 5).map((s) => ((s.category && s.category.categoryName) || "?") + "«" + (s.categoryTreeNodeAncestors || []).map((a) => a.categoryName).join("<")).join("  ;;  ") : "sin-sugerencias";
-  return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: pick ? "motors" : (sugg.length ? "nonmotors" : "empty"), dbg };
+  const pick = sugg[0];   // En el árbol 100 TODO es eBay Motors P&A → la mejor sugerencia ya es la correcta
+  const dbg = pick ? ((pick.category && pick.category.categoryName) || "?") : ("http=" + r.status + " " + JSON.stringify(j).slice(0, 100));
+  return { id: (pick && pick.category) ? pick.category.categoryId : "", ack: pick ? "ok" : "empty", dbg };
 }
 // Aspectos (item specifics) que eBay pide para una categoría
 async function ebayCategoryAspects(catId){
   const tok = await ebayAppToken();
   if (!tok) return [];
-  const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=" + encodeURIComponent(catId), {
+  const r = await fetch("https://api.ebay.com/commerce/taxonomy/v1/category_tree/" + EBAY_MOTORS_TREE + "/get_item_aspects_for_category?category_id=" + encodeURIComponent(catId), {
     headers: { "Authorization": "Bearer " + tok },
   });
   const j = await r.json();
@@ -275,23 +274,14 @@ async function resolveCategory(p){
   const is = d.itemSpecifics || {};
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
   const partType = d.ebayCategory || is["Type"] || p.name || "";
-  // 1) MATCH dentro de las hojas de Car & Truck Parts (Motors) — confiable, nunca se sale a bicicletas/herramientas
-  let leafDbg = "";
-  try {
-    const leaves = await getMotorsLeaves();
-    leafDbg = "leaves=" + leaves.length + " (" + _motorsDbg + ")";
-    const hit = matchMotorsLeaf(leaves, partType, p.name);
-    if (hit) return { catId: hit.id, catAck: "leaf:" + hit.name };
-  } catch (e) { leafDbg = "leafErr:" + (e.message || e); }
-  // 2) Fallback: get_category_suggestions (por si el match no encontró)
-  const veh = [p.vYear, p.vMake, p.vModel].filter(Boolean).join(" ");
-  const queries = [d.ebayCategory || "", partType || "", title, [veh, partType].filter(Boolean).join(" ")].filter((q) => q && q.trim());
-  let catAck = "none", catId = "", dbgList = [];
+  // get_category_suggestions EN EL ÁRBOL 100 (eBay Motors) → la mejor sugerencia ya es la categoría correcta de Motors.
+  const queries = [partType, title, p.name].filter((q) => q && q.trim());
+  let catAck = "none", catId = "", dbg0 = "";
   for (const q of queries) {
-    try { const c = await ebayCategorySuggest(q); dbgList.push("«" + q.slice(0, 22) + "» " + (c.dbg || "").slice(0, 120)); if (c.id) { catId = c.id; catAck = "motors:" + q.slice(0, 30); break; } catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
+    try { const c = await ebayCategorySuggest(q); if (!dbg0) dbg0 = c.dbg || ""; if (c.id) { catId = c.id; catAck = "ok:" + ((c.dbg || "").slice(0, 40)); break; } catAck = c.ack; } catch (e) { catAck = "err:" + (e.message || e); }
   }
   if (!catId && d.ebayCategoryId) { catId = d.ebayCategoryId; catAck = "draft"; }
-  if (!catId) { catId = "6030"; catAck += " [" + leafDbg + "]"; }
+  if (!catId) { catId = "6030"; catAck += " | " + dbg0; }
   return { catId, catAck };
 }
 
