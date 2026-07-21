@@ -557,7 +557,10 @@ exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
   const offerBody = {
     sku: b.sku, marketplaceId: "EBAY_US", format: "FIXED_PRICE", availableQuantity: 1,
     categoryId: b.catId, listingDescription: b.desc,
-    listingPolicies: { fulfillmentPolicyId: cfg.fulfillmentPolicyId, paymentPolicyId: cfg.paymentPolicyId, returnPolicyId: cfg.returnPolicyId },
+    listingPolicies: {
+      fulfillmentPolicyId: cfg.fulfillmentPolicyId, paymentPolicyId: cfg.paymentPolicyId, returnPolicyId: cfg.returnPolicyId,
+      bestOfferTerms: { bestOfferEnabled: true },   // ✅ aceptar ofertas en todos los anuncios
+    },
     pricingSummary: { price: { value: price, currency: "USD" } },
     merchantLocationKey: cfg.locationKey,
   };
