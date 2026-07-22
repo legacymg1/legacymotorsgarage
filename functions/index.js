@@ -1,6 +1,7 @@
 // Legacy DMS — backend (Cloud Functions v2)
 // redeploy marker: ebay oauth refresh v4
 const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
@@ -21,6 +22,52 @@ exports.ping = onCall((request) => ({
   ok: true, msg: "backend vivo 🚀", at: new Date().toISOString(),
   uid: request.auth ? request.auth.uid : null,
 }));
+
+// 🔔 NOTIFICACIONES PUSH del chat interno.
+// Debe empatar con CHAT_CHANNELS del frontend (quién es miembro de cada canal).
+const CHAT_MEMBERS = {
+  "group":            ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","warehouse@legacymotorsgarage.com","capture@legacymotorsgarage.com","listing@legacymotorsgarage.com","yarda@legacymotorsgarage.com","ebay@legacymotorsgarage.com","empaque@legacymotorsgarage.com","mechanic@legacymotorsgarage.com","mecanico@legacymotorsgarage.com"],
+  "owners":           ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com"],
+  "capture-listing":  ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","capture@legacymotorsgarage.com","listing@legacymotorsgarage.com","yarda@legacymotorsgarage.com","ebay@legacymotorsgarage.com"],
+  "warehouse-owners": ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","warehouse@legacymotorsgarage.com","empaque@legacymotorsgarage.com"],
+  "mechanic-owners":  ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","mechanic@legacymotorsgarage.com","mecanico@legacymotorsgarage.com"],
+};
+const CHAT_TITLES = {
+  "group": "Legacy Group", "owners": "Dueños", "capture-listing": "Captura ↔ Listado",
+  "warehouse-owners": "Empaque ↔ Dueños", "mechanic-owners": "Mecánico ↔ Dueños",
+};
+exports.chatPush = onDocumentCreated("chat_channels/{ch}/messages/{msgId}", async (event) => {
+  try {
+    const ch = event.params.ch;
+    const m = event.data && event.data.data();
+    if (!m) return;
+    const members = (CHAT_MEMBERS[ch] || []).filter((e) => e !== (m.byEmail || ""));   // no te notificas a ti mismo
+    if (!members.length) return;
+    // Junta los tokens de los miembros (de push_tokens, campo email)
+    const db = admin.firestore();
+    const tokens = [];
+    const tokDocs = [];
+    // Firestore "in" soporta hasta 30 valores; nuestros canales tienen menos.
+    const snap = await db.collection("push_tokens").where("email", "in", members).get();
+    snap.forEach((d) => { if (d.data().token) { tokens.push(d.data().token); tokDocs.push(d.ref); } });
+    if (!tokens.length) return;
+    const title = CHAT_TITLES[ch] || "Legacy Chat";
+    const body = ((m.byName || "") + ": " + (m.text || "")).slice(0, 180);
+    const res = await admin.messaging().sendEachForMulticast({
+      tokens,
+      notification: { title, body },
+      data: { channel: ch, url: "/warehouse.html" },
+      webpush: {
+        notification: { title, body, icon: "/icon-192.png", badge: "/icon-192.png" },
+        fcmOptions: { link: "https://legacymotorsgarage.com/warehouse.html" },
+      },
+    });
+    // Limpia tokens muertos (desinstalaron / revocaron)
+    const dead = [];
+    res.responses.forEach((r, i) => { if (!r.success) { const c = r.error && r.error.code; if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token") dead.push(tokDocs[i]); } });
+    await Promise.all(dead.map((ref) => ref.delete().catch(() => {})));
+  } catch (e) { console.log("chatPush err", e); }
+});
 
 // 🔔 eBay Marketplace Account Deletion/Closure — endpoint requerido para habilitar el keyset de Producción.
 // GET con challenge_code → responde SHA-256(challengeCode + verificationToken + endpointUrl).
