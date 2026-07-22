@@ -149,7 +149,7 @@ function backToList(){ view='list'; document.getElementById('lcw-convo').style.d
 function fitSheet(){ const sh=document.getElementById('lcw-sheet'), vv=window.visualViewport; if(!sh||!vv) return; sh.style.bottom='auto'; sh.style.height=vv.height+'px'; sh.style.transform='translateY('+vv.offsetTop+'px)'; const m=document.getElementById('lcw-msgs'); if(m) m.scrollTop=m.scrollHeight; }   // baja al último mensaje cuando sube/baja el teclado
 function vpOn(){ const vv=window.visualViewport; if(!vv) return; vv.addEventListener('resize',fitSheet); vv.addEventListener('scroll',fitSheet); fitSheet(); }
 function vpOff(){ const vv=window.visualViewport, sh=document.getElementById('lcw-sheet'); if(vv){ vv.removeEventListener('resize',fitSheet); vv.removeEventListener('scroll',fitSheet); } if(sh){ sh.style.height=''; sh.style.transform=''; sh.style.bottom='0'; } }
-function openPanel(){ open=true; view='list'; document.getElementById('lcw-panel').style.display='block'; backToList(); vpOn(); clearNotifs(); }
+function openPanel(){ open=true; view='list'; if(MYROLE==='owner') window._notifDiag=true; document.getElementById('lcw-panel').style.display='block'; backToList(); vpOn(); clearNotifs(); }
 function closePanel(){ open=false; const p=document.getElementById('lcw-panel'); if(p)p.style.display='none'; vpOff(); }
 function renderMsgs(){
   const box=document.getElementById('lcw-msgs'); if(!box) return;
@@ -207,7 +207,16 @@ function toast(k,m){
   el.style.display='block'; try{ if(navigator.vibrate) navigator.vibrate(60); }catch(e){}
   if(toastT) clearTimeout(toastT); toastT=setTimeout(()=>{ if(el) el.style.display='none'; },5000);
 }
-function clearNotifs(){ try{ if(!('serviceWorker' in navigator)) return; navigator.serviceWorker.getRegistrations().then(regs=>{ regs.forEach(r=>{ if(r.getNotifications) r.getNotifications().then(ns=>ns.forEach(n=>n.close())).catch(()=>{}); const w=r.active||r.waiting||r.installing; if(w) try{ w.postMessage({type:'lmg-clear-notifs'}); }catch(e){} }); }).catch(()=>{}); }catch(e){} }
+function clearNotifs(){ try{ if(!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.getRegistrations().then(async regs=>{
+    let total=0; const parts=[];
+    for(const r of regs){ const w=r.active||r.waiting||r.installing; if(w){ try{ w.postMessage({type:'lmg-clear-notifs'}); }catch(e){} }
+      if(r.getNotifications){ try{ const ns=await r.getNotifications(); total+=ns.length; parts.push(((r.active&&r.active.scriptURL||'?').split('/').pop())+':'+ns.length); ns.forEach(n=>n.close()); }catch(e){ parts.push('err'); } }
+      else parts.push('noGetNotif');
+    }
+    if(MYROLE==='owner' && window._notifDiag){ window._notifDiag=false; setTimeout(()=>alert('🔔 diag\nSW: '+regs.length+'\nnotifs: '+total+'\n['+parts.join(' · ')+']'),300); }
+  }).catch(()=>{});
+}catch(e){} }
 
 // 🔔 Push (reusa el SW existente de la página; si no hay, registra firebase-messaging-sw.js)
 function pushOn(){ return ('Notification' in window) && Notification.permission==='granted'; }
