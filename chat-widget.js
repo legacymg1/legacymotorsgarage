@@ -1,0 +1,185 @@
+// 💬 Widget de chat compartido — burbuja + panel para DUEÑOS en cualquier página (finanzas/admin/index).
+// Reusa la app Firebase ya inicializada de la página (misma sesión). Solo aparece para ev@ / ivan@.
+import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
+import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
+
+const CFG = { apiKey:"AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0", authDomain:"legacy-motors-garage.firebaseapp.com", projectId:"legacy-motors-garage", storageBucket:"legacy-motors-garage.firebasestorage.app", messagingSenderId:"783567672493", appId:"1:783567672493:web:3a825f2f59ec1c25e9a224" };
+const app = getApps().length ? getApp() : initializeApp(CFG);
+const db = getFirestore(app), auth = getAuth(app), functions = getFunctions(app);
+const VAPID_KEY = "BDUfgtFZl2cfkkTcFSdGmXScxn0_Y-hthANv1DTW6S8EQJk_Abh6Zx6MCg8xdltHn-WEiwBjRjoV_OtClRhmOmU";
+
+const OWNERS = ['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];
+const NAMES = { 'ev@legacymotorsgarage.com':'Enrique','ivan.garcia@legacymotorsgarage.com':'Ivan' };
+const CH = [
+  {k:'group',n:'Legacy Group'}, {k:'owners',n:'Supervisores'},
+  {k:'capture-listing',n:'Captura ↔ Listado'}, {k:'capture-owners',n:'Captura ↔ Supervisores'},
+  {k:'listing-owners',n:'Listado ↔ Supervisores'}, {k:'warehouse-owners',n:'Empaque ↔ Supervisores'},
+  {k:'mechanic-owners',n:'Mecánico ↔ Supervisores'},
+];
+const esc=(s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const dispName=(e)=>NAMES[(e||'').toLowerCase()]||((e||'').split('@')[0])||e;
+
+let ME='', msgs={}, seen={}, unsub={}, maxTms={}, init={}, view='list', curCh='', open=false, msgr=null, reg=null, toastT=null;
+try{ seen=JSON.parse(localStorage.getItem('lcw_seen')||'{}')||{}; }catch(e){}
+let hidden=[]; try{ hidden=JSON.parse(localStorage.getItem('lcw_hidden')||'[]')||[]; }catch(e){}
+const chName=(k)=>{ const c=CH.find(x=>x.k===k); return c?c.n:k; };
+
+function build(){
+  if(document.getElementById('lcw-fab')) return;
+  const style=document.createElement('style');
+  style.textContent=`#lcw-fab{position:fixed;left:18px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:2147483000;width:54px;height:54px;border-radius:30px;background:#151a24;color:#fff;border:1px solid #2a2f3a;box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:22px;cursor:pointer;display:none;align-items:center;justify-content:center;}
+  #lcw-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:20px;min-width:20px;height:20px;font-size:11px;font-weight:800;line-height:20px;padding:0 5px;display:none;}
+  #lcw-panel{position:fixed;inset:0;z-index:2147483001;background:#0b0e14;display:none;color:#e7e9ee;font-family:-apple-system,system-ui,sans-serif;}
+  #lcw-panel .wrap{position:absolute;inset:0;max-width:600px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;background:#0b0e14;}
+  #lcw-panel .hd{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 14px 12px;border-bottom:1px solid #2a2f3a;background:#151a24;}
+  #lcw-panel .hd .t{font-weight:800;flex:1;min-width:0;}
+  #lcw-panel button{cursor:pointer;font-family:inherit;}
+  #lcw-list{flex:1;overflow-y:auto;}
+  #lcw-convo{display:none;flex:1;flex-direction:column;overflow:hidden;}
+  #lcw-msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+  #lcw-bar{flex:0 0 auto;display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #2a2f3a;background:#151a24;}
+  #lcw-input{flex:1;min-width:0;background:#0b0e14;border:1px solid #2a2f3a;border-radius:10px;padding:11px 12px;color:#e7e9ee;font-size:15px;}
+  .lcw-send{flex:0 0 auto;background:#f0c040;color:#0b0e14;border:none;border-radius:10px;padding:0 16px;font-weight:800;}
+  .lcw-row{display:flex;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid #1e232d;cursor:pointer;}
+  .lcw-av{flex:0 0 auto;width:46px;height:46px;border-radius:50%;background:#1e232d;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#f0c040;}
+  .lcw-x{flex:0 0 auto;width:44px;height:44px;border-radius:50%;background:#1e232d;border:none;color:#e7e9ee;font-size:20px;font-weight:800;}
+  .lcw-note{flex:0 0 auto;padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #2a2f3a;background:#151a24;color:#98a0b0;font-size:12px;text-align:center;}`;
+  document.head.appendChild(style);
+  const fab=document.createElement('button'); fab.id='lcw-fab'; fab.innerHTML='💬<span id="lcw-badge"></span>'; fab.onclick=openPanel; document.body.appendChild(fab);
+  const p=document.createElement('div'); p.id='lcw-panel';
+  p.innerHTML=`<div class="wrap">
+    <div class="hd"><button id="lcw-back" style="display:none;background:none;border:none;color:#f0c040;font-size:22px;font-weight:800;">‹</button><div class="t" id="lcw-title">💬 Chat interno</div><button class="lcw-x" id="lcw-close">✕</button></div>
+    <div id="lcw-list"></div>
+    <div id="lcw-convo"><div id="lcw-msgs"></div>
+      <div class="lcw-note" id="lcw-note" style="display:none;">📢 Solo los supervisores pueden escribir aquí</div>
+      <div id="lcw-bar"><input id="lcw-input" type="text" readonly onfocus="this.removeAttribute('readonly')" placeholder="Escribe un mensaje…"><button class="lcw-send" id="lcw-sendbtn">Enviar</button></div>
+    </div></div>`;
+  document.body.appendChild(p);
+  p.addEventListener('click',(e)=>{ if(e.target===p) closePanel(); });
+  document.getElementById('lcw-close').onclick=closePanel;
+  document.getElementById('lcw-back').onclick=backToList;
+  document.getElementById('lcw-sendbtn').onclick=send;
+  document.getElementById('lcw-input').addEventListener('keydown',(e)=>{ if(e.key==='Enter') send(); });
+}
+
+function startListeners(){
+  CH.forEach(c=>{ if(unsub[c.k]) return;
+    const qy=query(collection(db,'chat_channels',c.k,'messages'), orderBy('ts'), limit(300));
+    unsub[c.k]=onSnapshot(qy, s=>{
+      const prev=maxTms[c.k]||0, was=init[c.k];
+      msgs[c.k]=s.docs.map(d=>({id:d.id,...d.data()}));
+      const arr=msgs[c.k], nm=arr.reduce((m,x)=>Math.max(m,x.tms||0),0);
+      if(was){ const fresh=arr.filter(x=>(x.tms||0)>prev && (x.byEmail||'')!==ME); const viewing=(open&&view==='convo'&&curCh===c.k); if(fresh.length&&!viewing) toast(c.k,fresh[fresh.length-1]); }
+      maxTms[c.k]=nm; init[c.k]=true;
+      if(open&&view==='convo'&&curCh===c.k){ renderMsgs(); markSeen(c.k); } else if(open&&view==='list'){ renderList(); }
+      badge();
+    }, e=>console.log('lcw',c.k,e));
+  });
+}
+const unread=(k)=>(msgs[k]||[]).filter(m=>(m.tms||0)>(seen[k]||0)&&(m.byEmail||'')!==ME).length;
+const lastMsg=(k)=>{ const a=msgs[k]||[]; return a.length?a[a.length-1]:null; };
+function badge(){ const b=document.getElementById('lcw-badge'); if(!b) return; const n=CH.reduce((s,c)=>s+unread(c.k),0); if(n>0){ b.textContent=n>9?'9+':n; b.style.display='block'; } else b.style.display='none'; }
+function markSeen(k){ seen[k]=Date.now(); try{ localStorage.setItem('lcw_seen',JSON.stringify(seen)); }catch(e){} badge(); }
+function saveHidden(){ try{ localStorage.setItem('lcw_hidden',JSON.stringify(hidden)); }catch(e){} }
+window.lcwHide=(k)=>{ if(hidden.indexOf(k)<0){ hidden.push(k); saveHidden(); } renderList(); };
+window.lcwUnhide=(k)=>{ hidden=hidden.filter(x=>x!==k); saveHidden(); renderList(); };
+
+function rowHTML(c,swipe){
+  const lm=lastMsg(c.k), u=unread(c.k);
+  const who=lm?((lm.byEmail===ME?'Tú':(lm.byName||''))+': '):'';
+  const prev=lm?esc(who+(lm.text||'')):'<span style="color:#6b7280;">Sin mensajes aún</span>';
+  const when=lm&&lm.ts?new Date(lm.ts).toLocaleString('es-MX',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+  const av=chName(c.k).slice(0,1).toUpperCase();
+  const inner=`<div class="lcw-av">${av}</div><div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;gap:8px;"><div style="font-weight:800;">${chName(c.k)}</div><div style="font-size:11px;color:#6b7280;flex:0 0 auto;">${when}</div></div><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:2px;"><div style="flex:1;min-width:0;color:#98a0b0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${prev}</div>${u>0?'<span style="flex:0 0 auto;background:#25d366;color:#0b0e14;border-radius:20px;min-width:20px;height:20px;font-size:11px;font-weight:800;line-height:20px;text-align:center;padding:0 6px;">'+u+'</span>':''}</div></div>`;
+  if(!swipe) return `<div class="lcw-row" style="opacity:.6;cursor:default;">${inner}<button class="lcw-send" style="background:none;border:1px solid #2a2f3a;color:#e7e9ee;padding:6px 10px;border-radius:8px;" onclick="lcwUnhide('${c.k}')">↩️ Mostrar</button></div>`;
+  return `<div style="position:relative;overflow:hidden;border-bottom:1px solid #1e232d;"><div style="position:absolute;inset:0;display:flex;justify-content:flex-end;align-items:center;background:#8a6d1f;"><span onclick="lcwHide('${c.k}')" style="color:#fff;font-weight:800;padding:0 22px;cursor:pointer;">🗄️ Ocultar</span></div><div class="lcw-swrow" data-k="${c.k}" style="position:relative;background:#0b0e14;transition:transform .15s;"><div class="lcw-row" style="border:none;" onclick="lcwTap(this,'${c.k}')">${inner}</div></div></div>`;
+}
+function renderList(){
+  const box=document.getElementById('lcw-list'); if(!box) return;
+  const vis=CH.filter(c=>hidden.indexOf(c.k)<0).sort((a,b)=>{ const la=lastMsg(a.k),lb=lastMsg(b.k); return (lb?lb.tms||0:0)-(la?la.tms||0:0); });
+  const hid=CH.filter(c=>hidden.indexOf(c.k)>=0);
+  const banner = pushOn() ? '' : `<div onclick="lcwEnablePush()" style="display:flex;gap:10px;align-items:center;margin:10px;padding:11px 13px;background:rgba(240,192,64,.12);border:1px solid rgba(240,192,64,.45);border-radius:12px;cursor:pointer;"><span style="font-size:20px;">🔔</span><div style="flex:1;font-size:13px;font-weight:700;">Activar notificaciones — que no se te escape ningún mensaje</div><span style="color:#f0c040;font-weight:800;">›</span></div>`;
+  let html=banner+vis.map(c=>rowHTML(c,true)).join('');
+  if(hid.length) html+=`<details style="margin-top:6px;"><summary style="cursor:pointer;padding:12px 14px;font-weight:800;color:#98a0b0;">🗄️ Ocultas (${hid.length})</summary>`+hid.map(c=>rowHTML(c,false)).join('')+`</details>`;
+  box.innerHTML=html; attachSwipe();
+}
+let swEl=null,swX0=0,swDX=0;
+function attachSwipe(){ document.querySelectorAll('#lcw-list .lcw-swrow').forEach(el=>{
+  el.addEventListener('touchstart',(e)=>{ swEl=el; swX0=e.touches[0].clientX; el.style.transition='none'; },{passive:true});
+  el.addEventListener('touchmove',(e)=>{ if(swEl!==el)return; let dx=e.touches[0].clientX-swX0; if(dx>0)dx=0; if(dx<-96)dx=-96; el.style.transform='translateX('+dx+'px)'; swDX=dx; },{passive:true});
+  el.addEventListener('touchend',()=>{ if(swEl!==el)return; el.style.transition='transform .15s'; el.style.transform=(swDX<-60)?'translateX(-96px)':'translateX(0)'; swEl=null; },{passive:true});
+}); }
+window.lcwTap=(el,k)=>{ const row=el.closest('.lcw-swrow'); if(row&&row.style.transform&&parseFloat(row.style.transform.replace(/[^0-9.-]/g,''))<-20){ row.style.transform='translateX(0)'; return; } openConvo(k); };
+
+function canWrite(k){ return true; }   // el widget es solo para dueños → siempre pueden escribir
+function openConvo(k){ curCh=k; view='convo';
+  document.getElementById('lcw-list').style.display='none';
+  document.getElementById('lcw-convo').style.display='flex';
+  document.getElementById('lcw-back').style.display='';
+  document.getElementById('lcw-title').textContent=chName(k);
+  document.getElementById('lcw-bar').style.display='flex'; document.getElementById('lcw-note').style.display='none';
+  renderMsgs(); markSeen(k);
+  setTimeout(()=>{ const i=document.getElementById('lcw-input'); if(i) i.focus(); },100);
+}
+window.lcwOpenTo=(k)=>{ if(!k||!CH.some(c=>c.k===k)){ openPanel(); return; } open=true; document.getElementById('lcw-panel').style.display='block'; openConvo(k); };
+function backToList(){ view='list'; document.getElementById('lcw-convo').style.display='none'; document.getElementById('lcw-list').style.display='block'; document.getElementById('lcw-back').style.display='none'; document.getElementById('lcw-title').textContent='💬 Chat interno'; renderList(); }
+function openPanel(){ open=true; view='list'; document.getElementById('lcw-panel').style.display='block'; backToList(); }
+function closePanel(){ open=false; const p=document.getElementById('lcw-panel'); if(p)p.style.display='none'; }
+function renderMsgs(){
+  const box=document.getElementById('lcw-msgs'); if(!box) return;
+  const arr=msgs[curCh]||[];
+  if(!arr.length){ box.innerHTML='<div style="text-align:center;margin:auto;color:#98a0b0;">Sin mensajes aún. Escribe el primero 👋</div>'; return; }
+  box.innerHTML=arr.map(m=>{ const mine=(m.byEmail||'')===ME; const when=m.ts?new Date(m.ts).toLocaleString('es-MX',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+    return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:82%;">${mine?'':`<div style="font-size:11px;color:#98a0b0;margin:0 0 2px 4px;font-weight:700;">${esc(m.byName||m.byEmail||'')}</div>`}<div style="background:${mine?'#f0c040':'#151a24'};color:${mine?'#0b0e14':'#e7e9ee'};border-radius:14px;padding:8px 12px;font-size:14px;line-height:1.4;word-break:break-word;">${esc(m.text||'')}</div><div style="font-size:10px;color:#6b7280;margin:2px 6px 0;text-align:${mine?'right':'left'};">${when}</div></div>`;
+  }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+async function send(){
+  const i=document.getElementById('lcw-input'); if(!i||!curCh) return;
+  const text=(i.value||'').trim(); if(!text) return; const ch=curCh; i.value='';
+  try{ await addDoc(collection(db,'chat_channels',ch,'messages'),{ text:text.slice(0,1000), byEmail:ME, byName:dispName(ME), byRole:'owner', ts:new Date().toISOString(), tms:Date.now() }); }
+  catch(e){ i.value=text; alert('Error: '+((e&&e.message)||e)); return; }
+  try{ markSeen(ch); }catch(_){}
+  setTimeout(()=>{ try{ const p=httpsCallable(functions,'sendChatPush')({ channel:ch, text:text.slice(0,180), byName:dispName(ME) }); if(p&&p.catch) p.catch(()=>{}); }catch(_){} },0);
+}
+function toast(k,m){
+  let el=document.getElementById('lcw-toast');
+  if(!el){ el=document.createElement('div'); el.id='lcw-toast'; el.style.cssText='position:fixed;top:calc(10px + env(safe-area-inset-top));left:10px;right:10px;max-width:560px;margin:0 auto;z-index:2147483002;background:#151a24;border:1px solid #f0c040;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.55);padding:11px 14px;display:none;cursor:pointer;color:#e7e9ee;font-family:-apple-system,system-ui,sans-serif;'; document.body.appendChild(el); }
+  el.onclick=()=>{ el.style.display='none'; window.lcwOpenTo(k); };
+  el.innerHTML='<div style="font-weight:800;font-size:13px;">💬 '+esc(chName(k))+'</div><div style="margin-top:2px;color:#98a0b0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc((m.byName||'')+': '+(m.text||''))+'</div>';
+  el.style.display='block'; try{ if(navigator.vibrate) navigator.vibrate(60); }catch(e){}
+  if(toastT) clearTimeout(toastT); toastT=setTimeout(()=>{ if(el) el.style.display='none'; },5000);
+}
+
+// 🔔 Push
+function pushOn(){ return ('Notification' in window) && Notification.permission==='granted'; }
+async function ensureToken(){ try{
+  if(!pushOn()) return false; if(!(await isSupported())) return false;
+  if(!reg) reg=await navigator.serviceWorker.register('firebase-messaging-sw.js'); await navigator.serviceWorker.ready;
+  if(!msgr) msgr=getMessaging(app);
+  const tok=await getToken(msgr,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
+  if(tok){ await setDoc(doc(db,'push_tokens',tok),{ token:tok, email:ME, role:'owner', lang:'es', ts:new Date().toISOString() }); return true; }
+}catch(e){ console.log('lcw push',e); } return false; }
+window.lcwEnablePush=async ()=>{ try{
+  if(!('Notification' in window)||!(await isSupported())){ alert('Este navegador no soporta notificaciones.'); return; }
+  const perm=await Notification.requestPermission(); if(perm!=='granted'){ alert('No diste permiso de notificaciones.'); renderList(); return; }
+  const ok=await ensureToken(); renderList(); alert(ok?'🔔 ¡Notificaciones activadas!':'No se pudo activar (¿navegador compatible?).');
+}catch(e){ alert('Error: '+((e&&e.message)||e)); } };
+function initPush(){ if(pushOn()) ensureToken(); isSupported().then(ok=>{ if(ok){ try{ if(!msgr)msgr=getMessaging(app); onMessage(msgr,()=>{ if(open&&view==='list') renderList(); }); }catch(e){} } }).catch(()=>{});
+  if('serviceWorker' in navigator){ navigator.serviceWorker.addEventListener('message',(e)=>{ if(e.data&&e.data.type==='open-chat') window.lcwOpenTo(e.data.channel); }); }
+}
+
+onAuthStateChanged(auth,(u)=>{
+  const email=((u&&u.email)||'').toLowerCase();
+  if(u && OWNERS.indexOf(email)>=0){
+    ME=email; build();
+    const fab=document.getElementById('lcw-fab'); if(fab) fab.style.display='flex';
+    startListeners(); initPush(); badge();
+    try{ const cc=new URLSearchParams(location.search).get('chat'); if(cc) setTimeout(()=>window.lcwOpenTo(cc),600); }catch(e){}
+  } else {
+    const fab=document.getElementById('lcw-fab'); if(fab) fab.style.display='none'; closePanel();
+  }
+});
