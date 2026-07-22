@@ -209,7 +209,7 @@
     </div>
     <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;"></div>
     <div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface);">
-      <input id="chat-input" type="text" autocomplete="off" data-i18n-ph="chatPh" placeholder="Escribe un mensaje…" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;margin-bottom:0;">
+      <input id="chat-input" type="text" name="chatmsg" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="true" data-1p-ignore data-lpignore="true" data-form-type="other" data-i18n-ph="chatPh" placeholder="Escribe un mensaje…" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;margin-bottom:0;">
       <button class="btn sm" style="flex:0 0 auto;" onclick="sendChat()" data-i18n="chatSend">Enviar</button>
     </div>
   </div>
