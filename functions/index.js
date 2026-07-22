@@ -348,6 +348,7 @@ async function resolveCategory(p){
 
 // Resuelve los ITEM SPECIFICS (compartido por el camino XML/Trading y el JSON/Inventory).
 // Pide a eBay los aspectos de ESA categoría y los llena con lo que tenemos (como a mano). Devuelve [{name, values:[...]}].
+const WARRANTY_VALUE = "1 Month";   // garantía fija de Legacy (si eBay rechaza este valor, prueba "30 Days")
 async function resolveSpecs(p, catId){
   const d = p.ebayDraft || {};
   const is = d.itemSpecifics || {};
@@ -378,6 +379,8 @@ async function resolveSpecs(p, catId){
   aspects.forEach((a) => addSpec(a.name, dataFor(a.name)));                                                // llena los campos que eBay pide
   Object.keys(is).forEach((k) => { if (is[k] && !/fitment|fits|compatib/i.test(k)) addSpec(k, [is[k]]); }); // + cualquier extra de la IA
   if (!seen.has("manufacturer part number") && !seen.has("mpn")) { const mpn = (d.partNumbers && d.partNumbers[0]) || d.suggestedPartNumber; if (mpn) addSpec("Manufacturer Part Number", [mpn]); }
+  // 🛡️ Garantía SIEMPRE 1 mes (lo que Legacy respeta al cliente). Pisa lo que haya puesto la IA.
+  specs.forEach((sp) => { if (/warranty/i.test(sp.name)) sp.values = [WARRANTY_VALUE]; });
   return specs;
 }
 
