@@ -34,9 +34,14 @@ const CHAT_MEMBERS = {
   "mechanic-owners":  ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","mechanic@legacymotorsgarage.com","mecanico@legacymotorsgarage.com"],
 };
 const CHAT_TITLES = {
-  "group": "Legacy Group", "owners": "Dueños", "capture-listing": "Captura ↔ Listado",
+  "group": "Legacy Group", "owners": "Supervisores", "capture-listing": "Captura ↔ Listado",
   "capture-owners": "Captura ↔ Supervisores", "listing-owners": "Listado ↔ Supervisores",
-  "warehouse-owners": "Empaque ↔ Dueños", "mechanic-owners": "Mecánico ↔ Dueños",
+  "warehouse-owners": "Empaque ↔ Supervisores", "mechanic-owners": "Mecánico ↔ Supervisores",
+};
+const CHAT_TITLES_EN = {
+  "group": "Legacy Group", "owners": "Supervisors", "capture-listing": "Capture ↔ Listing",
+  "capture-owners": "Capture ↔ Supervisors", "listing-owners": "Listing ↔ Supervisors",
+  "warehouse-owners": "Warehouse ↔ Supervisors", "mechanic-owners": "Mechanic ↔ Supervisors",
 };
 // La app llama esto DESPUÉS de guardar el mensaje (evita triggers Eventarc y sus permisos IAM).
 exports.sendChatPush = onCall({ timeoutSeconds: 30 }, async (request) => {
@@ -51,22 +56,26 @@ exports.sendChatPush = onCall({ timeoutSeconds: 30 }, async (request) => {
     const members = all.filter((e) => e !== email);              // no te notificas a ti mismo
     if (!members.length) return { ok: true, sent: 0 };
     const db = admin.firestore();
-    const tokens = [], tokDocs = [];
+    // Agrupa tokens por idioma → cada quien recibe el título en SU idioma.
+    const grp = { es: { tokens: [], refs: [] }, en: { tokens: [], refs: [] } };
     const snap = await db.collection("push_tokens").where("email", "in", members).get();
-    snap.forEach((d) => { if (d.data().token) { tokens.push(d.data().token); tokDocs.push(d.ref); } });
-    if (!tokens.length) return { ok: true, sent: 0 };
-    const title = CHAT_TITLES[ch] || "Legacy Chat";
+    snap.forEach((d) => { const dd = d.data(); if (dd.token) { const lg = (dd.lang === "en") ? "en" : "es"; grp[lg].tokens.push(dd.token); grp[lg].refs.push(d.ref); } });
     const body = (byName + ": " + text).slice(0, 180);
-    // SOLO data (sin 'notification') → la muestra el service worker UNA vez (evita el doble aviso).
-    const res = await admin.messaging().sendEachForMulticast({
-      tokens,
-      data: { title, body, channel: ch, url: "/warehouse.html?chat=" + ch },
-      webpush: { headers: { Urgency: "high", TTL: "86400" } },
-    });
-    const dead = [];
-    res.responses.forEach((r, i) => { if (!r.success) { const c = r.error && r.error.code; if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token") dead.push(tokDocs[i]); } });
+    const dead = []; let sent = 0;
+    for (const lg of ["es", "en"]) {
+      if (!grp[lg].tokens.length) continue;
+      const title = (lg === "en" ? CHAT_TITLES_EN[ch] : CHAT_TITLES[ch]) || "Legacy Chat";
+      // SOLO data (sin 'notification') → la muestra el service worker UNA vez (evita el doble aviso).
+      const res = await admin.messaging().sendEachForMulticast({
+        tokens: grp[lg].tokens,
+        data: { title, body, channel: ch, url: "/warehouse.html?chat=" + ch },
+        webpush: { headers: { Urgency: "high", TTL: "86400" } },
+      });
+      sent += res.successCount;
+      res.responses.forEach((r, i) => { if (!r.success) { const c = r.error && r.error.code; if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token") dead.push(grp[lg].refs[i]); } });
+    }
     await Promise.all(dead.map((ref) => ref.delete().catch(() => {})));
-    return { ok: true, sent: res.successCount };
+    return { ok: true, sent };
   } catch (e) { console.log("sendChatPush err", e); return { ok: false, err: String(e && e.message || e) }; }
 });
 
