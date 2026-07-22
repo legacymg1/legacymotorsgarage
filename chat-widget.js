@@ -50,7 +50,7 @@ function build(){
   document.head.appendChild(style);
   const fab=document.createElement('button'); fab.id='lcw-fab'; fab.innerHTML='💬<span id="lcw-badge"></span>'; fab.onclick=openPanel; document.body.appendChild(fab);
   const p=document.createElement('div'); p.id='lcw-panel';
-  p.innerHTML=`<div class="wrap">
+  p.innerHTML=`<div class="wrap" id="lcw-sheet">
     <div class="hd"><button id="lcw-back" style="display:none;background:none;border:none;color:#f0c040;font-size:22px;font-weight:800;">‹</button><div class="t" id="lcw-title">💬 Chat interno</div><button class="lcw-x" id="lcw-close">✕</button></div>
     <div id="lcw-list"></div>
     <div id="lcw-convo"><div id="lcw-msgs"></div>
@@ -124,10 +124,13 @@ function openConvo(k){ curCh=k; view='convo';
   renderMsgs(); markSeen(k);
   setTimeout(()=>{ const i=document.getElementById('lcw-input'); if(i) i.focus(); },100);
 }
-window.lcwOpenTo=(k)=>{ if(!k||!CH.some(c=>c.k===k)){ openPanel(); return; } open=true; document.getElementById('lcw-panel').style.display='block'; openConvo(k); };
+window.lcwOpenTo=(k)=>{ if(!k||!CH.some(c=>c.k===k)){ openPanel(); return; } open=true; document.getElementById('lcw-panel').style.display='block'; openConvo(k); vpOn(); };
 function backToList(){ view='list'; document.getElementById('lcw-convo').style.display='none'; document.getElementById('lcw-list').style.display='block'; document.getElementById('lcw-back').style.display='none'; document.getElementById('lcw-title').textContent='💬 Chat interno'; renderList(); }
-function openPanel(){ open=true; view='list'; document.getElementById('lcw-panel').style.display='block'; backToList(); }
-function closePanel(){ open=false; const p=document.getElementById('lcw-panel'); if(p)p.style.display='none'; }
+function fitSheet(){ const sh=document.getElementById('lcw-sheet'), vv=window.visualViewport; if(!sh||!vv) return; sh.style.bottom='auto'; sh.style.height=vv.height+'px'; sh.style.transform='translateY('+vv.offsetTop+'px)'; }
+function vpOn(){ const vv=window.visualViewport; if(!vv) return; vv.addEventListener('resize',fitSheet); vv.addEventListener('scroll',fitSheet); fitSheet(); }
+function vpOff(){ const vv=window.visualViewport, sh=document.getElementById('lcw-sheet'); if(vv){ vv.removeEventListener('resize',fitSheet); vv.removeEventListener('scroll',fitSheet); } if(sh){ sh.style.height=''; sh.style.transform=''; sh.style.bottom='0'; } }
+function openPanel(){ open=true; view='list'; document.getElementById('lcw-panel').style.display='block'; backToList(); vpOn(); }
+function closePanel(){ open=false; const p=document.getElementById('lcw-panel'); if(p)p.style.display='none'; vpOff(); }
 function renderMsgs(){
   const box=document.getElementById('lcw-msgs'); if(!box) return;
   const arr=msgs[curCh]||[];

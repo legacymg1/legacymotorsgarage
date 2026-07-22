@@ -202,7 +202,7 @@
 <!-- 💬 Chat interno (Capture ↔ Listing, luego todos) -->
 <button id="fab-chat" onclick="openChat()" style="display:none;position:fixed;left:18px;bottom:22px;z-index:8000;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:30px;width:54px;height:54px;font-size:22px;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;">💬<span id="chat-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:20px;min-width:20px;height:20px;font-size:11px;font-weight:800;line-height:20px;padding:0 5px;"></span></button>
 <div id="chat-panel" style="display:none;position:fixed;inset:0;z-index:9600;background:var(--bg);">
-  <div style="position:absolute;inset:0;max-width:600px;margin:0 auto;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+  <div id="chat-sheet" style="position:absolute;top:0;left:0;right:0;bottom:0;max-width:600px;margin:0 auto;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
     <!-- Encabezado FIJO -->
     <div style="flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 14px 12px;border-bottom:1px solid var(--border);background:var(--surface);">
       <button id="chat-back" onclick="chatBackToList()" style="display:none;background:none;border:none;color:var(--gold);font-size:22px;font-weight:800;cursor:pointer;line-height:1;">‹</button>
@@ -588,8 +588,12 @@ window.chatBackToList=function(){
   document.getElementById('chat-header').innerHTML='💬 '+t('chatTitle');
   renderChatList();
 };
-window.openChat=function(){ _chatOpen=true; _chatViewMode='list'; document.getElementById('chat-panel').style.display='block'; chatBackToList(); };
-window.closeChat=function(){ _chatOpen=false; const p=document.getElementById('chat-panel'); if(p) p.style.display='none'; };
+// 📱 Ancla el panel al área VISIBLE (arregla que el teclado esconda la barra de arriba en iPhone)
+function fitChatSheet(){ const sh=document.getElementById('chat-sheet'), vv=window.visualViewport; if(!sh||!vv) return; sh.style.bottom='auto'; sh.style.height=vv.height+'px'; sh.style.transform='translateY('+vv.offsetTop+'px)'; }
+function chatViewportOn(){ const vv=window.visualViewport; if(!vv) return; vv.addEventListener('resize',fitChatSheet); vv.addEventListener('scroll',fitChatSheet); fitChatSheet(); }
+function chatViewportOff(){ const vv=window.visualViewport, sh=document.getElementById('chat-sheet'); if(vv){ vv.removeEventListener('resize',fitChatSheet); vv.removeEventListener('scroll',fitChatSheet); } if(sh){ sh.style.height=''; sh.style.transform=''; sh.style.bottom='0'; } }
+window.openChat=function(){ _chatOpen=true; _chatViewMode='list'; document.getElementById('chat-panel').style.display='block'; chatBackToList(); chatViewportOn(); };
+window.closeChat=function(){ _chatOpen=false; const p=document.getElementById('chat-panel'); if(p) p.style.display='none'; chatViewportOff(); };
 // 🔔 Abre el chat directamente en un canal (al tocar una notificación)
 function openChatToChannel(ch){
   if(!ch || !_chatChans.some(c=>c.key===ch)) { openChat(); return; }
