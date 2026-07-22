@@ -476,12 +476,35 @@ function startChat(){
   _chatChans.forEach(c=>{
     if(_chatUnsub[c.key]) return;
     const qy=query(collection(db,'chat_channels',c.key,'messages'), orderBy('ts'), limit(300));
-    _chatUnsub[c.key]=onSnapshot(qy, s=>{ _chatMsgs[c.key]=s.docs.map(d=>({id:d.id,...d.data()}));
+    _chatUnsub[c.key]=onSnapshot(qy, s=>{
+      const prevMax=_chatMaxTms[c.key]||0, wasInit=_chatInit[c.key];
+      _chatMsgs[c.key]=s.docs.map(d=>({id:d.id,...d.data()}));
+      const arr=_chatMsgs[c.key];
+      const newMax=arr.reduce((m,x)=>Math.max(m,x.tms||0),0);
+      // Aviso DENTRO de la app: mensaje nuevo de OTRA conversación (no la que estás viendo)
+      if(wasInit){
+        const fresh=arr.filter(x=>(x.tms||0)>prevMax && (x.byEmail||'')!==myEmail);
+        const viewing=(_chatOpen && _chatViewMode==='convo' && _chatCh===c.key);
+        if(fresh.length && !viewing) showChatToast(c.key, fresh[fresh.length-1]);
+      }
+      _chatMaxTms[c.key]=newMax; _chatInit[c.key]=true;
       if(_chatOpen && _chatViewMode==='convo' && _chatCh===c.key){ renderChat(); markChatSeen(c.key); }
       else if(_chatOpen && _chatViewMode==='list'){ renderChatList(); }
       updateChatBadge();
     }, e=>console.log('chat',c.key,e));
   });
+}
+let _chatMaxTms={}, _chatInit={}, _chatToastT=null;
+function showChatToast(key, m){
+  const c=chanOf(key); if(!c) return;
+  let el=document.getElementById('chat-toast');
+  if(!el){ el=document.createElement('div'); el.id='chat-toast'; el.style.cssText='position:fixed;top:calc(10px + env(safe-area-inset-top));left:10px;right:10px;max-width:560px;margin:0 auto;z-index:9800;background:var(--surface);border:1px solid var(--gold);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.55);padding:11px 14px;display:none;cursor:pointer;'; document.body.appendChild(el); }
+  el.onclick=()=>{ el.style.display='none'; openChatToChannel(key); };
+  el.innerHTML='<div style="font-weight:800;font-size:13px;">💬 '+esc(chanLabel(c))+'</div><div class="sub" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc((m.byName||'')+': '+(m.text||''))+'</div>';
+  el.style.display='block';
+  try{ if(navigator.vibrate) navigator.vibrate(60); }catch(e){}
+  if(_chatToastT) clearTimeout(_chatToastT);
+  _chatToastT=setTimeout(()=>{ if(el) el.style.display='none'; }, 5000);
 }
 function unreadFor(key){ return (_chatMsgs[key]||[]).filter(m=>(m.tms||0)>(_chatSeen[key]||0) && (m.byEmail||'')!==myEmail).length; }
 function lastMsgOf(key){ const a=_chatMsgs[key]||[]; return a.length?a[a.length-1]:null; }
