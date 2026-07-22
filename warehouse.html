@@ -555,18 +555,21 @@ window.sendChat=async function(){
 };
 
 // ---- 🔔 PUSH (FCM) ----
-let _pushReg=null;
+let _pushReg=null, _lastPushErr='';
 function pushConfigured(){ return typeof VAPID_KEY==='string' && VAPID_KEY.indexOf('PASTE')<0 && VAPID_KEY.length>20; }
 async function ensurePushToken(){
+  _lastPushErr='';
   try{
-    if(!pushConfigured()) return false;
-    if(Notification.permission!=='granted') return false;
-    if(!(await isSupported())) return false;
-    if(!_messaging) _messaging=getMessaging(app);
+    if(!pushConfigured()){ _lastPushErr='sin VAPID'; return false; }
+    if(Notification.permission!=='granted'){ _lastPushErr='sin permiso'; return false; }
+    if(!(await isSupported())){ _lastPushErr='navegador no soporta FCM (¿app instalada? iOS 16.4+)'; return false; }
     if(!_pushReg) _pushReg=await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    await navigator.serviceWorker.ready;                 // espera a que el SW esté activo (arregla varios errores en iOS)
+    if(!_messaging) _messaging=getMessaging(app);
     const tok=await getToken(_messaging,{vapidKey:VAPID_KEY, serviceWorkerRegistration:_pushReg});
     if(tok){ await setDoc(doc(db,'push_tokens',tok),{ token:tok, email:myEmail, role:role, ts:new Date().toISOString() }); return true; }
-  }catch(e){ console.log('push token',e); }
+    _lastPushErr='sin token';
+  }catch(e){ _lastPushErr=(e&&(e.message||e.code))||String(e); console.log('push token',e); }
   return false;
 }
 window.enablePush=async function(btn){
@@ -577,7 +580,7 @@ window.enablePush=async function(btn){
     if(perm!=='granted'){ alert(t('pushDenied')); renderChatList(); return; }
     const ok=await ensurePushToken();
     renderChatList();
-    if(btn) alert(ok?t('pushOn'):t('pushErr'));
+    if(btn) alert(ok?t('pushOn'):(t('pushErr')+'\n\n['+_lastPushErr+']'));   // muestra el error EXACTO
   }catch(e){ alert(t('error')+((e&&e.message)||e)); }
 };
 function pushEnabled(){ return ('Notification' in window) && Notification.permission==='granted'; }
