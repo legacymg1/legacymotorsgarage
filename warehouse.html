@@ -94,7 +94,7 @@
 
   <!-- ===================== CAPTURA ===================== -->
   <div id="view-yard" style="display:none;">
-    <div class="card" style="margin-bottom:14px;">
+    <div class="card" id="addcar-card" style="margin-bottom:14px;">
       <div onclick="toggleAddCar()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
         <span style="font-weight:800;" data-i18n="addCar">➕ Carro a desmantelar</span>
         <span id="addcar-arrow" class="gold" style="font-size:18px;">▾</span>
@@ -133,6 +133,17 @@
       <input type="file" id="v-cam" accept="image/*" capture="environment" multiple style="display:none" onchange="addCarPhotos(this)">
       <input type="file" id="v-photos" accept="image/*" multiple style="display:none" onchange="addCarPhotos(this)">
       <div id="v-prev" class="thumbs"></div>
+      <label data-i18n="carCostLbl">💵 Costo del carro ($)</label>
+      <input id="v-cost" type="number" inputmode="decimal" placeholder="0">
+      <div class="sub" style="font-size:11px;margin:-2px 0 8px;" data-i18n="carCostHint">Se registra como gasto en Finanzas (tu bolsa), concepto "Carro para desmantelar".</div>
+      <label data-i18n="carDocsLbl">📄 Documentación (papeles del carro)</label>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('v-doc-cam').click()" data-i18n="takePhoto">📷 Cámara</button>
+        <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('v-doc-file').click()" data-i18n="fromFile">📁 Archivo</button>
+      </div>
+      <input type="file" id="v-doc-cam" accept="image/*" capture="environment" multiple style="display:none" onchange="addCarDocs(this)">
+      <input type="file" id="v-doc-file" accept="image/*" multiple style="display:none" onchange="addCarDocs(this)">
+      <div id="v-doc-prev" class="thumbs"></div>
       <button class="btn" style="width:100%;margin-top:12px;" id="v-save" onclick="saveVehicle()" data-i18n="saveCar">Guardar carro</button>
       </div>
     </div>
@@ -275,7 +286,7 @@ const T={
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Escanea o pega el código…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería', fromFile:'📁 Archivo', photoStarHint:'⭐ mándala al frente · 🤖 el bot lee las 2 primeras', photoToFront:'Mandar al frente',
     carPhoto:'📷 Foto del carro', binLbl:'📦 Bin', binPh:'Ej. A-14', backCars:'← Carros', vinFichaBtn:'📋 Ficha del VIN', specSearchPh:'🔎 Buscar dato…', partsTitle:'Partes del carro', addPartFab:'Parte', noPhoto:'Sin foto', closeLbl:'Cerrar', tapForParts:'Toca para ver el carro y sus partes',
-    titleBtn:'📄 Título', titleModalTitle:'📄 Título / Papeles del carro', titleHint:'Foto del título, lien, o la hoja del DMV que comprueba que el carro es de Legacy. Solo tú y tu socio ven esto.', noTitleYet:'Aún no hay título/papeles. Agrega la foto ↑', savingTitle:'Guardando…', statusLbl:'Estado del carro', carCost:'💵 Costo del carro (lo que pagamos)',
+    titleBtn:'📄 Título', titleModalTitle:'📄 Título / Papeles del carro', titleHint:'Foto del título, lien, o la hoja del DMV que comprueba que el carro es de Legacy. Solo tú y tu socio ven esto.', noTitleYet:'Aún no hay título/papeles. Agrega la foto ↑', savingTitle:'Guardando…', statusLbl:'Estado del carro', carCost:'💵 Costo del carro (lo que pagamos)', carCostLbl:'💵 Costo del carro ($)', carCostHint:'Se registra como gasto en Finanzas (tu bolsa), concepto "Carro para desmantelar".', carDocsLbl:'📄 Documentación (papeles del carro)', carDocsBtn:'Documentación', carDocsHint:'Foto de TODOS los papeles del carro (título, factura, hoja del DMV, etc.). Solo tú y tu socio ven esto.', noDocsYet:'Aún no hay documentos. Agrega fotos ↑', docsReady:'documento(s) listo(s)', savingDocs:'Subiendo documentos…',
     searchCarPh:'🔎 Buscar carro…', noCarsMatch:'Ningún carro coincide.', editLbl:'✏️ Editar', deleteLbl:'🗑️ Eliminar', editPart:'✏️ Editar parte', deletePart:'🗑️ Eliminar parte', saveChanges:'Guardar cambios', confirmDelCar:'¿Eliminar este carro? No se puede deshacer.', confirmDelPart:'¿Eliminar esta parte? No se puede deshacer.', carHasParts:'Este carro tiene N parte(s). Elimina o mueve sus partes primero.',
     printLabel:'🖨️ Imprimir etiqueta', labelTitle:'Etiqueta', labelShare:'📤 Compartir a la impresora', labelHint:'Elige la app de Rongta para imprimir. Si no aparece, mantén presionada la imagen, guárdala y ábrela en la app de Rongta.', labelNoShare:'Tu dispositivo no deja compartir el archivo. Mantén presionada la imagen para guardarla y ábrela en la app de Rongta.', makingLabel:'Generando etiqueta…',
     photoOrderTitle:'Orden de las fotos (para el bot):', photoOrderHint:'1ª foto: el NÚMERO / etiqueta de cerca y bien legible. 2ª foto: general de la pieza. Luego las demás que quieras para el anuncio. El bot lee solo las primeras — por eso el número va primero. (Si hay otro número importante, tómalo también entre las primeras.)', quickItemBtn:'Artículo rápido (sin carro)', looseItems:'Artículos sueltos', quickItemTitle:'Artículo rápido', quickItemHint:'Para partes que subes tú sin carro en el inventario (ej. estéreos). Genera el QR, imprime desde la máquina y sube las fotos. El carro es solo de referencia para el anuncio — opcional.', refVehicle:'Carro de referencia (opcional)', vinFillHint:'(opcional — llena los datos del carro solo, NO crea un carro)', trimLbl:'Versión', stickerLbl:'Estampa (número)', stickerPh:'Número de la estampa (ej. 0042)', stickerDup:'⚠️ Ese número ya está en uso', stickerFree:'✓ número libre', stickerDupConfirm:'⚠️ Ese número de estampa ya está en una parte activa. ¿Guardar de todos modos?', quickAddBtn:'➕ Agregar parte (estampa + bin)', quickAddTitle:'➕ Agregar parte rápida', quickAddHint:'Para dar de alta piezas de topers viejos: solo estampa + bin. El nombre y las fotos se agregan después.', stickerReq:'Pon el número de la estampa.', looseItem:'Artículo suelto', genLabelBtn:'🖨️ Generar e imprimir QR', labelBeforePhotos:'Imprime el QR y pégalo en la parte ANTES de tomar las fotos, así el QR sale en las fotos.', labelPrint:'🖨️ Imprimir', labelPrintHint:'Se abre la vista de impresión — desde ahí comparte a la app de Rongta (o elige la impresora).', copyQrLink:'📋 Copiar link (QR nativo RLabel)', copiedLink:'✓ Copiado — pégalo en el QR de RLabel',
@@ -295,7 +306,7 @@ const T={
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Scan or paste the code…',
     addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery', fromFile:'📁 File', photoStarHint:'⭐ send to front · 🤖 bot reads the first 2', photoToFront:'Send to front',
     carPhoto:'📷 Car photo', binLbl:'📦 Bin', binPh:'e.g. A-14', backCars:'← Cars', vinFichaBtn:'📋 VIN details', specSearchPh:'🔎 Search detail…', partsTitle:'Car parts', addPartFab:'Part', noPhoto:'No photo', closeLbl:'Close', tapForParts:'Tap to open the car and its parts',
-    titleBtn:'📄 Title', titleModalTitle:'📄 Car title / papers', titleHint:'Photo of the title, lien, or DMV sheet proving Legacy owns the car. Only you and your partner can see this.', noTitleYet:'No title/papers yet. Add the photo ↑', savingTitle:'Saving…', statusLbl:'Car status', carCost:'💵 Car cost (what we paid)',
+    titleBtn:'📄 Title', titleModalTitle:'📄 Car title / papers', titleHint:'Photo of the title, lien, or DMV sheet proving Legacy owns the car. Only you and your partner can see this.', noTitleYet:'No title/papers yet. Add the photo ↑', savingTitle:'Saving…', statusLbl:'Car status', carCost:'💵 Car cost (what we paid)', carCostLbl:'💵 Car cost ($)', carCostHint:'Logged as an expense in Finanzas (your pocket), concept "Car to dismantle".', carDocsLbl:'📄 Documentation (car papers)', carDocsBtn:'Documentation', carDocsHint:'Photo of ALL the car papers (title, invoice, DMV sheet, etc.). Only you and your partner can see this.', noDocsYet:'No documents yet. Add photos ↑', docsReady:'document(s) ready', savingDocs:'Uploading documents…',
     searchCarPh:'🔎 Search car…', noCarsMatch:'No car matches.', editLbl:'✏️ Edit', deleteLbl:'🗑️ Delete', editPart:'✏️ Edit part', deletePart:'🗑️ Delete part', saveChanges:'Save changes', confirmDelCar:'Delete this car? This cannot be undone.', confirmDelPart:'Delete this part? This cannot be undone.', carHasParts:'This car has N part(s). Delete or move its parts first.',
     printLabel:'🖨️ Print label', labelTitle:'Label', labelShare:'📤 Share to printer', labelHint:'Pick the Rongta app to print. If it is not listed, long-press the image, save it, and open it in the Rongta app.', labelNoShare:'Your device cannot share the file. Long-press the image to save it and open it in the Rongta app.', makingLabel:'Building label…',
     photoOrderTitle:'Photo order (for the bot):', photoOrderHint:'1st photo: the NUMBER / label, close-up and readable. 2nd photo: a general shot of the part. Then any others for the listing. The bot only reads the first ones — so the number goes first. (If there is another important number, take it among the first ones too.)', quickItemBtn:'Quick item (no car)', looseItems:'Loose items', quickItemTitle:'Quick item', quickItemHint:'For parts you list yourself with no car in inventory (e.g. stereos). Generate the QR, print from the machine and upload the photos. The car is just a reference for the listing — optional.', refVehicle:'Reference vehicle (optional)', vinFillHint:'(optional — fills the car info only, does NOT create a car)', trimLbl:'Trim', stickerLbl:'Sticker (number)', stickerPh:'Sticker number (e.g. 0042)', stickerDup:'⚠️ That number is already in use', stickerFree:'✓ number free', stickerDupConfirm:'⚠️ That sticker number is already on an active part. Save anyway?', quickAddBtn:'➕ Add part (sticker + bin)', quickAddTitle:'➕ Quick add part', quickAddHint:'To log parts from old totes: just sticker + bin. Add the name and photos later.', stickerReq:'Enter the sticker number.', looseItem:'Loose item', genLabelBtn:'🖨️ Generate & print QR', labelBeforePhotos:'Print the QR and stick it on the part BEFORE taking the photos, so the QR shows in them.', labelPrint:'🖨️ Print', labelPrintHint:'The print view opens — from there share to the Rongta app (or pick the printer).', copyQrLink:'📋 Copy link (RLabel native QR)', copiedLink:'✓ Copied — paste it into the RLabel QR',
@@ -398,6 +409,7 @@ onAuthStateChanged(auth,(user)=>{
     document.getElementById('who').textContent = whoLabel(email,role);
     document.body.classList.toggle('owner-nav', role==='owner');
     buildTabs();
+    const acCard=document.getElementById('addcar-card'); if(acCard) acCard.style.display = (role==='owner') ? '' : 'none';   // solo el dueño agrega carros
     if(!_listening){ _listening=true; startListening(); }
     startChat();   // 💬 chat multi-canal — se auto-filtra: cada rol ve solo sus canales (dueños ven los 3)
     initPush();    // 🔔 refresca token si ya dio permiso + escucha mensajes en foreground
@@ -790,9 +802,17 @@ window.stopVinCam=function(){
 function stopVinCam(){ window.stopVinCam(); }
 
 // Fotos del carro (cámara una por una + galería), se acumulan igual que las partes
-let _carFiles=[];
+let _carFiles=[], _carDocFiles=[];
 window.addCarPhotos=async function(inp){ await pushImgs(_carFiles, inp, renderCarPhotos); };
 window.removeCarPhoto=function(i){ _carFiles.splice(i,1); renderCarPhotos(); };
+window.addCarDocs=async function(inp){ await pushImgs(_carDocFiles, inp, renderCarDocs); };
+window.removeCarDoc=function(i){ _carDocFiles.splice(i,1); renderCarDocs(); };
+function renderCarDocs(){ const box=document.getElementById('v-doc-prev'); if(!box) return; if(!_carDocFiles.length){ box.innerHTML=''; return; }
+  box.innerHTML='<div style="font-size:12px;color:var(--faint);margin:4px 0;width:100%;">📄 '+_carDocFiles.length+' '+t('docsReady')+'</div>'
+    +_carDocFiles.map((f,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${URL.createObjectURL(f)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;"><button type="button" onclick="removeCarDoc(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
+}
+// Bolsa (dept de Finanzas) de quien agrega: ev→dealer, ivan→parts
+function myBolsa(){ return myEmail==='ivan.garcia@legacymotorsgarage.com' ? 'parts' : 'dealer'; }
 function renderCarPhotos(){
   const box=document.getElementById('v-prev'); if(!box) return;
   if(!_carFiles.length){ box.innerHTML=''; return; }
@@ -809,14 +829,30 @@ window.saveVehicle=async function(){
   try{
     const photoURLs=[];
     for(const f of _carFiles){ btn.textContent=t('savingPhotos'); const jpg=await toJpeg(f); const r=ref(storage,'dismantle_vehicles/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); photoURLs.push(await getDownloadURL(r)); }
+    const docURLs=[];
+    for(const f of _carDocFiles){ btn.textContent=t('savingDocs'); const jpg=await toJpeg(f); const r=ref(storage,'dismantle_vehicles/'+id+'/docs/'+Date.now()+'_'+(jpg.name||'doc.jpg')); await uploadBytes(r,jpg); docURLs.push(await getDownloadURL(r)); }
+    const costUsd=Number((document.getElementById('v-cost')||{}).value)||0;
+    const costCents=Math.round(costUsd*100);
+    const label=[year,make,model].filter(Boolean).join(' ')||vin||'Carro';
+    let costTxId='';
+    // 💰 Registra el costo como gasto en Finanzas (bolsa de quien lo agrega)
+    if(costCents>0){
+      costTxId='veh_'+id;
+      try{ await setDoc(doc(db,'transactions',costTxId), {
+        entryId:costTxId, type:'expense', dept:myBolsa(), category:'Carro para desmantelar',
+        amountCents:costCents, method:'', date:new Date().toISOString().slice(0,10), vendor:'',
+        carId:id, carLabel:label, receiptURL:'', note:'Carro para desmantelar (yarda): '+label+(vin?' · VIN '+vin:''),
+        createdAt:new Date().toISOString(), createdBy:myEmail, source:'warehouse' }); }
+      catch(e){ alert(t('error')+'Finanzas: '+e.message); }
+    }
     await setDoc(doc(db,'dismantle_vehicles',id), { entryId:id, vin, year, make, model,
       miles:document.getElementById('v-miles').value.trim(),
       engine:document.getElementById('v-engine').value.trim(), color:titleCase(document.getElementById('v-color').value.trim()), colorCode:document.getElementById('v-colorcode').value.trim().toUpperCase(),
-      photoURLs,
+      photoURLs, docURLs, costCents:costCents||null, costTxId:costTxId||null, costBolsa:costCents>0?myBolsa():null,
       spec: (_vSpec && _vSpec.vin===vin) ? _vSpec : null,   // ficha NHTSA (Nivel 1) — extensible a Nivel 2
       status:'desmantelando', createdAt:new Date().toISOString(), createdBy:myEmail });
-    ['v-vin','v-year','v-make','v-model','v-miles','v-engine','v-color','v-colorcode'].forEach(x=>document.getElementById(x).value='');
-    document.getElementById('v-decode-msg').textContent=''; _vSpec=null; renderVSpec(null); _carFiles=[]; renderCarPhotos();
+    ['v-vin','v-year','v-make','v-model','v-miles','v-engine','v-color','v-colorcode','v-cost'].forEach(x=>{ const el=document.getElementById(x); if(el) el.value=''; });
+    document.getElementById('v-decode-msg').textContent=''; _vSpec=null; renderVSpec(null); _carFiles=[]; renderCarPhotos(); _carDocFiles=[]; renderCarDocs();
     _selVeh=id;
   }catch(e){ alert(t('error')+e.message); }
   btn.disabled=false; btn.textContent=t('saveCar');
@@ -949,17 +985,21 @@ function renderCarDetail(){
   const info=[ v.vin?('VIN '+v.vin):'', v.miles?(Number(v.miles).toLocaleString()+' mi'):'', v.engine||'', [v.color,v.colorCode].filter(Boolean).join(' · ') ]
     .filter(Boolean).map(x=>`<div class="sub" style="margin:2px 0;">${x}</div>`).join('');
   const specBtn = (v.spec&&v.spec.all&&v.spec.all.length) ? `<button class="btn ghost sm" onclick="openSpecModal('${v.id}')">${t('vinFichaBtn')} (${v.spec.all.length})</button>` : '';
-  // 📄 Título/papeles — SOLO dueños (tú e Ivan), no el empleado de captura
+  // 📄 Título/papeles + 📄 Documentación + 💵 costo — SOLO dueños (tú e Ivan), no el empleado de captura
   const titleBtn = (role==='owner') ? `<button class="btn ghost sm" onclick="openTitleModal('${v.id}')">${t('titleBtn')}${(v.titleURLs&&v.titleURLs.length)?' ✓':''}</button>` : '';
-  const btnRow = (specBtn||titleBtn) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${specBtn}${titleBtn}</div>` : '';
+  const docsBtn = (role==='owner') ? `<button class="btn ghost sm" onclick="openDocsModal('${v.id}')">📄 ${t('carDocsBtn')}${(v.docURLs&&v.docURLs.length)?' ('+v.docURLs.length+')':''}</button>` : '';
+  const costTag = (role==='owner' && v.costCents) ? `<div class="sub" style="margin:6px 2px 0;">💵 ${t('carCost')}: $${(v.costCents/100).toFixed(2)}${v.costBolsa?' · '+(v.costBolsa==='parts'?'Partes':v.costBolsa==='ebay'?'eBay':'Dealer'):''}</div>` : '';
+  const btnRow = (specBtn||titleBtn||docsBtn) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${specBtn}${titleBtn}${docsBtn}</div>` : '';
+  const canEditCar = (role==='owner');
   box.innerHTML=`
     <button class="btn ghost sm" style="margin-bottom:12px;" onclick="closeCar()">${t('backCars')}</button>
     <div class="card" style="display:flex;gap:14px;align-items:flex-start;">
       ${photoEl}
-      <div style="flex:1;min-width:0;cursor:pointer;" onclick="openCarEdit('${v.id}')">
-        <div class="title" style="font-size:20px;margin-bottom:4px;">${vehLabel(v)} <span style="font-size:13px;color:var(--faint);font-weight:600;">✏️</span></div>
+      <div style="flex:1;min-width:0;${canEditCar?'cursor:pointer;':''}" ${canEditCar?`onclick="openCarEdit('${v.id}')"`:''}>
+        <div class="title" style="font-size:20px;margin-bottom:4px;">${vehLabel(v)} ${canEditCar?'<span style="font-size:13px;color:var(--faint);font-weight:600;">✏️</span>':''}</div>
         <div style="margin:2px 0 6px;"><span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;">${carStatusLabel(v.status)}</span></div>
         ${info}
+        ${costTag}
       </div>
     </div>
     ${btnRow}
@@ -1081,6 +1121,7 @@ function isDeleter(){ return myEmail==='ev@legacymotorsgarage.com'; }   // quien
 // ---- Editar / eliminar CARRO ----
 let _editCarKeep=[], _editCarNew=[];
 window.openCarEdit=function(id){
+  if(role!=='owner') return;   // solo el dueño edita el vehículo
   const v=vehicles.find(x=>x.id===id); if(!v) return;
   _editCarKeep=(v.photoURLs||[]).slice(); _editCarNew=[];
   document.getElementById('modal-inner').innerHTML=`
@@ -1122,7 +1163,16 @@ window.saveCarEdit=async function(id){
     const photoURLs=_editCarKeep.concat(newURLs);
     const stEl=document.getElementById('ec-status');
     const upd={ year:g('ec-year'), make:titleCase(g('ec-make')), model:titleCase(g('ec-model')), miles:g('ec-miles'), engine:g('ec-engine'), color:titleCase(g('ec-color')), colorCode:g('ec-colorcode').toUpperCase(), vin:g('ec-vin').toUpperCase(), photoURLs, status:(stEl&&stEl.value)||'desmantelando' };
-    const costEl=document.getElementById('ec-cost'); if(costEl && costEl.value!=='') upd.costCents=Math.round((Number(costEl.value)||0)*100);
+    const costEl=document.getElementById('ec-cost');
+    if(costEl && costEl.value!==''){
+      const newCents=Math.round((Number(costEl.value)||0)*100); upd.costCents=newCents;
+      const v=vehicles.find(x=>x.id===id)||{};
+      const label=[g('ec-year'),titleCase(g('ec-make')),titleCase(g('ec-model'))].filter(Boolean).join(' ')||g('ec-vin')||'Carro';
+      let txId=v.costTxId;
+      if(txId){ try{ await updateDoc(doc(db,'transactions',txId),{ amountCents:newCents, carLabel:label, category:'Carro para desmantelar', note:'Carro para desmantelar (yarda): '+label }); }catch(e){} }
+      else if(newCents>0){ txId='veh_'+id; upd.costTxId=txId; upd.costBolsa=v.costBolsa||myBolsa();
+        try{ await setDoc(doc(db,'transactions',txId),{ entryId:txId, type:'expense', dept:(v.costBolsa||myBolsa()), category:'Carro para desmantelar', amountCents:newCents, method:'', date:new Date().toISOString().slice(0,10), vendor:'', carId:id, carLabel:label, receiptURL:'', note:'Carro para desmantelar (yarda): '+label, createdAt:new Date().toISOString(), createdBy:myEmail, source:'warehouse' }); }catch(e){} }
+    }
     await updateDoc(doc(db,'dismantle_vehicles',id), upd);
     _editCarNew=[]; closeModal(); if(_carView) renderCarDetail();
   }catch(e){ alert(t('error')+e.message); if(btn){ btn.disabled=false; btn.textContent=t('saveChanges'); } }
@@ -1172,6 +1222,47 @@ window.saveTitle=async function(id){
     const titleURLs=_titleKeep.concat(newURLs);
     await updateDoc(doc(db,'dismantle_vehicles',id),{ titleURLs, titleBy:myEmail, titleAt:new Date().toISOString() });
     _titleNew=[]; closeModal(); if(_carView) renderCarDetail();
+  }catch(e){ alert(t('error')+e.message); if(btn){ btn.disabled=false; btn.textContent=t('saveChanges'); } }
+};
+
+// ---- 📄 Documentación (papeles del carro, SOLO dueños) ----
+let _docsKeep=[], _docsNew=[];
+window.openDocsModal=function(id){
+  if(role!=='owner') return;
+  const v=vehicles.find(x=>x.id===id); if(!v) return;
+  _docsKeep=(v.docURLs||[]).slice(); _docsNew=[];
+  document.getElementById('modal-inner').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-weight:800;">📄 ${t('carDocsBtn')}</div><button class="btn ghost sm" onclick="closeModal()">✕</button></div>
+    <div class="sub" style="margin-bottom:10px;">${t('carDocsHint')}</div>
+    <div style="display:flex;gap:8px;">
+      <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('dd-cam').click()">${t('takePhoto')}</button>
+      <button type="button" class="btn ghost sm" style="flex:1" onclick="document.getElementById('dd-file').click()">${t('fromFile')}</button>
+    </div>
+    <input type="file" id="dd-cam" accept="image/*" capture="environment" multiple style="display:none" onchange="addDocPhotos(this)">
+    <input type="file" id="dd-file" accept="image/*" multiple style="display:none" onchange="addDocPhotos(this)">
+    <div id="dd-prev" class="thumbs" style="margin-top:10px;"></div>
+    <button class="btn" id="dd-save" style="width:100%;margin-top:12px;" onclick="saveDocs('${id}')">${t('saveChanges')}</button>`;
+  document.getElementById('modal').style.display='block';
+  renderDocPhotos();
+};
+window.addDocPhotos=async function(inp){ await pushImgs(_docsNew, inp, renderDocPhotos); };
+window.removeDocKeep=function(i){ _docsKeep.splice(i,1); renderDocPhotos(); };
+window.removeDocNew=function(i){ _docsNew.splice(i,1); renderDocPhotos(); };
+function renderDocPhotos(){
+  const box=document.getElementById('dd-prev'); if(!box) return;
+  const ex=_docsKeep.map((u,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${u}" onclick="openPhoto('${u}')" style="width:72px;height:72px;object-fit:cover;border-radius:8px;cursor:pointer;"><button type="button" onclick="event.stopPropagation();removeDocKeep(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
+  const nw=_docsNew.map((f,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${URL.createObjectURL(f)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--gold);"><button type="button" onclick="removeDocNew(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
+  box.innerHTML=(ex+nw) || ('<div class="sub">'+t('noDocsYet')+'</div>');
+}
+window.saveDocs=async function(id){
+  if(role!=='owner') return;
+  const btn=document.getElementById('dd-save'); if(btn){ btn.disabled=true; btn.textContent=t('savingDocs'); }
+  try{
+    const newURLs=[];
+    for(const f of _docsNew){ const jpg=await toJpeg(f); const r=ref(storage,'dismantle_vehicles/'+id+'/docs/'+Date.now()+'_'+(jpg.name||'doc.jpg')); await uploadBytes(r,jpg); newURLs.push(await getDownloadURL(r)); }
+    const docURLs=_docsKeep.concat(newURLs);
+    await updateDoc(doc(db,'dismantle_vehicles',id),{ docURLs, docsBy:myEmail, docsAt:new Date().toISOString() });
+    _docsNew=[]; closeModal(); if(_carView) renderCarDetail();
   }catch(e){ alert(t('error')+e.message); if(btn){ btn.disabled=false; btn.textContent=t('saveChanges'); } }
 };
 
