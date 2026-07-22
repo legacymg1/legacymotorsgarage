@@ -189,7 +189,7 @@ window.lcwReact=async (msgId,emoji)=>{
   hideReactPicker();
   const rid=curCh+'__'+msgId+'__'+ME;
   const mine=!!(reax[msgId]&&reax[msgId][emoji]&&reax[msgId][emoji].indexOf(ME)>=0);
-  try{ if(mine){ await deleteDoc(doc(db,'chat_reactions',rid)); } else { await setDoc(doc(db,'chat_reactions',rid),{ ch:curCh, msgId, email:ME, emoji, at:new Date().toISOString() }); } }catch(e){ console.log('react',e); }
+  try{ if(mine){ await deleteDoc(doc(db,'chat_reactions',rid)); } else { await setDoc(doc(db,'chat_reactions',rid),{ ch:curCh, msgId, email:ME, emoji, at:new Date().toISOString() }); } }catch(e){ console.log('react',e); alert('Reacción no se guardó: '+((e&&e.message)||e)); }
 };
 async function send(){
   const i=document.getElementById('lcw-input'); if(!i||!curCh) return;
