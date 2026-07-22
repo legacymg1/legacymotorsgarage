@@ -646,7 +646,8 @@ async function ensurePushToken(){
     if(!pushConfigured()){ _lastPushErr='sin VAPID'; return false; }
     if(Notification.permission!=='granted'){ _lastPushErr='sin permiso'; return false; }
     if(!(await isSupported())){ _lastPushErr='navegador no soporta FCM (¿app instalada? iOS 16.4+)'; return false; }
-    if(!_pushReg) _pushReg=await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    // Scope propio para el SW de notificaciones → NO choca con sw-warehouse.js (que controla la raíz "/").
+    if(!_pushReg) _pushReg=await navigator.serviceWorker.register('firebase-messaging-sw.js',{scope:'/firebase-cloud-messaging-push-scope'});
     await navigator.serviceWorker.ready;                 // espera a que el SW esté activo (arregla varios errores en iOS)
     if(!_messaging) _messaging=getMessaging(app);
     const tok=await getToken(_messaging,{vapidKey:VAPID_KEY, serviceWorkerRegistration:_pushReg});

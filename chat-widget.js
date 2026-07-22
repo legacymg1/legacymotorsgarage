@@ -162,7 +162,7 @@ function toast(k,m){
 function pushOn(){ return ('Notification' in window) && Notification.permission==='granted'; }
 async function ensureToken(){ try{
   if(!pushOn()) return false; if(!(await isSupported())) return false;
-  if(!reg) reg=await navigator.serviceWorker.register('firebase-messaging-sw.js'); await navigator.serviceWorker.ready;
+  if(!reg) reg=await navigator.serviceWorker.register('firebase-messaging-sw.js',{scope:'/firebase-cloud-messaging-push-scope'}); await navigator.serviceWorker.ready;
   if(!msgr) msgr=getMessaging(app);
   const tok=await getToken(msgr,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
   if(tok){ await setDoc(doc(db,'push_tokens',tok),{ token:tok, email:ME, role:'owner', lang:'es', ts:new Date().toISOString() }); return true; }
