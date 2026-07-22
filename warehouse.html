@@ -1304,10 +1304,20 @@ window.removeEditPartKeep=function(i){ _editPartKeep.splice(i,1); renderEditPart
 window.removeEditPartNew=function(i){ _editPartNew.splice(i,1); renderEditPartPhotos(); };
 function renderEditPartPhotos(){
   const box=document.getElementById('epa-prev'); if(!box) return;
-  const ex=_editPartKeep.map((u,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${u}" onclick="openPhoto('${u}')" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer;"><button type="button" onclick="event.stopPropagation();removeEditPartKeep(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
-  const nw=_editPartNew.map((f,i)=>`<span style="position:relative;display:inline-block;margin:3px;"><img src="${URL.createObjectURL(f)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid var(--gold);"><button type="button" onclick="removeEditPartNew(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button></span>`).join('');
-  box.innerHTML=ex+nw;
+  const total=_editPartKeep.length+_editPartNew.length;
+  const badge=(idx)=> idx<3 ? '<span style="position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);background:var(--gold);color:#0b0e14;border-radius:20px;font-size:9px;font-weight:800;padding:1px 6px;white-space:nowrap;">🤖</span>' : '';
+  const out=(idx)=> idx<3 ? 'outline:2px solid var(--gold);outline-offset:1px;' : '';
+  const ex=_editPartKeep.map((u,i)=>{ const star = i>0 ? `<button type="button" title="${t('photoToFront')}" onclick="event.stopPropagation();starEditPart(${i})" style="position:absolute;top:-6px;left:-6px;background:var(--gold);color:#0b0e14;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">⭐</button>` : '';
+    return `<span style="position:relative;display:inline-block;margin:8px 4px;"><img src="${u}" onclick="openPhoto('${u}')" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer;${out(i)}"><button type="button" onclick="event.stopPropagation();removeEditPartKeep(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button>${star}${badge(i)}</span>`;
+  }).join('');
+  const nw=_editPartNew.map((f,i)=>{ const idx=_editPartKeep.length+i;
+    return `<span style="position:relative;display:inline-block;margin:8px 4px;"><img src="${URL.createObjectURL(f)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid var(--gold);${out(idx)}"><button type="button" onclick="removeEditPartNew(${i})" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:800;line-height:1;cursor:pointer;">✕</button>${badge(idx)}</span>`;
+  }).join('');
+  const hint = total ? '<div style="font-size:12px;color:var(--faint);margin:4px 0;width:100%;">'+t('photoStarHint')+'</div>' : '';
+  box.innerHTML=hint+ex+nw;
 }
+// ⭐ Manda una foto (de las ya guardadas) al FRENTE → se vuelve la principal.
+window.starEditPart=function(i){ if(i<=0||i>=_editPartKeep.length) return; const u=_editPartKeep.splice(i,1)[0]; _editPartKeep.unshift(u); renderEditPartPhotos(); };
 window.savePartEdit=async function(id){
   const p=parts.find(x=>x.id===id)||{};
   const name=(document.getElementById('epa-name').value||'').trim(); if(!name){ alert(t('alertPart')); return; }
