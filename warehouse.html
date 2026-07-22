@@ -26,6 +26,7 @@
   #wh-tabbar a.on{color:#f0c040;}
   body.owner-nav #wh-tabbar{display:flex;}
   body.owner-nav #fab-part{bottom:calc(80px + env(safe-area-inset-bottom)) !important;}
+  body.owner-nav #fab-chat{bottom:calc(80px + env(safe-area-inset-bottom)) !important;}
   body.owner-nav #install-bar{bottom:calc(74px + env(safe-area-inset-bottom)) !important;}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;}
   input,select,textarea{width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:15px;}
@@ -198,6 +199,22 @@
 <!-- Botón flotante: agregar parte (solo en la página del carro) -->
 <button id="fab-part" onclick="openPartModal()" style="display:none;position:fixed;right:18px;bottom:22px;z-index:8000;background:var(--gold);color:#0b0e14;border:none;border-radius:30px;padding:14px 20px;font-size:16px;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;">＋ <span data-i18n="addPartFab">Parte</span></button>
 
+<!-- 💬 Chat interno (Capture ↔ Listing, luego todos) -->
+<button id="fab-chat" onclick="openChat()" style="display:none;position:fixed;left:18px;bottom:22px;z-index:8000;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:30px;width:54px;height:54px;font-size:22px;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;">💬<span id="chat-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:20px;min-width:20px;height:20px;font-size:11px;font-weight:800;line-height:20px;padding:0 5px;"></span></button>
+<div id="chat-panel" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.5);" onclick="if(event.target===this)closeChat()">
+  <div style="position:absolute;left:0;right:0;bottom:0;max-width:600px;margin:0 auto;height:82vh;background:var(--bg);border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);">
+      <div style="font-weight:800;">💬 <span data-i18n="chatTitle">Chat interno</span></div>
+      <button onclick="closeChat()" style="background:none;border:none;color:var(--muted);font-size:22px;font-weight:800;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;"></div>
+    <div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface);">
+      <input id="chat-input" type="text" autocomplete="off" data-i18n-ph="chatPh" placeholder="Escribe un mensaje…" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;margin-bottom:0;">
+      <button class="btn sm" style="flex:0 0 auto;" onclick="sendChat()" data-i18n="chatSend">Enviar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal genérico (ficha VIN / agregar parte) -->
 <div id="modal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);padding:14px;overflow:auto;" onclick="if(event.target===this)closeModal()">
   <div id="modal-inner" class="card" style="max-width:600px;margin:20px auto;"></div>
@@ -219,7 +236,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
@@ -250,7 +267,7 @@ const T={
     printLabel:'🖨️ Imprimir etiqueta', labelTitle:'Etiqueta', labelShare:'📤 Compartir a la impresora', labelHint:'Elige la app de Rongta para imprimir. Si no aparece, mantén presionada la imagen, guárdala y ábrela en la app de Rongta.', labelNoShare:'Tu dispositivo no deja compartir el archivo. Mantén presionada la imagen para guardarla y ábrela en la app de Rongta.', makingLabel:'Generando etiqueta…',
     photoOrderTitle:'Orden de las fotos (para el bot):', photoOrderHint:'1ª foto: el NÚMERO / etiqueta de cerca y bien legible. 2ª foto: general de la pieza. Luego las demás que quieras para el anuncio. El bot lee solo las primeras — por eso el número va primero. (Si hay otro número importante, tómalo también entre las primeras.)', quickItemBtn:'Artículo rápido (sin carro)', looseItems:'Artículos sueltos', quickItemTitle:'Artículo rápido', quickItemHint:'Para partes que subes tú sin carro en el inventario (ej. estéreos). Genera el QR, imprime desde la máquina y sube las fotos. El carro es solo de referencia para el anuncio — opcional.', refVehicle:'Carro de referencia (opcional)', vinFillHint:'(opcional — llena los datos del carro solo, NO crea un carro)', trimLbl:'Versión', stickerLbl:'Estampa (número)', stickerPh:'Número de la estampa (ej. 0042)', stickerDup:'⚠️ Ese número ya está en uso', stickerFree:'✓ número libre', stickerDupConfirm:'⚠️ Ese número de estampa ya está en una parte activa. ¿Guardar de todos modos?', quickAddBtn:'➕ Agregar parte (estampa + bin)', quickAddTitle:'➕ Agregar parte rápida', quickAddHint:'Para dar de alta piezas de topers viejos: solo estampa + bin. El nombre y las fotos se agregan después.', stickerReq:'Pon el número de la estampa.', looseItem:'Artículo suelto', genLabelBtn:'🖨️ Generar e imprimir QR', labelBeforePhotos:'Imprime el QR y pégalo en la parte ANTES de tomar las fotos, así el QR sale en las fotos.', labelPrint:'🖨️ Imprimir', labelPrintHint:'Se abre la vista de impresión — desde ahí comparte a la app de Rongta (o elige la impresora).', copyQrLink:'📋 Copiar link (QR nativo RLabel)', copiedLink:'✓ Copiado — pégalo en el QR de RLabel',
     seeQR:'⬇️ Ver/descargar QR', tagSold:'Vendido', tagPublished:'Publicado', tagDraft:'Borrador', tagAvailable:'Disponible', noLoc:'sin ubicación',
-    listerHint:'Partes listas para publicar. Toca una para copiar los campos, ver precios "sold" y marcar publicada.', noToPublish:'No hay partes por publicar.', ebayTitleLbl:'Título eBay:', copy:'Copiar', copied:'¡Copiado!', seeSold:'💲 Ver "sold" en eBay', ebayNewSide:'🆕 eBay al lado', ebayOpened:'✓ Título copiado · pega con Ctrl+V', dlPhotos:'⬇️ Descargar fotos', dlWorking:'⬇️ Armando ZIP…', ebayPrep:'🤖 Preparar en eBay', ebayRegen:'🤖 Regenerar', ebayThinking:'🤖 Analizando fotos…', ebayDraftLbl:'Borrador de eBay (IA)', titleLbl:'Título', descLbl:'Descripción', fbPh:'¿Algo mal? Dile al bot… ej: el OEM es 12345, es lado izquierdo, es un vidrio (no un switch)', fbBtn:'🔁 Corregir', secPendientes:'Pendientes de publicar', secBorrador:'Borrador en eBay (revisar y publicar)', secPublicadas:'Publicadas', secVendidas:'Vendidas', interLbl:'Intercambio', sugOem:'🔎 OEM sugerido (verificar)', fitsLbl:'Compatible con', catLbl:'Categoría eBay', specsLbl:'Especificaciones', noSpecs:'Sin especificaciones — dale 🤖 Regenerar o corrige la categoría', taxiTitle:'Consumo del bot IA', taxiMonth:'Este mes', taxiTotal:'Total', taxiCount:'Análisis', taxiLast:'Última búsqueda', taxiNote:'Solo informativo. No es un gasto en Finanzas — en Finanzas se registra la recarga de crédito, no el consumo.', markPublished:'✓ Marcar publicada', unpublishBtn:'↩️ Quitar publicada', tapOpen:'toca para ver', ebayTestBtn:'🧪 Probar conexión eBay', ebaySetupBtn:'⚙️ Configurar eBay (1 vez)', ebayCreateDraft:'📝 Crear borrador en eBay', ebayUpdateDraft:'🔄 Actualizar borrador', ebayViewDraft:'📂 Ver borrador en eBay', ebayPublishLive:'🚀 Publicar (en vivo)',
+    listerHint:'Partes listas para publicar. Toca una para copiar los campos, ver precios "sold" y marcar publicada.', noToPublish:'No hay partes por publicar.', ebayTitleLbl:'Título eBay:', copy:'Copiar', copied:'¡Copiado!', seeSold:'💲 Ver "sold" en eBay', ebayNewSide:'🆕 eBay al lado', ebayOpened:'✓ Título copiado · pega con Ctrl+V', dlPhotos:'⬇️ Descargar fotos', dlWorking:'⬇️ Armando ZIP…', ebayPrep:'🤖 Preparar en eBay', ebayRegen:'🤖 Regenerar', ebayThinking:'🤖 Analizando fotos…', ebayDraftLbl:'Borrador de eBay (IA)', titleLbl:'Título', descLbl:'Descripción', fbPh:'¿Algo mal? Dile al bot… ej: el OEM es 12345, es lado izquierdo, es un vidrio (no un switch)', fbBtn:'🔁 Corregir', secPendientes:'Pendientes de publicar', secBorrador:'Borrador en eBay (revisar y publicar)', secPublicadas:'Publicadas', secVendidas:'Vendidas', interLbl:'Intercambio', sugOem:'🔎 OEM sugerido (verificar)', fitsLbl:'Compatible con', catLbl:'Categoría eBay', specsLbl:'Especificaciones', noSpecs:'Sin especificaciones — dale 🤖 Regenerar o corrige la categoría', chatTitle:'Chat interno', chatPh:'Escribe un mensaje…', chatSend:'Enviar', chatEmpty:'Sin mensajes todavía. Escribe el primero 👋', taxiTitle:'Consumo del bot IA', taxiMonth:'Este mes', taxiTotal:'Total', taxiCount:'Análisis', taxiLast:'Última búsqueda', taxiNote:'Solo informativo. No es un gasto en Finanzas — en Finanzas se registra la recarga de crédito, no el consumo.', markPublished:'✓ Marcar publicada', unpublishBtn:'↩️ Quitar publicada', tapOpen:'toca para ver', ebayTestBtn:'🧪 Probar conexión eBay', ebaySetupBtn:'⚙️ Configurar eBay (1 vez)', ebayCreateDraft:'📝 Crear borrador en eBay', ebayUpdateDraft:'🔄 Actualizar borrador', ebayViewDraft:'📂 Ver borrador en eBay', ebayPublishLive:'🚀 Publicar (en vivo)',
     eErr:'❌ Error: ', eNoDetail:'sin detalle', eStep:'paso',
     eConfiguring:'⚙️ Configurando…', eSetupConfirm:'⚙️ Esto configura tu cuenta de eBay para la API:\n• Crea la ubicación de envío (Porterville, CA 93257)\n• Crea/usa las políticas de pago, envío ($15 USPS Priority) y devolución (30 días)\n\nSe hace UNA sola vez. ¿Continuar?', eSetupOk:'✅ ¡Cuenta configurada!', eLoc:'Ubicación', eShip:'Envío', ePay:'Pago', eRet:'Devolución', eHandling:'Handling/zonas', eSetupOkEnd:'Ya puedes crear borradores.', eSetupFail:'⚠️ Falta algo en la configuración:', eSetupFailHint:'(Si menciona "Business Policies"/"opt in", hay que activarlas en eBay — dime y te guío.)',
     ePricePrompt:'💵 Precio de venta en eBay ($):', eInvalidPrice:'Precio inválido', eCreatingDraft:'📝 Creando borrador…', eDraftOk:'✅ ¡Borrador creado en eBay!', eTitleW:'Título', eCatW:'Categoría', eSpecsW:'Item specifics', ePhotosW:'Fotos', ePriceW:'Precio', eDraftOkEnd:'Revísalo en eBay (Seller Hub → Listings → Drafts). Cuando esté OK, pica "🚀 Publicar (en vivo)".', eDraftFail:'⚠️ No se creó el borrador', eSetupFirst:'👉 Primero pica "⚙️ Configurar eBay (1 vez)".',
@@ -270,7 +287,7 @@ const T={
     printLabel:'🖨️ Print label', labelTitle:'Label', labelShare:'📤 Share to printer', labelHint:'Pick the Rongta app to print. If it is not listed, long-press the image, save it, and open it in the Rongta app.', labelNoShare:'Your device cannot share the file. Long-press the image to save it and open it in the Rongta app.', makingLabel:'Building label…',
     photoOrderTitle:'Photo order (for the bot):', photoOrderHint:'1st photo: the NUMBER / label, close-up and readable. 2nd photo: a general shot of the part. Then any others for the listing. The bot only reads the first ones — so the number goes first. (If there is another important number, take it among the first ones too.)', quickItemBtn:'Quick item (no car)', looseItems:'Loose items', quickItemTitle:'Quick item', quickItemHint:'For parts you list yourself with no car in inventory (e.g. stereos). Generate the QR, print from the machine and upload the photos. The car is just a reference for the listing — optional.', refVehicle:'Reference vehicle (optional)', vinFillHint:'(optional — fills the car info only, does NOT create a car)', trimLbl:'Trim', stickerLbl:'Sticker (number)', stickerPh:'Sticker number (e.g. 0042)', stickerDup:'⚠️ That number is already in use', stickerFree:'✓ number free', stickerDupConfirm:'⚠️ That sticker number is already on an active part. Save anyway?', quickAddBtn:'➕ Add part (sticker + bin)', quickAddTitle:'➕ Quick add part', quickAddHint:'To log parts from old totes: just sticker + bin. Add the name and photos later.', stickerReq:'Enter the sticker number.', looseItem:'Loose item', genLabelBtn:'🖨️ Generate & print QR', labelBeforePhotos:'Print the QR and stick it on the part BEFORE taking the photos, so the QR shows in them.', labelPrint:'🖨️ Print', labelPrintHint:'The print view opens — from there share to the Rongta app (or pick the printer).', copyQrLink:'📋 Copy link (RLabel native QR)', copiedLink:'✓ Copied — paste it into the RLabel QR',
     seeQR:'⬇️ View/download QR', tagSold:'Sold', tagPublished:'Published', tagDraft:'Draft', tagAvailable:'Available', noLoc:'no location',
-    listerHint:'Parts ready to list. Tap one to copy the fields, see "sold" prices and mark as published.', noToPublish:'No parts to publish.', ebayTitleLbl:'eBay title:', copy:'Copy', copied:'Copied!', seeSold:'💲 See "sold" on eBay', ebayNewSide:'🆕 eBay beside', ebayOpened:'✓ Title copied · paste with Ctrl+V', dlPhotos:'⬇️ Download photos', dlWorking:'⬇️ Building ZIP…', ebayPrep:'🤖 Prepare for eBay', ebayRegen:'🤖 Regenerate', ebayThinking:'🤖 Analyzing photos…', ebayDraftLbl:'eBay draft (AI)', titleLbl:'Title', descLbl:'Description', fbPh:'Something wrong? Tell the bot… e.g. OEM is 12345, left side, it is glass (not a switch)', fbBtn:'🔁 Fix', secPendientes:'To publish', secBorrador:'eBay draft (review & publish)', secPublicadas:'Published', secVendidas:'Sold', interLbl:'Interchange', sugOem:'🔎 Suggested OEM (verify)', fitsLbl:'Fits', catLbl:'eBay category', specsLbl:'Item specifics', noSpecs:'No item specifics — hit 🤖 Regenerate or fix the category', taxiTitle:'AI bot usage', taxiMonth:'This month', taxiTotal:'Total', taxiCount:'Analyses', taxiLast:'Last usage', taxiNote:'Info only. Not a Finanzas expense — Finanzas logs the credit recharge, not the consumption.', markPublished:'✓ Mark published', unpublishBtn:'↩️ Undo published', tapOpen:'tap to view', ebayTestBtn:'🧪 Test eBay connection', ebaySetupBtn:'⚙️ Set up eBay (once)', ebayCreateDraft:'📝 Create eBay draft', ebayUpdateDraft:'🔄 Update draft', ebayViewDraft:'📂 View draft on eBay', ebayPublishLive:'🚀 Publish (live)',
+    listerHint:'Parts ready to list. Tap one to copy the fields, see "sold" prices and mark as published.', noToPublish:'No parts to publish.', ebayTitleLbl:'eBay title:', copy:'Copy', copied:'Copied!', seeSold:'💲 See "sold" on eBay', ebayNewSide:'🆕 eBay beside', ebayOpened:'✓ Title copied · paste with Ctrl+V', dlPhotos:'⬇️ Download photos', dlWorking:'⬇️ Building ZIP…', ebayPrep:'🤖 Prepare for eBay', ebayRegen:'🤖 Regenerate', ebayThinking:'🤖 Analyzing photos…', ebayDraftLbl:'eBay draft (AI)', titleLbl:'Title', descLbl:'Description', fbPh:'Something wrong? Tell the bot… e.g. OEM is 12345, left side, it is glass (not a switch)', fbBtn:'🔁 Fix', secPendientes:'To publish', secBorrador:'eBay draft (review & publish)', secPublicadas:'Published', secVendidas:'Sold', interLbl:'Interchange', sugOem:'🔎 Suggested OEM (verify)', fitsLbl:'Fits', catLbl:'eBay category', specsLbl:'Item specifics', noSpecs:'No item specifics — hit 🤖 Regenerate or fix the category', chatTitle:'Internal chat', chatPh:'Type a message…', chatSend:'Send', chatEmpty:'No messages yet. Send the first one 👋', taxiTitle:'AI bot usage', taxiMonth:'This month', taxiTotal:'Total', taxiCount:'Analyses', taxiLast:'Last usage', taxiNote:'Info only. Not a Finanzas expense — Finanzas logs the credit recharge, not the consumption.', markPublished:'✓ Mark published', unpublishBtn:'↩️ Undo published', tapOpen:'tap to view', ebayTestBtn:'🧪 Test eBay connection', ebaySetupBtn:'⚙️ Set up eBay (once)', ebayCreateDraft:'📝 Create eBay draft', ebayUpdateDraft:'🔄 Update draft', ebayViewDraft:'📂 View draft on eBay', ebayPublishLive:'🚀 Publish (live)',
     eErr:'❌ Error: ', eNoDetail:'no detail', eStep:'step',
     eConfiguring:'⚙️ Setting up…', eSetupConfirm:'⚙️ This sets up your eBay account for the API:\n• Creates the ship-from location (Porterville, CA 93257)\n• Creates/uses the payment, shipping ($15 USPS Priority) and return (30 days) policies\n\nThis is done ONCE. Continue?', eSetupOk:'✅ Account set up!', eLoc:'Location', eShip:'Shipping', ePay:'Payment', eRet:'Returns', eHandling:'Handling/zones', eSetupOkEnd:'You can now create drafts.', eSetupFail:'⚠️ Something is missing in the setup:', eSetupFailHint:'(If it mentions "Business Policies"/"opt in", they must be enabled on eBay — tell me and I\'ll guide you.)',
     ePricePrompt:'💵 eBay sale price ($):', eInvalidPrice:'Invalid price', eCreatingDraft:'📝 Creating draft…', eDraftOk:'✅ Draft created on eBay!', eTitleW:'Title', eCatW:'Category', eSpecsW:'Item specifics', ePhotosW:'Photos', ePriceW:'Price', eDraftOkEnd:'Review it on eBay (Seller Hub → Listings → Drafts). When it looks good, tap "🚀 Publish (live)".', eDraftFail:'⚠️ Draft was not created', eSetupFirst:'👉 First tap "⚙️ Set up eBay (once)".',
@@ -365,6 +382,7 @@ onAuthStateChanged(auth,(user)=>{
     document.body.classList.toggle('owner-nav', role==='owner');
     buildTabs();
     if(!_listening){ _listening=true; startListening(); }
+    if(['owner','warehouse','yard','lister'].indexOf(role)>=0) startChat();   // 💬 chat: Capture ↔ Listing (+ dueños)
     const canTabs=(role==='owner'||role==='warehouse');
     const allowed = canTabs?['yard','lister','pack']:(role==='yard'?['yard']:role==='lister'?['lister']:['pack']);
     const def = (canTabs||role==='yard')?'yard':(role==='lister'?'lister':'pack');
@@ -372,6 +390,7 @@ onAuthStateChanged(auth,(user)=>{
     setView(allowed.indexOf(saved)>=0?saved:def);
   } else {
     _carView=''; document.body.classList.remove('owner-nav'); const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
+    const fc=document.getElementById('fab-chat'); if(fc) fc.style.display='none'; closeChat();
     const vc=document.getElementById('view-car'); if(vc) vc.style.display='none'; closeModal();
     document.getElementById('app').style.display='none';
     document.getElementById('login').style.display='flex';
@@ -398,6 +417,47 @@ window.setView=function(k){
   if(k==='yard') renderVehicles();
   if(k==='lister') renderLister();
   if(k==='pack'){ _pendingConfirm=''; _packMode='find'; renderPending(); setTimeout(()=>{ const s=document.getElementById('scan-input'); if(s) s.focus(); }, 120); }   // escáner listo al entrar
+};
+
+// ---- 💬 CHAT INTERNO (tiempo real) ----
+let _chatMsgs=[], _chatOpen=false, _chatLastSeen=0, _chatUnsub=null;
+try{ _chatLastSeen=Number(localStorage.getItem('lmg_wh_chatseen')||0); }catch(e){}
+function startChat(){
+  const fab=document.getElementById('fab-chat'); if(fab) fab.style.display='flex';
+  if(_chatUnsub) return;
+  const qy=query(collection(db,'chat_messages'), orderBy('ts'), limit(300));
+  _chatUnsub=onSnapshot(qy, s=>{ _chatMsgs=s.docs.map(d=>({id:d.id,...d.data()}));
+    if(_chatOpen){ renderChat(); markChatSeen(); } else updateChatBadge();
+  }, e=>console.log('chat',e));
+}
+function updateChatBadge(){
+  const b=document.getElementById('chat-badge'); if(!b) return;
+  const n=_chatMsgs.filter(m=>(m.tms||0)>_chatLastSeen && (m.byEmail||'')!==myEmail).length;
+  if(n>0){ b.textContent=n>9?'9+':String(n); b.style.display=''; } else b.style.display='none';
+}
+function markChatSeen(){ _chatLastSeen=Date.now(); try{ localStorage.setItem('lmg_wh_chatseen',String(_chatLastSeen)); }catch(e){} updateChatBadge(); }
+window.openChat=function(){ _chatOpen=true; document.getElementById('chat-panel').style.display='block'; renderChat(); markChatSeen(); setTimeout(()=>{ const i=document.getElementById('chat-input'); if(i) i.focus(); },100); };
+window.closeChat=function(){ _chatOpen=false; document.getElementById('chat-panel').style.display='none'; };
+function renderChat(){
+  const box=document.getElementById('chat-msgs'); if(!box) return;
+  if(!_chatMsgs.length){ box.innerHTML='<div class="sub" style="text-align:center;margin:auto;">'+t('chatEmpty')+'</div>'; return; }
+  box.innerHTML=_chatMsgs.map(m=>{
+    const mine=(m.byEmail||'')===myEmail;
+    const when=m.ts?new Date(m.ts).toLocaleString(L==='es'?'es-MX':'en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+    return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:82%;">
+      ${mine?'':`<div style="font-size:11px;color:var(--muted);margin:0 0 2px 4px;font-weight:700;">${esc(m.byName||m.byEmail||'')}</div>`}
+      <div style="background:${mine?'var(--gold)':'var(--surface)'};color:${mine?'#0b0e14':'var(--text)'};border:1px solid ${mine?'transparent':'var(--border)'};border-radius:14px;padding:8px 12px;font-size:14px;line-height:1.4;word-break:break-word;">${esc(m.text||'')}</div>
+      <div style="font-size:10px;color:var(--faint);margin:2px 6px 0;text-align:${mine?'right':'left'};">${when}</div>
+    </div>`;
+  }).join('');
+  box.scrollTop=box.scrollHeight;
+}
+window.sendChat=async function(){
+  const i=document.getElementById('chat-input'); if(!i) return;
+  const text=(i.value||'').trim(); if(!text) return;
+  i.value='';
+  try{ await addDoc(collection(db,'chat_messages'), { text:text.slice(0,1000), byEmail:myEmail, byName:(myEmail.split('@')[0]||myEmail), byRole:role, ts:new Date().toISOString(), tms:Date.now() }); markChatSeen(); }
+  catch(e){ i.value=text; alert(t('error')+((e&&e.message)||e)); }
 };
 
 // ---- DATA ----
