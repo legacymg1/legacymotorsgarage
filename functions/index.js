@@ -124,6 +124,18 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
     if (!messages.length || messages[0].role !== "user") messages.unshift({ role: "user", content: lang === "en" ? "Hi" : "Hola" });
     const msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 500, system, messages });
     const reply = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    // 🧮 Taxímetro INDEPENDIENTE del bot de la web (config/aiUsage, claves "site_")
+    try {
+      const u = msg.usage || {};
+      const cost = +(((u.input_tokens || 0) / 1e6) * 3 + ((u.output_tokens || 0) / 1e6) * 15).toFixed(6);
+      const ym = new Date().toISOString().slice(0, 7).replace("-", "_");
+      const inc = admin.firestore.FieldValue.increment;
+      await admin.firestore().collection("config").doc("aiUsage").set({
+        siteUsd: inc(cost), siteCount: inc(1), siteLastUsd: cost,
+        ["site_m_" + ym + "_usd"]: inc(cost), ["site_m_" + ym + "_count"]: inc(1),
+        siteUpdatedAt: new Date().toISOString(),
+      }, { merge: true });
+    } catch (e) {}
     res.json({ reply: reply || (lang === "en" ? "How can I help you find a good car today?" : "¿Cómo te puedo ayudar a encontrar un buen carro hoy?") });
   } catch (e) {
     console.log("siteChat", e);
