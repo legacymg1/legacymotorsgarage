@@ -637,7 +637,7 @@ async function ensurePushToken(){
     await navigator.serviceWorker.ready;                 // espera a que el SW esté activo (arregla varios errores en iOS)
     if(!_messaging) _messaging=getMessaging(app);
     const tok=await getToken(_messaging,{vapidKey:VAPID_KEY, serviceWorkerRegistration:_pushReg});
-    if(tok){ await setDoc(doc(db,'push_tokens',tok),{ token:tok, email:myEmail, role:role, ts:new Date().toISOString() }); return true; }
+    if(tok){ await setDoc(doc(db,'push_tokens',tok),{ token:tok, email:myEmail, role:role, lang:L, ts:new Date().toISOString() }); return true; }
     _lastPushErr='sin token';
   }catch(e){ _lastPushErr=(e&&(e.message||e.code))||String(e); console.log('push token',e); }
   return false;
