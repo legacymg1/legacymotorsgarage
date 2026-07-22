@@ -207,7 +207,7 @@
     <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);">
       <button id="chat-back" onclick="chatBackToList()" style="display:none;background:none;border:none;color:var(--gold);font-size:22px;font-weight:800;cursor:pointer;line-height:1;">‹</button>
       <div id="chat-header" style="font-weight:800;flex:1;min-width:0;">💬 <span data-i18n="chatTitle">Chat interno</span></div>
-      <button onclick="closeChat()" style="background:none;border:none;color:var(--muted);font-size:22px;font-weight:800;cursor:pointer;line-height:1;">✕</button>
+      <button onclick="closeChat()" style="flex:0 0 auto;background:var(--surface2);border:none;color:var(--text);font-size:20px;font-weight:800;cursor:pointer;line-height:1;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;">✕</button>
     </div>
     <!-- Vista LISTA (estilo WhatsApp) -->
     <div id="chat-list" style="flex:1;overflow-y:auto;"></div>
@@ -245,7 +245,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
@@ -259,13 +259,14 @@ const firebaseConfig = {
 };
 const app=initializeApp(firebaseConfig);
 const db=getFirestore(app); const storage=getStorage(app); const auth=getAuth(app); const functions=getFunctions(app);
+setPersistence(auth, browserLocalPersistence).catch(()=>{});   // 🔒 recuérdame: mantiene la sesión (no pide correo/contraseña cada vez)
 // 🔔 Notificaciones push (FCM). VAPID = llave PÚBLICA del certificado Web Push (Firebase → Cloud Messaging).
 const VAPID_KEY="BDUfgtFZl2cfkkTcFSdGmXScxn0_Y-hthANv1DTW6S8EQJk_Abh6Zx6MCg8xdltHn-WEiwBjRjoV_OtClRhmOmU";
 let _messaging=null;
 
 // ================= IDIOMA / LANGUAGE =================
 const T={
-  es:{ installApp:'📲 Instalar Warehouse como app', teamAccess:'Acceso del equipo', email:'Correo', pass:'Contraseña', enter:'Entrar', logout:'Salir',
+  es:{ installApp:'📲 Instalar Warehouse como app', teamAccess:'Acceso del equipo', email:'Correo', pass:'Contraseña', enter:'Entrar', logout:'Salir', logoutConfirm:'¿Cerrar sesión? Tendrás que volver a poner tu correo y contraseña.',
     needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Warehouse.',
     roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque', roleMech:'Mecánico',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
@@ -285,7 +286,7 @@ const T={
     ePublishConfirm:'⚠️ Esto PUBLICA el borrador EN VIVO en eBay (aplica tarifa de eBay como siempre).\n\n¿Publicar ahora?', ePublishing:'🚀 Publicando…', ePublishedOk:'✅ ¡PUBLICADO EN EBAY!', eViewW:'Ver', ePublishedEnd:'La parte pasó a Publicadas.', ePublishFail:'⚠️ eBay no publicó', priceAsk:'¿A qué precio la publicaste? (opcional, en $)', confirmUnpublish:'¿Quitar "publicada"? Vuelve a Pendientes. (La venta se marca en Empaque, no aquí.)',
     scanTitle:'📦 Escanear / buscar parte', scanHint:'Escanea el QR de la parte vendida — o escribe el nombre/número para buscarla.', multiMatch:'Varias coinciden — elige la parte:', searchBtn:'Buscar', scanCam:'📷 Escanear con cámara', saveNewLoc:'Guardar nueva ubicación', relocBtn:'🔄 Guardar ubicación', relocMode:'🔄 Reubicar producto', relocHint:'Modo reubicar: escanea la parte para cambiar su bin. Cierra cuando termines.', confirmSellBtn:'✅ Confirmar que es esta', confirmScanTitle:'📷 Reescanea la parte', confirmScanHint:'Escanea el QR de la parte para confirmar que es la que buscas.', keepScan:'Escanea otra vez la parte correcta.', wrongPart:'⚠️ Esa NO es. Escaneaste:', soldOk:'✅ ¡Es esta! Confirmada y lista para enviar', notFoundBtn:'❌ No la encontré (dejar pendiente)', leftPending:'Quedó en pendientes — la verás abajo para no perderla.', pendingTitle:'📋 Pendientes de encontrar', closeResult:'✕ Cerrar', cancelPack:'✕ Cancelar', notFoundPart:'No encontré esa parte.', codeLbl:'Código', locSaved:'✓ Ubicación guardada', noCamera:'Este dispositivo no soporta escaneo por cámara. Usa el lector físico o teclea el código.', camErr:'No se pudo abrir la cámara: ', installHint:'Para instalar: menú del navegador (⋮) → "Agregar a inicio" / "Instalar app".',
     alertPart:'Escribe qué parte es.', alertCar:'Pon al menos VIN o marca/modelo.', carNotFound:'Carro no encontrado.', vinShort:'El VIN se ve corto (deben ser ~17).', decoding:'Decodificando…', decodeOk:'✓ Datos rellenados — revisa y corrige si hace falta.', decodeNone:'No se encontró info de ese VIN; captura a mano.', decodeErr:'No se pudo decodificar (sin internet o VIN inválido). Captura a mano.', error:'Error: ' },
-  en:{ installApp:'📲 Install Warehouse as app', teamAccess:'Team access', email:'Email', pass:'Password', enter:'Sign in', logout:'Log out',
+  en:{ installApp:'📲 Install Warehouse as app', teamAccess:'Team access', email:'Email', pass:'Password', enter:'Sign in', logout:'Log out', logoutConfirm:'Log out? You\'ll have to enter your email and password again.',
     needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Warehouse.',
     roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing', roleMech:'Mechanic',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
@@ -382,7 +383,7 @@ window.doLogin=async function(){
   try{ await signInWithEmailAndPassword(auth,email,pass); }
   catch(e){ err.textContent = (e.code==='auth/too-many-requests')?t('loginMany'):t('loginBad'); }
 };
-window.doLogout=function(){ signOut(auth); };
+window.doLogout=function(){ if(confirm(t('logoutConfirm'))) signOut(auth); };
 
 onAuthStateChanged(auth,(user)=>{
   const email=((user&&user.email)||'').toLowerCase();
