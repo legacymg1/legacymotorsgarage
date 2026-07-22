@@ -358,6 +358,8 @@ function carStatusLabel(v){ const c=CAR_STATUS.find(x=>x.v===v); return c?(L==='
 
 // ---- PWA: service worker + botón instalar ----
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw-warehouse.js').catch(e=>console.log('sw',e)); }
+// Pide almacenamiento PERSISTENTE → iOS no borra la sesión (evita que te saque y pida contraseña).
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
 let _deferredPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); _deferredPrompt=e; let dis=false; try{ dis=localStorage.getItem('lmg_wh_install_dismissed')==='1'; }catch(_){} const b=document.getElementById('install-bar'); if(b && !dis) b.style.display=''; });
 window.dismissInstall=function(ev){ if(ev){ ev.stopPropagation(); } const b=document.getElementById('install-bar'); if(b) b.style.display='none'; try{ localStorage.setItem('lmg_wh_install_dismissed','1'); }catch(_){} };
@@ -658,9 +660,9 @@ async function ensurePushToken(){
     if(!pushConfigured()){ _lastPushErr='sin VAPID'; return false; }
     if(Notification.permission!=='granted'){ _lastPushErr='sin permiso'; return false; }
     if(!(await isSupported())){ _lastPushErr='navegador no soporta FCM (¿app instalada? iOS 16.4+)'; return false; }
-    // Scope propio para el SW de notificaciones → NO choca con sw-warehouse.js (que controla la raíz "/").
-    if(!_pushReg) _pushReg=await navigator.serviceWorker.register('firebase-messaging-sw.js',{scope:'/firebase-cloud-messaging-push-scope'});
-    await navigator.serviceWorker.ready;                 // espera a que el SW esté activo (arregla varios errores en iOS)
+    // UN SOLO service worker: sw-warehouse.js ahora también hace FCM. Limpio registros viejos de firebase-messaging-sw que chocaban.
+    try{ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs){ if(r.active&&r.active.scriptURL&&r.active.scriptURL.indexOf('firebase-messaging-sw.js')>=0) await r.unregister(); } }catch(e){}
+    _pushReg=await navigator.serviceWorker.ready;        // el registro de sw-warehouse.js (controla "/")
     if(!_messaging) _messaging=getMessaging(app);
     const tok=await getToken(_messaging,{vapidKey:VAPID_KEY, serviceWorkerRegistration:_pushReg});
     if(tok){ await setDoc(doc(db,'push_tokens',tok),{ token:tok, email:myEmail, role:role, lang:L, ts:new Date().toISOString() }); return true; }
