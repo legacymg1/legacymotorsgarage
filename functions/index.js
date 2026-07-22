@@ -28,11 +28,14 @@ const CHAT_MEMBERS = {
   "group":            ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","warehouse@legacymotorsgarage.com","capture@legacymotorsgarage.com","listing@legacymotorsgarage.com","yarda@legacymotorsgarage.com","ebay@legacymotorsgarage.com","empaque@legacymotorsgarage.com","mechanic@legacymotorsgarage.com","mecanico@legacymotorsgarage.com"],
   "owners":           ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com"],
   "capture-listing":  ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","capture@legacymotorsgarage.com","listing@legacymotorsgarage.com","yarda@legacymotorsgarage.com","ebay@legacymotorsgarage.com"],
+  "capture-owners":   ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","capture@legacymotorsgarage.com","yarda@legacymotorsgarage.com"],
+  "listing-owners":   ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","listing@legacymotorsgarage.com","ebay@legacymotorsgarage.com"],
   "warehouse-owners": ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","warehouse@legacymotorsgarage.com","empaque@legacymotorsgarage.com"],
   "mechanic-owners":  ["ev@legacymotorsgarage.com","ivan.garcia@legacymotorsgarage.com","mechanic@legacymotorsgarage.com","mecanico@legacymotorsgarage.com"],
 };
 const CHAT_TITLES = {
   "group": "Legacy Group", "owners": "Dueños", "capture-listing": "Captura ↔ Listado",
+  "capture-owners": "Captura ↔ Supervisores", "listing-owners": "Listado ↔ Supervisores",
   "warehouse-owners": "Empaque ↔ Dueños", "mechanic-owners": "Mecánico ↔ Dueños",
 };
 // La app llama esto DESPUÉS de guardar el mensaje (evita triggers Eventarc y sus permisos IAM).
