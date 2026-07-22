@@ -392,6 +392,8 @@ onAuthStateChanged(auth,(user)=>{
   if(user && role){
     document.getElementById('login').style.display='none';
     document.getElementById('app').style.display='block';
+    // 🔒 Neutraliza el campo de contraseña del login mientras estás dentro → iOS deja de ofrecer "contraseña" en el chat.
+    try{ const lp=document.getElementById('l-pass'); if(lp){ lp.value=''; lp.type='text'; lp.setAttribute('autocomplete','off'); lp.disabled=true; } }catch(e){}
     document.getElementById('who').textContent = whoLabel(email,role);
     document.body.classList.toggle('owner-nav', role==='owner');
     buildTabs();
@@ -411,6 +413,7 @@ onAuthStateChanged(auth,(user)=>{
     const vc=document.getElementById('view-car'); if(vc) vc.style.display='none'; closeModal();
     document.getElementById('app').style.display='none';
     document.getElementById('login').style.display='flex';
+    try{ const lp=document.getElementById('l-pass'); if(lp){ lp.disabled=false; lp.type='password'; lp.setAttribute('autocomplete','current-password'); } }catch(e){}   // restaura para el login
     if(user && !role){ document.getElementById('l-err').textContent=t('noAccess'); signOut(auth); }
   }
 });
