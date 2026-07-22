@@ -1,6 +1,6 @@
 // Service worker de Legacy Warehouse — solo controla la app del almacén.
 // No toca finanzas/admin/index (su fetch los deja pasar normal).
-const CACHE = 'legacy-wh-v3';
+const CACHE = 'legacy-wh-v4';
 const SHELL = ['./warehouse.html','./manifest-warehouse.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

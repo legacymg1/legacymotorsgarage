@@ -129,7 +129,7 @@ function backToList(){ view='list'; document.getElementById('lcw-convo').style.d
 function fitSheet(){ const sh=document.getElementById('lcw-sheet'), vv=window.visualViewport; if(!sh||!vv) return; sh.style.bottom='auto'; sh.style.height=vv.height+'px'; sh.style.transform='translateY('+vv.offsetTop+'px)'; }
 function vpOn(){ const vv=window.visualViewport; if(!vv) return; vv.addEventListener('resize',fitSheet); vv.addEventListener('scroll',fitSheet); fitSheet(); }
 function vpOff(){ const vv=window.visualViewport, sh=document.getElementById('lcw-sheet'); if(vv){ vv.removeEventListener('resize',fitSheet); vv.removeEventListener('scroll',fitSheet); } if(sh){ sh.style.height=''; sh.style.transform=''; sh.style.bottom='0'; } }
-function clearNotifs(){ try{ if(!('serviceWorker' in navigator)) return; navigator.serviceWorker.getRegistrations().then(regs=>{ regs.forEach(r=>{ if(r.getNotifications) r.getNotifications().then(ns=>ns.forEach(n=>n.close())).catch(()=>{}); }); }).catch(()=>{}); }catch(e){} }
+function clearNotifs(){ const go=()=>{ try{ if(!('serviceWorker' in navigator)) return; navigator.serviceWorker.getRegistrations().then(regs=>{ regs.forEach(r=>{ if(r.getNotifications) r.getNotifications().then(ns=>ns.forEach(n=>n.close())).catch(()=>{}); const w=r.active||r.waiting||r.installing; if(w) try{ w.postMessage({type:'lmg-clear-notifs'}); }catch(e){} }); }).catch(()=>{}); }catch(e){} }; go(); setTimeout(go,600); }
 function openPanel(){ open=true; view='list'; document.getElementById('lcw-panel').style.display='block'; backToList(); vpOn(); clearNotifs(); }
 function closePanel(){ open=false; const p=document.getElementById('lcw-panel'); if(p)p.style.display='none'; vpOff(); }
 function renderMsgs(){

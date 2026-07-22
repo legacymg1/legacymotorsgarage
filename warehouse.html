@@ -594,7 +594,7 @@ function chatViewportOn(){ const vv=window.visualViewport; if(!vv) return; vv.ad
 function chatViewportOff(){ const vv=window.visualViewport, sh=document.getElementById('chat-sheet'); if(vv){ vv.removeEventListener('resize',fitChatSheet); vv.removeEventListener('scroll',fitChatSheet); } if(sh){ sh.style.height=''; sh.style.transform=''; sh.style.bottom='0'; } }
 // Limpia las notificaciones ya entregadas del teléfono. Las muestra el SW de FCM (firebase-messaging-sw.js),
 // que es OTRO registro → hay que recorrer TODOS los service workers.
-function clearChatNotifs(){ const go=()=>{ try{ if(!('serviceWorker' in navigator)) return; navigator.serviceWorker.getRegistrations().then(regs=>{ regs.forEach(r=>{ if(r.getNotifications) r.getNotifications().then(ns=>ns.forEach(n=>n.close())).catch(()=>{}); }); }).catch(()=>{}); }catch(e){} }; go(); setTimeout(go,500); }
+function clearChatNotifs(){ const go=()=>{ try{ if(!('serviceWorker' in navigator)) return; navigator.serviceWorker.getRegistrations().then(regs=>{ regs.forEach(r=>{ if(r.getNotifications) r.getNotifications().then(ns=>ns.forEach(n=>n.close())).catch(()=>{}); const w=r.active||r.waiting||r.installing; if(w) try{ w.postMessage({type:'lmg-clear-notifs'}); }catch(e){} }); }).catch(()=>{}); }catch(e){} }; go(); setTimeout(go,600); }
 window.openChat=function(){ _chatOpen=true; _chatViewMode='list'; document.getElementById('chat-panel').style.display='block'; chatBackToList(); chatViewportOn(); clearChatNotifs(); };
 window.closeChat=function(){ _chatOpen=false; const p=document.getElementById('chat-panel'); if(p) p.style.display='none'; chatViewportOff(); };
 // 🔔 Abre el chat directamente en un canal (al tocar una notificación)

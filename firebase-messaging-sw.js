@@ -25,6 +25,13 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
+// La app pide cerrar las notificaciones (al abrir el chat) → el SW dueño las cierra (más confiable).
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'lmg-clear-notifs') {
+    event.waitUntil(self.registration.getNotifications().then((ns) => ns.forEach((n) => n.close())).catch(() => {}));
+  }
+});
+
 // Al tocar la notificación → abre/enfoca la app EN ESA conversación.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
