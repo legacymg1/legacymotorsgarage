@@ -475,22 +475,34 @@ async function ebayPickOrCreatePolicy(token, type, listKey, idKey, prefer, name,
   return { err: ebayRestErrors(c), raw: (c.text || "").slice(0, 300) };
 }
 
-// Excluye Alaska/Hawái, Protectorados de EE.UU. (incluye Puerto Rico) y APO/FPO en la política de envío.
+// Afina la política de envío: (a) excluye Alaska/Hawái, Protectorados de EE.UU. (incluye Puerto Rico) y APO/FPO;
+// (b) fija el HANDLING TIME a 1 día (next-day). Solo escribe si algo cambia.
+const EBAY_HANDLING_DAYS = 1;   // días de manejo (next-day). Cambia aquí si algún día quieres otro.
 async function ebayExcludeRegions(token, id){
   try {
     const g = await ebayRest("GET", "/sell/account/v1/fulfillment_policy/" + id, token);
     if (!g.ok || !g.json) return "get_fail";
     const pol = g.json;
+    let changed = false;
+    // (a) exclusiones de zona
     const want = ["Alaska/Hawaii", "US Protectorates", "APO/FPO"];
     const cur = ((pol.shipToLocations || {}).regionExcluded || []).map((r) => r.regionName);
-    if (want.every((w) => cur.includes(w))) return "already";
-    const merged = new Set(cur); want.forEach((w) => merged.add(w));
-    pol.shipToLocations = Object.assign({}, pol.shipToLocations, {
-      regionExcluded: Array.from(merged).map((regionName) => ({ regionName })),
-    });
+    if (!want.every((w) => cur.includes(w))) {
+      const merged = new Set(cur); want.forEach((w) => merged.add(w));
+      pol.shipToLocations = Object.assign({}, pol.shipToLocations, {
+        regionExcluded: Array.from(merged).map((regionName) => ({ regionName })),
+      });
+      changed = true;
+    }
+    // (b) handling time = 1 día
+    if (!pol.handlingTime || pol.handlingTime.value !== EBAY_HANDLING_DAYS || pol.handlingTime.unit !== "DAY") {
+      pol.handlingTime = { value: EBAY_HANDLING_DAYS, unit: "DAY" };
+      changed = true;
+    }
+    if (!changed) return "already h=" + EBAY_HANDLING_DAYS + "d";
     delete pol.fulfillmentPolicyId;  // va en la URL, no en el body
     const u = await ebayRest("PUT", "/sell/account/v1/fulfillment_policy/" + id, token, pol);
-    return u.ok ? "excluded" : ((ebayRestErrors(u)[0] || "put_fail").slice(0, 120));
+    return u.ok ? ("ok excl+handling=" + EBAY_HANDLING_DAYS + "d") : ((ebayRestErrors(u)[0] || "put_fail").slice(0, 120));
   } catch (e) { return "exc:" + String(e && e.message || e).slice(0, 80); }
 }
 
