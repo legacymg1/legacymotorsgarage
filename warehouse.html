@@ -353,7 +353,9 @@ const ROLE_BY_EMAIL={
   'listing@legacymotorsgarage.com':'lister',    // Listado (eBay)
   'yarda@legacymotorsgarage.com':'yard',
   'ebay@legacymotorsgarage.com':'lister',
-  'empaque@legacymotorsgarage.com':'packager'
+  'empaque@legacymotorsgarage.com':'packager',
+  'mechanic@legacymotorsgarage.com':'mechanic',   // Mecánico (crear la cuenta en Firebase Auth cuando lo actives)
+  'mecanico@legacymotorsgarage.com':'mechanic'
 };
 let role='', myEmail='';
 let vehicles=[], parts=[], _selVeh='', _carView='', _restoredCar=false;
@@ -424,9 +426,11 @@ window.setView=function(k){
 // ---- 💬 CHAT INTERNO multi-canal (tiempo real) ----
 // 3 canales. Cada rol ve solo los suyos; los dueños ven los 3.
 const CHAT_CHANNELS=[
+  { key:'group',             es:'Legacy Group',      en:'Legacy Group',      roles:['owner','warehouse','yard','lister','packager','mechanic'] },
   { key:'owners',            es:'Dueños',            en:'Owners',            roles:['owner'] },
   { key:'capture-listing',   es:'Captura ↔ Listado', en:'Capture ↔ Listing', roles:['owner','yard','lister'] },
   { key:'warehouse-owners',  es:'Empaque ↔ Dueños',  en:'Warehouse ↔ Owners', roles:['owner','warehouse','packager'] },
+  { key:'mechanic-owners',   es:'Mecánico ↔ Dueños', en:'Mechanic ↔ Owners', roles:['owner','mechanic'] },
 ];
 let _chatMsgs={}, _chatSeen={}, _chatUnsub={}, _chatOpen=false, _chatCh='', _chatChans=[];
 try{ _chatSeen=JSON.parse(localStorage.getItem('lmg_wh_chatseen')||'{}')||{}; }catch(e){}
@@ -455,9 +459,9 @@ function markChatSeen(key){ _chatSeen[key]=Date.now(); try{ localStorage.setItem
 function renderChatTabs(){
   const box=document.getElementById('chat-tabs'); if(!box) return;
   if(_chatChans.length<2){ box.style.display='none'; return; }
-  box.style.display='flex';
+  box.style.display='flex'; box.style.overflowX='auto';
   box.innerHTML=_chatChans.map(c=>{ const u=unreadFor(c.key); const on=c.key===_chatCh;
-    return `<div onclick="chatSwitch('${c.key}')" style="flex:1;text-align:center;padding:7px 4px;font-size:12px;font-weight:800;cursor:pointer;border-bottom:2px solid ${on?'var(--gold)':'transparent'};color:${on?'var(--gold)':'var(--muted)'};">${chanLabel(c)}${u>0?' <span style="background:#c0392b;color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">'+u+'</span>':''}</div>`;
+    return `<div onclick="chatSwitch('${c.key}')" style="flex:0 0 auto;white-space:nowrap;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer;border-bottom:2px solid ${on?'var(--gold)':'transparent'};color:${on?'var(--gold)':'var(--muted)'};">${chanLabel(c)}${u>0?' <span style="background:#c0392b;color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">'+u+'</span>':''}</div>`;
   }).join('');
 }
 window.chatSwitch=function(key){ _chatCh=key; renderChat(); markChatSeen(key); const i=document.getElementById('chat-input'); if(i) i.focus(); };
