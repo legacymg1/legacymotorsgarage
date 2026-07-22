@@ -79,6 +79,58 @@ exports.sendChatPush = onCall({ timeoutSeconds: 30 }, async (request) => {
   } catch (e) { console.log("sendChatPush err", e); return { ok: false, err: String(e && e.message || e) }; }
 });
 
+// 🌐 BOT DE VENTAS de la página web (Claude). Contesta a visitantes y los empuja a venir en persona.
+const SITE_BOT_MODEL = "claude-sonnet-5";   // buen balance calidad/costo (mismo que el bot de eBay). Se puede subir a opus.
+function buildSitePrompt(inv) {
+  return `You are the warm, charismatic sales assistant for **Legacy Motors Garage LLC**, a Buy-Here-Pay-Here used-car dealership in Porterville, CA. Reply in the SAME language the customer writes (Spanish or English). You genuinely understand hard-working local families who need a good, reliable car to get to work.
+
+YOUR #1 GOAL: get them to COME IN PERSON (or set an appointment). That's where we help them and they can drive off the SAME DAY. Be kind, upbeat, human, and build trust. Keep replies short and conversational (2–4 sentences), and always end with a gentle nudge to visit, message, or call.
+
+FACTS:
+- Hours: Mon–Fri 9am–5pm. Saturday & Sunday by appointment. We recommend appointments. We're flexible — if their schedule is unusual, tell them to just message us and we'll gladly work around it.
+- Financing (Buy Here Pay Here): usually about HALF down + a valid driver's license. But invite them in — we work with what they bring for a down payment; sometimes a little less is enough. NEVER promise approval or credit.
+- Every car is CERTIFIED: freshly inspected and serviced, so they can be confident it's a good, solid car.
+- Every car includes a 1,000-mile warranty for peace of mind.
+- Phone: (559) 540-5145. Location: Porterville, CA.
+
+HARD RULES:
+- NEVER give a final price or "out-the-door" price. If asked, say it depends on their situation and invite them to come see what they qualify for.
+- Don't approve credit or promise financing — invite them to come and we'll see together what they qualify for.
+- Don't invent cars or specs. Use the inventory below; if we don't have exactly what they want, offer a close option and invite them in.
+- Stay on topic (cars, financing, visiting). Warm and charismatic, never pushy or robotic.
+
+CARS AVAILABLE RIGHT NOW:
+${inv}`;
+}
+exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeconds: 60 }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
+  const lang = (req.body && req.body.lang === "en") ? "en" : "es";
+  try {
+    const msgsIn = Array.isArray(req.body && req.body.messages) ? req.body.messages.slice(-12) : [];
+    let cars = [];
+    try {
+      const snap = await admin.firestore().collection("inventory").get();
+      cars = snap.docs.map((d) => d.data())
+        .filter((c) => c.status !== "sold" && c.status !== "prep")
+        .slice(0, 80)
+        .map((c) => [c.year, c.make, c.model].filter(Boolean).join(" ") + (c.miles ? " · " + Number(c.miles).toLocaleString() + " mi" : ""));
+    } catch (e) {}
+    const system = buildSitePrompt(cars.length ? cars.join("\n") : "(ask and we'll check availability)");
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const messages = msgsIn.filter((m) => m && m.content).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content).slice(0, 1200) }));
+    if (!messages.length || messages[0].role !== "user") messages.unshift({ role: "user", content: lang === "en" ? "Hi" : "Hola" });
+    const msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 500, system, messages });
+    const reply = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    res.json({ reply: reply || (lang === "en" ? "How can I help you find a good car today?" : "¿Cómo te puedo ayudar a encontrar un buen carro hoy?") });
+  } catch (e) {
+    console.log("siteChat", e);
+    res.json({ reply: lang === "en" ? "Sorry, I had a hiccup — call us at (559) 540-5145 and we'll help you right away." : "Perdón, tuve un detalle — llámanos al (559) 540-5145 y con gusto te ayudamos." });
+  }
+});
+
 // 🔔 eBay Marketplace Account Deletion/Closure — endpoint requerido para habilitar el keyset de Producción.
 // GET con challenge_code → responde SHA-256(challengeCode + verificationToken + endpointUrl).
 // POST (aviso real de borrado) → 200 OK (no guardamos PII de usuarios de eBay, solo confirmamos).
