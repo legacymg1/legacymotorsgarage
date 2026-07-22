@@ -145,7 +145,7 @@
     </button>
     <div id="cars-body" style="display:none;margin-top:10px;">
       <div id="veh-search-wrap" style="position:relative;margin-bottom:10px;">
-        <input id="veh-search" oninput="whSearch()" onfocus="whSearch()" autocomplete="off" data-i18n-ph="searchCarPh" placeholder="🔎 Buscar carro o producto…" style="margin-bottom:0;padding-right:40px;">
+        <input id="veh-search" type="search" name="carsearch" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-1p-ignore data-lpignore="true" oninput="whSearch()" onfocus="whSearch()" data-i18n-ph="searchCarPh" placeholder="🔎 Buscar carro o producto…" style="margin-bottom:0;padding-right:40px;">
         <button id="veh-x" type="button" onclick="whSearchClear()" style="display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:50%;width:28px;height:28px;font-size:14px;font-weight:800;line-height:1;cursor:pointer;">✕</button>
         <div id="veh-dd" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:12px;max-height:62vh;overflow:auto;box-shadow:0 14px 34px rgba(0,0,0,.55);"></div>
       </div>
@@ -166,7 +166,7 @@
     <button id="ebay-setup-btn" onclick="ebaySetup(this)" class="btn ghost sm" style="margin-bottom:10px;" data-i18n="ebaySetupBtn">⚙️ Configurar eBay (1 vez)</button>
     <div id="taximetro" style="margin-bottom:10px;"></div>
     <div class="sub" style="margin-bottom:10px;" data-i18n="listerHint">Partes listas para publicar.</div>
-    <input id="lister-search" data-i18n-ph="searchPartPh" placeholder="🔎 Buscar parte / carro…" oninput="renderLister()" style="margin-bottom:12px;">
+    <input id="lister-search" type="search" name="listersearch" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" data-1p-ignore data-lpignore="true" data-i18n-ph="searchPartPh" placeholder="🔎 Buscar parte / carro…" oninput="renderLister()" style="margin-bottom:12px;">
     <div id="lister-list"></div>
   </div>
 
@@ -588,9 +588,13 @@ function renderVehicles(){
   const cnt=document.getElementById('cars-count'); if(cnt) cnt.textContent='('+vehicles.length+')';
   const box=document.getElementById('veh-list'); if(!box) return;
   if(!vehicles.length){ box.innerHTML='<div class="sub" style="padding:8px 2px;">'+t('noCarsYet')+'</div>'; return; }
-  // Ordena por actividad más reciente: el carro con partes agregadas más recientemente sube (en el que se trabaja hoy)
+  // Orden: #1 = el que se está trabajando / último abierto (actividad más reciente).
+  //        Luego el RESTO por MÁS ATRASADO primero (el que entró a la yarda hace más tiempo).
   const lastActivity=v=>{ let latest=v.createdAt||''; parts.forEach(p=>{ if(p.vehicleId===v.id){ const t=p.createdAt||''; if(t>latest) latest=t; } }); return latest; };
-  const list=vehicles.slice().sort((a,b)=>lastActivity(b).localeCompare(lastActivity(a)));
+  const byRecent=vehicles.slice().sort((a,b)=>lastActivity(b).localeCompare(lastActivity(a)));
+  const top=byRecent[0];
+  const rest=byRecent.slice(1).sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));   // más viejo (atrasado) primero
+  const list=top?[top].concat(rest):rest;
   if(!list.length){ box.innerHTML='<div class="sub" style="padding:8px 2px;">'+t('noCarsMatch')+'</div>'; return; }
   box.innerHTML=list.map(v=>{
     const vp=parts.filter(p=>p.vehicleId===v.id);
