@@ -2979,11 +2979,15 @@ function checkInsurance() {
 function checkStartupOverdue(){
   const ov=clients.filter(c=>getStatus(c)==='overdue');
   if(!ov.length)return;
+  // Solo la PRIMERA vez del día (no cada que entras/recargas)
+  const today=new Date().toISOString().slice(0,10);
+  try{ if(localStorage.getItem('lmg_overdue_seen')===today) return; }catch(e){}
   document.getElementById('startup-list').innerHTML=ov.map(c=>{
     const days=Math.abs(daysUntil(getNextPayDate(c)));
     return `<div class="startup-item"><div><div style="font-weight:600;">${c.name} · ${c.year} ${c.make} ${c.model}</div><div style="font-size:12px;color:#ff8080;margin-top:2px;">Vencido hace ${days} día${days!==1?'s':''} · Adeuda ${formatMoney(calcBalance(c))}</div></div><button class="btn-msg" onclick="closeModal('startup-modal');openWhatsApp('${c.id}','overdue')" style="font-size:12px;padding:6px 10px;">📱</button></div>`;
   }).join('');
   document.getElementById('startup-modal').classList.add('active');
+  try{ localStorage.setItem('lmg_overdue_seen', today); }catch(e){}
 }
 
 window.editPayment=async function(clientId, idx, field, value){
