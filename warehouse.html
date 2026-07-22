@@ -551,7 +551,10 @@ window.sendChat=async function(){
   }catch(e){ i.value=text; alert(t('error')+((e&&e.message)||e)); return; }
   // 2) Efectos secundarios — nunca pueden tronar ni mostrar error.
   try{ markChatSeen(ch); }catch(_){}
-  setTimeout(()=>{ try{ const p=httpsCallable(functions,'sendChatPush')({ channel:ch, text:text.slice(0,180), byName:dispName(myEmail) }); if(p&&p.catch) p.catch(()=>{}); }catch(_){} },0);   // 🔔 push, aislado
+  setTimeout(()=>{ try{
+    const p=httpsCallable(functions,'sendChatPush')({ channel:ch, text:text.slice(0,180), byName:dispName(myEmail) });
+    if(p&&p.then) p.then(r=>{ const d=(r&&r.data)||{}; if(role==='owner') console.log('🔔 push →',d); if(role==='owner' && (d.sent===0)) setTimeout(()=>alert('🔔 Diag: 0 dispositivos con notificaciones activadas en este canal.\n(Nadie ha guardado su token todavía, o eres el único miembro conectado.)'),50); }).catch(()=>{});
+  }catch(_){} },0);   // 🔔 push, aislado + diagnóstico para dueño
 };
 
 // ---- 🔔 PUSH (FCM) ----
