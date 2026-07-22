@@ -172,6 +172,7 @@
   <div id="mov-results" style="display:none;margin:0 0 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;max-height:60vh;overflow-y:auto;"></div>
 
   <div id="trial-alert"></div>
+  <div id="ai-usage-box"></div>
 
   <div class="overlay" id="import-overlay">
     <div class="sheet">
@@ -751,7 +752,25 @@ onAuthStateChanged(auth,(user)=>{
 });
 
 // ---------- DATA ----------
+// 🤖 Semáforos de gasto de IA (config/aiUsage): bot eBay + bot web. Solo informativo (no toca las bolsas).
+let _aiUsage=null;
+function renderAiUsage(){
+  const box=document.getElementById('ai-usage-box'); if(!box) return;
+  const u=_aiUsage; if(!u){ box.innerHTML=''; return; }
+  const ym=(new Date().toISOString()).slice(0,7).replace('-','_');
+  const f=v=>'$'+((Number(v)||0)<1?(Number(v)||0).toFixed(3):(Number(v)||0).toFixed(2));
+  const ebayMes=u['m_'+ym+'_usd']||0, ebayTot=u.totalUsd||0;
+  const siteMes=u['site_m_'+ym+'_usd']||0, siteTot=u.siteUsd||0;
+  const mesTotal=(Number(ebayMes)||0)+(Number(siteMes)||0);
+  const row=(icon,label,mes,tot)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);"><div style="font-weight:700;font-size:13px;">'+icon+' '+label+'</div><div style="display:flex;gap:16px;align-items:baseline;"><div style="text-align:right;"><div style="font-size:10px;color:var(--muted);">Este mes</div><div style="font-weight:800;color:var(--gold);">'+f(mes)+'</div></div><div style="text-align:right;"><div style="font-size:10px;color:var(--muted);">Total</div><div style="font-weight:800;font-size:13px;">'+f(tot)+'</div></div></div></div>';
+  box.innerHTML='<div class="card" style="margin:0 0 16px;padding:12px 14px;background:linear-gradient(135deg,rgba(240,192,64,0.08),rgba(62,207,142,0.05));border:1px solid rgba(240,192,64,0.3);border-radius:14px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div style="font-weight:800;">🤖 Consumo de IA</div><div style="text-align:right;"><div style="font-size:10px;color:var(--muted);">Total este mes</div><div style="font-weight:800;color:#3ecf8e;font-size:16px;">'+f(mesTotal)+'</div></div></div>'
+    +row('📦','Bot eBay',ebayMes,ebayTot)
+    +row('🌐','Bot web',siteMes,siteTot)
+    +'<div style="font-size:10px;color:var(--faint);margin-top:8px;line-height:1.4;">Solo informativo. No es un gasto en Finanzas — aquí se registra la recarga de crédito de IA, no el consumo.</div></div>';
+}
 function startListening(){
+  onSnapshot(doc(db,'config','aiUsage'), s=>{ _aiUsage = s.exists()? s.data() : null; renderAiUsage(); }, err=>console.log('aiUsage', err));
   onSnapshot(collection(db,'subscriptions'), snap=>{
     subs = snap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>s.active!==false);
     render(); applySubsCollapse();
