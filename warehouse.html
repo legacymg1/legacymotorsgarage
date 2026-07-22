@@ -1018,9 +1018,14 @@ function detailPartCard(p){
     ${statusTag(p.status)}
   </div>`;
 }
+// Ver foto GRANDE en una capa aparte (encima de todo). Al cerrar solo se quita la capa → sigues DENTRO de la parte.
 window.openPhoto=function(url){
-  document.getElementById('modal-inner').innerHTML=`<div style="text-align:right;margin-bottom:6px;"><button class="btn ghost sm" onclick="closeModal()">✕</button></div><img src="${url}" style="width:100%;border-radius:10px;">`;
-  document.getElementById('modal').style.display='block';
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;';
+  ov.onclick=()=>ov.remove();
+  ov.innerHTML='<img src="'+url+'" style="max-width:100%;max-height:86vh;object-fit:contain;border-radius:12px;">'
+    +'<div style="color:rgba(255,255,255,.6);font-size:12px;">'+(L==='es'?'toca para cerrar':'tap to close')+'</div>';
+  document.body.appendChild(ov);
 };
 // Ficha del VIN con buscador + X + tocar fuera
 let _specRows=[];
