@@ -413,9 +413,8 @@ onAuthStateChanged(auth,(user)=>{
     buildTabs();
     const acCard=document.getElementById('addcar-card'); if(acCard) acCard.style.display = (role==='owner') ? '' : 'none';   // solo el dueño agrega carros
     if(!_listening){ _listening=true; startListening(); }
-    startChat();   // 💬 chat multi-canal — se auto-filtra: cada rol ve solo sus canales (dueños ven los 3)
-    initPush();    // 🔔 refresca token si ya dio permiso + escucha mensajes en foreground
-    try{ const cc=new URLSearchParams(location.search).get('chat'); if(cc){ setTimeout(()=>openChatToChannel(cc),500); } }catch(e){}   // vino de tocar una notificación
+    // 💬 Chat AHORA lo maneja chat-widget.js (unificado, mismo en las 4 páginas). El chat inline queda desactivado.
+    // startChat(); initPush(); ?chat → los maneja el widget.
     const canTabs=(role==='owner'||role==='warehouse');
     const allowed = canTabs?['yard','lister','pack']:(role==='yard'?['yard']:role==='lister'?['lister']:['pack']);
     const def = (canTabs||role==='yard')?'yard':(role==='lister'?'lister':'pack');
@@ -618,7 +617,7 @@ function openChatToChannel(ch){
   chatOpenConvo(ch); chatViewportOn(); clearChatNotifs();
 }
 // Notificación tocada con la app YA abierta → el SW nos avisa
-if('serviceWorker' in navigator){ navigator.serviceWorker.addEventListener('message', (e)=>{ if(e.data && e.data.type==='open-chat') openChatToChannel(e.data.channel); }); }
+/* chat inline desactivado — lo maneja chat-widget.js */
 function renderChat(){
   const box=document.getElementById('chat-msgs'); if(!box) return;
   const msgs=_chatMsgs[_chatCh]||[];
@@ -1987,6 +1986,7 @@ document.addEventListener('click', function(ev){
 // Aplicar idioma inicial (traduce estáticos + pone el toggle)
 setLang(L);
 </script>
+<script type="module" src="chat-widget.js"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
