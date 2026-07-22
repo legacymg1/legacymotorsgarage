@@ -263,7 +263,7 @@ const db=getFirestore(app); const storage=getStorage(app); const auth=getAuth(ap
 const T={
   es:{ installApp:'📲 Instalar Warehouse como app', teamAccess:'Acceso del equipo', email:'Correo', pass:'Contraseña', enter:'Entrar', logout:'Salir',
     needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Warehouse.',
-    roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque',
+    roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque', roleMech:'Mecánico',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Escanea o pega el código…',
@@ -283,7 +283,7 @@ const T={
     alertPart:'Escribe qué parte es.', alertCar:'Pon al menos VIN o marca/modelo.', carNotFound:'Carro no encontrado.', vinShort:'El VIN se ve corto (deben ser ~17).', decoding:'Decodificando…', decodeOk:'✓ Datos rellenados — revisa y corrige si hace falta.', decodeNone:'No se encontró info de ese VIN; captura a mano.', decodeErr:'No se pudo decodificar (sin internet o VIN inválido). Captura a mano.', error:'Error: ' },
   en:{ installApp:'📲 Install Warehouse as app', teamAccess:'Team access', email:'Email', pass:'Password', enter:'Sign in', logout:'Log out',
     needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Warehouse.',
-    roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing',
+    roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing', roleMech:'Mechanic',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Scan or paste the code…',
@@ -312,7 +312,7 @@ function setLang(l){
   document.querySelectorAll('#lang-toggle,#login-lang-toggle').forEach(b=>{ if(b) b.textContent=(L==='es')?'EN':'ES'; });
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.getAttribute('data-i18n')); });
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
-  if(document.getElementById('who') && myEmail) document.getElementById('who').textContent = myEmail+' · '+roleLabel(role);
+  if(document.getElementById('who') && myEmail) document.getElementById('who').textContent = whoLabel(myEmail,role);
   buildTabs();
   if(_carView) renderCarDetail();
   else if(_view==='yard') renderVehicles();
@@ -387,7 +387,7 @@ onAuthStateChanged(auth,(user)=>{
   if(user && role){
     document.getElementById('login').style.display='none';
     document.getElementById('app').style.display='block';
-    document.getElementById('who').textContent = email+' · '+roleLabel(role);
+    document.getElementById('who').textContent = whoLabel(email,role);
     document.body.classList.toggle('owner-nav', role==='owner');
     buildTabs();
     if(!_listening){ _listening=true; startListening(); }
@@ -407,7 +407,22 @@ onAuthStateChanged(auth,(user)=>{
     if(user && !role){ document.getElementById('l-err').textContent=t('noAccess'); signOut(auth); }
   }
 });
-function roleLabel(r){ return r==='owner'?t('roleOwner'):r==='warehouse'?t('roleWh'):r==='yard'?t('roleYard'):r==='lister'?t('roleLister'):r==='packager'?t('rolePack'):''; }
+function roleLabel(r){ return r==='owner'?t('roleOwner'):r==='warehouse'?t('roleWh'):r==='yard'?t('roleYard'):r==='lister'?t('roleLister'):r==='packager'?t('rolePack'):r==='mechanic'?t('roleMech'):''; }
+// Nombres y títulos relajados (nada de "owner"). Los dueños llevan su título de supervisor por área.
+const NAME_BY_EMAIL={
+  'ev@legacymotorsgarage.com':'Enrique',
+  'ivan.garcia@legacymotorsgarage.com':'Ivan',
+  'capture@legacymotorsgarage.com':'Captura','yarda@legacymotorsgarage.com':'Captura',
+  'listing@legacymotorsgarage.com':'Listado','ebay@legacymotorsgarage.com':'Listado',
+  'warehouse@legacymotorsgarage.com':'Empaque','empaque@legacymotorsgarage.com':'Empaque',
+  'mechanic@legacymotorsgarage.com':'Mecánico','mecanico@legacymotorsgarage.com':'Mecánico'
+};
+const TITLE_BY_EMAIL={
+  'ev@legacymotorsgarage.com':'Supervisor W',        // Enrique — Almacén/Warehouse
+  'ivan.garcia@legacymotorsgarage.com':'Supervisor Y' // Ivan — Yarda
+};
+function dispName(email){ email=(email||'').toLowerCase(); return NAME_BY_EMAIL[email]||(email.split('@')[0])||email; }
+function whoLabel(email,r){ email=(email||'').toLowerCase(); const ti=TITLE_BY_EMAIL[email]; if(ti) return dispName(email)+' · '+ti; return roleLabel(r); }
 
 // ---- TABS ----
 let _view='yard';
@@ -521,7 +536,7 @@ window.sendChat=async function(){
   const i=document.getElementById('chat-input'); if(!i||!_chatCh) return;
   const text=(i.value||'').trim(); if(!text) return;
   i.value='';
-  try{ await addDoc(collection(db,'chat_channels',_chatCh,'messages'), { text:text.slice(0,1000), byEmail:myEmail, byName:(myEmail.split('@')[0]||myEmail), byRole:role, ts:new Date().toISOString(), tms:Date.now() }); markChatSeen(_chatCh); }
+  try{ await addDoc(collection(db,'chat_channels',_chatCh,'messages'), { text:text.slice(0,1000), byEmail:myEmail, byName:dispName(myEmail), byRole:role, ts:new Date().toISOString(), tms:Date.now() }); markChatSeen(_chatCh); }
   catch(e){ i.value=text; alert(t('error')+((e&&e.message)||e)); }
 };
 
