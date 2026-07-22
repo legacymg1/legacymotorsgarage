@@ -543,13 +543,15 @@ function renderChat(){
 window.sendChat=async function(){
   const i=document.getElementById('chat-input'); if(!i||!_chatCh) return;
   const text=(i.value||'').trim(); if(!text) return;
+  const ch=_chatCh;
   i.value='';
+  // 1) Lo ÚNICO que importa: guardar el mensaje. Solo esto puede mostrar un error real.
   try{
-    await addDoc(collection(db,'chat_channels',_chatCh,'messages'), { text:text.slice(0,1000), byEmail:myEmail, byName:dispName(myEmail), byRole:role, ts:new Date().toISOString(), tms:Date.now() });
-    markChatSeen(_chatCh);
-    try{ const p=httpsCallable(functions,'sendChatPush')({ channel:_chatCh, text:text.slice(0,180), byName:dispName(myEmail) }); if(p&&p.catch) p.catch(()=>{}); }catch(_){}   // 🔔 dispara push (sin bloquear ni tronar)
-  }
-  catch(e){ i.value=text; alert(t('error')+((e&&e.message)||e)); }
+    await addDoc(collection(db,'chat_channels',ch,'messages'), { text:text.slice(0,1000), byEmail:myEmail, byName:dispName(myEmail), byRole:role, ts:new Date().toISOString(), tms:Date.now() });
+  }catch(e){ i.value=text; alert(t('error')+((e&&e.message)||e)); return; }
+  // 2) Efectos secundarios — nunca pueden tronar ni mostrar error.
+  try{ markChatSeen(ch); }catch(_){}
+  setTimeout(()=>{ try{ const p=httpsCallable(functions,'sendChatPush')({ channel:ch, text:text.slice(0,180), byName:dispName(myEmail) }); if(p&&p.catch) p.catch(()=>{}); }catch(_){} },0);   // 🔔 push, aislado
 };
 
 // ---- 🔔 PUSH (FCM) ----
