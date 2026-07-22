@@ -76,7 +76,9 @@ function build(){
   document.getElementById('lcw-close').onclick=closePanel;
   document.getElementById('lcw-back').onclick=backToList;
   document.getElementById('lcw-sendbtn').onclick=send;
-  document.getElementById('lcw-input').addEventListener('keydown',(e)=>{ if(e.key==='Enter') send(); });
+  const inp=document.getElementById('lcw-input');
+  inp.addEventListener('keydown',(e)=>{ if(e.key==='Enter') send(); });
+  inp.addEventListener('focus',()=>{ setTimeout(fitSheet,150); setTimeout(fitSheet,350); });   // al aparecer el teclado, ajusta y baja al último
 }
 
 function startListeners(){
@@ -139,7 +141,7 @@ function openConvo(k){ curCh=k; view='convo';
 }
 window.lcwOpenTo=(k)=>{ if(!k||!CH.some(c=>c.k===k)){ openPanel(); return; } open=true; document.getElementById('lcw-panel').style.display='block'; openConvo(k); vpOn(); clearNotifs(); };
 function backToList(){ view='list'; document.getElementById('lcw-convo').style.display='none'; document.getElementById('lcw-list').style.display='block'; document.getElementById('lcw-back').style.display='none'; document.getElementById('lcw-title').textContent='💬 Chat interno'; document.getElementById('lcw-subtitle').style.display='none'; renderList(); }
-function fitSheet(){ const sh=document.getElementById('lcw-sheet'), vv=window.visualViewport; if(!sh||!vv) return; sh.style.bottom='auto'; sh.style.height=vv.height+'px'; sh.style.transform='translateY('+vv.offsetTop+'px)'; }
+function fitSheet(){ const sh=document.getElementById('lcw-sheet'), vv=window.visualViewport; if(!sh||!vv) return; sh.style.bottom='auto'; sh.style.height=vv.height+'px'; sh.style.transform='translateY('+vv.offsetTop+'px)'; const m=document.getElementById('lcw-msgs'); if(m) m.scrollTop=m.scrollHeight; }   // baja al último mensaje cuando sube/baja el teclado
 function vpOn(){ const vv=window.visualViewport; if(!vv) return; vv.addEventListener('resize',fitSheet); vv.addEventListener('scroll',fitSheet); fitSheet(); }
 function vpOff(){ const vv=window.visualViewport, sh=document.getElementById('lcw-sheet'); if(vv){ vv.removeEventListener('resize',fitSheet); vv.removeEventListener('scroll',fitSheet); } if(sh){ sh.style.height=''; sh.style.transform=''; sh.style.bottom='0'; } }
 function openPanel(){ open=true; view='list'; document.getElementById('lcw-panel').style.display='block'; backToList(); vpOn(); clearNotifs(); }
