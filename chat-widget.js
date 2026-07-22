@@ -1,7 +1,7 @@
 // 💬 Widget de chat UNIFICADO — burbuja + panel para TODOS los roles, en cualquier página.
 // Reusa la app Firebase de la página (misma sesión). Estado (leído/oculto) en la NUBE → sincroniza entre dispositivos.
 import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, addDoc, deleteDoc, onSnapshot, query, orderBy, limit, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
@@ -39,6 +39,9 @@ const dispName=(e)=>NAMES[(e||'').toLowerCase()]||((e||'').split('@')[0])||e;
 
 let ME='', MYROLE='', CH=[], msgs={}, allReads={}, hidden=[], unsub={}, hiddenUnsub=null, readsUnsub=null;
 let open=false, view='list', curCh='', msgr=null, reg=null, toastT=null;
+const REACTIONS=['👍','❤️','😂','😮','😢','🙏'];
+let reax={}, _reaxDocs={};
+function recomputeReax(){ reax={}; Object.keys(_reaxDocs).forEach(ch=>_reaxDocs[ch].forEach(r=>{ if(!r.msgId||!r.emoji) return; (reax[r.msgId]=reax[r.msgId]||{}); (reax[r.msgId][r.emoji]=reax[r.msgId][r.emoji]||[]).push(r.email); })); }
 const chName=(k)=>{ const c=CH_ALL.find(x=>x.k===k); return c?c.n:k; };
 const myReads=()=>allReads[ME]||{};
 
@@ -85,6 +88,8 @@ function startListeners(){
   CH.forEach(c=>{ if(unsub[c.k]) return;
     const qy=query(collection(db,'chat_channels',c.k,'messages'), orderBy('ts'), limit(300));
     unsub[c.k]=onSnapshot(qy, s=>{ msgs[c.k]=s.docs.map(d=>({id:d.id,...d.data()})); refresh(); }, e=>console.log('lcw',c.k,e));
+    // 😀 Reacciones del canal
+    onSnapshot(query(collection(db,'chat_reactions'), where('ch','==',c.k)), s=>{ _reaxDocs[c.k]=s.docs.map(d=>d.data()); recomputeReax(); if(open&&view==='convo'&&curCh===c.k) renderMsgs(); }, e=>console.log('reax',c.k,e));
   });
   // 📖 Marcadores de LEÍDO (por usuario, en la nube) → no-leídos sincronizados + palomitas después
   if(!readsUnsub) readsUnsub=onSnapshot(collection(db,'chat_reads'), s=>{ const m={}; s.forEach(d=>m[d.id]=d.data()||{}); allReads=m; refresh(); }, e=>console.log('reads',e));
@@ -151,10 +156,41 @@ function renderMsgs(){
   const arr=msgs[curCh]||[];
   if(!arr.length){ box.innerHTML='<div style="text-align:center;margin:auto;color:#98a0b0;">Sin mensajes aún. Escribe el primero 👋</div>'; return; }
   box.innerHTML=arr.map(m=>{ const mine=(m.byEmail||'')===ME; const when=m.ts?new Date(m.ts).toLocaleString('es-MX',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
-    return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:82%;">${mine?'':`<div style="font-size:11px;color:#98a0b0;margin:0 0 2px 4px;font-weight:700;">${esc(m.byName||m.byEmail||'')}</div>`}<div style="background:${mine?'#f0c040':'#151a24'};color:${mine?'#0b0e14':'#e7e9ee'};border-radius:14px;padding:8px 12px;font-size:14px;line-height:1.4;word-break:break-word;">${esc(m.text||'')}</div><div style="font-size:10px;color:#6b7280;margin:2px 6px 0;text-align:${mine?'right':'left'};">${when}</div></div>`;
+    const rx=reax[m.id]||{}; const chips=Object.keys(rx).filter(e=>rx[e].length).map(e=>{ const mineR=rx[e].indexOf(ME)>=0; return '<span onclick="lcwReact(\''+m.id+'\',\''+e+'\')" style="display:inline-flex;align-items:center;gap:2px;font-size:12px;background:'+(mineR?'rgba(240,192,64,.18)':'#1e232d')+';border:1px solid '+(mineR?'#f0c040':'#2a2f3a')+';border-radius:20px;padding:1px 7px;margin:3px 3px 0 0;cursor:pointer;">'+e+' '+rx[e].length+'</span>'; }).join('');
+    return `<div data-mid="${m.id}" style="align-self:${mine?'flex-end':'flex-start'};max-width:82%;">${mine?'':`<div style="font-size:11px;color:#98a0b0;margin:0 0 2px 4px;font-weight:700;">${esc(m.byName||m.byEmail||'')}</div>`}<div class="lcw-bubble" style="background:${mine?'#f0c040':'#151a24'};color:${mine?'#0b0e14':'#e7e9ee'};border-radius:14px;padding:8px 12px;font-size:14px;line-height:1.4;word-break:break-word;">${esc(m.text||'')}</div><div style="font-size:10px;color:#6b7280;margin:2px 6px 0;text-align:${mine?'right':'left'};">${when}</div>${chips?'<div style="text-align:'+(mine?'right':'left')+';">'+chips+'</div>':''}</div>`;
   }).join('');
   box.scrollTop=box.scrollHeight;
+  attachLongPress();
 }
+// 😀 Dejar apretado un mensaje → selector de reacciones
+function attachLongPress(){
+  document.querySelectorAll('#lcw-msgs [data-mid] .lcw-bubble').forEach(b=>{
+    const el=b.parentNode; const mid=el.getAttribute('data-mid'); let timer=null;
+    const start=()=>{ timer=setTimeout(()=>{ try{ if(navigator.vibrate) navigator.vibrate(30); }catch(e){} showReactPicker(mid,b); }, 420); };
+    const cancel=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+    b.addEventListener('touchstart',start,{passive:true}); b.addEventListener('touchend',cancel); b.addEventListener('touchmove',cancel);
+    b.addEventListener('contextmenu',(e)=>{ e.preventDefault(); showReactPicker(mid,b); });
+  });
+}
+function hideReactPicker(){ const p=document.getElementById('lcw-reactpick'); if(p) p.remove(); }
+function showReactPicker(msgId, anchor){
+  hideReactPicker();
+  const rect=anchor.getBoundingClientRect();
+  const pick=document.createElement('div'); pick.id='lcw-reactpick';
+  pick.style.cssText='position:fixed;z-index:2147483004;background:#1e232d;border:1px solid #2a2f3a;border-radius:26px;padding:6px 10px;display:flex;gap:8px;box-shadow:0 8px 26px rgba(0,0,0,.6);';
+  pick.innerHTML=REACTIONS.map(e=>'<span onclick="lcwReact(\''+msgId+'\',\''+e+'\')" style="font-size:26px;cursor:pointer;line-height:1;">'+e+'</span>').join('');
+  document.body.appendChild(pick);
+  let top=rect.top-54; if(top<70) top=rect.bottom+8;
+  let left=rect.left; const w=pick.offsetWidth; if(left+w>window.innerWidth-10) left=window.innerWidth-w-10; if(left<10) left=10;
+  pick.style.top=top+'px'; pick.style.left=left+'px';
+  setTimeout(()=>{ document.addEventListener('click',hideReactPicker,{once:true}); document.addEventListener('touchstart',(ev)=>{ if(!pick.contains(ev.target)) hideReactPicker(); },{once:true,passive:true}); }, 20);
+}
+window.lcwReact=async (msgId,emoji)=>{
+  hideReactPicker();
+  const rid=curCh+'__'+msgId+'__'+ME;
+  const mine=!!(reax[msgId]&&reax[msgId][emoji]&&reax[msgId][emoji].indexOf(ME)>=0);
+  try{ if(mine){ await deleteDoc(doc(db,'chat_reactions',rid)); } else { await setDoc(doc(db,'chat_reactions',rid),{ ch:curCh, msgId, email:ME, emoji, at:new Date().toISOString() }); } }catch(e){ console.log('react',e); }
+};
 async function send(){
   const i=document.getElementById('lcw-input'); if(!i||!curCh) return;
   const text=(i.value||'').trim(); if(!text) return; const ch=curCh; i.value='';
