@@ -96,9 +96,9 @@
     <div class="card" style="margin-bottom:14px;">
       <div onclick="toggleAddCar()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
         <span style="font-weight:800;" data-i18n="addCar">➕ Carro a desmantelar</span>
-        <span id="addcar-arrow" class="gold" style="font-size:18px;">▴</span>
+        <span id="addcar-arrow" class="gold" style="font-size:18px;">▾</span>
       </div>
-      <div id="addcar-body" style="margin-top:8px;">
+      <div id="addcar-body" style="margin-top:8px;display:none;">
       <label>VIN</label>
       <input id="v-vin" data-i18n-ph="vinPh" placeholder="1FT... (17 dígitos)" style="text-transform:uppercase;" onkeydown="if(event.key==='Enter')decodeVin()">
       <div class="row2" style="margin-top:8px;">
@@ -139,13 +139,6 @@
       <span>⚡ <span data-i18n="quickItemBtn">Artículo rápido (sin carro)</span></span>
       <span class="gold" style="font-size:18px;">＋</span>
     </button>
-    <div id="loose-wrap" style="display:none;margin-bottom:14px;">
-      <div onclick="toggleLoose()" style="font-weight:800;margin:0 2px 8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-        <span>📦 <span data-i18n="looseItems">Artículos sueltos</span> <span id="loose-count" class="muted" style="font-weight:600;"></span></span>
-        <span id="loose-caret" style="font-size:14px;color:var(--muted);">▸</span>
-      </div>
-      <div id="loose-list" style="display:none;"></div>
-    </div>
     <button id="cars-toggle" onclick="toggleCarsList()" class="card" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:800;color:var(--text);">
       <span>🚗 <span data-i18n="carsDismantling">Carros en desmantelamiento</span> <span id="cars-count" class="muted" style="font-weight:600;"></span></span>
       <span id="cars-arrow" class="gold">▾</span>
@@ -157,6 +150,13 @@
         <div id="veh-dd" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:12px;max-height:62vh;overflow:auto;box-shadow:0 14px 34px rgba(0,0,0,.55);"></div>
       </div>
       <div id="veh-list"></div>
+    </div>
+    <div id="loose-wrap" class="card" style="display:none;margin-top:14px;">
+      <div onclick="toggleLoose()" style="font-weight:800;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+        <span>📦 <span data-i18n="looseItems">Artículos sueltos</span> <span id="loose-count" class="muted" style="font-weight:600;"></span></span>
+        <span id="loose-caret" style="font-size:14px;color:var(--muted);">▸</span>
+      </div>
+      <div id="loose-list" style="display:none;margin-top:10px;"></div>
     </div>
   </div>
 
@@ -553,7 +553,7 @@ function carThumb(v,size){ const s=size||64; const photo=(v.photoURLs&&v.photoUR
     ? `<img src="${photo}" style="width:${s}px;height:${s}px;object-fit:cover;border-radius:12px;border:1px solid var(--border);flex:0 0 auto;">`
     : `<div style="width:${s}px;height:${s}px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:${Math.round(s*0.4)}px;flex:0 0 auto;">🚗</div>`;
 }
-let _addCarOpen=true;
+let _addCarOpen=false;
 window.toggleAddCar=function(){
   _addCarOpen=!_addCarOpen;
   const b=document.getElementById('addcar-body'); if(b) b.style.display=_addCarOpen?'':'none';
