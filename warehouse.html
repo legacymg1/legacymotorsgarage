@@ -398,6 +398,7 @@ onAuthStateChanged(auth,(user)=>{
     if(!_listening){ _listening=true; startListening(); }
     startChat();   // 💬 chat multi-canal — se auto-filtra: cada rol ve solo sus canales (dueños ven los 3)
     initPush();    // 🔔 refresca token si ya dio permiso + escucha mensajes en foreground
+    try{ const cc=new URLSearchParams(location.search).get('chat'); if(cc){ setTimeout(()=>openChatToChannel(cc),500); } }catch(e){}   // vino de tocar una notificación
     const canTabs=(role==='owner'||role==='warehouse');
     const allowed = canTabs?['yard','lister','pack']:(role==='yard'?['yard']:role==='lister'?['lister']:['pack']);
     const def = (canTabs||role==='yard')?'yard':(role==='lister'?'lister':'pack');
@@ -526,6 +527,14 @@ window.chatBackToList=function(){
 };
 window.openChat=function(){ _chatOpen=true; _chatViewMode='list'; document.getElementById('chat-panel').style.display='block'; chatBackToList(); };
 window.closeChat=function(){ _chatOpen=false; const p=document.getElementById('chat-panel'); if(p) p.style.display='none'; };
+// 🔔 Abre el chat directamente en un canal (al tocar una notificación)
+function openChatToChannel(ch){
+  if(!ch || !_chatChans.some(c=>c.key===ch)) { openChat(); return; }
+  _chatOpen=true; document.getElementById('chat-panel').style.display='block';
+  chatOpenConvo(ch);
+}
+// Notificación tocada con la app YA abierta → el SW nos avisa
+if('serviceWorker' in navigator){ navigator.serviceWorker.addEventListener('message', (e)=>{ if(e.data && e.data.type==='open-chat') openChatToChannel(e.data.channel); }); }
 function renderChat(){
   const box=document.getElementById('chat-msgs'); if(!box) return;
   const msgs=_chatMsgs[_chatCh]||[];

@@ -13,27 +13,34 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Mensaje en segundo plano → muestra la notificación (una sola vez, controlada por nosotros).
+// Mensaje SOLO-DATA (el backend no manda 'notification' para NO duplicar) → mostramos UNA notificación.
 messaging.onBackgroundMessage((payload) => {
-  const n = (payload && payload.notification) || {};
   const d = (payload && payload.data) || {};
-  self.registration.showNotification(n.title || 'Legacy Chat', {
-    body: n.body || '',
+  self.registration.showNotification(d.title || 'Legacy Chat', {
+    body: d.body || '',
     icon: './icon-192.png',
     badge: './icon-192.png',
-    data: { url: (d.url || '/warehouse.html') },
-    tag: 'legacy-chat-' + (d.channel || 'x'),   // agrupa por canal
+    data: { url: (d.url || '/warehouse.html'), channel: (d.channel || '') },
+    tag: 'legacy-chat-' + (d.channel || 'x'),   // agrupa por canal (no apila 20)
   });
 });
 
-// Al tocar la notificación → abre/enfoca la app.
+// Al tocar la notificación → abre/enfoca la app EN ESA conversación.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/warehouse.html';
+  const data = event.notification.data || {};
+  const channel = data.channel || '';
+  const url = data.url || '/warehouse.html';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
-      for (const w of wins) { if (w.url.indexOf('warehouse') >= 0 && 'focus' in w) return w.focus(); }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
+      for (const w of wins) {
+        if (w.url.indexOf('warehouse') >= 0) {
+          w.focus();
+          w.postMessage({ type: 'open-chat', channel: channel });   // app ya abierta → ábrele el chat
+          return;
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);   // app cerrada → abre con ?chat=canal
     })
   );
 });
