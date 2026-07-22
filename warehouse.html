@@ -592,13 +592,15 @@ window.chatBackToList=function(){
 function fitChatSheet(){ const sh=document.getElementById('chat-sheet'), vv=window.visualViewport; if(!sh||!vv) return; sh.style.bottom='auto'; sh.style.height=vv.height+'px'; sh.style.transform='translateY('+vv.offsetTop+'px)'; }
 function chatViewportOn(){ const vv=window.visualViewport; if(!vv) return; vv.addEventListener('resize',fitChatSheet); vv.addEventListener('scroll',fitChatSheet); fitChatSheet(); }
 function chatViewportOff(){ const vv=window.visualViewport, sh=document.getElementById('chat-sheet'); if(vv){ vv.removeEventListener('resize',fitChatSheet); vv.removeEventListener('scroll',fitChatSheet); } if(sh){ sh.style.height=''; sh.style.transform=''; sh.style.bottom='0'; } }
-window.openChat=function(){ _chatOpen=true; _chatViewMode='list'; document.getElementById('chat-panel').style.display='block'; chatBackToList(); chatViewportOn(); };
+// Limpia las notificaciones ya entregadas del teléfono (al abrir el chat)
+function clearChatNotifs(){ try{ if('serviceWorker' in navigator) navigator.serviceWorker.ready.then(r=>{ if(r.getNotifications) r.getNotifications().then(ns=>ns.forEach(n=>n.close())).catch(()=>{}); }).catch(()=>{}); }catch(e){} }
+window.openChat=function(){ _chatOpen=true; _chatViewMode='list'; document.getElementById('chat-panel').style.display='block'; chatBackToList(); chatViewportOn(); clearChatNotifs(); };
 window.closeChat=function(){ _chatOpen=false; const p=document.getElementById('chat-panel'); if(p) p.style.display='none'; chatViewportOff(); };
 // 🔔 Abre el chat directamente en un canal (al tocar una notificación)
 function openChatToChannel(ch){
   if(!ch || !_chatChans.some(c=>c.key===ch)) { openChat(); return; }
   _chatOpen=true; document.getElementById('chat-panel').style.display='block';
-  chatOpenConvo(ch);
+  chatOpenConvo(ch); chatViewportOn(); clearChatNotifs();
 }
 // Notificación tocada con la app YA abierta → el SW nos avisa
 if('serviceWorker' in navigator){ navigator.serviceWorker.addEventListener('message', (e)=>{ if(e.data && e.data.type==='open-chat') openChatToChannel(e.data.channel); }); }
