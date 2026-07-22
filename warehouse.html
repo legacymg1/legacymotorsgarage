@@ -455,12 +455,12 @@ window.setView=function(k){
 // 3 canales. Cada rol ve solo los suyos; los dueños ven los 3.
 const CHAT_CHANNELS=[
   { key:'group',             es:'Legacy Group',      en:'Legacy Group',      roles:['owner','warehouse','yard','lister','packager','mechanic'] },
-  { key:'owners',            es:'Dueños',            en:'Owners',            roles:['owner'] },
+  { key:'owners',            es:'Supervisores',      en:'Supervisors',       roles:['owner'] },
   { key:'capture-listing',   es:'Captura ↔ Listado', en:'Capture ↔ Listing', roles:['owner','yard','lister'] },
   { key:'capture-owners',    es:'Captura ↔ Supervisores', en:'Capture ↔ Supervisors', roles:['owner','yard'] },
   { key:'listing-owners',    es:'Listado ↔ Supervisores', en:'Listing ↔ Supervisors', roles:['owner','lister'] },
-  { key:'warehouse-owners',  es:'Empaque ↔ Dueños',  en:'Warehouse ↔ Owners', roles:['owner','warehouse','packager'] },
-  { key:'mechanic-owners',   es:'Mecánico ↔ Dueños', en:'Mechanic ↔ Owners', roles:['owner','mechanic'] },
+  { key:'warehouse-owners',  es:'Empaque ↔ Supervisores', en:'Warehouse ↔ Supervisors', roles:['owner','warehouse','packager'] },
+  { key:'mechanic-owners',   es:'Mecánico ↔ Supervisores', en:'Mechanic ↔ Supervisors', roles:['owner','mechanic'] },
 ];
 let _chatMsgs={}, _chatSeen={}, _chatUnsub={}, _chatOpen=false, _chatCh='', _chatChans=[], _chatViewMode='list';
 try{ _chatSeen=JSON.parse(localStorage.getItem('lmg_wh_chatseen')||'{}')||{}; }catch(e){}
