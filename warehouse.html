@@ -207,6 +207,7 @@
       <div style="font-weight:800;">💬 <span data-i18n="chatTitle">Chat interno</span></div>
       <button onclick="closeChat()" style="background:none;border:none;color:var(--muted);font-size:22px;font-weight:800;cursor:pointer;line-height:1;">✕</button>
     </div>
+    <div id="chat-tabs" style="display:none;border-bottom:1px solid var(--border);"></div>
     <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;"></div>
     <div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface);">
       <input id="chat-input" type="text" name="chatmsg" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="true" data-1p-ignore data-lpignore="true" data-form-type="other" data-i18n-ph="chatPh" placeholder="Escribe un mensaje…" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;margin-bottom:0;">
@@ -382,7 +383,7 @@ onAuthStateChanged(auth,(user)=>{
     document.body.classList.toggle('owner-nav', role==='owner');
     buildTabs();
     if(!_listening){ _listening=true; startListening(); }
-    if(['owner','warehouse','yard','lister'].indexOf(role)>=0) startChat();   // 💬 chat: Capture ↔ Listing (+ dueños)
+    startChat();   // 💬 chat multi-canal — se auto-filtra: cada rol ve solo sus canales (dueños ven los 3)
     const canTabs=(role==='owner'||role==='warehouse');
     const allowed = canTabs?['yard','lister','pack']:(role==='yard'?['yard']:role==='lister'?['lister']:['pack']);
     const def = (canTabs||role==='yard')?'yard':(role==='lister'?'lister':'pack');
@@ -391,6 +392,7 @@ onAuthStateChanged(auth,(user)=>{
   } else {
     _carView=''; document.body.classList.remove('owner-nav'); const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
     const fc=document.getElementById('fab-chat'); if(fc) fc.style.display='none'; closeChat();
+    try{ Object.values(_chatUnsub).forEach(u=>u&&u()); }catch(e){} _chatUnsub={}; _chatMsgs={}; _chatChans=[];
     const vc=document.getElementById('view-car'); if(vc) vc.style.display='none'; closeModal();
     document.getElementById('app').style.display='none';
     document.getElementById('login').style.display='flex';
@@ -419,29 +421,53 @@ window.setView=function(k){
   if(k==='pack'){ _pendingConfirm=''; _packMode='find'; renderPending(); setTimeout(()=>{ const s=document.getElementById('scan-input'); if(s) s.focus(); }, 120); }   // escáner listo al entrar
 };
 
-// ---- 💬 CHAT INTERNO (tiempo real) ----
-let _chatMsgs=[], _chatOpen=false, _chatLastSeen=0, _chatUnsub=null;
-try{ _chatLastSeen=Number(localStorage.getItem('lmg_wh_chatseen')||0); }catch(e){}
+// ---- 💬 CHAT INTERNO multi-canal (tiempo real) ----
+// 3 canales. Cada rol ve solo los suyos; los dueños ven los 3.
+const CHAT_CHANNELS=[
+  { key:'owners',            es:'Dueños',            en:'Owners',            roles:['owner'] },
+  { key:'capture-listing',   es:'Captura ↔ Listado', en:'Capture ↔ Listing', roles:['owner','yard','lister'] },
+  { key:'warehouse-owners',  es:'Empaque ↔ Dueños',  en:'Warehouse ↔ Owners', roles:['owner','warehouse','packager'] },
+];
+let _chatMsgs={}, _chatSeen={}, _chatUnsub={}, _chatOpen=false, _chatCh='', _chatChans=[];
+try{ _chatSeen=JSON.parse(localStorage.getItem('lmg_wh_chatseen')||'{}')||{}; }catch(e){}
+function chanLabel(c){ return L==='es'?c.es:c.en; }
 function startChat(){
+  _chatChans=CHAT_CHANNELS.filter(c=>c.roles.indexOf(role)>=0);
+  if(!_chatChans.length){ const fab=document.getElementById('fab-chat'); if(fab) fab.style.display='none'; return; }
   const fab=document.getElementById('fab-chat'); if(fab) fab.style.display='flex';
-  if(_chatUnsub) return;
-  const qy=query(collection(db,'chat_messages'), orderBy('ts'), limit(300));
-  _chatUnsub=onSnapshot(qy, s=>{ _chatMsgs=s.docs.map(d=>({id:d.id,...d.data()}));
-    if(_chatOpen){ renderChat(); markChatSeen(); } else updateChatBadge();
-  }, e=>console.log('chat',e));
+  _chatCh=_chatChans[0].key;
+  _chatChans.forEach(c=>{
+    if(_chatUnsub[c.key]) return;
+    const qy=query(collection(db,'chat_channels',c.key,'messages'), orderBy('ts'), limit(300));
+    _chatUnsub[c.key]=onSnapshot(qy, s=>{ _chatMsgs[c.key]=s.docs.map(d=>({id:d.id,...d.data()}));
+      if(_chatOpen && _chatCh===c.key){ renderChat(); markChatSeen(c.key); } else updateChatBadge();
+    }, e=>console.log('chat',c.key,e));
+  });
 }
+function unreadFor(key){ return (_chatMsgs[key]||[]).filter(m=>(m.tms||0)>(_chatSeen[key]||0) && (m.byEmail||'')!==myEmail).length; }
 function updateChatBadge(){
   const b=document.getElementById('chat-badge'); if(!b) return;
-  const n=_chatMsgs.filter(m=>(m.tms||0)>_chatLastSeen && (m.byEmail||'')!==myEmail).length;
+  const n=_chatChans.reduce((s,c)=>s+unreadFor(c.key),0);
   if(n>0){ b.textContent=n>9?'9+':String(n); b.style.display=''; } else b.style.display='none';
+  renderChatTabs();
 }
-function markChatSeen(){ _chatLastSeen=Date.now(); try{ localStorage.setItem('lmg_wh_chatseen',String(_chatLastSeen)); }catch(e){} updateChatBadge(); }
-window.openChat=function(){ _chatOpen=true; document.getElementById('chat-panel').style.display='block'; renderChat(); markChatSeen(); setTimeout(()=>{ const i=document.getElementById('chat-input'); if(i) i.focus(); },100); };
-window.closeChat=function(){ _chatOpen=false; document.getElementById('chat-panel').style.display='none'; };
+function markChatSeen(key){ _chatSeen[key]=Date.now(); try{ localStorage.setItem('lmg_wh_chatseen',JSON.stringify(_chatSeen)); }catch(e){} updateChatBadge(); }
+function renderChatTabs(){
+  const box=document.getElementById('chat-tabs'); if(!box) return;
+  if(_chatChans.length<2){ box.style.display='none'; return; }
+  box.style.display='flex';
+  box.innerHTML=_chatChans.map(c=>{ const u=unreadFor(c.key); const on=c.key===_chatCh;
+    return `<div onclick="chatSwitch('${c.key}')" style="flex:1;text-align:center;padding:7px 4px;font-size:12px;font-weight:800;cursor:pointer;border-bottom:2px solid ${on?'var(--gold)':'transparent'};color:${on?'var(--gold)':'var(--muted)'};">${chanLabel(c)}${u>0?' <span style="background:#c0392b;color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">'+u+'</span>':''}</div>`;
+  }).join('');
+}
+window.chatSwitch=function(key){ _chatCh=key; renderChat(); markChatSeen(key); const i=document.getElementById('chat-input'); if(i) i.focus(); };
+window.openChat=function(){ _chatOpen=true; document.getElementById('chat-panel').style.display='block'; renderChatTabs(); renderChat(); markChatSeen(_chatCh); setTimeout(()=>{ const i=document.getElementById('chat-input'); if(i) i.focus(); },100); };
+window.closeChat=function(){ _chatOpen=false; const p=document.getElementById('chat-panel'); if(p) p.style.display='none'; };
 function renderChat(){
   const box=document.getElementById('chat-msgs'); if(!box) return;
-  if(!_chatMsgs.length){ box.innerHTML='<div class="sub" style="text-align:center;margin:auto;">'+t('chatEmpty')+'</div>'; return; }
-  box.innerHTML=_chatMsgs.map(m=>{
+  const msgs=_chatMsgs[_chatCh]||[];
+  if(!msgs.length){ box.innerHTML='<div class="sub" style="text-align:center;margin:auto;">'+t('chatEmpty')+'</div>'; return; }
+  box.innerHTML=msgs.map(m=>{
     const mine=(m.byEmail||'')===myEmail;
     const when=m.ts?new Date(m.ts).toLocaleString(L==='es'?'es-MX':'en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
     return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:82%;">
@@ -453,10 +479,10 @@ function renderChat(){
   box.scrollTop=box.scrollHeight;
 }
 window.sendChat=async function(){
-  const i=document.getElementById('chat-input'); if(!i) return;
+  const i=document.getElementById('chat-input'); if(!i||!_chatCh) return;
   const text=(i.value||'').trim(); if(!text) return;
   i.value='';
-  try{ await addDoc(collection(db,'chat_messages'), { text:text.slice(0,1000), byEmail:myEmail, byName:(myEmail.split('@')[0]||myEmail), byRole:role, ts:new Date().toISOString(), tms:Date.now() }); markChatSeen(); }
+  try{ await addDoc(collection(db,'chat_channels',_chatCh,'messages'), { text:text.slice(0,1000), byEmail:myEmail, byName:(myEmail.split('@')[0]||myEmail), byRole:role, ts:new Date().toISOString(), tms:Date.now() }); markChatSeen(_chatCh); }
   catch(e){ i.value=text; alert(t('error')+((e&&e.message)||e)); }
 };
 
