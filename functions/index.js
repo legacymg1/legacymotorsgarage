@@ -550,6 +550,7 @@ exports.ebaySellerSetup = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
     fulfillmentName: pol.fulfillmentName || "",
     paymentName: pol.paymentName || "",
     returnName: pol.returnName || "",
+    excludeRegions: pol.excludeRegions || "",   // resultado handling(1d) + exclusión AK/HI/PR
     updatedAt: new Date().toISOString(),
   };
   await admin.firestore().collection("config").doc("ebay").set(cfg, { merge: true });
