@@ -1757,11 +1757,12 @@ window.renderLister=function(){
   all.forEach(p=>{ (g[p.status]||g.disponible).push(p); });
   const byDate=(a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'');           // más nueva primero
   const byDateAsc=(a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'');         // más antigua primero
-  g.disponible.sort(byDateAsc); g.borrador.sort(byDateAsc); g.publicado.sort(byDate); g.vendido.sort(byDate); airbags.sort(byDateAsc);
+  // "Por publicar" + "Borrador" van JUNTOS (más viejo arriba) → al crear draft la parte se queda en su lugar, solo cambia el semáforo.
+  const working=g.disponible.concat(g.borrador).sort(byDateAsc);
+  g.publicado.sort(byDate); g.vendido.sort(byDate); airbags.sort(byDateAsc);
   const secHead=(color,label,n)=>'<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;margin:18px 2px 8px;"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+color+';"></span>'+label+' <span class="muted" style="font-weight:600;">('+n+')</span></div>';
   let html='';
-  if(g.disponible.length) html+=secHead('#ff9800',t('secPendientes'),g.disponible.length)+g.disponible.map(listerCard).join('');
-  if(g.borrador.length)   html+=secHead('#0b5cd6',t('secBorrador'),g.borrador.length)+g.borrador.map(listerCard).join('');
+  if(working.length)      html+=secHead('#ff9800',t('secPendientes'),working.length)+working.map(listerCard).join('');
   if(g.publicado.length)  html+=secHead('#3ecf8e',t('secPublicadas'),g.publicado.length)+g.publicado.map(listerCard).join('');
   if(g.vendido.length)    html+=secHead('#f0c040',t('secVendidas'),g.vendido.length)+g.vendido.map(listerCard).join('');
   if(airbags.length) html+='<details style="margin-top:18px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:#c084fc;padding:6px 2px;">🎈 '+t('secAirbags')+' ('+airbags.length+')</summary><div class="sub" style="margin:4px 2px 8px;">'+t('airbagNote')+'</div>'+airbags.map(listerCard).join('')+'</details>';
