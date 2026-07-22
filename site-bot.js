@@ -2,15 +2,15 @@
 (function(){
   var ENDPOINT='https://us-central1-legacy-motors-garage.cloudfunctions.net/siteChat';
   var lang=(navigator.language||'es').toLowerCase().indexOf('en')===0?'en':'es';
-  var T={ es:{ open:'💬 ¿Buscas carro? Escríbenos', title:'Legacy Motors', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi:'¡Hola! 👋 Soy de Legacy Motors Garage. ¿Qué tipo de carro buscas? Tenemos carros certificados, con servicio al día y 1,000 millas de garantía. Cuéntame y te ayudo.', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
-           en:{ open:'💬 Looking for a car? Chat with us', title:'Legacy Motors', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi:'Hi! 👋 I\'m with Legacy Motors Garage. What kind of car are you looking for? Our cars are certified, freshly serviced, and come with a 1,000-mile warranty. Tell me and I\'ll help you out.', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
+  var T={ es:{ open:'💬 ¿Buscas carro? Escríbenos', title:'Legacy Motors Garage', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi:'¡Hola! 👋 Bienvenido a Legacy Motors Garage. ¿Qué tipo de carro buscas?', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
+           en:{ open:'💬 Looking for a car? Chat with us', title:'Legacy Motors Garage', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi:'Hi! 👋 Welcome to Legacy Motors Garage. What kind of car are you looking for?', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
   function t(k){ return (T[lang]&&T[lang][k])||T.es[k]; }
   var msgs=[]; // {role, content}
   var openState=false, busy=false;
 
   var css=document.createElement('style');
-  css.textContent='#lmb-fab{position:fixed;right:18px;bottom:20px;z-index:2147482000;background:#0b0e14;color:#f0c040;border:1px solid #f0c040;border-radius:30px;padding:12px 18px;font:600 14px -apple-system,system-ui,sans-serif;box-shadow:0 10px 28px rgba(0,0,0,.45);cursor:pointer;display:flex;align-items:center;gap:8px;}'
-   +'#lmb-fab .dot{width:9px;height:9px;border-radius:50%;background:#3ecf8e;box-shadow:0 0 0 3px rgba(62,207,142,.25);}'
+  css.textContent='#lmb-fab{position:fixed;right:18px;bottom:22px;z-index:2147482000;background:#0b0e14;color:#f0c040;border:2px solid #f0c040;border-radius:34px;padding:16px 24px;font:700 16px -apple-system,system-ui,sans-serif;box-shadow:0 12px 34px rgba(0,0,0,.5);cursor:pointer;display:flex;align-items:center;gap:10px;}'
+   +'#lmb-fab .dot{width:11px;height:11px;border-radius:50%;background:#3ecf8e;box-shadow:0 0 0 4px rgba(62,207,142,.25);}'
    +'#lmb-panel{position:fixed;right:18px;bottom:20px;z-index:2147482001;width:min(380px,calc(100vw - 24px));height:min(560px,calc(100vh - 40px));background:#0b0e14;border:1px solid #2a2f3a;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.6);display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,system-ui,sans-serif;}'
    +'#lmb-panel.on{display:flex;}'
    +'#lmb-hd{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,#151a24,#0b0e14);border-bottom:1px solid #2a2f3a;}'
@@ -29,7 +29,7 @@
 
   var fab=document.createElement('button'); fab.id='lmb-fab'; fab.innerHTML='<span class="dot"></span>'+t('open'); fab.onclick=toggle; document.body.appendChild(fab);
   var panel=document.createElement('div'); panel.id='lmb-panel';
-  panel.innerHTML='<div id="lmb-hd"><div class="av">🚗</div><div class="ti">'+t('title')+'<div class="su">'+t('sub')+'</div></div><button id="lmb-x">✕</button></div>'
+  panel.innerHTML='<div id="lmb-hd"><div class="av"><img src="client-lmg-192.png" alt="Legacy" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div><div class="ti">'+t('title')+'<div class="su">'+t('sub')+'</div></div><button id="lmb-x">✕</button></div>'
    +'<div id="lmb-msgs"></div>'
    +'<div id="lmb-bar"><input id="lmb-in" type="text" autocomplete="off" placeholder="'+t('ph')+'"><button id="lmb-snd">'+t('send')+'</button></div>';
   document.body.appendChild(panel);
