@@ -1295,9 +1295,6 @@ window.openPartEdit=function(id){
     <input type="file" id="epa-cam" accept="image/*" capture="environment" multiple style="display:none" onchange="addEditPartPhotos(this)">
     <input type="file" id="epa-photos" accept="image/*" multiple style="display:none" onchange="addEditPartPhotos(this)">
     <div id="epa-prev" class="thumbs"></div>
-    <button class="btn ghost sm" style="width:100%;margin-top:12px;" onclick="printPartLabel('${id}')">${t('printLabel')}</button>
-    <button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="copyScanLink('${id}',this)">${t('copyQrLink')}</button>
-    ${_editPartQR?`<div style="margin-top:8px;text-align:center;"><a href="${_editPartQR}" target="_blank">${t('seeQR')}</a></div>`:''}
     <button class="btn" id="epa-save" style="width:100%;margin-top:12px;" onclick="savePartEdit('${id}')">${t('saveChanges')}</button>
     ${isDeleter()?`<button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--red);border-color:var(--red);" onclick="deletePart('${id}')">${t('deletePart')}</button>`:''}`;
   document.getElementById('modal').style.display='block';
