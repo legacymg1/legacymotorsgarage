@@ -202,16 +202,22 @@
 <!-- 💬 Chat interno (Capture ↔ Listing, luego todos) -->
 <button id="fab-chat" onclick="openChat()" style="display:none;position:fixed;left:18px;bottom:22px;z-index:8000;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:30px;width:54px;height:54px;font-size:22px;box-shadow:0 8px 24px rgba(0,0,0,.5);cursor:pointer;">💬<span id="chat-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:20px;min-width:20px;height:20px;font-size:11px;font-weight:800;line-height:20px;padding:0 5px;"></span></button>
 <div id="chat-panel" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.5);" onclick="if(event.target===this)closeChat()">
-  <div style="position:absolute;left:0;right:0;bottom:0;max-width:600px;margin:0 auto;height:82vh;background:var(--bg);border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden;">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);">
-      <div style="font-weight:800;">💬 <span data-i18n="chatTitle">Chat interno</span></div>
+  <div style="position:absolute;left:0;right:0;bottom:0;max-width:600px;margin:0 auto;height:85vh;background:var(--bg);border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden;">
+    <!-- Encabezado -->
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);">
+      <button id="chat-back" onclick="chatBackToList()" style="display:none;background:none;border:none;color:var(--gold);font-size:22px;font-weight:800;cursor:pointer;line-height:1;">‹</button>
+      <div id="chat-header" style="font-weight:800;flex:1;min-width:0;">💬 <span data-i18n="chatTitle">Chat interno</span></div>
       <button onclick="closeChat()" style="background:none;border:none;color:var(--muted);font-size:22px;font-weight:800;cursor:pointer;line-height:1;">✕</button>
     </div>
-    <div id="chat-tabs" style="display:none;border-bottom:1px solid var(--border);"></div>
-    <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;"></div>
-    <div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface);">
-      <input id="chat-input" type="text" name="chatmsg" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="true" data-1p-ignore data-lpignore="true" data-form-type="other" data-i18n-ph="chatPh" placeholder="Escribe un mensaje…" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;margin-bottom:0;">
-      <button class="btn sm" style="flex:0 0 auto;" onclick="sendChat()" data-i18n="chatSend">Enviar</button>
+    <!-- Vista LISTA (estilo WhatsApp) -->
+    <div id="chat-list" style="flex:1;overflow-y:auto;"></div>
+    <!-- Vista CONVERSACIÓN -->
+    <div id="chat-convo" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+      <div id="chat-msgs" style="flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;"></div>
+      <div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface);">
+        <input id="chat-input" type="text" name="chatmsg" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="true" data-1p-ignore data-lpignore="true" data-form-type="other" data-i18n-ph="chatPh" placeholder="Escribe un mensaje…" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;margin-bottom:0;">
+        <button class="btn sm" style="flex:0 0 auto;" onclick="sendChat()" data-i18n="chatSend">Enviar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -432,40 +438,69 @@ const CHAT_CHANNELS=[
   { key:'warehouse-owners',  es:'Empaque ↔ Dueños',  en:'Warehouse ↔ Owners', roles:['owner','warehouse','packager'] },
   { key:'mechanic-owners',   es:'Mecánico ↔ Dueños', en:'Mechanic ↔ Owners', roles:['owner','mechanic'] },
 ];
-let _chatMsgs={}, _chatSeen={}, _chatUnsub={}, _chatOpen=false, _chatCh='', _chatChans=[];
+let _chatMsgs={}, _chatSeen={}, _chatUnsub={}, _chatOpen=false, _chatCh='', _chatChans=[], _chatViewMode='list';
 try{ _chatSeen=JSON.parse(localStorage.getItem('lmg_wh_chatseen')||'{}')||{}; }catch(e){}
 function chanLabel(c){ return L==='es'?c.es:c.en; }
+function chanOf(key){ return CHAT_CHANNELS.find(c=>c.key===key); }
 function startChat(){
   _chatChans=CHAT_CHANNELS.filter(c=>c.roles.indexOf(role)>=0);
   if(!_chatChans.length){ const fab=document.getElementById('fab-chat'); if(fab) fab.style.display='none'; return; }
   const fab=document.getElementById('fab-chat'); if(fab) fab.style.display='flex';
-  _chatCh=_chatChans[0].key;
   _chatChans.forEach(c=>{
     if(_chatUnsub[c.key]) return;
     const qy=query(collection(db,'chat_channels',c.key,'messages'), orderBy('ts'), limit(300));
     _chatUnsub[c.key]=onSnapshot(qy, s=>{ _chatMsgs[c.key]=s.docs.map(d=>({id:d.id,...d.data()}));
-      if(_chatOpen && _chatCh===c.key){ renderChat(); markChatSeen(c.key); } else updateChatBadge();
+      if(_chatOpen && _chatViewMode==='convo' && _chatCh===c.key){ renderChat(); markChatSeen(c.key); }
+      else if(_chatOpen && _chatViewMode==='list'){ renderChatList(); }
+      updateChatBadge();
     }, e=>console.log('chat',c.key,e));
   });
 }
 function unreadFor(key){ return (_chatMsgs[key]||[]).filter(m=>(m.tms||0)>(_chatSeen[key]||0) && (m.byEmail||'')!==myEmail).length; }
+function lastMsgOf(key){ const a=_chatMsgs[key]||[]; return a.length?a[a.length-1]:null; }
 function updateChatBadge(){
   const b=document.getElementById('chat-badge'); if(!b) return;
   const n=_chatChans.reduce((s,c)=>s+unreadFor(c.key),0);
   if(n>0){ b.textContent=n>9?'9+':String(n); b.style.display=''; } else b.style.display='none';
-  renderChatTabs();
 }
 function markChatSeen(key){ _chatSeen[key]=Date.now(); try{ localStorage.setItem('lmg_wh_chatseen',JSON.stringify(_chatSeen)); }catch(e){} updateChatBadge(); }
-function renderChatTabs(){
-  const box=document.getElementById('chat-tabs'); if(!box) return;
-  if(_chatChans.length<2){ box.style.display='none'; return; }
-  box.style.display='flex'; box.style.overflowX='auto';
-  box.innerHTML=_chatChans.map(c=>{ const u=unreadFor(c.key); const on=c.key===_chatCh;
-    return `<div onclick="chatSwitch('${c.key}')" style="flex:0 0 auto;white-space:nowrap;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer;border-bottom:2px solid ${on?'var(--gold)':'transparent'};color:${on?'var(--gold)':'var(--muted)'};">${chanLabel(c)}${u>0?' <span style="background:#c0392b;color:#fff;border-radius:10px;font-size:10px;padding:0 5px;">'+u+'</span>':''}</div>`;
+// 📋 Lista estilo WhatsApp: última con mensaje hasta arriba + preview + no-leídos
+function renderChatList(){
+  const box=document.getElementById('chat-list'); if(!box) return;
+  const rows=_chatChans.slice().sort((a,b)=>{ const la=lastMsgOf(a.key), lb=lastMsgOf(b.key); return (lb?lb.tms||0:0)-(la?la.tms||0:0); });
+  box.innerHTML=rows.map(c=>{
+    const lm=lastMsgOf(c.key), u=unreadFor(c.key);
+    const who=lm?((lm.byEmail===myEmail?(L==='es'?'Tú':'You'):(lm.byName||''))+': '):'';
+    const prev=lm?esc(who+(lm.text||'')):('<span style="color:var(--faint);">'+t('chatEmpty')+'</span>');
+    const when=lm&&lm.ts?new Date(lm.ts).toLocaleString(L==='es'?'es-MX':'en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+    const av=chanLabel(c).slice(0,1).toUpperCase();
+    return `<div onclick="chatOpenConvo('${c.key}')" style="display:flex;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;">
+      <div style="flex:0 0 auto;width:46px;height:46px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:var(--gold);">${av}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;justify-content:space-between;gap:8px;"><div style="font-weight:800;">${chanLabel(c)}</div><div style="font-size:11px;color:var(--faint);flex:0 0 auto;">${when}</div></div>
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:2px;"><div class="sub" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${prev}</div>${u>0?'<span style="flex:0 0 auto;background:#25d366;color:#0b0e14;border-radius:20px;min-width:20px;height:20px;font-size:11px;font-weight:800;line-height:20px;text-align:center;padding:0 6px;">'+u+'</span>':''}</div>
+      </div>
+    </div>`;
   }).join('');
 }
-window.chatSwitch=function(key){ _chatCh=key; renderChat(); markChatSeen(key); const i=document.getElementById('chat-input'); if(i) i.focus(); };
-window.openChat=function(){ _chatOpen=true; document.getElementById('chat-panel').style.display='block'; renderChatTabs(); renderChat(); markChatSeen(_chatCh); setTimeout(()=>{ const i=document.getElementById('chat-input'); if(i) i.focus(); },100); };
+window.chatOpenConvo=function(key){
+  _chatCh=key; _chatViewMode='convo';
+  document.getElementById('chat-list').style.display='none';
+  document.getElementById('chat-convo').style.display='flex';
+  document.getElementById('chat-back').style.display='';
+  const c=chanOf(key); document.getElementById('chat-header').textContent=c?chanLabel(c):'';
+  renderChat(); markChatSeen(key);
+  setTimeout(()=>{ const i=document.getElementById('chat-input'); if(i) i.focus(); },100);
+};
+window.chatBackToList=function(){
+  _chatViewMode='list';
+  document.getElementById('chat-convo').style.display='none';
+  document.getElementById('chat-list').style.display='';
+  document.getElementById('chat-back').style.display='none';
+  document.getElementById('chat-header').innerHTML='💬 '+t('chatTitle');
+  renderChatList();
+};
+window.openChat=function(){ _chatOpen=true; _chatViewMode='list'; document.getElementById('chat-panel').style.display='block'; chatBackToList(); };
 window.closeChat=function(){ _chatOpen=false; const p=document.getElementById('chat-panel'); if(p) p.style.display='none'; };
 function renderChat(){
   const box=document.getElementById('chat-msgs'); if(!box) return;
