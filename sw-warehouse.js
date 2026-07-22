@@ -1,6 +1,6 @@
 // Service worker de Legacy Warehouse — solo controla la app del almacén.
 // No toca finanzas/admin/index (su fetch los deja pasar normal).
-const CACHE = 'legacy-wh-v1';
+const CACHE = 'legacy-wh-v2';
 const SHELL = ['./warehouse.html','./manifest-warehouse.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -25,9 +25,9 @@ self.addEventListener('fetch', e => {
   const isCDN = url.origin === 'https://www.gstatic.com' || url.origin === 'https://cdn.jsdelivr.net';
 
   if (isShell) {
-    // network-first: fresco cuando hay internet, cae al cache si no hay
+    // network-first + bypass del caché HTTP del navegador: SIEMPRE la versión más nueva con internet.
     e.respondWith(
-      fetch(req).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put(req, cp)); return r; })
+      fetch(req, { cache: 'reload' }).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put(req, cp)); return r; })
         .catch(() => caches.match(req).then(m => m || caches.match('./warehouse.html')))
     );
   } else if (isCDN) {
