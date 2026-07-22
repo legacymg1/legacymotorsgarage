@@ -998,6 +998,7 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
       await db.collection("config").doc("aiUsage").set({
         totalUsd: inc(draft.costUsd || 0), totalCount: inc(1),
         ["m_" + ym + "_usd"]: inc(draft.costUsd || 0), ["m_" + ym + "_count"]: inc(1),
+        lastUsd: draft.costUsd || 0,   // costo de la ÚLTIMA generación (para "Última búsqueda")
         updatedAt: draft.generatedAt,
       }, { merge: true });
     } catch (e) { /* el taxímetro es informativo; no romper la generación por esto */ }
