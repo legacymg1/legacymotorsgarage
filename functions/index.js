@@ -924,7 +924,7 @@ exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY, EBAY_APP_ID, EBAY_CERT_I
   // Fotos reales (sin el QR): SOLO las 3 primeras. El flujo de captura sube en orden
   // 1-2 = números/etiquetas, 3 = general. Con eso el bot tiene todo (números + identificación)
   // sin pagar por las 4-5 fotos extra que van al anuncio pero no aportan a la IA. Baja costo ~60%.
-  const urls = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 2);   // el bot lee las 2 primeras (1=número, 2=general)
+  const urls = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 3);   // el bot lee las 3 primeras (1=pieza completa, 2-3=estampas/números). Muchas partes traen 2 estampas.
   const images = [];
   for (const u of urls) {
     try {
