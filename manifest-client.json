@@ -1,7 +1,7 @@
 {
   "name": "Legacy Motors Garage",
   "short_name": "Legacy Motors",
-  "start_url": "index.html",
+  "start_url": "portal.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
