@@ -92,7 +92,7 @@ function startListeners(){
     onSnapshot(query(collection(db,'chat_reactions'), where('ch','==',c.k)), s=>{ _reaxDocs[c.k]=s.docs.map(d=>d.data()); recomputeReax(); if(open&&view==='convo'&&curCh===c.k) renderMsgs(); }, e=>console.log('reax',c.k,e));
   });
   // 📖 Marcadores de LEÍDO (por usuario, en la nube) → no-leídos sincronizados + palomitas después
-  if(!readsUnsub) readsUnsub=onSnapshot(collection(db,'chat_reads'), s=>{ const m={}; s.forEach(d=>m[d.id]=d.data()||{}); allReads=m; refresh(); }, e=>console.log('reads',e));
+  if(!readsUnsub) readsUnsub=onSnapshot(collection(db,'chat_reads'), s=>{ const m={}; s.forEach(d=>m[d.id]=d.data()||{}); allReads=m; refresh(); }, e=>{ console.log('reads',e); if(MYROLE==='owner') alert('No se pudo leer chat_reads (¿falta la regla?): '+((e&&e.message)||e)); });
   // 🗄️ Chats ocultos (por usuario, en la nube)
   if(!hiddenUnsub) hiddenUnsub=onSnapshot(doc(db,'chat_hidden',ME), s=>{ hidden=(s.exists()&&s.data().channels)||[]; if(open&&view==='list') renderList(); }, e=>console.log('hidden',e));
 }
@@ -101,7 +101,11 @@ function refresh(){ if(open&&view==='convo') renderMsgs(); if(open&&view==='list
 const unread=(k)=>{ const r=(myReads()[k])||0; return (msgs[k]||[]).filter(m=>(m.tms||0)>r && (m.byEmail||'')!==ME).length; };
 const lastMsg=(k)=>{ const a=msgs[k]||[]; return a.length?a[a.length-1]:null; };
 function badge(){ const b=document.getElementById('lcw-badge'); if(!b) return; const n=CH.reduce((s,c)=>s+unread(c.k),0); if(n>0){ b.textContent=n>9?'9+':n; b.style.display='block'; } else b.style.display='none'; }
-function markSeen(k){ const last=lastMsg(k); const tms=last?(last.tms||Date.now()):Date.now(); try{ setDoc(doc(db,'chat_reads',ME),{ email:ME, [k]:tms, at:new Date().toISOString() },{merge:true}); }catch(e){} }
+function markSeen(k){ const last=lastMsg(k); const tms=last?(last.tms||Date.now()):Date.now();
+  // Actualiza YA la vista (no espera a la nube) → el contador baja al instante
+  allReads[ME]=allReads[ME]||{}; if((allReads[ME][k]||0)<tms) allReads[ME][k]=tms; badge(); if(open&&view==='list') renderList();
+  try{ setDoc(doc(db,'chat_reads',ME),{ email:ME, [k]:tms, at:new Date().toISOString() },{merge:true}).catch(e=>{ if(MYROLE==='owner') alert('No se guardó leído: '+((e&&e.message)||e)); }); }catch(e){}
+}
 window.lcwHide=(k)=>{ if(hidden.indexOf(k)<0){ hidden=hidden.concat([k]); } try{ setDoc(doc(db,'chat_hidden',ME),{ email:ME, channels:hidden },{merge:true}); }catch(e){} renderList(); };
 window.lcwUnhide=(k)=>{ hidden=hidden.filter(x=>x!==k); try{ setDoc(doc(db,'chat_hidden',ME),{ email:ME, channels:hidden },{merge:true}); }catch(e){} renderList(); };
 
@@ -214,7 +218,6 @@ function clearNotifs(){ try{ if(!('serviceWorker' in navigator)) return;
       if(r.getNotifications){ try{ const ns=await r.getNotifications(); total+=ns.length; parts.push(((r.active&&r.active.scriptURL||'?').split('/').pop())+':'+ns.length); ns.forEach(n=>n.close()); }catch(e){ parts.push('err'); } }
       else parts.push('noGetNotif');
     }
-    if(MYROLE==='owner' && window._notifDiag){ window._notifDiag=false; setTimeout(()=>alert('🔔 diag\nSW: '+regs.length+'\nnotifs: '+total+'\n['+parts.join(' · ')+']'),300); }
   }).catch(()=>{});
 }catch(e){} }
 
