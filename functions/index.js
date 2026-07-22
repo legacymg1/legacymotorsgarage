@@ -57,14 +57,11 @@ exports.sendChatPush = onCall({ timeoutSeconds: 30 }, async (request) => {
     if (!tokens.length) return { ok: true, sent: 0 };
     const title = CHAT_TITLES[ch] || "Legacy Chat";
     const body = (byName + ": " + text).slice(0, 180);
+    // SOLO data (sin 'notification') → la muestra el service worker UNA vez (evita el doble aviso).
     const res = await admin.messaging().sendEachForMulticast({
       tokens,
-      notification: { title, body },
-      data: { channel: ch, url: "/warehouse.html" },
-      webpush: {
-        notification: { title, body, icon: "/icon-192.png", badge: "/icon-192.png" },
-        fcmOptions: { link: "https://legacymotorsgarage.com/warehouse.html" },
-      },
+      data: { title, body, channel: ch, url: "/warehouse.html?chat=" + ch },
+      webpush: { headers: { Urgency: "high", TTL: "86400" } },
     });
     const dead = [];
     res.responses.forEach((r, i) => { if (!r.success) { const c = r.error && r.error.code; if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token") dead.push(tokDocs[i]); } });
