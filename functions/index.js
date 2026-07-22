@@ -1,7 +1,6 @@
 // Legacy DMS — backend (Cloud Functions v2)
 // redeploy marker: ebay oauth refresh v4
 const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
@@ -36,23 +35,25 @@ const CHAT_TITLES = {
   "group": "Legacy Group", "owners": "Dueños", "capture-listing": "Captura ↔ Listado",
   "warehouse-owners": "Empaque ↔ Dueños", "mechanic-owners": "Mecánico ↔ Dueños",
 };
-exports.chatPush = onDocumentCreated("chat_channels/{ch}/messages/{msgId}", async (event) => {
+// La app llama esto DESPUÉS de guardar el mensaje (evita triggers Eventarc y sus permisos IAM).
+exports.sendChatPush = onCall({ timeoutSeconds: 30 }, async (request) => {
   try {
-    const ch = event.params.ch;
-    const m = event.data && event.data.data();
-    if (!m) return;
-    const members = (CHAT_MEMBERS[ch] || []).filter((e) => e !== (m.byEmail || ""));   // no te notificas a ti mismo
-    if (!members.length) return;
-    // Junta los tokens de los miembros (de push_tokens, campo email)
+    if (!request.auth) return { ok: false };
+    const email = (request.auth.token && request.auth.token.email || "").toLowerCase();
+    const ch = String((request.data && request.data.channel) || "");
+    const text = String((request.data && request.data.text) || "");
+    const byName = String((request.data && request.data.byName) || email.split("@")[0]);
+    const all = CHAT_MEMBERS[ch];
+    if (!all || all.indexOf(email) < 0) return { ok: false };   // solo miembros del canal
+    const members = all.filter((e) => e !== email);              // no te notificas a ti mismo
+    if (!members.length) return { ok: true, sent: 0 };
     const db = admin.firestore();
-    const tokens = [];
-    const tokDocs = [];
-    // Firestore "in" soporta hasta 30 valores; nuestros canales tienen menos.
+    const tokens = [], tokDocs = [];
     const snap = await db.collection("push_tokens").where("email", "in", members).get();
     snap.forEach((d) => { if (d.data().token) { tokens.push(d.data().token); tokDocs.push(d.ref); } });
-    if (!tokens.length) return;
+    if (!tokens.length) return { ok: true, sent: 0 };
     const title = CHAT_TITLES[ch] || "Legacy Chat";
-    const body = ((m.byName || "") + ": " + (m.text || "")).slice(0, 180);
+    const body = (byName + ": " + text).slice(0, 180);
     const res = await admin.messaging().sendEachForMulticast({
       tokens,
       notification: { title, body },
@@ -62,11 +63,11 @@ exports.chatPush = onDocumentCreated("chat_channels/{ch}/messages/{msgId}", asyn
         fcmOptions: { link: "https://legacymotorsgarage.com/warehouse.html" },
       },
     });
-    // Limpia tokens muertos (desinstalaron / revocaron)
     const dead = [];
     res.responses.forEach((r, i) => { if (!r.success) { const c = r.error && r.error.code; if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token") dead.push(tokDocs[i]); } });
     await Promise.all(dead.map((ref) => ref.delete().catch(() => {})));
-  } catch (e) { console.log("chatPush err", e); }
+    return { ok: true, sent: res.successCount };
+  } catch (e) { console.log("sendChatPush err", e); return { ok: false, err: String(e && e.message || e) }; }
 });
 
 // 🔔 eBay Marketplace Account Deletion/Closure — endpoint requerido para habilitar el keyset de Producción.
