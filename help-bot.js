@@ -15,9 +15,10 @@ function makeDraggable(fab,key){
   var hasPos=false, sx=null, sy=null, ox=0, oy=0, moved=false;
   function applyPos(x,y){ var w=fab.offsetWidth||62, h=fab.offsetHeight||62; x=Math.max(8,Math.min(x,window.innerWidth-w-8)); y=Math.max(8,Math.min(y,window.innerHeight-h-8)); fab.style.left=x+'px'; fab.style.top=y+'px'; fab.style.right='auto'; fab.style.bottom='auto'; hasPos=true; }
   try{ var s=JSON.parse(localStorage.getItem(key)||'null'); if(s&&typeof s.x==='number'){ applyPos(s.x,s.y); } }catch(e){}
-  fab.addEventListener('pointerdown',function(e){ moved=false; var r=fab.getBoundingClientRect(); ox=r.left; oy=r.top; sx=e.clientX; sy=e.clientY; try{ fab.setPointerCapture(e.pointerId); }catch(_){} });
+  function snapToEdge(){ var w=fab.offsetWidth||62, h=fab.offsetHeight||62; var r=fab.getBoundingClientRect(); var x=r.left, y=r.top; var toL=x, toR=window.innerWidth-(x+w), toT=y, toB=window.innerHeight-(y+h); var m=Math.min(toL,toR,toT,toB); if(m===toL) x=8; else if(m===toR) x=window.innerWidth-w-8; else if(m===toT) y=8; else y=window.innerHeight-h-8; fab.style.transition='left .18s ease, top .18s ease'; applyPos(x,y); return {x:x,y:y}; }
+  fab.addEventListener('pointerdown',function(e){ moved=false; fab.style.transition='none'; var r=fab.getBoundingClientRect(); ox=r.left; oy=r.top; sx=e.clientX; sy=e.clientY; try{ fab.setPointerCapture(e.pointerId); }catch(_){} });
   fab.addEventListener('pointermove',function(e){ if(sx==null) return; var dx=e.clientX-sx, dy=e.clientY-sy; if(!moved && Math.abs(dx)+Math.abs(dy)<6) return; moved=true; fab._dragged=true; e.preventDefault(); applyPos(ox+dx,oy+dy); });
-  fab.addEventListener('pointerup',function(){ if(sx==null) return; sx=null; if(moved){ var r=fab.getBoundingClientRect(); try{ localStorage.setItem(key,JSON.stringify({x:r.left,y:r.top})); }catch(_){} setTimeout(function(){ fab._dragged=false; },60); } });
+  fab.addEventListener('pointerup',function(){ if(sx==null) return; sx=null; if(moved){ var pos=snapToEdge(); try{ localStorage.setItem(key,JSON.stringify(pos)); }catch(_){} setTimeout(function(){ fab._dragged=false; },60); } });
   fab.addEventListener('click',function(e){ if(fab._dragged){ e.stopImmediatePropagation(); e.preventDefault(); fab._dragged=false; } },true);
   window.addEventListener('resize',function(){ if(!hasPos) return; var r=fab.getBoundingClientRect(); applyPos(r.left,r.top); });
 }
