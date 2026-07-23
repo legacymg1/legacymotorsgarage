@@ -492,6 +492,8 @@ CÓMO FUNCIONA LA APP (para que puedas guiarlos):
 WAREHOUSE — CAPTURA (para el que toma fotos):
 • Los carros a desmantelar SOLO los agregan los supervisores. Captura NO agrega carros, solo les agrega partes.
 • Para agregar una parte: entra al carro → "➕ Parte" → pon el número de ESTAMPA (la etiqueta de 4 dígitos), el nombre de la parte, condición, y el BIN (dónde queda). Toma las fotos: 1ª = la PIEZA COMPLETA (esa es la foto principal), 2ª y 3ª = los NÚMEROS/estampas de cerca (el bot lee las 3 primeras 🤖). Guarda.
+• El BIN acepta LETRAS y números (ej. A-14, V-3) — sirve para racks por letra como el de los vidrios. Se escribe en mayúsculas solo.
+• 🖨️ REIMPRIMIR NÚMERO: en "Agregar parte rápida" hay un botón "🖨️ Reimprimir número de estampa". Si la estampa de una parte ya está borrosa o no se ve, tócalo, escribe el número, y se imprime una etiqueta nueva GRANDE con ese número en la Sunmi/impresora (comparte a la app de la impresora). Ya no usamos QR.
 • Botón 🎈 "Airbag": si es airbag o sensor de airbag, tócalo — lo manda al bin AIRBAGS y no se lista (eBay no los permite). Clock springs y cinturones sí se listan normal.
 • Al EDITAR una parte: puedes mandar una foto al frente con ⭐ (se vuelve la principal), y para borrar fotos usa "🗑️ Eliminar fotos" → selecciona → confirma (así no borras sin querer). Al tocar una foto se agranda; al cerrarla sigues dentro de la parte.
 
