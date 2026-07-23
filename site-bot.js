@@ -2,17 +2,21 @@
 (function(){
   var ENDPOINT='https://us-central1-legacy-motors-garage.cloudfunctions.net/siteChat';
   var lang=(navigator.language||'es').toLowerCase().indexOf('en')===0?'en':'es';
-  var T={ es:{ open:'💬 ¿Buscas carro? Escríbenos', title:'Legacy Motors Garage', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi:'¡Hola! 👋 Bienvenido a Legacy Motors Garage. ¿Qué tipo de carro buscas?', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
-           en:{ open:'💬 Looking for a car? Chat with us', title:'Legacy Motors Garage', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi:'Hi! 👋 Welcome to Legacy Motors Garage. What kind of car are you looking for?', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
+  var T={ es:{ open:'¿Buscas carro? Escríbenos', title:'Legacy Motors Garage', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi:'¡Hola! 👋 Bienvenido a Legacy Motors Garage. ¿Qué tipo de carro buscas?', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
+           en:{ open:'Looking for a car? Chat with us', title:'Legacy Motors Garage', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi:'Hi! 👋 Welcome to Legacy Motors Garage. What kind of car are you looking for?', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
   function t(k){ return (T[lang]&&T[lang][k])||T.es[k]; }
   var msgs=[{role:'assistant',content:''}]; // el saludo se rellena abajo (según idioma)
   msgs[0].content=T[lang].hi;
   var openState=false, busy=false, unread=1;
 
   var css=document.createElement('style');
-  css.textContent='#lmb-fab{position:fixed;right:18px;bottom:22px;z-index:2147482000;background:#0b0e14;color:#f0c040;border:2px solid #f0c040;border-radius:34px;padding:16px 24px;font:700 16px -apple-system,system-ui,sans-serif;box-shadow:0 12px 34px rgba(0,0,0,.5);cursor:pointer;display:flex;align-items:center;gap:10px;}'
-   +'#lmb-fab .dot{width:11px;height:11px;border-radius:50%;background:#3ecf8e;box-shadow:0 0 0 4px rgba(62,207,142,.25);}'
-   +'#lmb-badge{background:#c0392b;color:#fff;border-radius:50%;min-width:22px;height:22px;font-size:12px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 5px;margin-left:2px;}'
+  css.textContent='#lmb-fab{position:fixed;right:18px;bottom:22px;z-index:2147482000;background:#0b0e14;color:#f0c040;border:2px solid #f0c040;border-radius:34px;height:62px;max-width:62px;padding:0;overflow:hidden;white-space:nowrap;font:700 15.5px -apple-system,system-ui,sans-serif;box-shadow:0 12px 34px rgba(0,0,0,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:max-width .5s cubic-bezier(.2,.85,.25,1),padding .5s;}'
+   +'#lmb-fab .ic{font-size:26px;flex:0 0 auto;width:58px;text-align:center;line-height:1;transition:width .5s;}'
+   +'#lmb-fab .txt{display:inline-flex;align-items:center;gap:8px;opacity:0;transition:opacity .35s;}'
+   +'#lmb-fab.wide{max-width:340px;padding:0 20px 0 2px;justify-content:flex-start;}'
+   +'#lmb-fab.wide .ic{width:44px;}'
+   +'#lmb-fab.wide .txt{opacity:1;}'
+   +'#lmb-badge{display:none;align-items:center;justify-content:center;background:#c0392b;color:#fff;border-radius:50%;width:21px;height:21px;font-size:11px;font-weight:800;flex:0 0 auto;}'
    +'@keyframes lmbpulse{0%,100%{box-shadow:0 12px 34px rgba(0,0,0,.5),0 0 0 0 rgba(240,192,64,.55)}50%{box-shadow:0 12px 34px rgba(0,0,0,.5),0 0 0 14px rgba(240,192,64,0)}}'
    +'#lmb-fab.pulse{animation:lmbpulse 2.2s infinite;}'
    +'#lmb-panel{position:fixed;inset:0;z-index:2147482001;background:rgba(0,0,0,.45);display:none;font-family:-apple-system,system-ui,sans-serif;}'
@@ -32,7 +36,7 @@
    +'#lmb-snd{flex:0 0 auto;background:#f0c040;color:#0b0e14;border:none;border-radius:50%;width:44px;height:44px;font-weight:800;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}';
   document.head.appendChild(css);
 
-  var fab=document.createElement('button'); fab.id='lmb-fab'; fab.innerHTML='<span class="dot"></span>'+t('open')+'<span id="lmb-badge"></span>'; fab.onclick=toggle; document.body.appendChild(fab);
+  var fab=document.createElement('button'); fab.id='lmb-fab'; fab.innerHTML='<span class="ic">💬</span><span class="txt">'+t('open')+'<span id="lmb-badge"></span></span>'; fab.onclick=toggle; document.body.appendChild(fab);
   var panel=document.createElement('div'); panel.id='lmb-panel';
   panel.innerHTML='<div id="lmb-sheet"><div id="lmb-hd"><div class="av"><img src="client-lmg-192.png" alt="Legacy" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div><div class="ti">'+t('title')+'<div class="su">'+t('sub')+'</div></div><button id="lmb-x">✕</button></div>'
    +'<div id="lmb-msgs"></div>'
@@ -58,8 +62,8 @@
     box.scrollTop=box.scrollHeight;
   }
   function updateFab(){
-    var b=document.getElementById('lmb-badge'); if(b){ b.style.display=unread>0?'flex':'none'; b.textContent=unread; }
-    fab.classList.toggle('pulse', unread>0 && !openState);
+    var b=document.getElementById('lmb-badge'); if(b){ b.style.display=unread>0?'inline-flex':'none'; b.textContent=unread; }
+    fab.classList.toggle('pulse', unread>0 && !openState && fab.classList.contains('wide'));
   }
   function toggle(){
     openState=!openState; panel.classList.toggle('on',openState); fab.style.display=openState?'none':'flex';
@@ -75,8 +79,8 @@
       .then(function(d){ busy=false; msgs.push({role:'assistant',content:(d&&d.reply)||t('err')}); if(!openState){ unread++; updateFab(); } render(); })
       .catch(function(){ busy=false; msgs.push({role:'assistant',content:t('err')}); render(); });
   }
-  // Al entrar por primera vez (por sesión), a los 2s se abre solo para que la gente lo note
-  var autoOpen=function(){ if(!openState) toggle(); };
-  try{ if(!sessionStorage.getItem('lmb_seen')){ sessionStorage.setItem('lmb_seen','1'); setTimeout(autoOpen,2000); } }catch(e){ setTimeout(autoOpen,2000); }
+  // Entra como círculo discreto; a los ~3s se "abre" a la barra con el globo rojo para llamar la atención (sin abrir el chat)
+  var reveal=function(){ if(!openState){ fab.classList.add('wide'); updateFab(); } };
+  setTimeout(reveal,3000);
   updateFab();
 })();
