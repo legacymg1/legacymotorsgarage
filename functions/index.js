@@ -109,7 +109,8 @@ HARD RULES:
 - Today is ${todayStr} (Pacific time). Use this to resolve dates the customer says ("tomorrow", "this Saturday", "el sábado") into an exact calendar date.
 - Your BEST outcome is a concrete appointment. As the chat warms up and they show real interest, naturally guide them to pick a DAY (and a time if they can) to come in.
 - To lock it in you need their NAME and a PHONE NUMBER so our team can confirm. Ask for these gently and naturally ("¿A qué nombre y a qué número te confirmamos la cita?").
-- ONCE you have at least a name, a phone number, and a day → call the \`book_appointment\` tool. Pass the date as YYYY-MM-DD, the time as HH:MM 24-hour if they gave one, the car they're interested in, roughly how much they can put down, and any useful notes about them (what they need the car for, etc.).
+- LEARN USEFUL INTEL as you build rapport (weave it in naturally, ONE or TWO questions at a time — this must feel like a warm conversation, NEVER an interrogation or a loan form): what they'll use the car for, roughly how much they can put DOWN, roughly what WEEKLY or BIWEEKLY payment they'd be comfortable with, whether they're WORKING (and where / how long — we're Buy-Here-Pay-Here so steady income helps them qualify), whether they have a valid DRIVER'S LICENSE, whether they have a TRADE-IN (and what), and HOW SOON they need the car. Gather what you naturally can; it's totally fine not to get everything.
+- ONCE you have at least a name, a phone number, and a day → call the \`book_appointment\` tool. Fill in EVERYTHING you learned (date as YYYY-MM-DD, time as HH:MM 24-hour if given, car interest, down payment, weekly/biweekly payment comfort, work situation, driver's license, trade-in, how soon they need it, and any other useful notes) so our team walks into the appointment already knowing this person and how to help them close.
 - After the tool saves it, warmly CONFIRM back to the customer (repeat the day/time) and tell them our team will text them to confirm and that we look forward to seeing them. Do NOT call the tool again for the same appointment.
 - If they're not ready to commit to a day yet, don't force it — keep building trust and invite them to come by anytime during hours.
 
@@ -127,16 +128,34 @@ async function saveBotAppointment(input, lang) {
   const time = tm ? (String(Math.min(23, +tm[1])).padStart(2, "0") + ":" + tm[2]) : "";
   const car = s(input.car_interest, 120);
   const down = s(input.down_payment, 40);
+  const weekly = s(input.weekly_payment, 40);
+  const works = s(input.works, 140);
+  const license = s(input.has_license, 30);
+  const trade = s(input.trade_in, 120);
+  const urgency = s(input.urgency, 60);
   const extra = s(input.notes, 300);
+  const en = lang === "en";
+  // 🧠 Intel estructurado del cliente (para que el equipo llegue a la cita sabiendo cómo cerrar)
+  const leadInfo = { down, weekly, works, license, trade, urgency, extra };
+  const L = {
+    down: en ? "💵 Down" : "💵 Enganche", weekly: en ? "📆 Payment" : "📆 Pago cómodo",
+    works: en ? "💼 Work" : "💼 Trabajo", license: en ? "🪪 License" : "🪪 Licencia",
+    trade: en ? "🔁 Trade-in" : "🔁 Cambio", urgency: en ? "⏱️ Needs it" : "⏱️ Urgencia",
+  };
   const noteParts = [];
-  if (down) noteParts.push((lang === "en" ? "Down: " : "Enganche: ") + down);
+  if (down) noteParts.push(L.down + ": " + down);
+  if (weekly) noteParts.push(L.weekly + ": " + weekly);
+  if (works) noteParts.push(L.works + ": " + works);
+  if (license) noteParts.push(L.license + ": " + license);
+  if (trade) noteParts.push(L.trade + ": " + trade);
+  if (urgency) noteParts.push(L.urgency + ": " + urgency);
   if (extra) noteParts.push(extra);
-  noteParts.push(lang === "en" ? "(Lead from website bot)" : "(Lead del bot de la web)");
+  noteParts.push(en ? "(Lead from website bot)" : "(Lead del bot de la web)");
   const id = "appt_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
   const data = {
     clientId: "", clientName: name, phone, phoneE164: "", lang,
-    carLabel: car, vin: "", type: (lang === "en" ? "Sale" : "Venta"), services: [{ es: "Venta", en: "Sale" }],
-    date, time, note: noteParts.join(" · "), downPayment: down,
+    carLabel: car, vin: "", type: (en ? "Sale" : "Venta"), services: [{ es: "Venta", en: "Sale" }],
+    date, time, note: noteParts.join(" · "), downPayment: down, leadInfo,
     status: "scheduled", confirmSent: false, reminderSent: false, source: "web-bot",
     createdAt: new Date().toISOString(), createdBy: "web-bot",
   };
@@ -182,8 +201,13 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
           car_interest: { type: "string", description: "The car they're interested in (year make model), if known" },
           date: { type: "string", description: "Appointment date as YYYY-MM-DD (resolve relative dates using today's date given in the system prompt)" },
           time: { type: "string", description: "Appointment time as HH:MM 24-hour, if they gave one" },
-          down_payment: { type: "string", description: "Roughly how much they can put down, if mentioned" },
-          notes: { type: "string", description: "Any useful notes about the customer (what they need the car for, etc.)" },
+          down_payment: { type: "string", description: "Roughly how much they can put DOWN, if mentioned" },
+          weekly_payment: { type: "string", description: "Roughly what weekly or biweekly/monthly PAYMENT they'd be comfortable with, if mentioned" },
+          works: { type: "string", description: "Their work / income situation — do they have a job, where, how long (important for Buy-Here-Pay-Here)" },
+          has_license: { type: "string", description: "Do they have a valid driver's license? (yes / no / unsure)" },
+          trade_in: { type: "string", description: "Do they have a car to trade in, and what is it, if mentioned" },
+          urgency: { type: "string", description: "How soon they need the car (today, this week, just looking, etc.)" },
+          notes: { type: "string", description: "Any other useful notes (family size, what they use the car for, concerns, budget, etc.)" },
         },
         required: ["name", "phone", "date"],
       },
