@@ -1377,7 +1377,16 @@ async function sendApptSms(a,kind){
 }
 window.sendApptConfirm=function(id){ const a=appointments.find(x=>x.id===id); if(a) sendApptSms(a,'confirm'); };
 window.sendApptReminder=function(id){ const a=appointments.find(x=>x.id===id); if(a) sendApptSms(a,'reminder'); };
-window.markApptDone=async function(id){ if(!confirm('¿Marcar esta cita como completada?')) return; try{ await updateDoc(doc(db,'appointments',id),{status:'done'}); }catch(e){ alert(e.message);} };
+// ✅ Completar cita + MARCADOR (scoreboard): guarda el resultado para que el bot de ventas aprenda qué cierra
+window.markApptDone=async function(id){
+  const bought=confirm('¿El cliente COMPRÓ un carro?\n\nAceptar = SÍ compró  ·  Cancelar = no compró');
+  let outcome, came, boughtB;
+  if(bought){ outcome='bought'; came=true; boughtB=true; }
+  else {
+    came=confirm('¿Al menos VINO a la cita?\n\nAceptar = sí vino  ·  Cancelar = no vino');
+    outcome=came?'came_no_buy':'no_show'; boughtB=false;
+  }
+  try{ await updateDoc(doc(db,'appointments',id),{status:'done', outcome, came, bought:boughtB, closedAt:new Date().toISOString()}); }catch(e){ alert(e.message);} };
 window.cancelAppt=async function(id){ const a=appointments.find(x=>x.id===id); if(!confirm('¿Cancelar / eliminar esta cita?')) return; try{ await deleteDoc(doc(db,'appointments',id)); if(a&&a.date&&a.time){ try{ await updateDoc(doc(db,'availability',a.date), {taken: arrayRemove(a.time)}); }catch(e){} } }catch(e){ alert(e.message);} };
 window.editAppt=function(id){
   const a=appointments.find(x=>x.id===id); if(!a) return;
@@ -1392,6 +1401,26 @@ window.editAppt=function(id){
   document.getElementById('appt-time').value=a.time||'';
   document.getElementById('appt-note').value=a.note||'';
 };
+function escAppt(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// 🧠 Intel que el bot le sacó al cliente — se muestra en la tarjeta de la cita para llegar sabiendo cómo cerrar
+function apptIntel(a){
+  const li=a.leadInfo; const es=(a.lang!=='en');
+  const rows=[
+    ['💵', es?'Enganche':'Down', li&&li.down],
+    ['📆', es?'Pago cómodo':'Payment', li&&li.weekly],
+    ['💼', es?'Trabajo':'Work', li&&li.works],
+    ['🪪', es?'Licencia':'License', li&&li.license],
+    ['🔁', es?'Cambio':'Trade-in', li&&li.trade],
+    ['⏱️', es?'Urgencia':'Needs it', li&&li.urgency],
+  ].filter(r=>r[2]);
+  const extra=li&&li.extra;
+  if(!rows.length && !extra){ return a.note?'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px;">'+escAppt(a.note)+'</div>':''; }
+  let h='<div style="margin-top:6px;background:rgba(240,192,64,0.06);border:1px solid rgba(240,192,64,0.25);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.6;">';
+  h+=rows.map(r=>`<div>${r[0]} <b>${r[1]}:</b> ${escAppt(r[2])}</div>`).join('');
+  if(extra) h+=`<div style="color:var(--muted);font-style:italic;margin-top:3px;">${escAppt(extra)}</div>`;
+  h+='</div>';
+  return h;
+}
 window.renderAppointments=function(){
   const box=document.getElementById('citas-list'); if(!box) return;
   const todayISO=apptTodayISO(), tomoISO=apptAddDays(todayISO,1);
@@ -1417,7 +1446,7 @@ window.renderAppointments=function(){
             <div style="font-weight:600;font-size:14px;">${a.clientName||''} ${flag}${a.source==='web-bot'?' <span style="font-size:10px;background:rgba(240,192,64,0.14);color:var(--gold);border:1px solid var(--gold);border-radius:5px;padding:1px 6px;white-space:nowrap;">🤖 Lead web</span>':''}</div>
             <div style="font-size:12px;color:var(--muted);">${a.type||''}${car}${a.phone?' · '+a.phone:''}</div>
             <div style="font-size:15px;font-weight:700;color:var(--gold);margin-top:3px;">${apptFmtLong(a.date,'es')}${hora}</div>
-            ${a.note?'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px;">'+a.note+'</div>':''}
+            ${a.source==='web-bot' ? apptIntel(a) : (a.note?'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px;">'+a.note+'</div>':'')}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button onclick="sendApptConfirm('${a.id}')" title="Confirmar por SMS" style="background:${a.confirmSent?'transparent':'#2196F3'};color:${a.confirmSent?'var(--muted)':'#fff'};border:1px solid ${a.confirmSent?'var(--border)':'#2196F3'};border-radius:7px;padding:6px 9px;font-size:11px;font-weight:700;cursor:pointer;">${a.confirmSent?'✓ Confirmó':'📩 Confirmar'}</button>
