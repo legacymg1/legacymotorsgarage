@@ -1414,8 +1414,11 @@ function apptIntel(a){
     ['⏱️', es?'Urgencia':'Needs it', li&&li.urgency],
   ].filter(r=>r[2]);
   const extra=li&&li.extra;
-  if(!rows.length && !extra){ return a.note?'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px;">'+escAppt(a.note)+'</div>':''; }
-  let h='<div style="margin-top:6px;background:rgba(240,192,64,0.06);border:1px solid rgba(240,192,64,0.25);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.6;">';
+  // 📖 Historia corta del cliente + cómo atenderlo (para llegar preparado, no en frío)
+  let story='';
+  if(a.botSummary){ story+=`<div style="margin-top:6px;background:rgba(91,157,255,0.08);border:1px solid rgba(91,157,255,0.35);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.55;"><div style="font-size:11px;font-weight:800;color:#5b9dff;margin-bottom:3px;">📖 ${es?'Historia del cliente':'Customer story'}</div>${escAppt(a.botSummary)}${a.botApproach?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(91,157,255,0.25);"><b style="color:#5b9dff;">🎯 ${es?'Cómo atenderlo':'How to approach'}:</b> ${escAppt(a.botApproach)}</div>`:''}</div>`; }
+  if(!rows.length && !extra){ return story + (a.note?'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px;">'+escAppt(a.note)+'</div>':''); }
+  let h=story+'<div style="margin-top:6px;background:rgba(240,192,64,0.06);border:1px solid rgba(240,192,64,0.25);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.6;">';
   h+=rows.map(r=>`<div>${r[0]} <b>${r[1]}:</b> ${escAppt(r[2])}</div>`).join('');
   if(extra) h+=`<div style="color:var(--muted);font-style:italic;margin-top:3px;">${escAppt(extra)}</div>`;
   h+='</div>';
