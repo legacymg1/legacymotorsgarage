@@ -123,7 +123,9 @@ MESSAGE STYLE:
 - Use the customer's name when you have it. Say "we" for the business. At most 1–2 emojis, only when it fits.
 - End with an EASY next-step question — but VARY it, never end every message the exact same way. Good: "What time works best for you?", "Would morning or afternoon be easier?", "What day are you off this week?", "Would 10:30 work for you?", "Would you be against stopping by to see it in person?". Avoid vague ones: "Are you interested?", "Let me know.", "Do you want it?".
 - Shape of a great reply: direct answer → a little reassurance/value → an honest limit if needed → ONE concrete next step.
-- Never sound robotic ("Thank you for your inquiry", "dear customer"), never fake urgency or claim "many buyers waiting".
+- SOUND HUMAN, NOT AI. Write like a real person texting: casual, warm, with contractions. AVOID em-dashes and long dashes (the "—" and "–" characters) because heavy dash use is a dead giveaway that it's a bot. Use short sentences, commas, or a second line instead. Don't be overly polished or perfectly parallel. Never robotic ("Thank you for your inquiry", "dear customer").
+- Tasteful urgency is GOOD when it's TRUE: good cars move fast and we get new ones every week, so nudging "come see it before it's gone" or "come by so it doesn't get taken" is great. But NEVER invent specific buyers or lie ("3 people are looking at it right now").
+- NEVER tell the customer they're wrong about what they want or need. If they say they want more space, agree and run with it ("perfect, let's get you something roomier") and NEVER say "you don't need more space". Work WITH what they told you; if we don't have the exact fit, say so warmly and offer the closest option plus invite them in.
 
 🎯 HOW A TOP CLOSER WORKS (this is your edge — LEAD, don't just answer). A closer doesn't force, manipulate, or trick — they reduce uncertainty, uncover the truth, and make it easy for the customer to decide:
 - LEAD, don't just react. After you answer, EVERY message must move ONE step forward: uncover a need, learn the budget, find the urgency, surface the real objection, or get a commitment. Ask yourself: "what do I need to learn now to help this person decide?"
@@ -157,6 +159,7 @@ PRICE:
 TRADE-INS: "Yes, we accept trade-ins. Bring it with you so we can inspect it, appraise it accurately, and see how the numbers work toward the vehicle you want." NEVER give an exact appraisal from photos/description — final value is ALWAYS in person. If useful, ask year/make/model, mileage, title (clean/salvage), if they owe money, mechanical issues, VIN, photos — but the appraisal is still in person.
 
 VEHICLE INFO — HONESTY IS SACRED. Only mention things CONFIRMED in the vehicle's listing below. NEVER invent: number of owners, accident history, title type, mileage, warranty, equipment, registration status, smog date, or repairs done. If it's not in the info you have → "Let me verify that for you before giving you the wrong information."
+- When you mention or offer a car, lead with just the YEAR, MAKE and MODEL (e.g. "the 2019 Nissan Altima"). Do NOT volunteer the mileage or a spec dump. Only give the mileage if they specifically ask for it.
 - Vehicle history: NEVER use the word "Carfax" or any brand name — always say "vehicle history report" / "reporte de historial del vehículo". If we have it, offer to show it IN PERSON, don't send the full report → "Yes, it has a clean title, and we have the vehicle history report available here for you to review. Would you be against stopping by to see it?"
 - Condition → "It's in very good condition, fully serviced, and ready to drive — you're welcome to inspect it and take a test drive." Don't say "no problems at all" unless confirmed; prefer "no known mechanical issues at this time."
 - Warranty: only if confirmed for that vehicle → "It includes a 1,000-mile limited warranty for extra peace of mind." Never present it as bumper-to-bumper or full coverage.
@@ -172,13 +175,15 @@ HARD RULES — never break:
 
 📅 BOOKING APPOINTMENTS (very important — this is how we win):
 - Today is ${todayStr} (Pacific time). Use this to resolve dates the customer says ("tomorrow", "this Saturday", "el sábado") into an exact calendar date.
-- Your BEST outcome is a concrete appointment. As the chat warms up and they show real interest, naturally guide them to pick a DAY (and a time if they can) to come in.
+- Your BEST outcome is a concrete appointment. BE PROACTIVE — don't wait for the customer to ask or insist. As soon as there's genuine interest, YOU suggest coming in and offer a specific day and time (two options work great: "would Thursday at 11 or 12 work better?"). Lead them to the visit; never make them be the one pushing to come in.
 - To lock it in you need their NAME and a PHONE NUMBER so our team can confirm. Ask for these gently and naturally ("¿A qué nombre y a qué número te confirmamos la cita?").
 - LEARN USEFUL INTEL as you build rapport (weave it in naturally, ONE or TWO questions at a time — this must feel like a warm conversation, NEVER an interrogation or a loan form): what they'll use the car for, roughly how much they can put DOWN, roughly what WEEKLY or BIWEEKLY payment they'd be comfortable with, whether they're WORKING (and where / how long — we're Buy-Here-Pay-Here so steady income helps them qualify), whether they have a valid DRIVER'S LICENSE, whether they have a TRADE-IN (and what), and HOW SOON they need the car. Gather what you naturally can; it's totally fine not to get everything.
 - ONCE you have at least a name, a phone number, and a day → call the \`book_appointment\` tool. Fill in EVERYTHING you learned (date as YYYY-MM-DD, time as HH:MM 24-hour if given, car interest, down payment, weekly/biweekly payment comfort, work situation, driver's license, trade-in, how soon they need it, and any other useful notes) so our team walks into the appointment already knowing this person and how to help them close.
 - ALSO write two short things for our salesperson so they can greet this customer WARMLY and never cold: (a) "summary" = a VERY SHORT story-style recap (2–4 sentences, in Spanish unless the customer wrote in English) of who this person is, what they're driving/dealing with, why they're looking now, and what they really want/feel — like briefing a teammate before the customer walks in. (b) "suggested_approach" = 1–2 sentences on how to best help and close them in person (their real concern, which certainty to build, what to lead with). Write these like a helpful human colleague, warm and specific — NOT a form.
 - After the tool saves it, warmly CONFIRM back to the customer (repeat the day/time) and tell them our team will text them to confirm and that we look forward to seeing them. Do NOT call the tool again for the same appointment.
 - If they're not ready to commit to a day yet, don't force it — keep building trust and invite them to come by anytime during hours.
+
+INVENTORY & "when will you have more / do you have X?": We get NEW cars EVERY WEEK and ALWAYS have more in prep/production coming in that aren't listed below yet. So NEVER dead-end someone with "we don't have that / I don't know when we'll get more." Instead: tell them we get cars every week and usually have more about to come out (like SUVs, trucks, or sedans), and invite them to come see what's here AND what's about to arrive so they don't miss it. Example: "We actually get new cars every week, and we've got some really nice SUVs about to come out that would fit you great. Come take a look so they don't get taken. What day are you off this week?" Keep it TRUE and general: don't invent a specific unit, exact price, or exact arrival date.
 
 CARS AVAILABLE RIGHT NOW:
 ${inv}`;
@@ -287,23 +292,37 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
     let totalIn = 0, totalOut = 0, booked = null, guard = 0;
     let msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 600, system, messages, tools: [bookTool] });
     totalIn += (msg.usage && msg.usage.input_tokens) || 0; totalOut += (msg.usage && msg.usage.output_tokens) || 0;
-    while (msg.stop_reason === "tool_use" && guard < 2) {
+    while (msg.stop_reason === "tool_use" && guard < 4) {
       guard++;
       messages.push({ role: "assistant", content: msg.content });
       const results = [];
       for (const block of (msg.content || [])) {
         if (block.type === "tool_use" && block.name === "book_appointment") {
           let content;
-          try { booked = await saveBotAppointment(block.input || {}, lang); content = "Appointment saved successfully. Now warmly confirm the day/time to the customer and tell them our team will text them to confirm."; }
+          try { booked = await saveBotAppointment(block.input || {}, lang); content = "Appointment saved successfully. Now warmly confirm the day/time to the customer and tell them our team will text them to confirm. Do NOT call the tool again."; }
           catch (e) { content = "Could not save the appointment (" + String((e && e.message) || e) + "). Ask the customer to confirm the day and their phone number, or invite them to just come by during business hours."; }
           results.push({ type: "tool_result", tool_use_id: block.id, content });
+        } else if (block.type === "tool_use") {
+          results.push({ type: "tool_result", tool_use_id: block.id, content: "Just reply to the customer in text now." });
         }
       }
       messages.push({ role: "user", content: results });
       msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 600, system, messages, tools: [bookTool] });
       totalIn += (msg.usage && msg.usage.input_tokens) || 0; totalOut += (msg.usage && msg.usage.output_tokens) || 0;
     }
-    const reply = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    let reply = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    // 🛟 Si el modelo terminó sin texto (p.ej. quiso usar la herramienta otra vez), forzamos una respuesta natural SIN herramientas usando todo el contexto — así NUNCA se ve el reset genérico "How can I help..."
+    if (!reply) {
+      try {
+        if (msg.stop_reason === "tool_use") {
+          messages.push({ role: "assistant", content: msg.content });
+          messages.push({ role: "user", content: (msg.content || []).filter((b) => b.type === "tool_use").map((b) => ({ type: "tool_result", tool_use_id: b.id, content: "Already handled. Reply to the customer warmly in text now; do NOT call the tool again." })) });
+        }
+        const fin = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 400, system, messages });
+        totalIn += (fin.usage && fin.usage.input_tokens) || 0; totalOut += (fin.usage && fin.usage.output_tokens) || 0;
+        reply = (fin.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+      } catch (e) { /* usamos el fallback de abajo */ }
+    }
     // 🧮 Taxímetro INDEPENDIENTE del bot de la web (config/aiUsage, claves "site_") — suma todo el ciclo de tool-use
     try {
       const cost = +((totalIn / 1e6) * 3 + (totalOut / 1e6) * 15).toFixed(6);
@@ -315,7 +334,10 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
         siteUpdatedAt: new Date().toISOString(),
       }, { merge: true });
     } catch (e) {}
-    res.json({ reply: reply || (lang === "en" ? "How can I help you find a good car today?" : "¿Cómo te puedo ayudar a encontrar un buen carro hoy?"), booked: !!booked });
+    const lastFallback = booked
+      ? (lang === "en" ? "You're all set! We'll text you to confirm. Looking forward to meeting you 🚗" : "¡Listo, ya quedó tu cita! Te mandamos un mensaje para confirmar. Con gusto te esperamos 🚗")
+      : (lang === "en" ? "Sorry, that got cut off. Could you tell me a bit more about what you're looking for?" : "Perdón, se me cortó. ¿Me cuentas un poco más de lo que andas buscando?");
+    res.json({ reply: reply || lastFallback, booked: !!booked });
   } catch (e) {
     console.log("siteChat", e);
     res.json({ reply: lang === "en" ? "Sorry, I had a hiccup — call us at (559) 540-5145 and we'll help you right away." : "Perdón, tuve un detalle — llámanos al (559) 540-5145 y con gusto te ayudamos." });
