@@ -388,6 +388,7 @@ let vehicles=[], parts=[], _selVeh='', _carView='', _restoredCar=false;
 const WH_URL='https://legacymotorsgarage.com/warehouse.html';
 function partScanURL(id){ return WH_URL+'?scan='+encodeURIComponent(id); }
 let _pendingScan=''; try{ _pendingScan=new URLSearchParams(location.search).get('scan')||''; }catch(e){}
+let _pendingEdit=''; try{ _pendingEdit=new URLSearchParams(location.search).get('edit')||''; }catch(e){}   // deep-link del chat: abrir una parte para editarla
 
 // ---- AUTH ----
 window.doLogin=async function(){
@@ -697,6 +698,7 @@ function startListening(){
     if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); }, e=>console.log('veh',e));
   onSnapshot(collection(db,'parts'), s=>{ parts=s.docs.map(d=>({id:d.id,...d.data()}));
     if(_pendingScan && role){ const pid=_pendingScan; _pendingScan=''; try{ history.replaceState({},'',location.pathname); }catch(e){} closeCar(); setView('pack'); const inp=document.getElementById('scan-input'); if(inp) inp.value=pid; scanLookup(); return; }
+    if(_pendingEdit && role){ const pid=_pendingEdit; _pendingEdit=''; try{ history.replaceState({},'',location.pathname); }catch(e){} if(parts.find(x=>x.id===pid)){ closeCar(); setView('lister'); try{ openPartEdit(pid); }catch(e){} } }
     if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); if(_view==='pack') renderPending(); }, e=>console.log('parts',e));
   // Taxímetro acumulado (contador real del gasto del bot)
   onSnapshot(doc(db,'config','aiUsage'), s=>{ _aiUsage = (s&&s.exists&&s.exists()) ? s.data() : null; if(_view==='lister') renderTaximetro(); }, e=>console.log('aiUsage',e));

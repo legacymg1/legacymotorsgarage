@@ -1,7 +1,7 @@
 // 💬 Widget de chat UNIFICADO — burbuja + panel para TODOS los roles, en cualquier página.
 // Reusa la app Firebase de la página (misma sesión). Estado (leído/oculto) en la NUBE → sincroniza entre dispositivos.
 import { getApps, getApp, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, addDoc, deleteDoc, onSnapshot, query, orderBy, limit, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, addDoc, deleteDoc, onSnapshot, query, orderBy, limit, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
@@ -86,13 +86,15 @@ function build(){
     <div id="lcw-list"></div>
     <div id="lcw-convo"><div id="lcw-msgs"></div>
       <div id="lcw-note" class="lcw-note" style="display:none;flex:0 0 auto;padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #2a2f3a;background:#151a24;color:#98a0b0;font-size:12px;text-align:center;">📢 Solo los supervisores pueden escribir aquí</div>
-      <div id="lcw-bar"><input id="lcw-input" type="text" readonly onfocus="this.removeAttribute('readonly')" placeholder="Escribe un mensaje…"><button class="lcw-send" id="lcw-sendbtn">Enviar</button></div>
+      <div id="lcw-attach" style="display:none;flex:0 0 auto;padding:8px 12px 0;"></div>
+      <div id="lcw-bar"><button id="lcw-partbtn" title="Señalar una parte" style="flex:0 0 auto;background:#1e232d;border:1px solid #2a2f3a;color:#f0c040;border-radius:10px;width:42px;font-size:18px;cursor:pointer;">🔧</button><input id="lcw-input" type="text" readonly onfocus="this.removeAttribute('readonly')" placeholder="Escribe un mensaje…"><button class="lcw-send" id="lcw-sendbtn">Enviar</button></div>
     </div></div>`;
   document.body.appendChild(p);
   p.addEventListener('click',(e)=>{ if(e.target===p) closePanel(); });
   document.getElementById('lcw-close').onclick=closePanel;
   document.getElementById('lcw-back').onclick=backToList;
   document.getElementById('lcw-sendbtn').onclick=send;
+  document.getElementById('lcw-partbtn').onclick=()=>window.lcwOpenPicker();
   const inp=document.getElementById('lcw-input');
   inp.addEventListener('keydown',(e)=>{ if(e.key==='Enter') send(); });
   inp.addEventListener('focus',()=>{ setTimeout(fitSheet,150); setTimeout(fitSheet,350); });   // al aparecer el teclado, ajusta y baja al último
@@ -182,7 +184,7 @@ function renderMsgs(){
   if(!arr.length){ box.innerHTML='<div style="text-align:center;margin:auto;color:#98a0b0;">Sin mensajes aún. Escribe el primero 👋</div>'; return; }
   box.innerHTML=arr.map(m=>{ const mine=(m.byEmail||'')===ME; const when=m.ts?new Date(m.ts).toLocaleString('es-MX',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
     const rx=reax[m.id]||{}; const chips=Object.keys(rx).filter(e=>rx[e].length).map(e=>{ const mineR=rx[e].indexOf(ME)>=0; return '<span onclick="lcwReact(\''+m.id+'\',\''+e+'\')" style="display:inline-flex;align-items:center;gap:2px;font-size:12px;background:'+(mineR?'rgba(240,192,64,.18)':'#1e232d')+';border:1px solid '+(mineR?'#f0c040':'#2a2f3a')+';border-radius:20px;padding:1px 7px;margin:3px 3px 0 0;cursor:pointer;">'+e+' '+rx[e].length+'</span>'; }).join('');
-    return `<div data-mid="${m.id}" style="align-self:${mine?'flex-end':'flex-start'};max-width:82%;">${mine?'':`<div style="font-size:11px;color:#98a0b0;margin:0 0 2px 4px;font-weight:700;">${esc(m.byName||m.byEmail||'')}</div>`}<div class="lcw-bubble" style="background:${mine?'#f0c040':'#151a24'};color:${mine?'#0b0e14':'#e7e9ee'};border-radius:14px;padding:8px 12px;font-size:14px;line-height:1.4;word-break:break-word;">${esc(m.text||'')}</div><div style="font-size:10px;color:#6b7280;margin:2px 6px 0;text-align:${mine?'right':'left'};">${when}</div>${chips?'<div style="text-align:'+(mine?'right':'left')+';">'+chips+'</div>':''}</div>`;
+    return `<div data-mid="${m.id}" style="align-self:${mine?'flex-end':'flex-start'};max-width:82%;">${mine?'':`<div style="font-size:11px;color:#98a0b0;margin:0 0 2px 4px;font-weight:700;">${esc(m.byName||m.byEmail||'')}</div>`}<div class="lcw-bubble" style="background:${mine?'#f0c040':'#151a24'};color:${mine?'#0b0e14':'#e7e9ee'};border-radius:14px;padding:8px 12px;font-size:14px;line-height:1.4;word-break:break-word;">${esc(m.text||'')}${m.partRef?`<div onclick="window.lcwOpenPart('${m.partRef.id}')" style="margin-top:6px;background:#0b0e14;border:1px solid #f0c040;border-radius:10px;padding:6px 10px;font-size:12px;font-weight:800;color:#f0c040;cursor:pointer;">🔧 ${esc(m.partRef.label||'Parte')}${m.partRef.sticker?(' · #'+esc(m.partRef.sticker)):''} ›</div>`:''}</div><div style="font-size:10px;color:#6b7280;margin:2px 6px 0;text-align:${mine?'right':'left'};">${when}</div>${chips?'<div style="text-align:'+(mine?'right':'left')+';">'+chips+'</div>':''}</div>`;
   }).join('');
   box.scrollTop=box.scrollHeight;
   attachLongPress();
@@ -216,11 +218,64 @@ window.lcwReact=async (msgId,emoji)=>{
   const mine=!!(reax[msgId]&&reax[msgId][emoji]&&reax[msgId][emoji].indexOf(ME)>=0);
   try{ if(mine){ await deleteDoc(doc(db,'chat_reactions',rid)); } else { await setDoc(doc(db,'chat_reactions',rid),{ ch:curCh, msgId, email:ME, emoji, at:new Date().toISOString() }); } }catch(e){ console.log('react',e); alert('Reacción no se guardó: '+((e&&e.message)||e)); }
 };
+// 🔧 SEÑALAR UNA PARTE dentro del chat — adjuntas una parte y todos pueden picarle para saltar a editarla.
+let pendingPart=null, _partsCache=null;
+async function loadPartsCache(){
+  if(_partsCache) return _partsCache;
+  try{ const s=await getDocs(collection(db,'parts')); _partsCache=s.docs.map(d=>({id:d.id,...d.data()})); }
+  catch(e){ _partsCache=[]; }
+  return _partsCache;
+}
+function renderAttach(){
+  const el=document.getElementById('lcw-attach'); if(!el) return;
+  if(!pendingPart){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='block';
+  el.innerHTML='<div style="display:inline-flex;align-items:center;gap:8px;background:#151a24;border:1px solid #f0c040;border-radius:10px;padding:6px 10px;font-size:12px;color:#f0c040;font-weight:700;">🔧 '+esc(pendingPart.label)+(pendingPart.sticker?(' · #'+esc(pendingPart.sticker)):'')+'<span onclick="window.lcwClearPart()" style="cursor:pointer;color:#e57373;font-weight:800;">✕</span></div>';
+}
+window.lcwClearPart=function(){ pendingPart=null; renderAttach(); };
+window.lcwPickPart=function(id){
+  const p=(_partsCache||[]).find(x=>x.id===id); if(!p) return;
+  pendingPart={ id:p.id, label:((p.name||'Pieza')+(p.vehicleLabel?(' · '+p.vehicleLabel):'')).slice(0,120), sticker:p.stickerNum||'' };
+  const ov=document.getElementById('lcw-picker'); if(ov) ov.remove();
+  renderAttach();
+};
+window.lcwOpenPart=function(id){
+  if(typeof window.openPartEdit==='function'){ try{ closePanel(); }catch(_){} try{ window.openPartEdit(id); }catch(e){ alert('No se pudo abrir la parte.'); } }
+  else{ window.location.href='warehouse.html?edit='+encodeURIComponent(id); }
+};
+window.lcwOpenPicker=async function(){
+  let ov=document.getElementById('lcw-picker');
+  if(!ov){ ov=document.createElement('div'); ov.id='lcw-picker'; ov.style.cssText='position:fixed;inset:0;z-index:2147483005;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;font-family:-apple-system,system-ui,sans-serif;'; document.body.appendChild(ov); ov.addEventListener('click',e=>{ if(e.target===ov) ov.remove(); }); }
+  ov.innerHTML='<div style="background:#0b0e14;border:1px solid #f0c040;border-radius:18px 18px 0 0;width:100%;max-width:560px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;">'
+    +'<div style="padding:12px 14px;border-bottom:1px solid #2a2f3a;display:flex;gap:8px;align-items:center;"><b style="flex:1;color:#e7e9ee;">🔧 Señalar una parte</b><button onclick="document.getElementById(\'lcw-picker\').remove()" style="background:#1e232d;border:none;color:#e7e9ee;width:34px;height:34px;border-radius:50%;font-weight:800;cursor:pointer;">✕</button></div>'
+    +'<input id="lcw-picker-q" type="text" autocomplete="off" placeholder="Busca por número de sticker o nombre…" style="margin:10px 14px;background:#151a24;border:1px solid #2a2f3a;border-radius:10px;padding:11px 12px;color:#e7e9ee;font-size:16px;outline:none;">'
+    +'<div id="lcw-picker-res" style="flex:1;overflow-y:auto;padding:0 8px 14px;"></div></div>';
+  const q=document.getElementById('lcw-picker-q'), res=document.getElementById('lcw-picker-res');
+  res.innerHTML='<div style="color:#98a0b0;padding:14px;font-size:13px;">Cargando partes…</div>';
+  await loadPartsCache();
+  function draw(){
+    const w=(q.value||'').trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let list=_partsCache||[];
+    if(w.length){ list=list.filter(p=>{ const hay=((p.stickerNum||'')+' '+(p.name||'')+' '+(p.partNumber||'')+' '+(p.vehicleLabel||'')+' '+((p.location&&p.location.bin)||'')).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); }); }
+    list=list.slice(0,30);
+    res.innerHTML=list.length?list.map(p=>{
+      const th=(p.photoURLs||[]).find(u=>u&&!/00_QR/.test(u))||'';
+      return '<div onclick="window.lcwPickPart(\''+p.id+'\')" style="display:flex;gap:10px;align-items:center;padding:9px 8px;border-bottom:1px solid #1e232d;cursor:pointer;">'
+        +(th?'<img src="'+th+'" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex:0 0 auto;">':'<div style="width:42px;height:42px;border-radius:8px;background:#1e232d;display:flex;align-items:center;justify-content:center;flex:0 0 auto;">🔧</div>')
+        +'<div style="flex:1;min-width:0;color:#e7e9ee;"><div style="font-weight:700;font-size:14px;">'+esc(p.name||'Pieza')+(p.stickerNum?(' · #'+esc(p.stickerNum)):'')+'</div><div style="font-size:12px;color:#98a0b0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(p.vehicleLabel||'')+(p.partNumber?(' · '+esc(p.partNumber)):'')+'</div></div></div>';
+    }).join(''):'<div style="color:#98a0b0;padding:14px;font-size:13px;">Sin coincidencias.</div>';
+  }
+  q.oninput=draw; draw(); setTimeout(()=>{ if(window.innerWidth>600) q.focus(); },100);
+};
 async function send(){
   const i=document.getElementById('lcw-input'); if(!i||!curCh) return;
-  const text=(i.value||'').trim(); if(!text) return; const ch=curCh; i.value='';
-  try{ await addDoc(collection(db,'chat_channels',ch,'messages'),{ text:text.slice(0,1000), byEmail:ME, byName:dispName(ME), byRole:MYROLE, ts:new Date().toISOString(), tms:Date.now() }); }
-  catch(e){ i.value=text; alert('Error: '+((e&&e.message)||e)); return; }
+  const typed=(i.value||'').trim(); if(!typed && !pendingPart) return; const ch=curCh;
+  const text=typed || ('🔧 '+((pendingPart&&pendingPart.label)||'parte'));
+  const part=pendingPart; i.value=''; pendingPart=null; renderAttach();
+  const doc0={ text:text.slice(0,1000), byEmail:ME, byName:dispName(ME), byRole:MYROLE, ts:new Date().toISOString(), tms:Date.now() };
+  if(part) doc0.partRef={ id:part.id, label:(part.label||'').slice(0,120), sticker:(part.sticker||'').slice(0,20) };
+  try{ await addDoc(collection(db,'chat_channels',ch,'messages'),doc0); }
+  catch(e){ i.value=typed; pendingPart=part; renderAttach(); alert('Error: '+((e&&e.message)||e)); return; }
   try{ markSeen(ch); }catch(_){}
   setTimeout(()=>{ try{ const p=httpsCallable(functions,'sendChatPush')({ channel:ch, text:text.slice(0,180), byName:dispName(ME) }); if(p&&p.catch) p.catch(()=>{}); }catch(_){} },0);
 }
