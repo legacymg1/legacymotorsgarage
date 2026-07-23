@@ -48,7 +48,7 @@ const myReads=()=>allReads[ME]||{};
 function build(){
   if(document.getElementById('lcw-fab')) return;
   const style=document.createElement('style');
-  style.textContent=`#lcw-fab{position:fixed;left:18px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:2147483000;width:62px;height:62px;border-radius:34px;background:#151a24;color:#f0c040;border:2px solid #f0c040;box-shadow:0 10px 28px rgba(0,0,0,.55);font-size:27px;cursor:pointer;display:none;align-items:center;justify-content:center;}
+  style.textContent=`#lcw-fab{position:fixed;left:18px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:6500;width:62px;height:62px;border-radius:34px;background:#151a24;color:#f0c040;border:2px solid #f0c040;box-shadow:0 10px 28px rgba(0,0,0,.55);font-size:27px;cursor:pointer;display:none;align-items:center;justify-content:center;}
   #lcw-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:20px;min-width:20px;height:20px;font-size:11px;font-weight:800;line-height:20px;padding:0 5px;display:none;}
   #lcw-panel{position:fixed;inset:0;z-index:2147483001;background:rgba(0,0,0,.45);display:none;color:#e7e9ee;font-family:-apple-system,system-ui,sans-serif;}
   #lcw-sheet{position:fixed;left:14px;bottom:calc(90px + env(safe-area-inset-bottom));width:min(400px,calc(100vw - 28px));height:min(72vh,620px);border:2px solid #f0c040;border-radius:20px;box-shadow:0 22px 60px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;background:#0b0e14;}
