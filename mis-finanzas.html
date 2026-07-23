@@ -158,6 +158,7 @@ async function plaidSyncNow(silent){
 window.plaidSyncNow=plaidSyncNow;
 window.plaidConnect=async function(kind){
   if(typeof Plaid==='undefined'){ alert('Cargando Plaid… intenta de nuevo en un segundo.'); return; }
+  const owner = confirm('¿Esta cuenta es de tu ESPOSA?\n\nAceptar = de ella  ·  Cancelar = tuya') ? 'ella' : 'yo';
   try{
     const r=await httpsCallable(functions,'plaidLinkToken')({kind});
     const token=r&&r.data&&r.data.link_token; if(!token) throw new Error('sin token');
@@ -165,7 +166,7 @@ window.plaidConnect=async function(kind){
       token,
       onSuccess: async (public_token, metadata)=>{
         try{
-          await httpsCallable(functions,'plaidExchange')({ public_token, kind, institution:(metadata&&metadata.institution&&metadata.institution.name)||'' });
+          await httpsCallable(functions,'plaidExchange')({ public_token, kind, owner, institution:(metadata&&metadata.institution&&metadata.institution.name)||'' });
           await plaidSyncNow(true);
           alert('✅ Cuenta conectada');
         }catch(e){ alert('No se pudo conectar: '+((e&&e.message)||e)); }
@@ -174,6 +175,10 @@ window.plaidConnect=async function(kind){
     });
     handler.open();
   }catch(e){ alert('Plaid: '+((e&&e.message)||e)); }
+};
+window.plaidToggleOwner=async function(itemId, newOwner){
+  try{ await httpsCallable(functions,'plaidSetOwner')({ itemId, owner:newOwner }); await plaidSyncNow(true); }
+  catch(e){ alert('Plaid: '+((e&&e.message)||e)); }
 };
 window.plaidUnlink=async function(itemId){
   if(!confirm('¿Desconectar esta cuenta?')) return;
@@ -188,7 +193,8 @@ function vConectar(){
       const cls=a.type==='credit'?'neg':((a.type==='depository'||a.type==='investment'||a.type==='brokerage')?'pos':'');
       return `<div class="row"><div class="l"><b>${esc(a.name||a.type)}${a.mask?(' ••'+esc(a.mask)):''}</b><div class="s">${esc(a.subtype||a.type)}${due}${a.apr?(' · '+esc(a.apr)+'% APR'):''}</div></div><div class="r"><b class="${cls}">${fmt(a.balance)}</b></div></div>`;
     }).join('');
-    return `<div class="card"><h2>🏦 ${esc(it.institution||'Cuenta')}<button class="iconbtn" style="margin-left:auto;color:#e57373;" onclick="plaidUnlink('${it.itemId}')">✕</button></h2>${accs||'<div class="empty">Sin cuentas.</div>'}${it.error?('<div class="s neg" style="margin-top:4px;">⚠️ '+esc(it.error)+'</div>'):''}</div>`;
+    const own=(it.owner==='ella');
+    return `<div class="card"><h2>🏦 ${esc(it.institution||'Cuenta')}<button class="btn ghost sm" style="margin-left:auto;" onclick="plaidToggleOwner('${it.itemId}','${own?'yo':'ella'}')">${own?'👩 Esposa':'👤 Tú'}</button><button class="iconbtn" style="color:#e57373;" onclick="plaidUnlink('${it.itemId}')">✕</button></h2>${accs||'<div class="empty">Sin cuentas.</div>'}${it.error?('<div class="s neg" style="margin-top:4px;">⚠️ '+esc(it.error)+'</div>'):''}</div>`;
   }).join(''):`<div class="card"><div class="empty">Aún no conectas ninguna cuenta. Toca un botón de arriba para empezar.</div></div>`;
   return `
   <div class="card">

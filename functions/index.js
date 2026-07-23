@@ -106,12 +106,23 @@ exports.plaidExchange = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeo
   if (!publicToken) throw new HttpsError("invalid-argument", "Falta public_token.");
   const kind = (request.data && request.data.kind) === "investments" ? "investments" : "bank";
   const institution = (request.data && request.data.institution ? String(request.data.institution) : "").slice(0, 80);
+  const owner = (request.data && request.data.owner) === "ella" ? "ella" : "yo";
   const client = plaidClient();
   const ex = await client.itemPublicTokenExchange({ public_token: publicToken });
   await admin.firestore().collection("plaid_items").doc(ex.data.item_id).set({
-    accessToken: ex.data.access_token, itemId: ex.data.item_id, kind, institution, createdAt: new Date().toISOString(),
+    accessToken: ex.data.access_token, itemId: ex.data.item_id, kind, institution, owner, createdAt: new Date().toISOString(),
   });
   return { ok: true, itemId: ex.data.item_id };
+});
+
+// 👤 Etiquetar de quién es una cuenta conectada (Tú / Esposa) — vista familiar en un solo portal.
+exports.plaidSetOwner = onCall({ timeoutSeconds: 15 }, async (request) => {
+  plaidOwnerOnly(request);
+  const itemId = request.data && request.data.itemId;
+  if (!itemId) throw new HttpsError("invalid-argument", "Falta itemId.");
+  const owner = (request.data && request.data.owner) === "ella" ? "ella" : "yo";
+  await admin.firestore().collection("plaid_items").doc(itemId).set({ owner }, { merge: true });
+  return { ok: true };
 });
 
 exports.plaidSync = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeoutSeconds: 180 }, async (request) => {
@@ -122,7 +133,7 @@ exports.plaidSync = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeoutSe
   let cash = 0, cardDebt = 0, invest = 0;
   for (const d of snap.docs) {
     const it = d.data();
-    const entry = { itemId: it.itemId, kind: it.kind, institution: it.institution || "", accounts: [] };
+    const entry = { itemId: it.itemId, kind: it.kind, institution: it.institution || "", owner: it.owner || "yo", accounts: [] };
     try {
       const bal = await client.accountsBalanceGet({ access_token: it.accessToken });
       let liab = null;
