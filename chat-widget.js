@@ -48,17 +48,17 @@ const myReads=()=>allReads[ME]||{};
 function build(){
   if(document.getElementById('lcw-fab')) return;
   const style=document.createElement('style');
-  style.textContent=`#lcw-fab{position:fixed;left:18px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:2147483000;width:54px;height:54px;border-radius:30px;background:#151a24;color:#fff;border:1px solid #2a2f3a;box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:22px;cursor:pointer;display:none;align-items:center;justify-content:center;}
+  style.textContent=`#lcw-fab{position:fixed;left:18px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:2147483000;width:62px;height:62px;border-radius:34px;background:#151a24;color:#f0c040;border:2px solid #f0c040;box-shadow:0 10px 28px rgba(0,0,0,.55);font-size:27px;cursor:pointer;display:none;align-items:center;justify-content:center;}
   #lcw-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:20px;min-width:20px;height:20px;font-size:11px;font-weight:800;line-height:20px;padding:0 5px;display:none;}
-  #lcw-panel{position:fixed;inset:0;z-index:2147483001;background:#0b0e14;display:none;color:#e7e9ee;font-family:-apple-system,system-ui,sans-serif;}
-  #lcw-sheet{position:absolute;inset:0;max-width:600px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;background:#0b0e14;}
-  #lcw-panel .hd{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 14px 12px;border-bottom:1px solid #2a2f3a;background:#151a24;}
+  #lcw-panel{position:fixed;inset:0;z-index:2147483001;background:rgba(0,0,0,.45);display:none;color:#e7e9ee;font-family:-apple-system,system-ui,sans-serif;}
+  #lcw-sheet{position:fixed;left:14px;bottom:calc(90px + env(safe-area-inset-bottom));width:min(400px,calc(100vw - 28px));height:min(72vh,620px);border:2px solid #f0c040;border-radius:20px;box-shadow:0 22px 60px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;background:#0b0e14;}
+  #lcw-panel .hd{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid #2a2f3a;background:#151a24;}
   #lcw-panel .hd .t{font-weight:800;flex:1;min-width:0;} #lcw-panel .hd .sub{font-size:11px;color:#98a0b0;font-weight:600;margin-top:1px;}
   #lcw-panel button{cursor:pointer;font-family:inherit;}
   #lcw-list{flex:1;overflow-y:auto;}
   #lcw-convo{display:none;flex:1;flex-direction:column;overflow:hidden;}
   #lcw-msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
-  #lcw-bar{flex:0 0 auto;display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #2a2f3a;background:#151a24;}
+  #lcw-bar{flex:0 0 auto;display:flex;gap:8px;padding:10px 12px 12px;border-top:1px solid #2a2f3a;background:#151a24;}
   #lcw-input{flex:1;min-width:0;background:#0b0e14;border:1px solid #2a2f3a;border-radius:10px;padding:11px 12px;color:#e7e9ee;font-size:15px;}
   .lcw-send{flex:0 0 auto;background:#f0c040;color:#0b0e14;border:none;border-radius:10px;padding:0 16px;font-weight:800;}
   .lcw-row{display:flex;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid #1e232d;cursor:pointer;}
@@ -150,9 +150,16 @@ function openConvo(k){ curCh=k; view='convo';
 }
 window.lcwOpenTo=(k)=>{ if(!k||!CH.some(c=>c.k===k)){ openPanel(); return; } open=true; document.getElementById('lcw-panel').style.display='block'; openConvo(k); vpOn(); clearNotifs(); };
 function backToList(){ view='list'; document.getElementById('lcw-convo').style.display='none'; document.getElementById('lcw-list').style.display='block'; document.getElementById('lcw-back').style.display='none'; document.getElementById('lcw-title').textContent='💬 Chat interno'; document.getElementById('lcw-subtitle').style.display='none'; renderList(); }
-function fitSheet(){ const sh=document.getElementById('lcw-sheet'), vv=window.visualViewport; if(!sh||!vv) return; sh.style.bottom='auto'; sh.style.height=vv.height+'px'; sh.style.transform='translateY('+vv.offsetTop+'px)'; const m=document.getElementById('lcw-msgs'); if(m) m.scrollTop=m.scrollHeight; }   // baja al último mensaje cuando sube/baja el teclado
+// Ventana flotante (tipo Messenger): al abrir el teclado, sube la ventana arriba del teclado; si no, deja la tarjeta chica.
+function fitSheet(){ const sh=document.getElementById('lcw-sheet'), vv=window.visualViewport; if(!sh) return;
+  if(!vv || window.innerWidth>700){ sh.style.bottom=''; sh.style.height=''; return; }
+  const kb=Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+  if(kb>60){ sh.style.bottom=(kb+8)+'px'; sh.style.height=(vv.height-70)+'px'; }
+  else { sh.style.bottom=''; sh.style.height=''; }
+  const m=document.getElementById('lcw-msgs'); if(m) m.scrollTop=m.scrollHeight;
+}
 function vpOn(){ const vv=window.visualViewport; if(!vv) return; vv.addEventListener('resize',fitSheet); vv.addEventListener('scroll',fitSheet); fitSheet(); }
-function vpOff(){ const vv=window.visualViewport, sh=document.getElementById('lcw-sheet'); if(vv){ vv.removeEventListener('resize',fitSheet); vv.removeEventListener('scroll',fitSheet); } if(sh){ sh.style.height=''; sh.style.transform=''; sh.style.bottom='0'; } }
+function vpOff(){ const vv=window.visualViewport, sh=document.getElementById('lcw-sheet'); if(vv){ vv.removeEventListener('resize',fitSheet); vv.removeEventListener('scroll',fitSheet); } if(sh){ sh.style.height=''; sh.style.bottom=''; } }
 function openPanel(){ open=true; view='list'; if(MYROLE==='owner') window._notifDiag=true; document.getElementById('lcw-panel').style.display='block'; backToList(); vpOn(); clearNotifs(); }
 function closePanel(){ open=false; const p=document.getElementById('lcw-panel'); if(p)p.style.display='none'; vpOff(); }
 function renderMsgs(){
