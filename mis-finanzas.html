@@ -73,6 +73,7 @@
 
 <div id="ov" onclick="if(event.target===this)closeSheet()"><div id="sheet"></div></div>
 
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -90,6 +91,7 @@ const REF=doc(db,'private_finance','ev');
 const CG={ BTC:'bitcoin', ETH:'ethereum', SOL:'solana', DOGE:'dogecoin', ADA:'cardano', XRP:'ripple', BNB:'binancecoin', LTC:'litecoin', MATIC:'matic-network', AVAX:'avalanche-2', DOT:'polkadot', LINK:'chainlink', SHIB:'shiba-inu' };
 const DEF={ crypto:[], stocks:[], cash:0, cards:[], insurance:[], expenses:[], income:[], coRevenue:[], coExpenses:[] };
 let D=JSON.parse(JSON.stringify(DEF)), prices={crypto:{},stocks:{},at:''}, section='resumen', unsub=null;
+let plaid={ items:[], totals:{cash:0,cardDebt:0,invest:0}, at:'' };
 
 const uid=()=> 'x'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
 const num=(v)=>{ const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
@@ -129,6 +131,7 @@ function start(){
   },(e)=>{ console.warn('finance',e); });
   buildNav();
   refreshPrices();
+  plaidSyncNow(true);
 }
 async function save(){ try{ await setDoc(REF, D); }catch(e){ alert('No se pudo guardar: '+e.message); } }
 
@@ -146,30 +149,92 @@ window.refreshPrices=async function(){
 const cgPrice=(c)=> prices.crypto[c.cgId] || 0;
 const syPrice=(s)=> prices.stocks[(s.symbol||'').toUpperCase()] || 0;
 
+// ---------- PLAID (cuentas reales) ----------
+async function plaidSyncNow(silent){
+  try{ const r=await httpsCallable(functions,'plaidSync')({}); if(r&&r.data) plaid=r.data; }
+  catch(e){ if(!silent) alert('Plaid: '+((e&&e.message)||e)); }
+  render();
+}
+window.plaidSyncNow=plaidSyncNow;
+window.plaidConnect=async function(kind){
+  if(typeof Plaid==='undefined'){ alert('Cargando Plaid… intenta de nuevo en un segundo.'); return; }
+  try{
+    const r=await httpsCallable(functions,'plaidLinkToken')({kind});
+    const token=r&&r.data&&r.data.link_token; if(!token) throw new Error('sin token');
+    const handler=Plaid.create({
+      token,
+      onSuccess: async (public_token, metadata)=>{
+        try{
+          await httpsCallable(functions,'plaidExchange')({ public_token, kind, institution:(metadata&&metadata.institution&&metadata.institution.name)||'' });
+          await plaidSyncNow(true);
+          alert('✅ Cuenta conectada');
+        }catch(e){ alert('No se pudo conectar: '+((e&&e.message)||e)); }
+      },
+      onExit: ()=>{}
+    });
+    handler.open();
+  }catch(e){ alert('Plaid: '+((e&&e.message)||e)); }
+};
+window.plaidUnlink=async function(itemId){
+  if(!confirm('¿Desconectar esta cuenta?')) return;
+  try{ await httpsCallable(functions,'plaidRemove')({itemId}); await plaidSyncNow(true); }
+  catch(e){ alert('Plaid: '+((e&&e.message)||e)); }
+};
+function vConectar(){
+  const t=plaid.totals||{cash:0,cardDebt:0,invest:0};
+  const itemsHtml=(plaid.items&&plaid.items.length)?plaid.items.map(it=>{
+    const accs=(it.accounts||[]).map(a=>{
+      const due=a.dueDate?(' · 📆 vence '+esc(a.dueDate)):'';
+      const cls=a.type==='credit'?'neg':((a.type==='depository'||a.type==='investment'||a.type==='brokerage')?'pos':'');
+      return `<div class="row"><div class="l"><b>${esc(a.name||a.type)}${a.mask?(' ••'+esc(a.mask)):''}</b><div class="s">${esc(a.subtype||a.type)}${due}${a.apr?(' · '+esc(a.apr)+'% APR'):''}</div></div><div class="r"><b class="${cls}">${fmt(a.balance)}</b></div></div>`;
+    }).join('');
+    return `<div class="card"><h2>🏦 ${esc(it.institution||'Cuenta')}<button class="iconbtn" style="margin-left:auto;color:#e57373;" onclick="plaidUnlink('${it.itemId}')">✕</button></h2>${accs||'<div class="empty">Sin cuentas.</div>'}${it.error?('<div class="s neg" style="margin-top:4px;">⚠️ '+esc(it.error)+'</div>'):''}</div>`;
+  }).join(''):`<div class="card"><div class="empty">Aún no conectas ninguna cuenta. Toca un botón de arriba para empezar.</div></div>`;
+  return `
+  <div class="card">
+    <h2>🔗 Conectar cuentas reales</h2>
+    <div class="s mut" style="margin-bottom:10px;">Conecta tus bancos, tarjetas y Robinhood para que se actualicen solos. Tus contraseñas NUNCA pasan por aquí.</div>
+    <button class="btn gold" style="width:100%;margin-bottom:8px;" onclick="plaidConnect('bank')">🏦 Conectar banco / tarjeta</button>
+    <button class="btn" style="width:100%;" onclick="plaidConnect('investments')">📈 Conectar inversión (Robinhood)</button>
+    <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="plaidSyncNow()">🔄 Actualizar saldos</button>
+    <div class="asof" style="margin-top:8px;">${plaid.at?('Actualizado '+new Date(plaid.at).toLocaleString('es-MX')):'Toca actualizar para traer saldos'}</div>
+  </div>
+  <div class="kpis" style="margin:12px 0;">
+    <div class="kpi"><div class="t">Efectivo conectado</div><div class="v pos">${fmt0(t.cash)}</div></div>
+    <div class="kpi"><div class="t">Inversiones conectadas</div><div class="v">${fmt0(t.invest)}</div></div>
+    <div class="kpi"><div class="t">Deuda tarjetas conectadas</div><div class="v neg">${fmt0(t.cardDebt)}</div></div>
+    <div class="kpi"><div class="t">Cuentas conectadas</div><div class="v">${(plaid.items||[]).length}</div></div>
+  </div>
+  ${itemsHtml}
+  <div class="card"><div class="s mut">💡 Para no contar doble: lo que conectes aquí NO lo metas también a mano en Tarjetas / Efectivo / Acciones.</div></div>`;
+}
+
 // ---------- CALCS ----------
 function calc(){
   const cryptoVal=D.crypto.reduce((a,c)=>a+num(c.amount)*(cgPrice(c)||num(c.buyPrice)),0);
   const cryptoCost=D.crypto.reduce((a,c)=>a+num(c.amount)*num(c.buyPrice),0);
   const stockVal=D.stocks.reduce((a,s)=>a+num(s.shares)*(syPrice(s)||num(s.buyPrice)),0);
   const stockCost=D.stocks.reduce((a,s)=>a+num(s.shares)*num(s.buyPrice),0);
-  const invVal=cryptoVal+stockVal, invCost=cryptoCost+stockCost;
-  const cash=num(D.cash);
-  const debt=sum(D.cards,'balance');
-  const assets=cash+invVal;
+  const invVal=cryptoVal+stockVal, invCost=cryptoCost+stockCost;   // manual (para ganancia/pérdida)
+  const pt=plaid.totals||{}; const plaidCash=num(pt.cash), plaidInvest=num(pt.invest), plaidDebt=num(pt.cardDebt);
+  const cash=num(D.cash)+plaidCash;
+  const debt=sum(D.cards,'balance')+plaidDebt;
+  const invTotal=invVal+plaidInvest;
+  const assets=cash+invTotal;
   const net=assets-debt;
   const income=sum(D.income,'amount');
   const expenses=sum(D.expenses,'amount')+sum(D.insurance,'premium');
   const monthly=income-expenses;
   const coRev=sum(D.coRevenue,'amount'), coExp=sum(D.coExpenses,'amount');
-  return { cryptoVal,cryptoCost,stockVal,stockCost,invVal,invCost,cash,debt,assets,net,income,expenses,monthly,coRev,coExp,coNet:coRev-coExp };
+  return { cryptoVal,cryptoCost,stockVal,stockCost,invVal,invCost,invTotal,plaidCash,plaidInvest,plaidDebt,cash,debt,assets,net,income,expenses,monthly,coRev,coExp,coNet:coRev-coExp };
 }
 
 // ---------- NAV / RENDER ----------
-const SECTIONS=[['resumen','📊 Resumen'],['crypto','₿ Cripto'],['stocks','📈 Acciones'],['cards','💳 Tarjetas'],['insurance','🛡️ Seguro'],['expenses','🧾 Gastos'],['income','💰 Ingresos'],['company','🏢 Empresa']];
+const SECTIONS=[['resumen','📊 Resumen'],['conectar','🔗 Conectar'],['crypto','₿ Cripto'],['stocks','📈 Acciones'],['cards','💳 Tarjetas'],['insurance','🛡️ Seguro'],['expenses','🧾 Gastos'],['income','💰 Ingresos'],['company','🏢 Empresa']];
 function buildNav(){ document.getElementById('nav').innerHTML=SECTIONS.map(([k,l])=>`<button data-k="${k}" class="${k===section?'on':''}" onclick="go('${k}')">${l}</button>`).join(''); }
 window.go=(k)=>{ section=k; buildNav(); render(); window.scrollTo(0,0); };
 
-function render(){ const v=document.getElementById('view'); if(!v) return; v.innerHTML=({resumen:vResumen,crypto:vCrypto,stocks:vStocks,cards:vCards,insurance:vInsurance,expenses:vExpenses,income:vIncome,company:vCompany}[section]||vResumen)(); }
+function render(){ const v=document.getElementById('view'); if(!v) return; v.innerHTML=({resumen:vResumen,conectar:vConectar,crypto:vCrypto,stocks:vStocks,cards:vCards,insurance:vInsurance,expenses:vExpenses,income:vIncome,company:vCompany}[section]||vResumen)(); }
 
 function rowsHtml(list, mapFn, addLabel, addKey){
   const body = list.length ? list.map(mapFn).join('') : `<div class="empty">Nada todavía.</div>`;
@@ -193,7 +258,7 @@ function vResumen(){
     <h2>📊 Patrimonio neto</h2>
     <div class="kpis">
       <div class="kpi"><div class="t">Patrimonio neto</div><div class="v ${c.net>=0?'pos':'neg'}">${fmt0(c.net)}</div></div>
-      <div class="kpi"><div class="t">Inversiones hoy</div><div class="v">${fmt0(c.invVal)}</div></div>
+      <div class="kpi"><div class="t">Inversiones hoy</div><div class="v">${fmt0(c.invTotal)}</div></div>
       <div class="kpi"><div class="t">Efectivo / ahorros</div><div class="v">${fmt0(c.cash)}</div></div>
       <div class="kpi"><div class="t">Deuda tarjetas</div><div class="v neg">${fmt0(c.debt)}</div></div>
     </div>

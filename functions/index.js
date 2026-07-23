@@ -15,6 +15,8 @@ const EBAY_DEV_ID = defineSecret("EBAY_DEV_ID");
 const EBAY_CERT_ID = defineSecret("EBAY_CERT_ID");
 const EBAY_AUTH_TOKEN = defineSecret("EBAY_AUTH_TOKEN");
 const EBAY_OAUTH_REFRESH = defineSecret("EBAY_OAUTH_REFRESH");
+const PLAID_CLIENT_ID = defineSecret("PLAID_CLIENT_ID");
+const PLAID_SECRET = defineSecret("PLAID_SECRET");
 
 // Prueba: confirma que el backend está vivo.
 exports.ping = onCall((request) => ({
@@ -50,6 +52,95 @@ exports.marketQuotes = onCall({ timeoutSeconds: 30 }, async (request) => {
     } catch (e) { /* símbolo no disponible */ }
   }
   return out;
+});
+
+// 🔗 PLAID — conectar cuentas reales (bancos, tarjetas, Robinhood) al portal financiero privado del dueño.
+// Los access_token viven SOLO en el backend (colección plaid_items, negada al cliente por las reglas). SOLO ev@.
+function plaidOwnerOnly(request) {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  if (email !== "ev@legacymotorsgarage.com") throw new HttpsError("permission-denied", "Solo el dueño.");
+}
+function plaidClient() {
+  const { Configuration, PlaidApi, PlaidEnvironments } = require("plaid");
+  const cfg = new Configuration({
+    basePath: PlaidEnvironments.production,
+    baseOptions: { headers: { "PLAID-CLIENT-ID": PLAID_CLIENT_ID.value(), "PLAID-SECRET": PLAID_SECRET.value() } },
+  });
+  return new PlaidApi(cfg);
+}
+const _r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+exports.plaidLinkToken = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeoutSeconds: 30 }, async (request) => {
+  plaidOwnerOnly(request);
+  const kind = (request.data && request.data.kind) === "investments" ? "investments" : "bank";
+  const client = plaidClient();
+  const req = {
+    user: { client_user_id: "ev-owner" },
+    client_name: "Legacy Finance",
+    products: kind === "investments" ? ["investments"] : ["transactions"],
+    country_codes: ["US"],
+    language: "en",
+  };
+  if (kind === "bank") req.additional_consented_products = ["liabilities"];
+  const r = await client.linkTokenCreate(req);
+  return { link_token: r.data.link_token };
+});
+
+exports.plaidExchange = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeoutSeconds: 30 }, async (request) => {
+  plaidOwnerOnly(request);
+  const publicToken = request.data && request.data.public_token;
+  if (!publicToken) throw new HttpsError("invalid-argument", "Falta public_token.");
+  const kind = (request.data && request.data.kind) === "investments" ? "investments" : "bank";
+  const institution = (request.data && request.data.institution ? String(request.data.institution) : "").slice(0, 80);
+  const client = plaidClient();
+  const ex = await client.itemPublicTokenExchange({ public_token: publicToken });
+  await admin.firestore().collection("plaid_items").doc(ex.data.item_id).set({
+    accessToken: ex.data.access_token, itemId: ex.data.item_id, kind, institution, createdAt: new Date().toISOString(),
+  });
+  return { ok: true, itemId: ex.data.item_id };
+});
+
+exports.plaidSync = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeoutSeconds: 180 }, async (request) => {
+  plaidOwnerOnly(request);
+  const client = plaidClient();
+  const snap = await admin.firestore().collection("plaid_items").get();
+  const items = [];
+  let cash = 0, cardDebt = 0, invest = 0;
+  for (const d of snap.docs) {
+    const it = d.data();
+    const entry = { itemId: it.itemId, kind: it.kind, institution: it.institution || "", accounts: [] };
+    try {
+      const bal = await client.accountsBalanceGet({ access_token: it.accessToken });
+      let liab = null;
+      try { const l = await client.liabilitiesGet({ access_token: it.accessToken }); liab = l.data.liabilities; } catch (e) { /* sin liabilities */ }
+      for (const a of bal.data.accounts) {
+        const b = (a.balances && (a.balances.current != null ? a.balances.current : a.balances.available)) || 0;
+        const acc = { name: a.name || a.official_name || "", mask: a.mask || "", type: a.type, subtype: a.subtype, balance: _r2(b) };
+        if (a.type === "depository") cash += b;
+        else if (a.type === "credit") {
+          cardDebt += b;
+          if (liab && liab.credit) { const cl = liab.credit.find((c) => c.account_id === a.account_id); if (cl) { acc.dueDate = cl.next_payment_due_date || cl.last_payment_due_date || ""; acc.apr = (cl.aprs && cl.aprs[0] && cl.aprs[0].apr_percentage) || ""; acc.minPayment = cl.minimum_payment_amount || ""; } }
+        } else if (a.type === "investment" || a.type === "brokerage") invest += b;
+        entry.accounts.push(acc);
+      }
+    } catch (e) { entry.error = String((e && e.response && e.response.data && e.response.data.error_message) || (e && e.message) || e); }
+    items.push(entry);
+  }
+  return { at: new Date().toISOString(), items, totals: { cash: _r2(cash), cardDebt: _r2(cardDebt), invest: _r2(invest) } };
+});
+
+exports.plaidRemove = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeoutSeconds: 30 }, async (request) => {
+  plaidOwnerOnly(request);
+  const itemId = request.data && request.data.itemId;
+  if (!itemId) throw new HttpsError("invalid-argument", "Falta itemId.");
+  const ref = admin.firestore().collection("plaid_items").doc(itemId);
+  const doc = await ref.get();
+  if (doc.exists) {
+    try { await plaidClient().itemRemove({ access_token: doc.data().accessToken }); } catch (e) { /* igual lo borramos localmente */ }
+    await ref.delete();
+  }
+  return { ok: true };
 });
 
 // 🔔 NOTIFICACIONES PUSH del chat interno.
