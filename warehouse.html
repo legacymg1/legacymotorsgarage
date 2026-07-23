@@ -1019,13 +1019,38 @@ function detailPartCard(p){
   </div>`;
 }
 // Ver foto GRANDE en una capa aparte (encima de todo). Al cerrar solo se quita la capa → sigues DENTRO de la parte.
-window.openPhoto=function(url){
+// 🖼️ Visor de fotos con SWIPE: abre una y deslizas entre todas (flechas en compu, tocar afuera cierra)
+window.openPhoto=function(url, all, idx){
+  const urls=(Array.isArray(all)&&all.length)?all:[url];
+  let i=(typeof idx==='number')?idx:Math.max(0,urls.indexOf(url)); if(i<0)i=0;
   const ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;';
-  ov.onclick=()=>ov.remove();
-  ov.innerHTML='<img src="'+url+'" style="max-width:100%;max-height:86vh;object-fit:contain;border-radius:12px;">'
-    +'<div style="color:rgba(255,255,255,.6);font-size:12px;">'+(L==='es'?'toca para cerrar':'tap to close')+'</div>';
-  document.body.appendChild(ov);
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;touch-action:pan-y;';
+  const img=document.createElement('img');
+  img.style.cssText='max-width:100%;max-height:84vh;object-fit:contain;border-radius:12px;user-select:none;';
+  const cap=document.createElement('div'); cap.style.cssText='color:rgba(255,255,255,.6);font-size:12px;text-align:center;';
+  const prev=document.createElement('button'), next=document.createElement('button');
+  [prev,next].forEach(b=>{ b.style.cssText='position:fixed;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.45);color:#fff;border:none;width:52px;height:52px;border-radius:50%;font-size:28px;line-height:1;cursor:pointer;display:'+(urls.length>1?'flex':'none')+';align-items:center;justify-content:center;'; });
+  prev.style.left='10px'; next.style.right='10px'; prev.textContent='‹'; next.textContent='›';
+  function show(){ img.src=urls[i]; cap.textContent=(urls.length>1?((i+1)+' / '+urls.length+' · '):'')+(L==='es'?(urls.length>1?'desliza · toca afuera para cerrar':'toca afuera para cerrar'):(urls.length>1?'swipe · tap outside to close':'tap outside to close')); }
+  function go(d){ if(urls.length<2) return; i=(i+d+urls.length)%urls.length; show(); }
+  function close(){ document.removeEventListener('keydown',onKey); ov.remove(); }
+  prev.onclick=(e)=>{ e.stopPropagation(); go(-1); }; next.onclick=(e)=>{ e.stopPropagation(); go(1); };
+  ov.onclick=close;
+  img.onclick=(e)=>{ if(urls.length<2){ close(); } else { e.stopPropagation(); } };
+  let sx=null;
+  ov.addEventListener('touchstart',e=>{ sx=e.touches[0].clientX; },{passive:true});
+  ov.addEventListener('touchend',e=>{ if(sx==null) return; const dx=e.changedTouches[0].clientX-sx; if(Math.abs(dx)>40){ e.stopPropagation(); go(dx<0?1:-1); } sx=null; });
+  const onKey=(e)=>{ if(e.key==='ArrowLeft') go(-1); else if(e.key==='ArrowRight') go(1); else if(e.key==='Escape') close(); };
+  document.addEventListener('keydown',onKey);
+  ov.appendChild(img); ov.appendChild(cap); ov.appendChild(prev); ov.appendChild(next);
+  document.body.appendChild(ov); show();
+};
+// Reúne TODAS las fotos del mismo grupo (miniaturas hermanas) y abre el visor en la que picaste, para deslizar entre ellas
+window.openPhotoG=function(el){
+  const box=el.parentElement; if(!box){ openPhoto(el.getAttribute('data-full')||el.src); return; }
+  const imgs=Array.from(box.querySelectorAll('img'));
+  const urls=imgs.map(x=>x.getAttribute('data-full')||x.src);
+  openPhoto(urls[imgs.indexOf(el)]||el.src, urls, imgs.indexOf(el));
 };
 // Ficha del VIN con buscador + X + tocar fuera
 let _specRows=[];
@@ -1688,14 +1713,14 @@ function listerCard(p){
   const pics=(p.photoURLs||[]).filter(x=>x&&!/00_QR/.test(x));
   // Publicada / Vendida → tarjeta compacta: nombre + TODAS las fotos en miniatura (toca una para agrandarla).
   if(p.status==='publicado'||p.status==='vendido'){
-    const thumbs=pics.length?`<div class="thumbs" style="margin-top:8px;">${pics.map(u=>`<img src="${u}" onclick="openPhoto('${u}')" style="cursor:pointer;">`).join('')}</div>`:'';
+    const thumbs=pics.length?`<div class="thumbs" style="margin-top:8px;">${pics.map(u=>`<img src="${u}" data-full="${u}" onclick="openPhotoG(this)" style="cursor:pointer;">`).join('')}</div>`:'';
     return `<div class="part">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="font-weight:700;min-width:0;">${esc(p.vehicleLabel||'')} · ${esc(p.name||'')}</div>${p.status==='publicado'?`<button class="btn ghost sm" style="flex:0 0 auto;color:var(--muted);" onclick="unpublish('${p.id}')">${t('unpublishBtn')}</button>`:semaforoTag(p.status)}</div>
       <div class="sub">${condLabel(p.condition)}${p.partNumber?' · OEM '+esc(p.partNumber):''}</div>
       ${thumbs}
     </div>`;
   }
-  const fotos=pics.map(u=>`<img src="${u}" onclick="openPhoto('${u}')" style="cursor:pointer;">`).join('');
+  const fotos=pics.map(u=>`<img src="${u}" data-full="${u}" onclick="openPhotoG(this)" style="cursor:pointer;">`).join('');
   return `<div class="part">
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="font-weight:700;min-width:0;">${p.vehicleLabel} · ${p.name}</div>${semaforoTag(p.status)}</div>
     <div class="sub">${condLabel(p.condition)}${p.partNumber?' · OEM '+p.partNumber:''} · 📍 ${locText(p)}</div>
