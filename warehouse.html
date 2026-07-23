@@ -1100,7 +1100,7 @@ window.openQuickAdd=function(){
     <div class="sub" style="margin-bottom:10px;">${t('quickAddHint')}</div>
     <label>🏷️ ${t('stickerLbl')}</label><input id="qa-sticker" inputmode="numeric" autocomplete="off" placeholder="${t('stickerPh')}" oninput="qaCheck()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('qa-bin').focus();}">
     <div id="qa-sticker-msg" class="sub" style="margin:2px 0 6px;"></div>
-    <label>${t('binLbl')}</label><input id="qa-bin" autocomplete="off" placeholder="${t('binPh')}" onkeydown="if(event.key==='Enter'){event.preventDefault();saveQuickAdd();}">
+    <label>${t('binLbl')}</label><input id="qa-bin" autocomplete="off" autocapitalize="characters" inputmode="text" placeholder="${t('binPh')}" onkeydown="if(event.key==='Enter'){event.preventDefault();saveQuickAdd();}">
     <label>${t('whichPart')} <span style="color:var(--muted);font-weight:400;">(opcional)</span></label><input id="qa-name" placeholder="${t('whichPartPh')}">
     <button class="btn" style="width:100%;margin-top:12px;" id="qa-save" onclick="saveQuickAdd()">${t('savePart')}</button>
     <div id="qa-added" class="sub" style="margin-top:8px;"></div>`;
@@ -1312,7 +1312,7 @@ window.openPartEdit=function(id){
     <label>🏷️ ${t('stickerLbl')}</label><input id="epa-sticker" value="${esc(p.stickerNum||'')}" inputmode="numeric" autocomplete="off" placeholder="${t('stickerPh')}">
     <label>${t('whichPart')}</label><input id="epa-name" value="${esc(p.name)}">
     <div class="row2"><div><label>${t('condition')}</label><select id="epa-cond">${condOptions()}</select></div><div><label>${t('partNum')}</label><input id="epa-num" value="${esc(p.partNumber)}"></div></div>
-    <label>${t('binLbl')}</label><input id="epa-bin" value="${esc(oldBin)}" placeholder="${t('binPh')}">
+    <label>${t('binLbl')}</label><input id="epa-bin" value="${esc(oldBin)}" autocapitalize="characters" inputmode="text" placeholder="${t('binPh')}">
     <button type="button" id="epa-airbag" class="btn ghost sm" style="width:100%;margin:6px 0;${p.airbag?'background:#c084fc;color:#0b0e14;border-color:#c084fc;':''}" onclick="toggleAirbagEdit()">🎈 ${p.airbag?t('airbagOn'):t('airbagBtn')}</button>
     <label>${t('photos')}</label>
     <div style="display:flex;gap:8px;">
@@ -1542,7 +1542,7 @@ function addPartFormHtml(vid){
     <div id="p-sticker-msg-${vid}" class="sub" style="margin:2px 0 6px;"></div>
     <label>${t('whichPart')}</label><input id="p-name-${vid}" placeholder="${t('whichPartPh')}">
     <label>${t('condition')}</label><select id="p-cond-${vid}">${condOptions()}</select>
-    <label>${t('binLbl')}</label><input id="p-bin-${vid}" placeholder="${t('binPh')}">
+    <label>${t('binLbl')}</label><input id="p-bin-${vid}" autocapitalize="characters" inputmode="text" placeholder="${t('binPh')}">
     <button type="button" id="p-airbag-${vid}" class="btn ghost sm" style="width:100%;margin:6px 0;" onclick="toggleAirbag('${vid}')">🎈 ${t('airbagBtn')}</button>
     <label>${t('photos')}</label>
     <div style="background:rgba(240,192,64,0.12);border:1px solid rgba(240,192,64,0.4);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;line-height:1.45;">📸 <b>${t('photoOrderTitle')}</b><br>${t('photoOrderHint')}</div>
@@ -1565,7 +1565,7 @@ function addQuickItemFormHtml(){
     <div id="p-sticker-msg-${vid}" class="sub" style="margin:2px 0 6px;"></div>
     <label>${t('whichPart')}</label><input id="p-name-${vid}" placeholder="${t('whichPartPh')}">
     <label>${t('condition')}</label><select id="p-cond-${vid}">${condOptions()}</select>
-    <label>${t('binLbl')}</label><input id="p-bin-${vid}" placeholder="${t('binPh')}">
+    <label>${t('binLbl')}</label><input id="p-bin-${vid}" autocapitalize="characters" inputmode="text" placeholder="${t('binPh')}">
     <button type="button" id="p-airbag-${vid}" class="btn ghost sm" style="width:100%;margin:6px 0;" onclick="toggleAirbag('${vid}')">🎈 ${t('airbagBtn')}</button>
     <label>VIN <span style="color:var(--muted);font-weight:400;">${t('vinFillHint')}</span></label>
     <div style="display:flex;gap:8px;">
@@ -2023,7 +2023,7 @@ window.scanLookup=function(){
     box.innerHTML=`<div class="card">
       <div style="font-weight:800;">${p.vehicleLabel} · ${p.name}</div>
       <div style="font-size:16px;font-weight:800;color:var(--gold);margin:8px 0;">📍 ${locText(p)}</div>
-      <label>${t('binLbl')}</label><input id="pk-bin" autocomplete="off" value="${(p.location&&p.location.bin)||''}" placeholder="${t('binPh')}">
+      <label>${t('binLbl')}</label><input id="pk-bin" autocomplete="off" autocapitalize="characters" inputmode="text" value="${(p.location&&p.location.bin)||''}" placeholder="${t('binPh')}">
       <button class="btn" style="width:100%;margin-top:8px;" onclick="saveLoc('${p.id}')">${t('relocBtn')}</button>
       <button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="exitReloc()">${t('closeResult')}</button>
     </div>`;
