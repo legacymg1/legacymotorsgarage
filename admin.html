@@ -1414,8 +1414,8 @@ window.renderAppointments=function(){
       html+=`<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
           <div style="min-width:170px;flex:1;">
-            <div style="font-weight:600;font-size:14px;">${a.clientName||''} ${flag}</div>
-            <div style="font-size:12px;color:var(--muted);">${a.type||''}${car}</div>
+            <div style="font-weight:600;font-size:14px;">${a.clientName||''} ${flag}${a.source==='web-bot'?' <span style="font-size:10px;background:rgba(240,192,64,0.14);color:var(--gold);border:1px solid var(--gold);border-radius:5px;padding:1px 6px;white-space:nowrap;">🤖 Lead web</span>':''}</div>
+            <div style="font-size:12px;color:var(--muted);">${a.type||''}${car}${a.phone?' · '+a.phone:''}</div>
             <div style="font-size:15px;font-weight:700;color:var(--gold);margin-top:3px;">${apptFmtLong(a.date,'es')}${hora}</div>
             ${a.note?'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px;">'+a.note+'</div>':''}
           </div>
