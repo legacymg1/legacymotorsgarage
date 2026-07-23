@@ -9,6 +9,18 @@ const TEAM=['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com','wa
 const HI='¡Hola! 🛟 Soy el ayudante del sistema Legacy. Pregúntame lo que quieras: cómo agregar una parte, subir a eBay, usar el chat, los airbags, lo que sea. ¿En qué te ayudo?';
 let built=false, msgs=[], openS=false, busy=false;
 
+// 🖐️ Burbuja arrastrable a cualquier parte; recuerda dónde la dejaron. Un toque normal = abrir.
+function makeDraggable(fab,key){
+  fab.style.touchAction='none';
+  var hasPos=false, sx=null, sy=null, ox=0, oy=0, moved=false;
+  function applyPos(x,y){ var w=fab.offsetWidth||62, h=fab.offsetHeight||62; x=Math.max(8,Math.min(x,window.innerWidth-w-8)); y=Math.max(8,Math.min(y,window.innerHeight-h-8)); fab.style.left=x+'px'; fab.style.top=y+'px'; fab.style.right='auto'; fab.style.bottom='auto'; hasPos=true; }
+  try{ var s=JSON.parse(localStorage.getItem(key)||'null'); if(s&&typeof s.x==='number'){ applyPos(s.x,s.y); } }catch(e){}
+  fab.addEventListener('pointerdown',function(e){ moved=false; var r=fab.getBoundingClientRect(); ox=r.left; oy=r.top; sx=e.clientX; sy=e.clientY; try{ fab.setPointerCapture(e.pointerId); }catch(_){} });
+  fab.addEventListener('pointermove',function(e){ if(sx==null) return; var dx=e.clientX-sx, dy=e.clientY-sy; if(!moved && Math.abs(dx)+Math.abs(dy)<6) return; moved=true; fab._dragged=true; e.preventDefault(); applyPos(ox+dx,oy+dy); });
+  fab.addEventListener('pointerup',function(){ if(sx==null) return; sx=null; if(moved){ var r=fab.getBoundingClientRect(); try{ localStorage.setItem(key,JSON.stringify({x:r.left,y:r.top})); }catch(_){} setTimeout(function(){ fab._dragged=false; },60); } });
+  fab.addEventListener('click',function(e){ if(fab._dragged){ e.stopImmediatePropagation(); e.preventDefault(); fab._dragged=false; } },true);
+  window.addEventListener('resize',function(){ if(!hasPos) return; var r=fab.getBoundingClientRect(); applyPos(r.left,r.top); });
+}
 function build(){
   if(built) return; built=true;
   var css=document.createElement('style');
@@ -30,6 +42,7 @@ function build(){
    +'#hb-snd{flex:0 0 auto;background:#5b9dff;color:#04132b;border:none;border-radius:50%;width:44px;height:44px;font-weight:800;font-size:18px;cursor:pointer;}';
   document.head.appendChild(css);
   var fab=document.createElement('button'); fab.id='hb-fab'; fab.textContent='🛟'; fab.title='Ayuda del sistema'; fab.onclick=toggle; document.body.appendChild(fab);
+  makeDraggable(fab,'hb_fabpos');
   var p=document.createElement('div'); p.id='hb-panel';
   p.innerHTML='<div id="hb-sheet"><div id="hb-hd"><div class="av">🛟</div><div class="ti">Ayuda del sistema<div class="su">Dudas de cómo usar la app</div></div><button id="hb-x">✕</button></div>'
    +'<div id="hb-msgs"></div><div id="hb-bar"><input id="hb-in" type="text" autocomplete="off" enterkeyhint="send" placeholder="Escribe tu duda…"><button id="hb-snd">➤</button></div></div>';

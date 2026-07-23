@@ -45,6 +45,18 @@ function recomputeReax(){ reax={}; Object.keys(_reaxDocs).forEach(ch=>_reaxDocs[
 const chName=(k)=>{ const c=CH_ALL.find(x=>x.k===k); return c?c.n:k; };
 const myReads=()=>allReads[ME]||{};
 
+// 🖐️ Hacer la burbuja arrastrable a cualquier parte de la pantalla; recuerda dónde la dejaron. Un toque normal = abrir.
+function makeDraggable(fab,key){
+  fab.style.touchAction='none';
+  let hasPos=false, sx=null, sy=null, ox=0, oy=0, moved=false;
+  function applyPos(x,y){ const w=fab.offsetWidth||62, h=fab.offsetHeight||62; x=Math.max(8,Math.min(x,window.innerWidth-w-8)); y=Math.max(8,Math.min(y,window.innerHeight-h-8)); fab.style.left=x+'px'; fab.style.top=y+'px'; fab.style.right='auto'; fab.style.bottom='auto'; hasPos=true; }
+  try{ const s=JSON.parse(localStorage.getItem(key)||'null'); if(s&&typeof s.x==='number'){ applyPos(s.x,s.y); } }catch(e){}
+  fab.addEventListener('pointerdown',(e)=>{ moved=false; const r=fab.getBoundingClientRect(); ox=r.left; oy=r.top; sx=e.clientX; sy=e.clientY; try{ fab.setPointerCapture(e.pointerId); }catch(_){} });
+  fab.addEventListener('pointermove',(e)=>{ if(sx==null) return; const dx=e.clientX-sx, dy=e.clientY-sy; if(!moved && Math.abs(dx)+Math.abs(dy)<6) return; moved=true; fab._dragged=true; e.preventDefault(); applyPos(ox+dx,oy+dy); });
+  fab.addEventListener('pointerup',()=>{ if(sx==null) return; sx=null; if(moved){ const r=fab.getBoundingClientRect(); try{ localStorage.setItem(key,JSON.stringify({x:r.left,y:r.top})); }catch(_){} setTimeout(()=>{ fab._dragged=false; },60); } });
+  fab.addEventListener('click',(e)=>{ if(fab._dragged){ e.stopImmediatePropagation(); e.preventDefault(); fab._dragged=false; } },true);
+  window.addEventListener('resize',()=>{ if(!hasPos) return; const r=fab.getBoundingClientRect(); applyPos(r.left,r.top); });
+}
 function build(){
   if(document.getElementById('lcw-fab')) return;
   const style=document.createElement('style');
@@ -66,6 +78,7 @@ function build(){
   .lcw-x{flex:0 0 auto;width:44px;height:44px;border-radius:50%;background:#1e232d;border:none;color:#e7e9ee;font-size:20px;font-weight:800;}`;
   document.head.appendChild(style);
   const fab=document.createElement('button'); fab.id='lcw-fab'; fab.innerHTML='💬<span id="lcw-badge"></span>'; fab.onclick=openPanel; document.body.appendChild(fab);
+  makeDraggable(fab,'lcw_fabpos');
   const p=document.createElement('div'); p.id='lcw-panel';
   p.innerHTML=`<div id="lcw-sheet">
     <div class="hd"><button id="lcw-back" style="display:none;background:none;border:none;color:#f0c040;font-size:22px;font-weight:800;">‹</button><div style="flex:1;min-width:0;"><div class="t" id="lcw-title">💬 Chat interno</div><div class="sub" id="lcw-subtitle" style="display:none;"></div></div><button class="lcw-x" id="lcw-close">✕</button></div>
