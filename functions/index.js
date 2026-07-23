@@ -78,11 +78,17 @@ exports.plaidLinkToken = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], time
   const req = {
     user: { client_user_id: "ev-owner" },
     client_name: "Legacy Finance",
-    products: kind === "investments" ? ["investments"] : ["transactions"],
     country_codes: ["US"],
     language: "en",
   };
-  if (kind === "bank") req.additional_consented_products = ["liabilities"];
+  if (kind === "investments") {
+    req.products = ["investments"];
+  } else {
+    // Banco/tarjeta: NO exigir "transactions" (así entran tarjetas que solo dan saldo/día de pago, ej. Merrick).
+    // Balance siempre está disponible; transactions/liabilities se jalan solo si el banco los soporta.
+    req.products = [];
+    req.required_if_supported_products = ["transactions", "liabilities"];
+  }
   const r = await client.linkTokenCreate(req);
   return { link_token: r.data.link_token };
 });
