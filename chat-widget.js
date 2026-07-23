@@ -276,6 +276,8 @@ async function send(){
   const part=pendingPart; i.value=''; pendingPart=null; renderAttach();
   const doc0={ text:text.slice(0,1000), byEmail:ME, byName:dispName(ME), byRole:MYROLE, ts:new Date().toISOString(), tms:Date.now() };
   if(part) doc0.partRef={ id:part.id, label:(part.label||'').slice(0,120), sticker:(part.sticker||'').slice(0,20) };
+  // 🌐 Canal GROUP (avisos a todo el equipo): traduce y guarda ES+EN para que cada quien lo lea en su idioma.
+  if(ch==='group'){ try{ const tr=await httpsCallable(functions,'translateText')({ text:doc0.text }); if(tr&&tr.data){ doc0.textEs=tr.data.es||doc0.text; doc0.textEn=tr.data.en||doc0.text; } }catch(_){} }
   try{ await addDoc(collection(db,'chat_channels',ch,'messages'),doc0); }
   catch(e){ i.value=typed; pendingPart=part; renderAttach(); alert('Error: '+((e&&e.message)||e)); return; }
   try{ markSeen(ch); }catch(_){}

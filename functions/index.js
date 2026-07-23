@@ -1,7 +1,6 @@
 // Legacy DMS — backend (Cloud Functions v2)
 // redeploy marker: ebay oauth refresh v4
 const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
@@ -168,15 +167,12 @@ exports.plaidRemove = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeout
   return { ok: true };
 });
 
-// 🌐 Traducir los mensajes del canal GROUP (avisos a todo el equipo) → guarda versión ES y EN.
-// Cada quien los lee en el idioma de su página. Modelo Haiku (rápido y baratísimo). Admin SDK salta la regla de inmutabilidad.
-exports.translateGroupMsg = onDocumentCreated({ document: "chat_channels/group/messages/{msgId}", secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, async (event) => {
-  const snap = event.data;
-  if (!snap) return;
-  const d = snap.data() || {};
-  if (d.textEs && d.textEn) return;
-  const text = String(d.text || "").trim();
-  if (!text) return;
+// 🌐 Traducir un mensaje corto → { es, en }. Se llama al ENVIAR al canal GROUP para guardar ambas versiones.
+// Callable normal (sin Eventarc) → no necesita permisos especiales. Modelo Haiku (rápido y baratísimo).
+exports.translateText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const text = String((request.data && request.data.text) || "").trim();
+  if (!text) return { es: "", en: "" };
   try {
     const AnthropicMod = require("@anthropic-ai/sdk");
     const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
@@ -190,10 +186,8 @@ exports.translateGroupMsg = onDocumentCreated({ document: "chat_channels/group/m
     const raw = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
     let parsed = null;
     try { parsed = JSON.parse(raw); } catch (e) { const mm = raw.match(/\{[\s\S]*\}/); if (mm) { try { parsed = JSON.parse(mm[0]); } catch (e2) {} } }
-    if (parsed && (parsed.es || parsed.en)) {
-      await snap.ref.update({ textEs: String(parsed.es || text).slice(0, 1200), textEn: String(parsed.en || text).slice(0, 1200) });
-    }
-  } catch (e) { console.log("translateGroupMsg", e); }
+    return { es: String((parsed && parsed.es) || text).slice(0, 1200), en: String((parsed && parsed.en) || text).slice(0, 1200) };
+  } catch (e) { return { es: text, en: text }; }
 });
 
 // 🔔 NOTIFICACIONES PUSH del chat interno.
