@@ -195,7 +195,8 @@ function vConectar(){
     <h2>🔗 Conectar cuentas reales</h2>
     <div class="s mut" style="margin-bottom:10px;">Conecta tus bancos, tarjetas y Robinhood para que se actualicen solos. Tus contraseñas NUNCA pasan por aquí.</div>
     <button class="btn gold" style="width:100%;margin-bottom:8px;" onclick="plaidConnect('bank')">🏦 Conectar banco / tarjeta</button>
-    <button class="btn" style="width:100%;" onclick="plaidConnect('investments')">📈 Conectar inversión (Robinhood)</button>
+    <button class="btn" style="width:100%;margin-bottom:8px;" onclick="plaidConnect('investments')">📈 Conectar inversión (Robinhood)</button>
+    <button class="btn" style="width:100%;" onclick="plaidConnect('card')">💳 Tarjeta que no jaló arriba (solo saldo)</button>
     <button class="btn ghost sm" style="width:100%;margin-top:10px;" onclick="plaidSyncNow()">🔄 Actualizar saldos</button>
     <div class="asof" style="margin-top:8px;">${plaid.at?('Actualizado '+new Date(plaid.at).toLocaleString('es-MX')):'Toca actualizar para traer saldos'}</div>
   </div>

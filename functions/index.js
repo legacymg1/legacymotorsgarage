@@ -83,13 +83,20 @@ exports.plaidLinkToken = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], time
   };
   if (kind === "investments") {
     req.products = ["investments"];
+  } else if (kind === "card") {
+    // Tarjeta de crédito / tienda que solo da saldo + día de pago (ej. Merrick): pedir liabilities, no transactions.
+    req.products = ["liabilities"];
   } else {
-    // Banco/tarjeta: NO exigir "transactions" (así entran tarjetas que solo dan saldo/día de pago, ej. Merrick).
-    // Balance siempre está disponible; transactions/liabilities se jalan solo si el banco los soporta.
-    req.products = [];
-    req.required_if_supported_products = ["transactions", "liabilities"];
+    req.products = ["transactions"];
+    req.additional_consented_products = ["liabilities"];
   }
-  const r = await client.linkTokenCreate(req);
+  let r;
+  try {
+    r = await client.linkTokenCreate(req);
+  } catch (e) {
+    const msg = (e && e.response && e.response.data && e.response.data.error_message) || (e && e.message) || "error desconocido";
+    throw new HttpsError("failed-precondition", "Plaid: " + msg);
+  }
   return { link_token: r.data.link_token };
 });
 
