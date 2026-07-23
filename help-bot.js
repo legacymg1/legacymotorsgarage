@@ -7,7 +7,8 @@ const auth=getAuth(app);
 const ENDPOINT='https://us-central1-legacy-motors-garage.cloudfunctions.net/helpChat';
 const TEAM=['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com','warehouse@legacymotorsgarage.com','capture@legacymotorsgarage.com','listing@legacymotorsgarage.com','yarda@legacymotorsgarage.com','ebay@legacymotorsgarage.com','empaque@legacymotorsgarage.com','mechanic@legacymotorsgarage.com','mecanico@legacymotorsgarage.com'];
 const HI='¡Hola! 🛟 Soy el ayudante del sistema Legacy. Pregúntame lo que quieras: cómo agregar una parte, subir a eBay, usar el chat, los airbags, lo que sea. ¿En qué te ayudo?';
-let built=false, msgs=[], openS=false, busy=false;
+let built=false, msgs=[], openS=false, busy=false, _hbEmail='';
+function saveConv(){ try{ if(_hbEmail) localStorage.setItem('hb_conv_'+_hbEmail, JSON.stringify(msgs.slice(-60))); }catch(e){} }
 
 // 🖐️ Burbuja arrastrable a cualquier parte; recuerda dónde la dejaron. Un toque normal = abrir.
 function makeDraggable(fab,key){
@@ -67,14 +68,14 @@ function toggle(){
 }
 function send(){
   var i=document.getElementById('hb-in'); var txt=(i.value||'').trim(); if(!txt||busy) return;
-  i.value=''; msgs.push({role:'user',content:txt}); busy=true; render();
+  i.value=''; msgs.push({role:'user',content:txt}); busy=true; render(); saveConv();
   fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:msgs.slice(-12)})})
     .then(function(r){return r.json();})
-    .then(function(d){ busy=false; msgs.push({role:'assistant',content:(d&&d.reply)||'Perdón, intenta de nuevo.'}); render(); })
-    .catch(function(){ busy=false; msgs.push({role:'assistant',content:'Perdón, tuve un detalle. Intenta de nuevo.'}); render(); });
+    .then(function(d){ busy=false; msgs.push({role:'assistant',content:(d&&d.reply)||'Perdón, intenta de nuevo.'}); render(); saveConv(); })
+    .catch(function(){ busy=false; msgs.push({role:'assistant',content:'Perdón, tuve un detalle. Intenta de nuevo.'}); render(); saveConv(); });
 }
 onAuthStateChanged(auth,function(u){
   var email=((u&&u.email)||'').toLowerCase();
-  if(u && TEAM.indexOf(email)>=0){ build(); var fab=document.getElementById('hb-fab'); if(fab) fab.style.display='flex'; }
+  if(u && TEAM.indexOf(email)>=0){ _hbEmail=email; try{ var saved=JSON.parse(localStorage.getItem('hb_conv_'+email)||'null'); if(Array.isArray(saved)&&saved.length){ msgs=saved; } }catch(e){} build(); if(openS) render(); var fab=document.getElementById('hb-fab'); if(fab) fab.style.display='flex'; }
   else { var fab=document.getElementById('hb-fab'); if(fab) fab.style.display='none'; var p=document.getElementById('hb-panel'); if(p) p.classList.remove('on'); }
 });

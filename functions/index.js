@@ -504,6 +504,10 @@ WAREHOUSE — LISTADO (para el que sube a eBay):
 CHAT INTERNO (la burbuja 💬):
 • Tiene varios canales según tu rol. Para reaccionar a un mensaje, déjalo apretado y elige un emoji. Para ocultar un chat, deslízalo a la izquierda.
 • Activa las notificaciones tocando "🔔 Activar" para que no se te escape ningún mensaje.
+• 🔧 SEÑALAR UNA PARTE: si tú y un compañero están hablando de una pieza específica, toca el botón 🔧 al lado de la cajita de escribir, busca la parte por su número de sticker o nombre, y se pega en el mensaje. Cualquiera puede tocar esa etiqueta 🔧 en el mensaje para saltar directo a esa parte y editarla/arreglarla. Sirve para que no haya confusión de cuál pieza es y la corrijan rápido entre los dos.
+• 🌐 En el canal de avisos a todos (grupo), los mensajes se traducen solos: cada quien los lee en español o inglés según el idioma que tenga puesto en su app.
+• La burbuja de chat (y la de ayuda) se pueden arrastrar y se pegan a la orilla; recuerdan dónde las dejaste.
+• AYUDA (esta burbuja 🛟): tu conversación conmigo se queda guardada aunque cierres o salgas — puedes volver y ver lo que preguntaste antes.
 
 Si te preguntan algo que no está aquí o es de dinero/permisos/decisiones, di amablemente que le pregunten a Enrique o Ivan. Nunca inventes.`;
 exports.helpChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeconds: 60 }, async (req, res) => {
