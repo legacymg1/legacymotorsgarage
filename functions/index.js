@@ -22,6 +22,36 @@ exports.ping = onCall((request) => ({
   uid: request.auth ? request.auth.uid : null,
 }));
 
+// 💹 Precios de mercado EN VIVO (BTC/cripto + acciones) para el portal financiero privado del dueño.
+// Sin llaves, sin CORS (corre en el servidor). SOLO el dueño (ev@) puede llamarlo.
+exports.marketQuotes = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  if (email !== "ev@legacymotorsgarage.com") throw new HttpsError("permission-denied", "Solo el dueño.");
+  const cryptoIds = (request.data && Array.isArray(request.data.crypto)) ? request.data.crypto.filter(Boolean).slice(0, 30) : [];
+  const stocks = (request.data && Array.isArray(request.data.stocks)) ? request.data.stocks.filter(Boolean).slice(0, 40) : [];
+  const out = { crypto: {}, stocks: {}, at: new Date().toISOString() };
+  try {
+    if (cryptoIds.length) {
+      const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=" + encodeURIComponent(cryptoIds.join(",")) + "&vs_currencies=usd");
+      if (r.ok) { const j = await r.json(); for (const k in j) { if (j[k] && typeof j[k].usd === "number") out.crypto[k] = j[k].usd; } }
+    }
+  } catch (e) { /* precios cripto no disponibles */ }
+  for (const symRaw of stocks) {
+    const sym = String(symRaw).toUpperCase().trim();
+    if (!sym) continue;
+    try {
+      const r = await fetch("https://query1.finance.yahoo.com/v8/finance/chart/" + encodeURIComponent(sym) + "?interval=1d&range=1d", { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (r.ok) {
+        const j = await r.json();
+        const p = j && j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta && j.chart.result[0].meta.regularMarketPrice;
+        if (typeof p === "number") out.stocks[sym] = p;
+      }
+    } catch (e) { /* símbolo no disponible */ }
+  }
+  return out;
+});
+
 // 🔔 NOTIFICACIONES PUSH del chat interno.
 // Debe empatar con CHAT_CHANNELS del frontend (quién es miembro de cada canal).
 const CHAT_MEMBERS = {
