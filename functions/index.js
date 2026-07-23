@@ -81,7 +81,7 @@ exports.sendChatPush = onCall({ timeoutSeconds: 30 }, async (request) => {
 
 // 🌐 BOT DE VENTAS de la página web (Claude). Contesta a visitantes y los empuja a venir en persona.
 const SITE_BOT_MODEL = "claude-sonnet-5";   // buen balance calidad/costo (mismo que el bot de eBay). Se puede subir a opus.
-function buildSitePrompt(inv) {
+function buildSitePrompt(inv, todayStr) {
   return `You are the warm, charismatic sales assistant for **Legacy Motors Garage LLC**, a Buy-Here-Pay-Here used-car dealership in Porterville, CA. Reply in the SAME language the customer writes (Spanish or English). You genuinely understand hard-working local families who need a good, reliable car to get to work.
 
 YOUR #1 GOAL: get them to COME IN PERSON (or set an appointment). That's where we help them and they can drive off the SAME DAY. Be kind, upbeat, human, and build trust. Keep replies short and conversational (2–4 sentences), and always end with a gentle nudge to visit, message, or call.
@@ -105,8 +105,43 @@ HARD RULES:
 - Don't invent cars or specs. Use the inventory below; if we don't have exactly what they want, offer a close option and invite them in.
 - Stay on topic (cars, financing, visiting). Warm and charismatic, never pushy or robotic.
 
+📅 BOOKING APPOINTMENTS (very important — this is how we win):
+- Today is ${todayStr} (Pacific time). Use this to resolve dates the customer says ("tomorrow", "this Saturday", "el sábado") into an exact calendar date.
+- Your BEST outcome is a concrete appointment. As the chat warms up and they show real interest, naturally guide them to pick a DAY (and a time if they can) to come in.
+- To lock it in you need their NAME and a PHONE NUMBER so our team can confirm. Ask for these gently and naturally ("¿A qué nombre y a qué número te confirmamos la cita?").
+- ONCE you have at least a name, a phone number, and a day → call the \`book_appointment\` tool. Pass the date as YYYY-MM-DD, the time as HH:MM 24-hour if they gave one, the car they're interested in, roughly how much they can put down, and any useful notes about them (what they need the car for, etc.).
+- After the tool saves it, warmly CONFIRM back to the customer (repeat the day/time) and tell them our team will text them to confirm and that we look forward to seeing them. Do NOT call the tool again for the same appointment.
+- If they're not ready to commit to a day yet, don't force it — keep building trust and invite them to come by anytime during hours.
+
 CARS AVAILABLE RIGHT NOW:
 ${inv}`;
+}
+// 🗓️ Guarda una cita generada por el bot de ventas en la MISMA colección/formato que el CRM (admin.html) y el portal.
+async function saveBotAppointment(input, lang) {
+  const s = (v, n) => (v == null ? "" : String(v)).trim().slice(0, n);
+  const name = s(input.name, 80);
+  const phone = s(input.phone, 30);
+  const date = s(input.date, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("bad date");
+  const tm = s(input.time, 5).match(/^(\d{1,2}):(\d{2})$/);
+  const time = tm ? (String(Math.min(23, +tm[1])).padStart(2, "0") + ":" + tm[2]) : "";
+  const car = s(input.car_interest, 120);
+  const down = s(input.down_payment, 40);
+  const extra = s(input.notes, 300);
+  const noteParts = [];
+  if (down) noteParts.push((lang === "en" ? "Down: " : "Enganche: ") + down);
+  if (extra) noteParts.push(extra);
+  noteParts.push(lang === "en" ? "(Lead from website bot)" : "(Lead del bot de la web)");
+  const id = "appt_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+  const data = {
+    clientId: "", clientName: name, phone, phoneE164: "", lang,
+    carLabel: car, vin: "", type: (lang === "en" ? "Sale" : "Venta"), services: [{ es: "Venta", en: "Sale" }],
+    date, time, note: noteParts.join(" · "), downPayment: down,
+    status: "scheduled", confirmSent: false, reminderSent: false, source: "web-bot",
+    createdAt: new Date().toISOString(), createdBy: "web-bot",
+  };
+  await admin.firestore().collection("appointments").doc(id).set(data);
+  return data;
 }
 exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeconds: 60 }, async (req, res) => {
   if (req.method === "OPTIONS") { res.status(204).send(""); return; }
@@ -122,18 +157,61 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
         .slice(0, 80)
         .map((c) => [c.year, c.make, c.model].filter(Boolean).join(" ") + (c.miles ? " · " + Number(c.miles).toLocaleString() + " mi" : ""));
     } catch (e) {}
-    const system = buildSitePrompt(cars.length ? cars.join("\n") : "(ask and we'll check availability)");
+    // Fecha de HOY en hora del Pacífico (Porterville) para que el bot resuelva "mañana", "el sábado", etc.
+    let todayStr = "";
+    try {
+      const ld = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
+      const iso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      todayStr = ld + " (" + iso + ")";
+    } catch (e) { todayStr = new Date().toISOString().slice(0, 10); }
+    const system = buildSitePrompt(cars.length ? cars.join("\n") : "(ask and we'll check availability)", todayStr);
     const AnthropicMod = require("@anthropic-ai/sdk");
     const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
     const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
     const messages = msgsIn.filter((m) => m && m.content).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content).slice(0, 1200) }));
     if (!messages.length || messages[0].role !== "user") messages.unshift({ role: "user", content: lang === "en" ? "Hi" : "Hola" });
-    const msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 500, system, messages });
+
+    const bookTool = {
+      name: "book_appointment",
+      description: "Save a real appointment for a customer who agreed to come in on a specific day. Only call when you have at least their name, phone number, and a day.",
+      input_schema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Customer's name" },
+          phone: { type: "string", description: "Customer's phone number" },
+          car_interest: { type: "string", description: "The car they're interested in (year make model), if known" },
+          date: { type: "string", description: "Appointment date as YYYY-MM-DD (resolve relative dates using today's date given in the system prompt)" },
+          time: { type: "string", description: "Appointment time as HH:MM 24-hour, if they gave one" },
+          down_payment: { type: "string", description: "Roughly how much they can put down, if mentioned" },
+          notes: { type: "string", description: "Any useful notes about the customer (what they need the car for, etc.)" },
+        },
+        required: ["name", "phone", "date"],
+      },
+    };
+
+    let totalIn = 0, totalOut = 0, booked = null, guard = 0;
+    let msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 600, system, messages, tools: [bookTool] });
+    totalIn += (msg.usage && msg.usage.input_tokens) || 0; totalOut += (msg.usage && msg.usage.output_tokens) || 0;
+    while (msg.stop_reason === "tool_use" && guard < 2) {
+      guard++;
+      messages.push({ role: "assistant", content: msg.content });
+      const results = [];
+      for (const block of (msg.content || [])) {
+        if (block.type === "tool_use" && block.name === "book_appointment") {
+          let content;
+          try { booked = await saveBotAppointment(block.input || {}, lang); content = "Appointment saved successfully. Now warmly confirm the day/time to the customer and tell them our team will text them to confirm."; }
+          catch (e) { content = "Could not save the appointment (" + String((e && e.message) || e) + "). Ask the customer to confirm the day and their phone number, or invite them to just come by during business hours."; }
+          results.push({ type: "tool_result", tool_use_id: block.id, content });
+        }
+      }
+      messages.push({ role: "user", content: results });
+      msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 600, system, messages, tools: [bookTool] });
+      totalIn += (msg.usage && msg.usage.input_tokens) || 0; totalOut += (msg.usage && msg.usage.output_tokens) || 0;
+    }
     const reply = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
-    // 🧮 Taxímetro INDEPENDIENTE del bot de la web (config/aiUsage, claves "site_")
+    // 🧮 Taxímetro INDEPENDIENTE del bot de la web (config/aiUsage, claves "site_") — suma todo el ciclo de tool-use
     try {
-      const u = msg.usage || {};
-      const cost = +(((u.input_tokens || 0) / 1e6) * 3 + ((u.output_tokens || 0) / 1e6) * 15).toFixed(6);
+      const cost = +((totalIn / 1e6) * 3 + (totalOut / 1e6) * 15).toFixed(6);
       const ym = new Date().toISOString().slice(0, 7).replace("-", "_");
       const inc = admin.firestore.FieldValue.increment;
       await admin.firestore().collection("config").doc("aiUsage").set({
@@ -142,7 +220,7 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
         siteUpdatedAt: new Date().toISOString(),
       }, { merge: true });
     } catch (e) {}
-    res.json({ reply: reply || (lang === "en" ? "How can I help you find a good car today?" : "¿Cómo te puedo ayudar a encontrar un buen carro hoy?") });
+    res.json({ reply: reply || (lang === "en" ? "How can I help you find a good car today?" : "¿Cómo te puedo ayudar a encontrar un buen carro hoy?"), booked: !!booked });
   } catch (e) {
     console.log("siteChat", e);
     res.json({ reply: lang === "en" ? "Sorry, I had a hiccup — call us at (559) 540-5145 and we'll help you right away." : "Perdón, tuve un detalle — llámanos al (559) 540-5145 y con gusto te ayudamos." });
