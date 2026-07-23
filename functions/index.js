@@ -149,6 +149,56 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
   }
 });
 
+// 🛟 BOT INTERNO DE AYUDA — le resuelve dudas a los empleados sobre CÓMO USAR el sistema Legacy DMS.
+const HELP_PROMPT = `Eres el asistente de ayuda INTERNO de Legacy Motors Garage — ayudas a los EMPLEADOS y supervisores a usar el sistema (la app "Legacy DMS"). Responde en el idioma en que te escriban (casi siempre español). Sé claro, breve, paciente y amable, con pasos simples (1, 2, 3). Si no sabes algo o es una decisión del negocio (precios, permisos, dinero), diles que le pregunten a un supervisor (Enrique o Ivan).
+
+CÓMO FUNCIONA LA APP (para que puedas guiarlos):
+• Hay 4 secciones abajo: **Inventario** (carros a la venta), **Clientes** (pagos, citas), **Finanzas** (gastos/ingresos), **Warehouse** (yarda/almacén). Cada quien ve solo lo de su rol.
+• ROLES: Captura (el que toma fotos de partes), Listado (el que sube a eBay), Empaque (Sunmi, empaca), Mecánico, y Supervisores (Enrique = Supervisor W / Ivan = Supervisor Y).
+
+WAREHOUSE — CAPTURA (para el que toma fotos):
+• Los carros a desmantelar SOLO los agregan los supervisores. Captura NO agrega carros, solo les agrega partes.
+• Para agregar una parte: entra al carro → "➕ Parte" → pon el número de ESTAMPA (la etiqueta de 4 dígitos), el nombre de la parte, condición, y el BIN (dónde queda). Toma las fotos: 1ª = la PIEZA COMPLETA (esa es la foto principal), 2ª y 3ª = los NÚMEROS/estampas de cerca (el bot lee las 3 primeras 🤖). Guarda.
+• Botón 🎈 "Airbag": si es airbag o sensor de airbag, tócalo — lo manda al bin AIRBAGS y no se lista (eBay no los permite). Clock springs y cinturones sí se listan normal.
+• Al EDITAR una parte: puedes mandar una foto al frente con ⭐ (se vuelve la principal), y para borrar fotos usa "🗑️ Eliminar fotos" → selecciona → confirma (así no borras sin querer). Al tocar una foto se agranda; al cerrarla sigues dentro de la parte.
+
+WAREHOUSE — LISTADO (para el que sube a eBay):
+• Cada parte tiene un botón 🤖 "Preparar/Regenerar": el bot lee las fotos y arma el anuncio (título, categoría, descripción, números). Revisa en la app la CATEGORÍA y los ESPECIFICOS antes de publicar.
+• Si algo está mal, escribe en la cajita "¿Algo mal?" (ej. "es un vidrio, no un switch") y dale 🔁 Corregir.
+• Luego "🔄 Actualizar borrador" y cuando esté bien "🚀 Publicar (en vivo)".
+• El orden de la lista es del más viejo arriba al más nuevo abajo (hazlos en orden). Los airbags salen en su sección aparte abajo.
+
+CHAT INTERNO (la burbuja 💬):
+• Tiene varios canales según tu rol. Para reaccionar a un mensaje, déjalo apretado y elige un emoji. Para ocultar un chat, deslízalo a la izquierda.
+• Activa las notificaciones tocando "🔔 Activar" para que no se te escape ningún mensaje.
+
+Si te preguntan algo que no está aquí o es de dinero/permisos/decisiones, di amablemente que le pregunten a Enrique o Ivan. Nunca inventes.`;
+exports.helpChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeconds: 60 }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
+  try {
+    const msgsIn = Array.isArray(req.body && req.body.messages) ? req.body.messages.slice(-12) : [];
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const messages = msgsIn.filter((m) => m && m.content).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content).slice(0, 1200) }));
+    if (!messages.length || messages[0].role !== "user") messages.unshift({ role: "user", content: "Hola" });
+    const msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 600, system: HELP_PROMPT, messages });
+    const reply = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    try {
+      const u = msg.usage || {};
+      const cost = +(((u.input_tokens || 0) / 1e6) * 3 + ((u.output_tokens || 0) / 1e6) * 15).toFixed(6);
+      const ym = new Date().toISOString().slice(0, 7).replace("-", "_");
+      const inc = admin.firestore.FieldValue.increment;
+      await admin.firestore().collection("config").doc("aiUsage").set({
+        helpUsd: inc(cost), helpCount: inc(1),
+        ["help_m_" + ym + "_usd"]: inc(cost), ["help_m_" + ym + "_count"]: inc(1),
+      }, { merge: true });
+    } catch (e) {}
+    res.json({ reply: reply || "¿En qué te ayudo con el sistema?" });
+  } catch (e) { console.log("helpChat", e); res.json({ reply: "Perdón, tuve un detalle. Intenta de nuevo o pregúntale a un supervisor." }); }
+});
+
 // 🔔 eBay Marketplace Account Deletion/Closure — endpoint requerido para habilitar el keyset de Producción.
 // GET con challenge_code → responde SHA-256(challengeCode + verificationToken + endpointUrl).
 // POST (aviso real de borrado) → 200 OK (no guardamos PII de usuarios de eBay, solo confirmamos).
