@@ -764,13 +764,16 @@ function renderAiUsage(){
   const helpMes=u['help_m_'+ym+'_usd']||0, helpTot=u.helpUsd||0, helpN=u.helpCount||0;
   const mesTotal=(Number(ebayMes)||0)+(Number(siteMes)||0)+(Number(helpMes)||0);
   const row=(icon,label,mes,tot,cnt,cntLbl)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);"><div style="font-weight:700;font-size:13px;min-width:0;">'+icon+' '+label+'<div style="font-size:10px;color:var(--muted);font-weight:500;">'+(cnt||0)+' '+cntLbl+'</div></div><div style="display:flex;gap:16px;align-items:baseline;flex:0 0 auto;"><div style="text-align:right;"><div style="font-size:10px;color:var(--muted);">Este mes</div><div style="font-weight:800;color:var(--gold);">'+f(mes)+'</div></div><div style="text-align:right;"><div style="font-size:10px;color:var(--muted);">Total</div><div style="font-weight:800;font-size:13px;">'+f(tot)+'</div></div></div></div>';
+  const col = (function(){ try{ return localStorage.getItem('lmg_ai_col')==='1'; }catch(e){ return false; } })();
   box.innerHTML='<div class="card" style="margin:0 0 16px;padding:12px 14px;background:linear-gradient(135deg,rgba(240,192,64,0.08),rgba(62,207,142,0.05));border:1px solid rgba(240,192,64,0.3);border-radius:14px;">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div style="font-weight:800;">🤖 Consumo de IA</div><div style="text-align:right;"><div style="font-size:10px;color:var(--muted);">Total este mes</div><div style="font-weight:800;color:#3ecf8e;font-size:16px;">'+f(mesTotal)+'</div></div></div>'
+    +'<div onclick="toggleAiBox()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;"><div style="font-weight:800;">🤖 Consumo de IA <span style="color:var(--muted);font-size:12px;font-weight:600;">· mes '+f(mesTotal)+'</span></div><span id="ai-arrow" class="coll-arrow">'+(col?'▸':'▾')+'</span></div>'
+    +'<div id="ai-detail" style="'+(col?'display:none;':'')+'margin-top:6px;">'
     +row('📦','Bot eBay',ebayMes,ebayTot,ebayN,'anuncios')
     +row('🌐','Bot web',siteMes,siteTot,siteN,'conversaciones')
     +row('🛟','Bot ayuda',helpMes,helpTot,helpN,'consultas')
-    +'<div style="font-size:10px;color:var(--faint);margin-top:8px;line-height:1.4;">Solo informativo. No es un gasto en Finanzas — aquí se registra la recarga de crédito de IA, no el consumo.</div></div>';
+    +'<div style="font-size:10px;color:var(--faint);margin-top:8px;line-height:1.4;">Solo informativo. No es un gasto en Finanzas — aquí se registra la recarga de crédito de IA, no el consumo.</div></div></div>';
 }
+window.toggleAiBox=function(){ const el=document.getElementById('ai-detail'); if(!el) return; const show=el.style.display==='none'; el.style.display=show?'':'none'; const ar=document.getElementById('ai-arrow'); if(ar) ar.textContent=show?'▾':'▸'; try{ localStorage.setItem('lmg_ai_col', show?'0':'1'); }catch(e){} };
 function startListening(){
   onSnapshot(doc(db,'config','aiUsage'), s=>{ _aiUsage = s.exists()? s.data() : null; renderAiUsage(); }, err=>console.log('aiUsage', err));
   onSnapshot(collection(db,'subscriptions'), snap=>{
