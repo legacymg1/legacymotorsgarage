@@ -2355,9 +2355,13 @@ window.qOpen=function(idx){ const it=_qItems[idx]; if(!it) return; if(it.partId)
 function qThumbs(idx){
   const it=_qItems[idx]; const photos=(it&&it.photos)||[];
   if(!photos.length) return '<div class="sub" style="margin:8px 0;color:#ff9a9a;">'+t('manualNoPhotos')+'</div>';
-  let h='<div class="thumbs" style="display:flex;gap:8px;overflow-x:auto;margin:10px 0;">';
-  h+=photos.slice(0,3).map(u=>'<img src="'+u+'" onclick="openQueuePhotos('+idx+')" style="width:92px;height:92px;object-fit:cover;border-radius:10px;flex:0 0 auto;cursor:pointer;">').join('');
-  if(photos.length>3) h+='<div onclick="openQueuePhotos('+idx+')" style="width:92px;height:92px;border-radius:10px;flex:0 0 auto;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;cursor:pointer;">+'+(photos.length-3)+'</div>';
+  const extra=photos.length-3;
+  // Exactamente 3 fotos en una línea (sin cajón extra). Si hay más, un "+N" ENCIMA de la 3ª foto → toca cualquiera y salen todas.
+  let h='<div class="thumbs" style="display:flex;gap:8px;margin:10px 0;">';
+  h+=photos.slice(0,3).map((u,i)=>{
+    const badge=(i===2 && extra>0)?'<div style="position:absolute;inset:0;background:rgba(0,0,0,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;border-radius:10px;">+'+extra+'</div>':'';
+    return '<div onclick="openQueuePhotos('+idx+')" style="position:relative;width:31%;aspect-ratio:1;flex:1 1 0;min-width:0;cursor:pointer;"><img src="'+u+'" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">'+badge+'</div>';
+  }).join('');
   return h+'</div>';
 }
 // 🔧 FLUJO MANUAL: la venta de eBay no está ligada a una pieza. Abre la foto (3, tap = todas), lee el número, escríbelo y encuéntrala; o si NO está en el sistema, el botón de abajo.
