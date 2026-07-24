@@ -504,6 +504,15 @@ WAREHOUSE — LISTADO (para el que sube a eBay):
 • Luego "🔄 Actualizar borrador" y cuando esté bien "🚀 Publicar (en vivo)".
 • El orden de la lista es del más viejo arriba al más nuevo abajo (hazlos en orden). Los airbags salen en su sección aparte abajo.
 
+WAREHOUSE — EMPAQUE (para el que empaca y envía, con la Sunmi en el shop):
+• 🔎 "Busca tu parte" (caja de arriba): escribe el número de estampa o el nombre. Las de eBay con SKU no hace falta buscarlas.
+• Cuando aparece la pieza, toca la foto para agrandarla y deslizarla; luego toca "✅ Es esta pieza".
+• Sale "📍 Sácala del bin": ve al bin que indica, saca la pieza y, para confirmar que la tienes, teclea o escanea con el láser el número directo de la pieza (o toca "✅ Sí, ya la tengo"). Si escaneas una que NO es, te avisa y te deja reintentar sin sacarte.
+• Si NO la encuentras, toca "❌ No la encuentro": la deja pendiente y avisa a los supervisores en el chat.
+• Ya confirmada, abre "📦 Empaca tu producto": tips, medidas de la caja, y el PESO (escribes lo que sale en la báscula en libras, ej. 15.85, y se convierte solo a lb + oz). Toca "✅ Empacado y listo" → animación de enviado.
+• Si marcaste una por error como vendida, búscala y toca "↩️ Regresar a inventario".
+• 🛠️ Herramientas de almacén (caja de abajo, se minimiza): "📥 Recibir / asignar ubicación" (piezas que llegan de la yarda sin bin: escanea o teclea el número y asígnale su bin), "🏷️ Alta de pieza vieja" (mete piezas viejas con estampa + bin), y "📦 Consolidar bins" (junta bins con pocas piezas: elige uno, muévelo a otro, y te dice apartar el bin vacío para Captura).
+
 CHAT INTERNO (la burbuja 💬):
 • Tiene varios canales según tu rol. Para reaccionar a un mensaje, déjalo apretado y elige un emoji. Para ocultar un chat, deslízalo a la izquierda.
 • Activa las notificaciones tocando "🔔 Activar" para que no se te escape ningún mensaje.
