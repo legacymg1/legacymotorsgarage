@@ -751,7 +751,15 @@ exports.ebayConsent = onRequest({ secrets: [EBAY_APP_ID] }, (req, res) => {
 // 📦 Órdenes vendidas SIN enviar (Fulfillment API getOrders) → cola "Por enviar" para Empaque.
 // Devuelve datos crudos por orden (SKU, título, cantidad, fecha límite de envío, comprador); el front hace el match SKU→parte (bin/foto).
 const EBAY_FULFILL_SCOPE = "https://api.ebay.com/oauth/api_scope/sell.fulfillment";
-exports.ebayOrders = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (request) => {
+// Fotos REALES del anuncio de eBay (Trading API GetItem → PictureDetails.PictureURL). Para mostrarlas en la cola de Empaque.
+async function ebayListingPhotos(itemId){
+  if (!itemId) return [];
+  try {
+    const xml = await ebayXml("GetItem", "<ItemID>" + itemId + "</ItemID><OutputSelector>PictureDetails.PictureURL</OutputSelector>");
+    return ebayTags(xml, "PictureURL").map((u) => u.replace(/&amp;/g, "&").trim()).filter(Boolean).slice(0, 24);
+  } catch (e) { return []; }
+}
+exports.ebayOrders = onCall({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const a = await ebayUserAccessToken(EBAY_FULFILL_SCOPE);
   if (!a.token) {
@@ -790,6 +798,11 @@ exports.ebayOrders = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_RE
   });
   // Ordena por fecha límite de envío (los sin fecha, por fecha de creación) — HOY primero.
   orders.sort((a2, b2) => (a2.shipBy || a2.createdAt || "").localeCompare(b2.shipBy || b2.createdAt || ""));
+  // Enriquece con las fotos REALES del anuncio de eBay (una llamada GetItem por artículo único, en paralelo). Cap 60 para no abusar.
+  const ids = [...new Set(orders.flatMap((o) => (o.items || []).map((i) => i.itemId).filter(Boolean)))].slice(0, 60);
+  const photoMap = {};
+  await Promise.all(ids.map(async (id) => { photoMap[id] = await ebayListingPhotos(id); }));
+  orders.forEach((o) => (o.items || []).forEach((i) => { i.photos = (i.itemId && photoMap[i.itemId]) || []; }));
   return { ok: true, count: orders.length, orders };
 });
 

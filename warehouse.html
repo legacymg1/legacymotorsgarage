@@ -1051,7 +1051,7 @@ function detailPartCard(p){
 }
 // Ver foto GRANDE en una capa aparte (encima de todo). Al cerrar solo se quita la capa → sigues DENTRO de la parte.
 // 🖼️ Visor de fotos con SWIPE: abre una y deslizas entre todas (flechas en compu, tocar afuera cierra)
-window.openPhoto=function(url, all, idx){
+window.openPhoto=function(url, all, idx, onClose){
   const urls=(Array.isArray(all)&&all.length)?all:[url];
   let i=(typeof idx==='number')?idx:Math.max(0,urls.indexOf(url)); if(i<0)i=0;
   const ov=document.createElement('div'); ov.className='lmg-photo-ov';
@@ -1064,7 +1064,7 @@ window.openPhoto=function(url, all, idx){
   prev.style.left='10px'; next.style.right='10px'; prev.textContent='‹'; next.textContent='›';
   function show(){ img.src=urls[i]; cap.textContent=(urls.length>1?((i+1)+' / '+urls.length+' · '):'')+(L==='es'?(urls.length>1?'desliza · toca afuera para cerrar':'toca afuera para cerrar'):(urls.length>1?'swipe · tap outside to close':'tap outside to close')); }
   function go(d){ if(urls.length<2) return; i=(i+d+urls.length)%urls.length; show(); }
-  function close(){ document.removeEventListener('keydown',onKey); ov.remove(); }
+  function close(){ document.removeEventListener('keydown',onKey); ov.remove(); if(typeof onClose==='function'){ try{ onClose(); }catch(_){} } }
   prev.onclick=(e)=>{ e.stopPropagation(); go(-1); }; next.onclick=(e)=>{ e.stopPropagation(); go(1); };
   ov.onclick=(e)=>{ e.stopPropagation(); close(); };   // cerrar la foto NO debe cerrar la vista de abajo (Empaque)
   img.onclick=(e)=>{ e.stopPropagation(); if(urls.length<2) close(); };
@@ -2307,29 +2307,38 @@ window.loadEbayQueue=async function(force){
   }catch(e){ _ebayQLoading=false; box.innerHTML='<div class="card"><div class="sub" style="color:#ff8a8a;">📦 '+t('qError')+' '+esc((e&&e.message)||e)+'</div><button class="btn ghost sm" style="margin-top:8px;" onclick="loadEbayQueue(true)">'+t('qRetry')+'</button></div>'; }
 };
 function matchPartBySku(sku){ if(!sku) return null; return parts.find(p=>(p.stickerNum||'')===String(sku)) || parts.find(p=>p.id===String(sku)) || null; }
+let _qItems=[];   // registro por artículo de la cola: {photos, title, partId} → para clic en foto/parte sin meter comillas en el HTML
 function renderEbayQueue(){
   const box=document.getElementById('pack-ebayqueue'); if(!box) return;
-  const orders=_ebayQ||[];
+  const orders=_ebayQ||[]; _qItems=[];
   const head='<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 2px 8px;"><span style="font-weight:800;">📦 '+t('qTitle')+' ('+orders.length+')</span><button class="btn ghost sm" style="flex:0 0 auto;" onclick="loadEbayQueue(true)">↻</button></div>';
   if(!orders.length){ box.innerHTML=head+'<div class="card"><div class="sub">'+t('qEmpty')+'</div></div>'; return; }
   box.innerHTML=head+orders.map(o=>{
     const sb=shipByLabel(o.shipBy||o.createdAt);
     const items=(o.items||[]).map(it=>{
       const p=matchPartBySku(it.sku);
-      const u=p?((p.photoURLs||[]).find(x=>x&&!/00_QR/.test(x))||''):'';
-      const th=u?'<img src="'+u+'" style="width:46px;height:46px;object-fit:cover;border-radius:8px;flex:0 0 auto;">':'<div style="width:46px;height:46px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">📦</div>';
+      // Fotos: primero las REALES del anuncio de eBay; si no vinieron, las de nuestra parte.
+      const photos=(it.photos&&it.photos.length)?it.photos:(p?((p.photoURLs||[]).filter(x=>x&&!/00_QR/.test(x))):[]);
+      const qi=_qItems.push({photos:photos, title:(it.title||''), partId:(p?p.id:'')})-1;
+      const thumb=photos[0]||'';
+      const th=thumb
+        ? '<img src="'+thumb+'" onclick="event.stopPropagation();openQueuePhotos('+qi+')" style="width:52px;height:52px;object-fit:cover;border-radius:8px;flex:0 0 auto;cursor:pointer;">'
+        : '<div style="width:52px;height:52px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">📦</div>';
       const bin=p?('📍 '+locText(p)):('<span style="color:#ff8a8a;">'+t('qNoMatch')+'</span>');
       const sku=it.sku?('🏷️ '+esc(it.sku)):'';
-      const btn=p?('<button class="btn sm" style="flex:0 0 auto;" onclick="packFromQueue(\''+p.id+'\')">'+t('confirmSellBtn')+'</button>')
-                 :('<button class="btn ghost sm" style="flex:0 0 auto;" onclick="document.getElementById(\'scan-input\').value=\''+esc(it.title||'').replace(/'/g,"")+'\';scanLookup()">'+t('searchBtn')+'</button>');
-      return '<div style="display:flex;gap:10px;align-items:center;padding:9px 2px;border-top:1px solid var(--border);">'+th
-        +'<div style="flex:1;min-width:0;"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(it.title||t('qItem'))+(it.qty>1?(' ×'+it.qty):'')+'</div><div class="sub">'+[sku,bin].filter(Boolean).join(' · ')+'</div></div>'+btn+'</div>';
+      return '<div onclick="qOpen('+qi+')" style="display:flex;gap:10px;align-items:center;padding:10px 2px;border-top:1px solid var(--border);cursor:pointer;">'+th
+        +'<div style="flex:1;min-width:0;"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(it.title||t('qItem'))+(it.qty>1?(' ×'+it.qty):'')+'</div><div class="sub">'+[sku,bin].filter(Boolean).join(' · ')+'</div></div>'
+        +'<span style="flex:0 0 auto;color:var(--muted);font-size:20px;">›</span></div>';
     }).join('');
     return '<div class="card" style="margin-bottom:10px;padding:12px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">'
       +'<span style="font-size:12px;font-weight:800;border-radius:20px;padding:2px 10px;background:'+sb.c+'22;color:'+sb.c+';border:1px solid '+sb.c+'66;white-space:nowrap;">🚚 '+sb.txt+'</span>'
       +'<span class="sub" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(o.buyer?('👤 '+esc(o.buyer)):'')+'</span></div>'+items+'</div>';
   }).join('');
 }
+// Clic en la PARTE (renglón) → abre la secuencia de la parte (¿es esta? → sácala del bin → empaca). Si no cruzó con inventario, busca por título.
+window.qOpen=function(idx){ const it=_qItems[idx]; if(!it) return; if(it.partId){ packFromQueue(it.partId); } else { const inp=document.getElementById('scan-input'); if(inp){ inp.value=it.title||''; scanLookup(); } } };
+// Clic en la FOTO → galería con swipe (fotos del anuncio de eBay); al cerrar (clic afuera) te deja en la parte; cerrar la parte te regresa a la lista.
+window.openQueuePhotos=function(idx){ const it=_qItems[idx]; if(!it) return; const urls=it.photos||[]; if(!urls.length){ qOpen(idx); return; } openPhoto(urls[0], urls, 0, ()=>{ if(it.partId) packFromQueue(it.partId); }); };
 // Confirmar desde la cola = mismo flujo de siempre (buscar por sticker/id → "Sácala del bin" → empacar).
 window.packFromQueue=function(id){ packPick(id); const r=document.getElementById('pack-result'); if(r) r.scrollIntoView({block:'center',behavior:'smooth'}); };
 let _camStream=null;
