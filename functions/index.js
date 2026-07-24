@@ -510,7 +510,9 @@ WAREHOUSE — EMPAQUE (para el que empaca y envía, con la Sunmi en el shop):
 • Sale "📍 Sácala del bin": ve al bin que indica, saca la pieza y, para confirmar que la tienes, teclea o escanea con el láser el número directo de la pieza (o toca "✅ Sí, ya la tengo"). Si escaneas una que NO es, te avisa y te deja reintentar sin sacarte.
 • Si NO la encuentras, toca "❌ No la encuentro": la deja pendiente y avisa a los supervisores en el chat.
 • Ya confirmada, abre "📦 Empaca tu producto": tips, medidas de la caja, y el PESO (escribes lo que sale en la báscula en libras, ej. 15.85, y se convierte solo a lb + oz). Toca "✅ Empacado y listo" → animación de enviado.
+• 🚦 SEMÁFORO (la pieza NO se cambia de sección, solo cambia de color en su lugar): 🟢 Publicada → 🟤 Empaquetando (café, cuando terminas de empacar) → 🟣 En tránsito (morado; toca "🚚 Marcar como enviada" cuando ya la mandaste) → 🟡 VENDIDA (dorado; toca "💵 Marcar como VENDIDA" cuando eBay pagó). Cada paso queda registrado para las métricas. Si te equivocaste de estado, la misma pieza tiene el botón para regresarla.
 • Si marcaste una por error como vendida, búscala y toca "↩️ Regresar a inventario".
+• El teclado nunca tapa los buscadores: al escribir, el panel sube solo y baja cuando cierras el teclado.
 • 🛠️ Herramientas de almacén (caja de abajo, se minimiza): "📥 Recibir / asignar ubicación" (piezas que llegan de la yarda sin bin: escanea o teclea el número y asígnale su bin), "🏷️ Alta de pieza vieja" (mete piezas viejas con estampa + bin), y "📦 Consolidar bins" (junta bins con pocas piezas: elige uno, muévelo a otro, y te dice apartar el bin vacío para Captura).
 
 CHAT INTERNO (la burbuja 💬):
