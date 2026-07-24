@@ -60,21 +60,24 @@ function makeDraggable(fab,key){
   // ⌨️ Cuando el teclado abre (en cualquier buscador de la app), levanta la burbuja para que no la tape; al cerrar, regresa.
   // Funciona en 2 modos: (1) si el equipo reporta el teclado (visualViewport) → medida exacta; (2) si NO lo reporta
   // (Sunmi/Android industrial con IME propio) → al enfocar un campo levanta con un estimado y regresa al desenfocar.
-  let _kbFocus=false;
+  let _kbFocus=false, _kbReports=false;
   function measuredKb(){ const vv=window.visualViewport; if(!vv) return 0; return Math.max(0, Math.round(window.innerHeight-vv.height-(vv.offsetTop||0))); }
+  function isField(t){ const tag=(t&&t.tagName||'').toLowerCase(); return tag==='input'||tag==='textarea'||tag==='select'||(t&&t.isContentEditable); }
   function liftForKb(){
     if(fab.style.display==='none'){ fab.style.transform=''; return; }
     let kb=measuredKb();
-    if(kb<=120 && _kbFocus) kb=Math.round(window.innerHeight*0.42);   // teclado no reportado → estimado
-    if(kb<=120){ fab.style.transform=''; return; }
+    if(kb>120) _kbReports=true;                                        // el equipo SÍ reporta el teclado → confiamos en la medida
+    if(kb<=120 && _kbFocus && !_kbReports) kb=Math.round(window.innerHeight*0.42);   // equipo que NO reporta (Sunmi) → estimado
+    if(kb<=120){ fab.style.transform=''; return; }                     // sin teclado → regresa la burbuja
     fab.style.transform='';                                            // medir posición real
     const r=fab.getBoundingClientRect(), vv=window.visualViewport;
-    const kbTop = vv ? ((vv.offsetTop||0)+vv.height) : (window.innerHeight-kb);
+    const kbTop = (_kbReports && vv) ? ((vv.offsetTop||0)+vv.height) : (window.innerHeight-kb);
     const over = r.bottom-kbTop+12;
     if(over>0) fab.style.transform='translateY(-'+Math.round(over)+'px)';
   }
-  document.addEventListener('focusin',(e)=>{ const t=e.target, tag=(t&&t.tagName||'').toLowerCase(); if(tag==='input'||tag==='textarea'||tag==='select'||(t&&t.isContentEditable)){ _kbFocus=true; setTimeout(liftForKb,300); } });
-  document.addEventListener('focusout',()=>{ _kbFocus=false; setTimeout(liftForKb,200); });
+  document.addEventListener('focusin',(e)=>{ if(isField(e.target)){ _kbFocus=true; setTimeout(liftForKb,300); } });
+  document.addEventListener('focusout',()=>{ _kbFocus=false; setTimeout(liftForKb,250); });
+  document.addEventListener('pointerdown',(e)=>{ if(!isField(e.target)){ _kbFocus=false; setTimeout(liftForKb,300); } },true);   // tocar afuera de un campo → baja la burbuja (respaldo para equipos que no avisan al cerrar teclado)
   if(window.visualViewport){ window.visualViewport.addEventListener('resize',liftForKb); window.visualViewport.addEventListener('scroll',liftForKb); }
 }
 function build(){
