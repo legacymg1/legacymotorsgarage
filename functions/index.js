@@ -395,7 +395,8 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
       const iso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
       todayStr = ld + " (" + iso + ")";
     } catch (e) { todayStr = new Date().toISOString().slice(0, 10); }
-    const system = buildSitePrompt(cars.length ? cars.join("\n") : "(ask and we'll check availability)", todayStr);
+    // 🧠 Prompt caching: el prompt grande (persona + curso de cierre + inventario) se cachea y se reusa en cada mensaje → baja el costo de entrada 50-90%.
+    const system = [{ type: "text", text: buildSitePrompt(cars.length ? cars.join("\n") : "(ask and we'll check availability)", todayStr), cache_control: { type: "ephemeral" } }];
     const AnthropicMod = require("@anthropic-ai/sdk");
     const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
     const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
@@ -522,7 +523,8 @@ exports.helpChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
     const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
     const messages = msgsIn.filter((m) => m && m.content).map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content).slice(0, 1200) }));
     if (!messages.length || messages[0].role !== "user") messages.unshift({ role: "user", content: "Hola" });
-    const msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 600, system: HELP_PROMPT, messages });
+    // 🧠 Prompt caching: el manual grande (HELP_PROMPT) se cachea y se reusa en cada pregunta → baja el costo de entrada.
+    const msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 600, system: [{ type: "text", text: HELP_PROMPT, cache_control: { type: "ephemeral" } }], messages });
     const reply = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
     try {
       const u = msg.usage || {};
