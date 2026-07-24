@@ -185,10 +185,12 @@
   <!-- ===================== EMPAQUE ===================== -->
   <div id="view-pack" style="display:none;">
     <div id="pack-scanbox" class="card" style="margin-bottom:12px;">
-      <div style="font-weight:800;margin-bottom:8px;" data-i18n="scanTitle">🔎 Busca una parte</div>
-      <div class="row2">
-        <input id="scan-input" name="scancode" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-i18n-ph="scanPh" placeholder="Escanea o pega el código…" onkeydown="if(event.key==='Enter')scanLookup()">
-        <button class="btn sm" style="flex:0 0 auto;" onclick="scanLookup()" data-i18n="searchBtn">Buscar</button>
+      <div onclick="toggleScan()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:800;user-select:none;"><span data-i18n="scanTitle">🔎 Busca una parte</span><span id="scan-arrow">▸</span></div>
+      <div id="scan-body" style="display:none;margin-top:10px;">
+        <div class="row2">
+          <input id="scan-input" name="scancode" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-i18n-ph="scanPh" placeholder="Escanea o pega el código…" onkeydown="if(event.key==='Enter')scanLookup()">
+          <button class="btn sm" style="flex:0 0 auto;" onclick="scanLookup()" data-i18n="searchBtn">Buscar</button>
+        </div>
       </div>
     </div>
     <div id="pack-ebayqueue" style="margin-bottom:12px;"></div>
@@ -470,7 +472,7 @@ window.setView=function(k){
   document.getElementById('view-pack').style.display   = k==='pack'?'':'none';
   if(k==='yard') renderVehicles();
   if(k==='lister') renderLister();
-  if(k==='pack'){ _pendingConfirm=''; _packMode='find'; renderPending(); loadEbayQueue(); setTimeout(()=>{ const s=document.getElementById('scan-input'); if(s) s.focus(); }, 120); }   // escáner + cola de eBay listos al entrar
+  if(k==='pack'){ _pendingConfirm=''; _packMode='find'; renderPending(); loadEbayQueue(); }   // cola de eBay lista al entrar; el buscador queda minimizado
 };
 
 // ---- 💬 CHAT INTERNO multi-canal (tiempo real) ----
@@ -2255,6 +2257,8 @@ window.undoSold=async function(id){
 };
 // 🛠️ Minimizar la caja de herramientas
 window.toggleTools=function(){ const b=document.getElementById('tools-body'), a=document.getElementById('tools-arrow'); if(!b) return; const show=b.style.display==='none'; b.style.display=show?'':'none'; if(a) a.textContent=show?'▾':'▸'; try{ localStorage.setItem('pk_tools_col', show?'0':'1'); }catch(e){} };
+// 🔎 "Busca una parte" arranca minimizada (uso ocasional). Se abre al tocar el título.
+window.toggleScan=function(){ const b=document.getElementById('scan-body'), a=document.getElementById('scan-arrow'); if(!b) return; const show=b.style.display==='none'; b.style.display=show?'block':'none'; if(a) a.textContent=show?'▾':'▸'; if(show){ const i=document.getElementById('scan-input'); if(i) i.focus(); } };
 // 📦 CONSOLIDAR BINS: junta bins con pocas piezas. Cuenta piezas por bin, elige origen→destino, mueve todo, aparta el vacío.
 function binCounts(){ const m={}; parts.forEach(p=>{ const b=(p.location&&p.location.bin)||''; if(!b||p.status==='vendido'||b==='AIRBAGS') return; m[b]=(m[b]||0)+1; }); return m; }
 window.openConsolidar=function(){

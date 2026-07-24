@@ -1,6 +1,6 @@
 // Service worker de Legacy Warehouse — controla la app del almacén: caché OFFLINE + NOTIFICACIONES (FCM).
 // Un SOLO service worker (antes había dos y chocaban → sacaba la sesión y no limpiaba notificaciones).
-const CACHE = 'legacy-wh-v10';
+const CACHE = 'legacy-wh-v11';
 const SHELL = ['./warehouse.html','./manifest-warehouse.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 
 // ---- 🔔 FCM (notificaciones) dentro de este mismo SW ----
