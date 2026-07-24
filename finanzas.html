@@ -1260,8 +1260,9 @@ window.renderCorte = function(){
   if(_lc){ if(_lc.fondoDealerCents!=null || _lc.fondoPartsCents!=null){ carried.dealer=_lc.fondoDealerCents||0; carried.parts=_lc.fondoPartsCents||0; } else if((_lc.fondoCents||0)>0){ carried[_lc.fondoDept||'dealer']=_lc.fondoCents; } }
   const dNet=dIn-dEx+carried.dealer, pNet=pIn-pEx+carried.parts, totalNet=dNet+pNet;
   // Devoluciones del período (reversas marcadas): ese dinero va a FONDO de su caja, NO se reparte
+  // Las devoluciones NO van a un fondo aparte: el dinero se trata como EFECTIVO en caja (ya sube en "💵 Efectivo en caja ahora")
+  // y fluye normal (reduce gastos, al final se reparte). NO es una venta nueva (no es ingreso). Por eso devFondo queda en cero.
   const devFondo={dealer:0,parts:0};
-  ['dealer','parts'].forEach(dd=>{ data[dd].exp.forEach(tx=>{ if(tx.type==='expense_reversal' && tx.devolucion) devFondo[dd]+=(Number(tx.amountCents)||0); }); });
   const listBlock=(title,color,items,total)=>
     '<div style="font-size:13px;font-weight:800;color:'+color+';margin:16px 0 4px;">'+title+'</div>'
     +'<div style="max-height:220px;overflow:auto;">'+_pnlListHtml(items)+'</div>'
@@ -1352,11 +1353,7 @@ window.confirmCierre = async function(){
     await setDoc(doc(db,'transactions',closingId), {
       entryId:closingId, type:'closing', amountCents:0, date:day, closedAt:now,
       dealerNetCents:s.dNet, partesNetCents:s.pNet, totalCents:s.total,
-      oweCents:s.owe, oweDir:s.oweDir,
-      // Solo el fondo MANUAL se carga al siguiente corte (ese sí se reparte después).
-      // El dinero de DEVOLUCIONES se queda como efectivo en caja (no se reparte, no se cuenta como venta) → NO se carga al siguiente.
-      fondoCents:(s.manDealerCents||0)+(s.manPartsCents||0), fondoDealerCents:(s.manDealerCents||0), fondoPartsCents:(s.manPartsCents||0),
-      devFondoDealerCents:(s.devFondoDealer||0), devFondoPartsCents:(s.devFondoParts||0), fondoTotalCents:s.fondoCents,
+      oweCents:s.owe, oweDir:s.oweDir, fondoCents:s.fondoCents, fondoDealerCents:s.fondoDealerCents, fondoPartsCents:s.fondoPartsCents,
       repartirCents:s.repartir, cadaCents:s.cada, retiros:retiros.length,
       createdAt:now, createdBy:who, source:'finanzas'
     });
