@@ -607,6 +607,33 @@ window.chatBackToList=function(){
 function fitChatSheet(){ const sh=document.getElementById('chat-sheet'), vv=window.visualViewport; if(!sh||!vv) return; sh.style.bottom='auto'; sh.style.height=vv.height+'px'; sh.style.transform='translateY('+vv.offsetTop+'px)'; }
 function chatViewportOn(){ const vv=window.visualViewport; if(!vv) return; vv.addEventListener('resize',fitChatSheet); vv.addEventListener('scroll',fitChatSheet); fitChatSheet(); }
 function chatViewportOff(){ const vv=window.visualViewport, sh=document.getElementById('chat-sheet'); if(vv){ vv.removeEventListener('resize',fitChatSheet); vv.removeEventListener('scroll',fitChatSheet); } if(sh){ sh.style.height=''; sh.style.transform=''; sh.style.bottom='0'; } }
+// ⌨️ EMPAQUE: cuando el teclado abre en CUALQUIER buscador/campo de la sección, le damos espacio abajo al panel
+// y centramos el campo activo para que él y sus botones queden SIEMPRE visibles; al cerrar el teclado, todo regresa.
+(function(){
+  const packEl=()=>document.getElementById('view-pack');
+  function activePackField(){
+    const el=document.activeElement; if(!el) return null;
+    const tag=(el.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'&&tag!=='select') return null;
+    const pk=packEl(); if(!pk||pk.style.display==='none'||!pk.contains(el)) return null;
+    return el;
+  }
+  function fitPack(){
+    const pk=packEl(); if(!pk) return;
+    const vv=window.visualViewport;
+    const kb = vv ? Math.max(0, window.innerHeight - vv.height - (vv.offsetTop||0)) : 0;
+    const el = activePackField();
+    if(el && kb>120){                          // teclado abierto sobre un campo de Empaque
+      pk.style.paddingBottom=(kb+24)+'px';     // espacio extra para poder subir los botones sobre el teclado
+      try{ el.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_){ try{ el.scrollIntoView(); }catch(e){} }
+    } else {
+      pk.style.paddingBottom='';               // teclado cerrado → regresa el panel
+    }
+  }
+  document.addEventListener('focusin',()=>setTimeout(fitPack,250));   // espera a que el teclado termine de abrir
+  document.addEventListener('focusout',()=>setTimeout(fitPack,250));
+  if(window.visualViewport){ window.visualViewport.addEventListener('resize',()=>setTimeout(fitPack,50)); }
+})();
 // Limpia las notificaciones ya entregadas del teléfono. Las muestra el SW de FCM (firebase-messaging-sw.js),
 // que es OTRO registro → hay que recorrer TODOS los service workers.
 function clearChatNotifs(){ const go=()=>{ try{ if(!('serviceWorker' in navigator)) return; navigator.serviceWorker.getRegistrations().then(regs=>{ regs.forEach(r=>{ if(r.getNotifications) r.getNotifications().then(ns=>ns.forEach(n=>n.close())).catch(()=>{}); const w=r.active||r.waiting||r.installing; if(w) try{ w.postMessage({type:'lmg-clear-notifs'}); }catch(e){} }); }).catch(()=>{}); }catch(e){} }; go(); setTimeout(go,600); }
