@@ -768,31 +768,6 @@ async function ebayListingPhotos(itemId){
     return [...new Set(urls)].slice(0, 24);
   } catch (e) { return []; }
 }
-// 🧪 DIAGNÓSTICO TEMPORAL (protegido con token) — ver por qué no salen las fotos de la cola. Consultar: /ebayDiag?k=<EBAY_VERIFY_TOKEN>
-exports.ebayDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (req, res) => {
-  if (req.query.k !== EBAY_VERIFY_TOKEN) { res.status(403).json({ error: "forbidden" }); return; }
-  const out = {};
-  try {
-    const a = await ebayUserAccessToken(EBAY_FULFILL_SCOPE);
-    out.gotToken = !!a.token;
-    if (!a.token) { out.tokenErr = a.raw; res.json(out); return; }
-    const filter = encodeURIComponent("orderfulfillmentstatus:{NOT_STARTED|IN_PROGRESS}");
-    const r = await fetch("https://api.ebay.com/sell/fulfillment/v1/order?limit=5&filter=" + filter, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json", "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" } });
-    const j = await r.json().catch(() => ({}));
-    out.ordersStatus = r.status;
-    out.orderCount = (j.orders || []).length;
-    const li = ((((j.orders || [])[0] || {}).lineItems || [])[0]) || {};
-    out.firstLineItemKeys = Object.keys(li);
-    out.firstLegacyItemId = li.legacyItemId || null;
-    out.firstSku = li.sku || null;
-    if (li.legacyItemId) {
-      const pics = await ebayListingPhotos(li.legacyItemId);
-      out.pictureCount = pics.length;
-      out.firstPics = pics.slice(0, 2);
-    }
-  } catch (e) { out.err = (e && e.message) || String(e); }
-  res.json(out);
-});
 exports.ebayOrders = onCall({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const a = await ebayUserAccessToken(EBAY_FULFILL_SCOPE);
