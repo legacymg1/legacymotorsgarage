@@ -754,11 +754,18 @@ const EBAY_FULFILL_SCOPE = "https://api.ebay.com/oauth/api_scope/sell.fulfillmen
 // Fotos REALES del anuncio de eBay (Trading API GetItem → PictureDetails.PictureURL). Para mostrarlas en la cola de Empaque.
 async function ebayListingPhotos(itemId){
   if (!itemId) return [];
+  // Usa la Browse API con TOKEN DE APLICACIÓN (client_credentials) — se genera solo y NO se revoca (el Trading token viejo sí fue revocado).
   try {
-    // Sin OutputSelector (un selector mal formado devolvía vacío). GetItem por defecto ya trae PictureDetails.PictureURL.
-    const xml = await ebayXml("GetItem", "<ItemID>" + itemId + "</ItemID>");
-    const urls = ebayTags(xml, "PictureURL").map((u) => u.replace(/&amp;/g, "&").trim()).filter(Boolean);
-    return [...new Set(urls)].slice(0, 24);   // dedup (a veces repite la galería)
+    const tok = await ebayAppToken();
+    if (!tok) return [];
+    const r = await fetch("https://api.ebay.com/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=" + encodeURIComponent(itemId), {
+      headers: { "Authorization": "Bearer " + tok, "X-EBAY-C-MARKETPLACE-ID": "EBAY_US", "Accept": "application/json" },
+    });
+    const j = await r.json().catch(() => ({}));
+    const urls = [];
+    if (j && j.image && j.image.imageUrl) urls.push(j.image.imageUrl);
+    (j && j.additionalImages || []).forEach((im) => { if (im && im.imageUrl) urls.push(im.imageUrl); });
+    return [...new Set(urls)].slice(0, 24);
   } catch (e) { return []; }
 }
 // 🧪 DIAGNÓSTICO TEMPORAL (protegido con token) — ver por qué no salen las fotos de la cola. Consultar: /ebayDiag?k=<EBAY_VERIFY_TOKEN>
@@ -779,12 +786,9 @@ exports.ebayDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID,
     out.firstLegacyItemId = li.legacyItemId || null;
     out.firstSku = li.sku || null;
     if (li.legacyItemId) {
-      const xml = await ebayXml("GetItem", "<ItemID>" + li.legacyItemId + "</ItemID>");
-      out.getItemAck = (ebayTags(xml, "Ack")[0] || "").slice(0, 30);
-      out.getItemErrors = ebayTags(xml, "LongMessage").slice(0, 3);
-      out.pictureCount = ebayTags(xml, "PictureURL").length;
-      out.firstPics = ebayTags(xml, "PictureURL").slice(0, 2);
-      out.xmlLen = xml.length;
+      const pics = await ebayListingPhotos(li.legacyItemId);
+      out.pictureCount = pics.length;
+      out.firstPics = pics.slice(0, 2);
     }
   } catch (e) { out.err = (e && e.message) || String(e); }
   res.json(out);

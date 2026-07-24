@@ -39,8 +39,12 @@ function makeDraggable(fab,key){
     var over = r.bottom-kbTop+12;
     if(over>0) fab.style.transform='translateY(-'+Math.round(over)+'px)';
   }
-  document.addEventListener('focusin',function(e){ if(isField(e.target)){ _kbFocus=true; setTimeout(liftForKb,300); } });
-  document.addEventListener('focusout',function(){ _kbFocus=false; setTimeout(liftForKb,250); });
+  // Sondeo periódico: reevalúa la posición aunque el equipo NO dispare eventos (así baja sola al cerrar el teclado en la Sunmi).
+  var _kbPoll=null;
+  function startKbPoll(){ if(!_kbPoll) _kbPoll=setInterval(liftForKb,300); }
+  function stopKbPoll(){ if(_kbPoll){ clearInterval(_kbPoll); _kbPoll=null; } }
+  document.addEventListener('focusin',function(e){ if(isField(e.target)){ _kbFocus=true; startKbPoll(); setTimeout(liftForKb,300); } });
+  document.addEventListener('focusout',function(){ _kbFocus=false; setTimeout(liftForKb,250); setTimeout(function(){ if(!_kbFocus) stopKbPoll(); liftForKb(); },1400); });
   document.addEventListener('pointerdown',function(e){ if(!isField(e.target)){ _kbFocus=false; setTimeout(liftForKb,300); } },true);   // tocar afuera de un campo → baja la burbuja (respaldo para equipos que no avisan al cerrar teclado)
   if(window.visualViewport){ window.visualViewport.addEventListener('resize',liftForKb); window.visualViewport.addEventListener('scroll',liftForKb); }
 }
