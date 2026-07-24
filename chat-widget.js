@@ -57,6 +57,9 @@ function makeDraggable(fab,key){
   fab.addEventListener('pointerup',()=>{ if(sx==null) return; sx=null; if(moved){ const pos=snapToEdge(); try{ localStorage.setItem(key,JSON.stringify(pos)); }catch(_){} setTimeout(()=>{ fab._dragged=false; },60); } });
   fab.addEventListener('click',(e)=>{ if(fab._dragged){ e.stopImmediatePropagation(); e.preventDefault(); fab._dragged=false; } },true);
   window.addEventListener('resize',()=>{ if(!hasPos) return; const r=fab.getBoundingClientRect(); applyPos(r.left,r.top); });
+  // ⌨️ Cuando el teclado abre (en cualquier buscador de la app), levanta la burbuja justo lo que el teclado le tapa; al cerrar, regresa.
+  function liftForKb(){ const vv=window.visualViewport; if(!vv) return; if(fab.style.display==='none'){ fab.style.transform=''; return; } fab.style.transform='none'; const r=fab.getBoundingClientRect(); const over=r.bottom-(vv.offsetTop+vv.height)+10; fab.style.transform=(over>0)?('translateY(-'+over+'px)'):''; }
+  if(window.visualViewport){ window.visualViewport.addEventListener('resize',liftForKb); window.visualViewport.addEventListener('scroll',liftForKb); }
 }
 function build(){
   if(document.getElementById('lcw-fab')) return;
