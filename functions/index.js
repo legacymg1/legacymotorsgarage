@@ -755,8 +755,10 @@ const EBAY_FULFILL_SCOPE = "https://api.ebay.com/oauth/api_scope/sell.fulfillmen
 async function ebayListingPhotos(itemId){
   if (!itemId) return [];
   try {
-    const xml = await ebayXml("GetItem", "<ItemID>" + itemId + "</ItemID><OutputSelector>PictureDetails.PictureURL</OutputSelector>");
-    return ebayTags(xml, "PictureURL").map((u) => u.replace(/&amp;/g, "&").trim()).filter(Boolean).slice(0, 24);
+    // Sin OutputSelector (un selector mal formado devolvía vacío). GetItem por defecto ya trae PictureDetails.PictureURL.
+    const xml = await ebayXml("GetItem", "<ItemID>" + itemId + "</ItemID>");
+    const urls = ebayTags(xml, "PictureURL").map((u) => u.replace(/&amp;/g, "&").trim()).filter(Boolean);
+    return [...new Set(urls)].slice(0, 24);   // dedup (a veces repite la galería)
   } catch (e) { return []; }
 }
 exports.ebayOrders = onCall({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
