@@ -57,8 +57,24 @@ function makeDraggable(fab,key){
   fab.addEventListener('pointerup',()=>{ if(sx==null) return; sx=null; if(moved){ const pos=snapToEdge(); try{ localStorage.setItem(key,JSON.stringify(pos)); }catch(_){} setTimeout(()=>{ fab._dragged=false; },60); } });
   fab.addEventListener('click',(e)=>{ if(fab._dragged){ e.stopImmediatePropagation(); e.preventDefault(); fab._dragged=false; } },true);
   window.addEventListener('resize',()=>{ if(!hasPos) return; const r=fab.getBoundingClientRect(); applyPos(r.left,r.top); });
-  // ⌨️ Cuando el teclado abre (en cualquier buscador de la app), levanta la burbuja justo lo que el teclado le tapa; al cerrar, regresa.
-  function liftForKb(){ const vv=window.visualViewport; if(!vv) return; if(fab.style.display==='none'){ fab.style.transform=''; return; } fab.style.transform='none'; const r=fab.getBoundingClientRect(); const over=r.bottom-(vv.offsetTop+vv.height)+10; fab.style.transform=(over>0)?('translateY(-'+over+'px)'):''; }
+  // ⌨️ Cuando el teclado abre (en cualquier buscador de la app), levanta la burbuja para que no la tape; al cerrar, regresa.
+  // Funciona en 2 modos: (1) si el equipo reporta el teclado (visualViewport) → medida exacta; (2) si NO lo reporta
+  // (Sunmi/Android industrial con IME propio) → al enfocar un campo levanta con un estimado y regresa al desenfocar.
+  let _kbFocus=false;
+  function measuredKb(){ const vv=window.visualViewport; if(!vv) return 0; return Math.max(0, Math.round(window.innerHeight-vv.height-(vv.offsetTop||0))); }
+  function liftForKb(){
+    if(fab.style.display==='none'){ fab.style.transform=''; return; }
+    let kb=measuredKb();
+    if(kb<=120 && _kbFocus) kb=Math.round(window.innerHeight*0.42);   // teclado no reportado → estimado
+    if(kb<=120){ fab.style.transform=''; return; }
+    fab.style.transform='';                                            // medir posición real
+    const r=fab.getBoundingClientRect(), vv=window.visualViewport;
+    const kbTop = vv ? ((vv.offsetTop||0)+vv.height) : (window.innerHeight-kb);
+    const over = r.bottom-kbTop+12;
+    if(over>0) fab.style.transform='translateY(-'+Math.round(over)+'px)';
+  }
+  document.addEventListener('focusin',(e)=>{ const t=e.target, tag=(t&&t.tagName||'').toLowerCase(); if(tag==='input'||tag==='textarea'||tag==='select'||(t&&t.isContentEditable)){ _kbFocus=true; setTimeout(liftForKb,300); } });
+  document.addEventListener('focusout',()=>{ _kbFocus=false; setTimeout(liftForKb,200); });
   if(window.visualViewport){ window.visualViewport.addEventListener('resize',liftForKb); window.visualViewport.addEventListener('scroll',liftForKb); }
 }
 function build(){
