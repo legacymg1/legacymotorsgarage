@@ -733,6 +733,66 @@ exports.ebayOauthTest = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH
   return { ok: status >= 200 && status < 300, status, scope: scopeNote, body: (body || "").slice(0, 300) };
 });
 
+// 🔗 Re-autorización eBay con TODOS los permisos que usamos (inventario + cuenta + ÓRDENES/fulfillment).
+// Abre este enlace UNA vez, inicia sesión en eBay, acepta → el callback te da un refresh token NUEVO con permiso de leer órdenes.
+const EBAY_ALL_SCOPES = [
+  "https://api.ebay.com/oauth/api_scope",
+  "https://api.ebay.com/oauth/api_scope/sell.inventory",
+  "https://api.ebay.com/oauth/api_scope/sell.account",
+  "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
+].join(" ");
+exports.ebayConsent = onRequest({ secrets: [EBAY_APP_ID] }, (req, res) => {
+  const url = "https://auth.ebay.com/oauth2/authorize?client_id=" + encodeURIComponent(EBAY_APP_ID.value()) +
+    "&redirect_uri=" + encodeURIComponent(EBAY_RUNAME) +
+    "&response_type=code&prompt=login&scope=" + encodeURIComponent(EBAY_ALL_SCOPES);
+  res.redirect(302, url);
+});
+
+// 📦 Órdenes vendidas SIN enviar (Fulfillment API getOrders) → cola "Por enviar" para Empaque.
+// Devuelve datos crudos por orden (SKU, título, cantidad, fecha límite de envío, comprador); el front hace el match SKU→parte (bin/foto).
+const EBAY_FULFILL_SCOPE = "https://api.ebay.com/oauth/api_scope/sell.fulfillment";
+exports.ebayOrders = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const a = await ebayUserAccessToken(EBAY_FULFILL_SCOPE);
+  if (!a.token) {
+    const err = a.raw || {};
+    // Si el refresh token no tiene el permiso de órdenes, hay que re-autorizar con /ebayConsent.
+    return { ok: false, needConsent: /scope/i.test((err.error || "") + (err.error_description || "")), error: (err.error || "?") + " — " + (err.error_description || "sin detalle") };
+  }
+  // Órdenes activas sin enviar (NOT_STARTED = nada enviado; IN_PROGRESS = parcial).
+  const filter = encodeURIComponent("orderfulfillmentstatus:{NOT_STARTED|IN_PROGRESS}");
+  const url = "https://api.ebay.com/sell/fulfillment/v1/order?limit=200&filter=" + filter;
+  const r = await fetch(url, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json", "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" } });
+  const status = r.status;
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (status < 200 || status >= 300) {
+    return { ok: false, status, error: (j && j.errors && j.errors[0] && j.errors[0].message) || ("HTTP " + status) };
+  }
+  const orders = (j.orders || []).map((o) => {
+    const items = (o.lineItems || []).map((li) => ({
+      sku: li.sku || "",
+      title: li.title || "",
+      qty: li.quantity || 1,
+      itemId: li.legacyItemId || "",
+      shipBy: (li.lineItemFulfillmentInstructions && li.lineItemFulfillmentInstructions.shipByDate) || "",
+    }));
+    // Fecha límite de envío de la orden = la más próxima de sus items (o la fecha de creación como respaldo).
+    const shipDates = items.map((i) => i.shipBy).filter(Boolean).sort();
+    return {
+      orderId: o.orderId,
+      buyer: (o.buyer && o.buyer.username) || "",
+      createdAt: o.creationDate || "",
+      status: o.orderFulfillmentStatus || "",
+      shipBy: shipDates[0] || "",
+      total: (o.pricingSummary && o.pricingSummary.total && o.pricingSummary.total.value) || "",
+      items,
+    };
+  });
+  // Ordena por fecha límite de envío (los sin fecha, por fecha de creación) — HOY primero.
+  orders.sort((a2, b2) => (a2.shipBy || a2.createdAt || "").localeCompare(b2.shipBy || b2.createdAt || ""));
+  return { ok: true, count: orders.length, orders };
+});
+
 async function loadPart(partId){
   if (!partId) throw new HttpsError("invalid-argument", "Falta partId.");
   const snap = await admin.firestore().collection("parts").doc(partId).get();
