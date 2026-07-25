@@ -650,7 +650,12 @@
   <div class="modal" style="max-width:920px;width:100%;">
     <div class="modal-title">🧮 COTIZADOR DE PAGOS</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Simula el pago de uno o varios carros para que el cliente se lleve el presupuesto impreso. Es informativo, no es un contrato.</div>
-    <div class="form-group"><label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">Cliente (para el presupuesto)<span onclick="cotNueva()" style="color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;">🆕 Cotización nueva</span></label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente (opcional)" oninput="cotSaveDraft()"></div>
+    <div class="form-group"><label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">Cliente (para el presupuesto y seguimiento)<span onclick="cotNueva()" style="color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;">🆕 Cotización nueva</span></label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente" oninput="cotSaveDraft()"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">📱 Teléfono (para seguimiento)</label><input class="form-input" id="cot-phone" type="tel" inputmode="tel" placeholder="(559) 555-1234" oninput="cotSaveDraft()"></div>
+      <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">📍 Ciudad o ZIP (calcula impuestos)</label><input class="form-input" id="cot-city" placeholder="Porterville o 93257" autocomplete="off" oninput="cotApplyTax()"></div>
+    </div>
+    <div id="cot-tax-note" style="font-size:11.5px;margin:-4px 0 8px;"></div>
     <div class="form-group"><label class="form-label">Agregar carro del inventario</label>
       <div style="position:relative;">
         <input class="form-input" id="cot-car-search" placeholder="🔍 Busca por # inventario, marca, modelo o VIN..." autocomplete="off" oninput="cotFilterCars()" onfocus="cotFilterCars()" onkeydown="cotCarKey(event)" onblur="setTimeout(()=>{const b=document.getElementById('cot-car-results');if(b)b.style.display='none';},200)" style="padding-right:40px;">
@@ -662,7 +667,8 @@
     <button type="button" onclick="cotAddBlank()" style="background:transparent;color:var(--gold);border:1px dashed var(--gold);border-radius:10px;padding:10px;width:100%;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">＋ Agregar otra opción en blanco</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('cot-modal')">Cerrar</button>
-      <button class="btn-save" onclick="printCotizacion()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);">🖨 Imprimir presupuesto</button>
+      <button type="button" onclick="cotShare()" style="background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;">📤 Compartir</button>
+      <button class="btn-save" onclick="printCotizacion()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);">🖨 Imprimir</button>
     </div>
   </div>
 </div>
@@ -1491,7 +1497,7 @@ window.renderAppointments=function(){
 let cotInventory=[]; let cotOpts=[]; let cotSeq=0;
 // Guarda el cotizador en el equipo para que NO se pierda si la app se recarga
 function cotSaveDraft(){
-  try{ localStorage.setItem('cotDraft', JSON.stringify({ cust:(document.getElementById('cot-customer')||{}).value||'', opts:cotOpts, seq:cotSeq, ts:Date.now() })); }catch(e){}
+  try{ localStorage.setItem('cotDraft', JSON.stringify({ cust:(document.getElementById('cot-customer')||{}).value||'', phone:(document.getElementById('cot-phone')||{}).value||'', city:(document.getElementById('cot-city')||{}).value||'', opts:cotOpts, seq:cotSeq, ts:Date.now() })); }catch(e){}
 }
 function cotClearDraft(){ try{ localStorage.removeItem('cotDraft'); }catch(e){} }
 window.cotSaveDraft=cotSaveDraft;   // expuesto para el oninput inline del campo cliente
@@ -1505,9 +1511,15 @@ window.openCotizador=function(){
   if(recent){
     cotOpts=draft.opts; cotSeq=draft.seq||cotOpts.length;
     document.getElementById('cot-customer').value=draft.cust||'';
+    document.getElementById('cot-phone').value=draft.phone||'';
+    document.getElementById('cot-city').value=draft.city||'';
     renderCotOptions();
+    cotApplyTax(true);
   } else {
     document.getElementById('cot-customer').value='';
+    document.getElementById('cot-phone').value='';
+    document.getElementById('cot-city').value='';
+    document.getElementById('cot-tax-note').innerHTML='';
     cotOpts=[]; cotSeq=0;
     cotAddBlank();
   }
@@ -1518,8 +1530,56 @@ window.cotNueva=function(){
   if(cotOpts.length && !confirm('¿Empezar una cotización nueva? Se borra lo que tienes aquí.')) return;
   cotClearDraft();
   document.getElementById('cot-customer').value='';
+  document.getElementById('cot-phone').value='';
+  document.getElementById('cot-city').value='';
+  document.getElementById('cot-tax-note').innerHTML='';
   document.getElementById('cot-car-search').value='';
   cotOpts=[]; cotSeq=0; cotAddBlank();
+};
+// 💵 Tabla de impuesto de venta de California (tasa combinada). ⚠️ VERIFICAR/ACTUALIZAR con Enrique — el tax field queda editable como override.
+// Clave = ciudad (minúsculas, sin acentos) o ZIP de 5 dígitos → tasa decimal.
+const CA_TAX={
+  'porterville':0.0825,'93257':0.0825,'93258':0.0825,'93260':0.0775,
+  'visalia':0.0825,'93277':0.0825,'93291':0.0825,'93292':0.0825,'93290':0.0775,
+  'tulare':0.0825,'93274':0.0825,'93275':0.0825,
+  'lindsay':0.0925,'93247':0.0925,
+  'exeter':0.0775,'93221':0.0775,
+  'dinuba':0.0925,'93618':0.0925,
+  'farmersville':0.0975,'93223':0.0975,
+  'woodlake':0.0775,'93286':0.0775,
+  'delano':0.0825,'93215':0.0825,'93216':0.0825,
+  'earlimart':0.0775,'93219':0.0775,'pixley':0.0775,'93256':0.0775,'tipton':0.0775,'93272':0.0775,
+  'bakersfield':0.0825,'93301':0.0825,'93304':0.0825,'93305':0.0825,'93306':0.0825,'93307':0.0825,'93308':0.0825,'93309':0.0825,'93311':0.0825,'93312':0.0825,'93313':0.0825,'93314':0.0825,
+  'fresno':0.0835,'93701':0.0835,'93702':0.0835,'93703':0.0835,'93704':0.0835,'93705':0.0835,'93706':0.0835,'93710':0.0835,'93711':0.0835,'93720':0.0835,'93721':0.0835,'93722':0.0835,'93725':0.0835,'93726':0.0835,'93727':0.0835,'93728':0.0835,
+  'clovis':0.0775,'93611':0.0775,'93612':0.0775,'93619':0.0775,
+  'hanford':0.0795,'93230':0.0795,'93232':0.0795,
+  'corcoran':0.0895,'93212':0.0895,
+  'wasco':0.0825,'93280':0.0825,'shafter':0.0825,'93263':0.0825,
+  'default':0.0775,
+};
+let _cotTaxRate=0, _cotTaxCity='';
+window.cotLookupTax=function(raw){
+  const k=(raw||'').trim().toLowerCase();
+  if(!k) return null;
+  if(CA_TAX[k]!=null) return CA_TAX[k];
+  const zip=(k.match(/\d{5}/)||[])[0]; if(zip && CA_TAX[zip]!=null) return CA_TAX[zip];
+  // por nombre de ciudad aunque traiga estado ("porterville, ca")
+  const city=k.replace(/[^a-z ]/g,'').replace(/\s+ca$/,'').trim();
+  if(CA_TAX[city]!=null) return CA_TAX[city];
+  return null;
+};
+window.cotApplyTax=function(silent){
+  const raw=(document.getElementById('cot-city').value||'').trim();
+  const note=document.getElementById('cot-tax-note');
+  cotSaveDraft();
+  if(!raw){ _cotTaxRate=0; _cotTaxCity=''; if(note) note.innerHTML=''; return; }
+  const rate=cotLookupTax(raw);
+  if(rate==null){ _cotTaxRate=0; _cotTaxCity=''; if(note) note.innerHTML='<span style="color:#e0a54a;">No tengo esa ciudad/ZIP en la tabla — pon el impuesto a mano o dime la tasa y la agrego.</span>'; return; }
+  _cotTaxRate=rate; _cotTaxCity=raw;
+  // aplica el impuesto a cada opción sobre su precio (queda editable)
+  cotOpts.forEach((o,i)=>{ o.tax=Math.round((Number(o.price)||0)*rate*100)/100; });
+  renderCotOptions();
+  if(note) note.innerHTML='<span style="color:var(--green);">Impuesto de '+raw.replace(/</g,'')+': <b>'+(rate*100).toFixed(2)+'%</b> aplicado al precio de cada carro.</span>';
 };
 let _cotFiltered=[];
 window.cotClearCar=function(){ const s=document.getElementById('cot-car-search'); if(s){ s.value=''; } const b=document.getElementById('cot-car-results'); if(b){ b.style.display='none'; b.innerHTML=''; } const x=document.getElementById('cot-car-x'); if(x) x.style.display='none'; if(s) s.focus(); };
@@ -1542,8 +1602,35 @@ window.cotAddFromCar=function(id){
   const c=cotInventory.find(x=>x.id===id); if(!c) return;
   document.getElementById('cot-car-results').style.display='none';
   document.getElementById('cot-car-search').value='';
-  cotOpts.push({ id:++cotSeq, car:[c.year,c.make,c.model].filter(Boolean).join(' '), vin:c.vin||'', miles:c.miles||'', price:Number(c.price)||0, down:0, tax:0, dmv:0, numpay:52, freq:'weekly' });
+  const x=document.getElementById('cot-car-x'); if(x) x.style.display='none';
+  const price=Number(c.price)||0;
+  cotOpts.push({ id:++cotSeq, car:[c.year,c.make,c.model].filter(Boolean).join(' '), year:c.year||'', make:c.make||'', model:c.model||'', color:c.color||'', vin:c.vin||'', miles:c.miles||'', price:price, down:0, tax:(_cotTaxRate?Math.round(price*_cotTaxRate*100)/100:0), dmv:0, numpay:52, freq:'weekly' });
   renderCotOptions();
+};
+// 📤 Compartir el presupuesto por mensaje + guardar el lead (nombre/tel) para seguimiento.
+window.cotShare=async function(){
+  if(!cotOpts.length){ alert('Agrega al menos una opción.'); return; }
+  const cust=(document.getElementById('cot-customer').value||'').trim();
+  const phone=(document.getElementById('cot-phone').value||'').trim();
+  const freqTxt={weekly:'semanales',biweekly:'quincenales',monthly:'mensuales',cash:'de contado'};
+  const lines=['Legacy Motors Garage — Presupuesto'+(cust?(' para '+cust):'')];
+  cotOpts.forEach((o,i)=>{ const r=cotCalc(o); if(r.cash){ lines.push('• '+(o.car||('Opción '+(i+1)))+': de contado '+formatMoney(r.price+r.tax+r.dmv)); } else { lines.push('• '+(o.car||('Opción '+(i+1)))+': paga hoy '+formatMoney(r.payToday)+' · '+r.numpay+' pagos '+freqTxt[r.freq]+' de '+formatMoney(r.payEven)); } });
+  lines.push('','📞 (559) 540-5145 · Legacy Motors Garage, Porterville CA','(Presupuesto informativo, sujeto a aprobación.)');
+  const text=lines.join('\n');
+  saveQuoteLead(cust,phone);
+  try{ if(navigator.share){ await navigator.share({ title:'Presupuesto Legacy Motors', text:text }); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  try{ await navigator.clipboard.writeText(text); }catch(e){}
+  const digits=phone.replace(/\D/g,'');
+  if(digits.length>=10 && confirm('Presupuesto copiado. 📋\n\n¿Abrir WhatsApp para enviarlo a '+phone+'?')){ window.open('https://wa.me/1'+digits.replace(/^1/,'')+'?text='+encodeURIComponent(text),'_blank'); }
+  else { alert('Presupuesto copiado al portapapeles — pégalo en tu mensaje. 📋'); }
+};
+window.saveQuoteLead=async function(cust,phone){
+  if(!cust && !phone) return;
+  try{
+    const id='quote_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    const opts=cotOpts.map(o=>{ const r=cotCalc(o); return { car:o.car||'', vin:o.vin||'', price:r.price, down:r.down, payToday:r.payToday, numpay:r.numpay, freq:r.freq, payEven:r.payEven, cash:r.cash }; });
+    await setDoc(doc(db,'quotes',id),{ customer:cust||'', phone:phone||'', phoneE164:toE164(phone)||'', city:_cotTaxCity||'', taxRate:_cotTaxRate||0, options:opts, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' });
+  }catch(e){}
 };
 // Enter en el buscador → agrega la primera coincidencia (como los demás buscadores)
 window.cotCarKey=function(e){
@@ -1623,6 +1710,9 @@ function renderCotOptions(){
 window.printCotizacion=function(){
   if(!cotOpts.length){ alert('Agrega al menos una opción.'); return; }
   const cust=document.getElementById('cot-customer').value.trim();
+  const phone=(document.getElementById('cot-phone').value||'').trim();
+  const city=(document.getElementById('cot-city').value||'').trim();
+  saveQuoteLead(cust,phone);   // al imprimir también guarda el lead
   const dstr=new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'});
   const freqTxt={weekly:'semanales',biweekly:'quincenales',monthly:'mensuales',cash:'de contado'};
   let cards='';
@@ -1635,7 +1725,8 @@ window.printCotizacion=function(){
       rows=`<tr><td>Precio del vehículo</td><td>${formatMoney(r.price)}</td></tr><tr><td>Enganche / Down</td><td>${formatMoney(r.down)}</td></tr><tr><td>Impuestos + DMV</td><td>${formatMoney(r.tax+r.dmv)}</td></tr><tr class="hl"><td>Paga hoy / Due today</td><td>${formatMoney(r.payToday)}</td></tr><tr><td>Monto financiado</td><td>${formatMoney(r.amountFinanced)}</td></tr><tr><td>Cargo por financiamiento</td><td>${formatMoney(r.financeCharge)}</td></tr><tr class="tot"><td>Total a financiar</td><td>${formatMoney(r.totalPayments)}</td></tr>`;
     }
     const payLine = r.cash ? '' : `<div class="pay">${r.numpay} pagos ${freqTxt[r.freq]} de <b>${formatMoney(r.payEven)}</b>${Math.abs(r.lastPay-r.payEven)>0.01?` <span class="last">(último ${formatMoney(r.lastPay)})</span>`:''}</div>`;
-    cards+=`<div class="opt"><h3>Opción ${i+1}${o.car?' — '+o.car:''}</h3>${o.vin?`<div class="vin">VIN: ${o.vin}${o.miles?' · '+o.miles+' mi':''}</div>`:''}<table>${rows}</table>${payLine}</div>`;
+    const vinBits=[o.vin?('VIN: '+o.vin):'', o.color?o.color:'', o.miles?(Number(o.miles).toLocaleString()+' mi'):''].filter(Boolean).join(' · ');
+    cards+=`<div class="opt"><h3>Opción ${i+1}${o.car?' — '+o.car:''}</h3>${vinBits?`<div class="vin">${vinBits}</div>`:''}<table>${rows}</table>${payLine}</div>`;
   });
   const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Presupuesto — Legacy Motors Garage</title>
 <style>
@@ -1661,7 +1752,7 @@ window.printCotizacion=function(){
   @media print{body{padding:0;}}
 </style></head><body>
   <div class="head"><h1>LEGACY MOTORS GARAGE</h1><div class="sub">PRESUPUESTO · FINANCING ESTIMATE</div></div>
-  <div class="meta"><div><b>Cliente:</b> ${cust||'—'}</div><div><b>Fecha:</b> ${dstr}</div></div>
+  <div class="meta"><div><b>Cliente:</b> ${cust||'—'}${phone?' · '+phone:''}${city?' · '+city:''}</div><div><b>Fecha:</b> ${dstr}</div></div>
   ${cards}
   <div class="disc"><b>Presupuesto informativo — no es un contrato ni una oferta de crédito.</b> Cifras aproximadas, sujetas a verificación, inventario disponible y aprobación. Los montos finales se establecen en el contrato firmado. Incluye tarifa de documentación de $70. / <b>Estimate only — not a contract or a credit offer.</b> Figures are approximate and subject to verification and approval.</div>
   <div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California Dealer License No. 83177</div>
