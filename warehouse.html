@@ -2360,7 +2360,7 @@ function renderEbayQueue(){
       const qi=_qItems.push({photos:photos, title:(it.title||''), partId:(p?p.id:''), sku:(it.sku||''), itemId:(it.itemId||'')})-1;
       const thumb=photos[0]||'';
       const th=thumb
-        ? '<img src="'+thumb+'" onclick="event.stopPropagation();openQueuePhotos('+qi+')" style="width:52px;height:52px;object-fit:cover;border-radius:8px;flex:0 0 auto;cursor:pointer;">'
+        ? '<img src="'+thumb+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;flex:0 0 auto;">'
         : '<div style="width:52px;height:52px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">📦</div>';
       const bin=p?('📍 '+locText(p)):('<span style="color:#ff8a8a;">'+t('qNoMatch')+'</span>');
       const sku=it.sku?('🏷️ '+esc(it.sku)):'';
@@ -2395,7 +2395,7 @@ window.openManualPack=function(idx){
   box.innerHTML='<div class="card" style="border-color:var(--gold);">'
     +'<div style="font-weight:800;margin-bottom:2px;">'+esc(it.title||t('qItem'))+'</div>'
     +'<div class="sub" style="margin-bottom:6px;">'+t('manualHint')+'</div>'
-    +qThumbs(idx)
+    +'<div style="margin:10px 0;">'+inlineSwiper(it.photos||[])+'</div>'
     +'<input id="manual-search" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" placeholder="'+t('manualSearchPh')+'" oninput="manualSearch(this.value)" style="width:100%;">'
     +'<div id="manual-results" style="margin-top:8px;"></div>'
     +'<button class="btn ghost sm" style="width:100%;margin-top:10px;border-color:rgba(240,192,64,.4);color:var(--gold);" onclick="manualNotInSystem('+idx+')">'+t('manualNotInSys')+'</button>'
@@ -2410,7 +2410,7 @@ window.manualNotInSystem=function(idx){
   box.innerHTML='<div class="card" style="border-color:var(--gold);">'
     +'<div style="font-weight:800;margin-bottom:2px;">'+esc(it.title||t('qItem'))+'</div>'
     +'<div class="sub" style="margin-bottom:6px;">'+t('notInSysHint')+'</div>'
-    +qThumbs(idx)
+    +'<div style="margin:10px 0;">'+inlineSwiper(it.photos||[])+'</div>'
     +'<button class="btn" style="width:100%;font-size:16px;padding:14px;margin-top:8px;" onclick="packUnlistedOrder('+idx+')">'+t('notInSysConfirm')+'</button>'
     +'<button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--muted);" onclick="openManualPack('+idx+')">'+t('back')+'</button>'
     +'</div>';
