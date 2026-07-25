@@ -2,8 +2,8 @@
 (function(){
   var ENDPOINT='https://us-central1-legacy-motors-garage.cloudfunctions.net/siteChat';
   var lang=(navigator.language||'es').toLowerCase().indexOf('en')===0?'en':'es';
-  var T={ es:{ open:'¿Buscas carro? Escríbenos', title:'Legacy Motors Garage', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi:'¡Hola! 👋 Bienvenido a Legacy Motors Garage. ¿Qué tipo de carro buscas?', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
-           en:{ open:'Looking for a car? Chat with us', title:'Legacy Motors Garage', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi:'Hi! 👋 Welcome to Legacy Motors Garage. What kind of car are you looking for?', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
+  var T={ es:{ open:'¿Buscas carro? Escríbenos', title:'Legacy Motors Garage', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi:'¡Hola! 😊 ¿Cómo estás? Con gusto te ayudamos — ¿qué andas buscando?', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
+           en:{ open:'Looking for a car? Chat with us', title:'Legacy Motors Garage', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi:'Hi there! 😊 How are you? We’re happy to help — what are you looking for?', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
   function t(k){ return (T[lang]&&T[lang][k])||T.es[k]; }
   var msgs=[{role:'assistant',content:''}]; // el saludo se rellena abajo (según idioma)
   msgs[0].content=T[lang].hi;
@@ -55,10 +55,20 @@
   var inp=document.getElementById('lmb-in');
   inp.addEventListener('keydown',function(e){ if(e.key==='Enter') send(); });
   inp.addEventListener('focus',function(){ setTimeout(fit,150); setTimeout(fit,350); });
-  // 📱 Ventana flotante: al abrir el teclado, sube arriba de él; si no, tarjeta chica
-  function fit(){ if(window.innerWidth>700){ sheet.style.bottom=''; sheet.style.height=''; return; } var vv=window.visualViewport; if(!vv) return; var kb=Math.max(0,window.innerHeight-vv.height-vv.offsetTop); if(kb>60){ sheet.style.bottom=(kb+8)+'px'; sheet.style.height=(vv.height-70)+'px'; } else { sheet.style.bottom=''; sheet.style.height=''; } var m=document.getElementById('lmb-msgs'); if(m) m.scrollTop=m.scrollHeight; }
-  function vpOn(){ var vv=window.visualViewport; if(vv){ vv.addEventListener('resize',fit); vv.addEventListener('scroll',fit); fit(); } }
-  function vpOff(){ var vv=window.visualViewport; if(vv){ vv.removeEventListener('resize',fit); vv.removeEventListener('scroll',fit); } sheet.style.bottom=''; sheet.style.height=''; }
+  // 📱 Burbuja flotante fija: el TÍTULO siempre visible arriba y la barra siempre arriba del teclado.
+  // En móvil anclamos con top+bottom (altura auto) → el header nunca se esconde y queda hueco arriba (look de burbuja).
+  function fit(){
+    var vv=window.visualViewport;
+    if(window.innerWidth>700 || !vv){ sheet.style.top=''; sheet.style.bottom=''; sheet.style.height=''; return; }  // escritorio → CSS
+    var vTop=vv.offsetTop||0;
+    var kb=Math.max(0, window.innerHeight - vv.height - vTop);
+    if(kb>60){ sheet.style.top=(vTop+10)+'px'; sheet.style.bottom=(kb+8)+'px'; }        // con teclado: llena el área visible sobre el teclado
+    else { sheet.style.top=(vTop+Math.round(vv.height*0.11))+'px'; sheet.style.bottom='16px'; }  // sin teclado: hueco arriba → burbuja
+    sheet.style.height='auto';
+    var m=document.getElementById('lmb-msgs'); if(m) m.scrollTop=m.scrollHeight;
+  }
+  function vpOn(){ var vv=window.visualViewport; if(vv){ vv.addEventListener('resize',fit); vv.addEventListener('scroll',fit); } fit(); }
+  function vpOff(){ var vv=window.visualViewport; if(vv){ vv.removeEventListener('resize',fit); vv.removeEventListener('scroll',fit); } sheet.style.top=''; sheet.style.bottom=''; sheet.style.height=''; }
 
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function render(){
