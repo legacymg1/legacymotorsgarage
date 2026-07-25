@@ -1618,11 +1618,13 @@ window.cotShare=async function(){
   lines.push('','📞 (559) 540-5145 · Legacy Motors Garage, Porterville CA','(Presupuesto informativo, sujeto a aprobación.)');
   const text=lines.join('\n');
   saveQuoteLead(cust,phone);
+  // iPhone/Android: el "compartir" del sistema abre Mensajes (SMS/iMessage), correo, etc. — sin WhatsApp.
   try{ if(navigator.share){ await navigator.share({ title:'Presupuesto Legacy Motors', text:text }); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  // Respaldo (si el equipo no tiene "compartir"): copia y abre un mensaje de TEXTO al cliente.
   try{ await navigator.clipboard.writeText(text); }catch(e){}
   const digits=phone.replace(/\D/g,'');
-  if(digits.length>=10 && confirm('Presupuesto copiado. 📋\n\n¿Abrir WhatsApp para enviarlo a '+phone+'?')){ window.open('https://wa.me/1'+digits.replace(/^1/,'')+'?text='+encodeURIComponent(text),'_blank'); }
-  else { alert('Presupuesto copiado al portapapeles — pégalo en tu mensaje. 📋'); }
+  if(digits.length>=10){ const num=(digits.length===10?('+1'+digits):('+'+digits)); window.location.href='sms:'+num+'?&body='+encodeURIComponent(text); }
+  else { alert('Presupuesto copiado al portapapeles — pégalo en un mensaje de texto para el cliente. 📋'); }
 };
 window.saveQuoteLead=async function(cust,phone){
   if(!cust && !phone) return;
