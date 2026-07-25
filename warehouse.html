@@ -2401,7 +2401,7 @@ window.openManualPack=function(idx){
     +'<button class="btn ghost sm" style="width:100%;margin-top:10px;border-color:rgba(240,192,64,.4);color:var(--gold);" onclick="manualNotInSystem('+idx+')">'+t('manualNotInSys')+'</button>'
     +'<button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--muted);" onclick="cancelPack()">'+t('cancelPack')+'</button>'
     +'</div>';
-  setTimeout(()=>{ const i=document.getElementById('manual-search'); if(i) i.focus(); },150);
+  // NO enfocar el buscador automáticamente: que el empacador lea las instrucciones; el teclado sale cuando él toque la barra.
 };
 // ❌ "No está en el sistema" (piezas que aún no se dan de alta porque falta traspalar los bines): confirma físicamente con la foto → crea el registro al vuelo → empaca.
 window.manualNotInSystem=function(idx){
