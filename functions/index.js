@@ -476,11 +476,70 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
     const lastFallback = booked
       ? (lang === "en" ? "You're all set! We'll text you to confirm. Looking forward to meeting you 🚗" : "¡Listo, ya quedó tu cita! Te mandamos un mensaje para confirmar. Con gusto te esperamos 🚗")
       : (lang === "en" ? "Sorry, that got cut off. Could you tell me a bit more about what you're looking for?" : "Perdón, se me cortó. ¿Me cuentas un poco más de lo que andas buscando?");
-    res.json({ reply: reply || lastFallback, booked: !!booked });
+    const finalReply = reply || lastFallback;
+    // 📝 REGISTRO de la conversación (solo dueño) + contador diario de personas. No rompe la respuesta si falla.
+    try {
+      const convoId = String((req.body && req.body.convoId) || "").slice(0, 80).replace(/[^\w-]/g, "");
+      if (convoId) {
+        const now = new Date().toISOString();
+        const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date());  // YYYY-MM-DD Pacífico
+        const lastUser = msgsIn.slice().reverse().find((m) => m && m.role !== "assistant" && m.content);
+        const turn = [];
+        if (lastUser && lastUser.content) turn.push({ role: "user", text: String(lastUser.content).slice(0, 1500), at: now });
+        turn.push({ role: "assistant", text: String(finalReply).slice(0, 2000), at: now });
+        const ref = admin.firestore().collection("bot_convos").doc(convoId);
+        const snap = await ref.get();
+        if (!snap.exists) {
+          await ref.set({ convoId, lang, startedAt: now, lastAt: now, date: dateStr,
+            firstMsg: (lastUser && lastUser.content) ? String(lastUser.content).slice(0, 200) : "",
+            messages: turn, msgCount: turn.length, booked: !!booked });
+          await admin.firestore().collection("bot_stats").doc(dateStr).set({ date: dateStr,
+            convos: admin.firestore.FieldValue.increment(1), messages: admin.firestore.FieldValue.increment(turn.length), updatedAt: now }, { merge: true });
+        } else {
+          const prev = snap.data().messages || [];
+          await ref.set({ lastAt: now, messages: prev.concat(turn).slice(-300), msgCount: (snap.data().msgCount || prev.length) + turn.length, booked: (snap.data().booked || !!booked) }, { merge: true });
+          await admin.firestore().collection("bot_stats").doc(dateStr).set({ messages: admin.firestore.FieldValue.increment(turn.length), updatedAt: now }, { merge: true });
+        }
+      }
+    } catch (e) { /* el log nunca debe tumbar la respuesta */ }
+    res.json({ reply: finalReply, booked: !!booked });
   } catch (e) {
     console.log("siteChat", e);
     res.json({ reply: lang === "en" ? "Sorry, I had a hiccup — call us at (559) 540-5145 and we'll help you right away." : "Perdón, tuve un detalle — llámanos al (559) 540-5145 y con gusto te ayudamos." });
   }
+});
+
+// 💬 Repaso de las conversaciones del bot de ventas (SOLO dueños ev@ / ivan.garcia@). Lee vía backend → no expone las pláticas al cliente.
+function salesOwnerOnly(request) {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  if (email !== "ev@legacymotorsgarage.com" && email !== "ivan.garcia@legacymotorsgarage.com") throw new HttpsError("permission-denied", "Solo dueños.");
+}
+exports.botConvos = onCall({ timeoutSeconds: 30 }, async (request) => {
+  salesOwnerOnly(request);
+  const db = admin.firestore();
+  const days = [];
+  try {
+    const ss = await db.collection("bot_stats").orderBy("date", "desc").limit(14).get();
+    ss.forEach((d) => { const x = d.data(); days.push({ date: x.date || d.id, convos: x.convos || 0, messages: x.messages || 0 }); });
+  } catch (e) {}
+  const list = [];
+  try {
+    const cs = await db.collection("bot_convos").orderBy("lastAt", "desc").limit(60).get();
+    cs.forEach((d) => { const x = d.data(); list.push({ id: d.id, date: x.date || "", lastAt: x.lastAt || "", startedAt: x.startedAt || "", firstMsg: x.firstMsg || "", msgCount: x.msgCount || ((x.messages || []).length), booked: !!x.booked, lang: x.lang || "es" }); });
+  } catch (e) {}
+  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date());
+  const today = days.find((d) => d.date === todayStr) || { date: todayStr, convos: 0, messages: 0 };
+  return { today, days, list };
+});
+exports.botConvoGet = onCall({ timeoutSeconds: 30 }, async (request) => {
+  salesOwnerOnly(request);
+  const id = String((request.data && request.data.id) || "").slice(0, 80);
+  if (!id) throw new HttpsError("invalid-argument", "Falta id.");
+  const snap = await admin.firestore().collection("bot_convos").doc(id).get();
+  if (!snap.exists) return { ok: false };
+  const x = snap.data();
+  return { ok: true, id, date: x.date || "", startedAt: x.startedAt || "", lastAt: x.lastAt || "", lang: x.lang || "es", booked: !!x.booked, messages: x.messages || [] };
 });
 
 // 🛟 BOT INTERNO DE AYUDA — le resuelve dudas a los empleados sobre CÓMO USAR el sistema Legacy DMS.
