@@ -653,7 +653,8 @@
     <div class="form-group"><label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">Cliente (para el presupuesto)<span onclick="cotNueva()" style="color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;">🆕 Cotización nueva</span></label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente (opcional)" oninput="cotSaveDraft()"></div>
     <div class="form-group"><label class="form-label">Agregar carro del inventario</label>
       <div style="position:relative;">
-        <input class="form-input" id="cot-car-search" placeholder="🔍 Busca por # inventario, marca, modelo o VIN..." autocomplete="off" oninput="cotFilterCars()" onfocus="cotFilterCars()" onkeydown="cotCarKey(event)" onblur="setTimeout(()=>{const b=document.getElementById('cot-car-results');if(b)b.style.display='none';},200)">
+        <input class="form-input" id="cot-car-search" placeholder="🔍 Busca por # inventario, marca, modelo o VIN..." autocomplete="off" oninput="cotFilterCars()" onfocus="cotFilterCars()" onkeydown="cotCarKey(event)" onblur="setTimeout(()=>{const b=document.getElementById('cot-car-results');if(b)b.style.display='none';},200)" style="padding-right:40px;">
+        <button type="button" id="cot-car-x" onpointerdown="event.preventDefault();cotClearCar()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--border);color:var(--muted);border:none;width:26px;height:26px;border-radius:50%;font-size:14px;cursor:pointer;line-height:1;z-index:61;">✕</button>
         <div id="cot-car-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--navy2);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:240px;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,0.5);"></div>
       </div>
     </div>
@@ -1196,11 +1197,11 @@ window.filterApptClients = function(){
     });
   }
   items=items.slice(0,40);
-  let html=`<div onmousedown="pickApptClient('__walkin__')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);color:var(--gold);font-weight:600;">➕ Otro (sin registrar)</div>`;
+  let html=`<div onpointerdown="pickApptClient('__walkin__')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);color:var(--gold);font-weight:600;">➕ Otro (sin registrar)</div>`;
   if(!items.length){ html+=`<div style="padding:9px 12px;color:var(--muted);font-size:13px;">Sin coincidencias</div>`; }
   else items.forEach(c=>{
     const car=[c.year,c.make,c.model].filter(Boolean).join(' ');
-    html+=`<div onmousedown="pickApptClient('${c.id}')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);">
+    html+=`<div onpointerdown="pickApptClient('${c.id}')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);">
       <div style="font-weight:600;font-size:14px;">${c.name||''}${c.kind==='service'?' 🔧':''}</div>
       <div style="font-size:12px;color:var(--muted);">${car}${c.vin?' · …'+c.vin.slice(-6):''}${c.phone?' · '+c.phone:''}</div>
     </div>`;
@@ -1521,17 +1522,20 @@ window.cotNueva=function(){
   cotOpts=[]; cotSeq=0; cotAddBlank();
 };
 let _cotFiltered=[];
+window.cotClearCar=function(){ const s=document.getElementById('cot-car-search'); if(s){ s.value=''; } const b=document.getElementById('cot-car-results'); if(b){ b.style.display='none'; b.innerHTML=''; } const x=document.getElementById('cot-car-x'); if(x) x.style.display='none'; if(s) s.focus(); };
 window.cotFilterCars=function(){
   const q=(document.getElementById('cot-car-search').value||'').toLowerCase();
   const terms=q.trim().split(/\s+/).filter(Boolean);
   const box=document.getElementById('cot-car-results');
+  const xb=document.getElementById('cot-car-x'); if(xb) xb.style.display=q.trim()?'block':'none';
+  if(!terms.length){ box.style.display='none'; box.innerHTML=''; return; }   // solo muestra al escribir (no toda la lista)
   let items=cotInventory.slice();
   if(terms.length) items=items.filter(c=>{ const hay=((c.inventoryNum||'')+' '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.color||'')+' '+(c.vin||'')).toLowerCase(); return terms.every(x=>hay.includes(x)); });
   items=items.slice(0,30);
   _cotFiltered=items;   // guarda las coincidencias actuales (para Enter)
   let html='';
   if(!items.length) html='<div style="padding:9px 12px;color:var(--muted);font-size:13px;">Sin coincidencias — o escribe el carro a mano abajo.</div>';
-  else items.forEach(c=>{ const label=[c.year,c.make,c.model].filter(Boolean).join(' '); html+=`<div onmousedown="cotAddFromCar('${c.id}')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);"><div style="font-weight:600;">#${c.inventoryNum||'?'} · ${label}</div><div style="font-size:12px;color:var(--muted);">${c.price?formatMoney(c.price):'sin precio'}${c.vin?' · …'+String(c.vin).slice(-6):''}</div></div>`; });
+  else items.forEach(c=>{ const label=[c.year,c.make,c.model].filter(Boolean).join(' '); html+=`<div onpointerdown="cotAddFromCar('${c.id}')" style="padding:11px 12px;cursor:pointer;border-bottom:1px solid var(--border);touch-action:manipulation;"><div style="font-weight:600;">#${c.inventoryNum||'?'} · ${label}</div><div style="font-size:12px;color:var(--muted);">${c.price?formatMoney(c.price):'sin precio'}${c.vin?' · …'+String(c.vin).slice(-6):''}</div></div>`; });
   box.innerHTML=html; box.style.display='block';
 };
 window.cotAddFromCar=function(id){
