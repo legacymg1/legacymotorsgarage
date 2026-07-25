@@ -14,6 +14,9 @@
   try{ convoId=localStorage.getItem('lmg_bot_convo')||''; }catch(e){}
   var _td=bDay();
   if(!convoId || convoId.indexOf('c'+_td+'_')!==0){ convoId='c'+_td+'_'+Math.random().toString(36).slice(2,9); try{ localStorage.setItem('lmg_bot_convo', convoId); }catch(e){} }
+  // 💾 Persistencia: si el cliente refresca la página, NO se pierde la plática (se guarda en su navegador, misma conversación del día).
+  function saveMsgs(){ try{ localStorage.setItem('lmg_bot_msgs', JSON.stringify({ c:convoId, m:msgs.slice(-40) })); }catch(e){} }
+  try{ var _sv=JSON.parse(localStorage.getItem('lmg_bot_msgs')||'null'); if(_sv && _sv.c===convoId && Array.isArray(_sv.m) && _sv.m.length){ msgs=_sv.m; unread=0; } }catch(e){}
 
   var css=document.createElement('style');
   css.textContent='#lmb-fab{position:fixed;right:18px;bottom:22px;z-index:2147482000;background:#0b0e14;color:#f0c040;border:2px solid #f0c040;border-radius:34px;height:62px;max-width:62px;padding:0;overflow:hidden;white-space:nowrap;font:700 15.5px -apple-system,system-ui,sans-serif;box-shadow:0 12px 34px rgba(0,0,0,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:max-width .5s cubic-bezier(.2,.85,.25,1),padding .5s;}'
@@ -89,11 +92,11 @@
   }
   function send(){
     var i=document.getElementById('lmb-in'); var txt=(i.value||'').trim(); if(!txt||busy) return;
-    i.value=''; msgs.push({role:'user',content:txt}); busy=true; render();
+    i.value=''; msgs.push({role:'user',content:txt}); busy=true; render(); saveMsgs();
     fetch(ENDPOINT,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lang:lang, convoId:convoId, messages:msgs.slice(-12) }) })
       .then(function(r){ return r.json(); })
-      .then(function(d){ busy=false; msgs.push({role:'assistant',content:(d&&d.reply)||t('err')}); if(!openState){ unread++; updateFab(); } render(); })
-      .catch(function(){ busy=false; msgs.push({role:'assistant',content:t('err')}); render(); });
+      .then(function(d){ busy=false; msgs.push({role:'assistant',content:(d&&d.reply)||t('err')}); if(!openState){ unread++; updateFab(); } render(); saveMsgs(); })
+      .catch(function(){ busy=false; msgs.push({role:'assistant',content:t('err')}); render(); saveMsgs(); });
   }
   // Entra como círculo discreto; a los ~3s se "abre" a la barra con el globo rojo para llamar la atención (sin abrir el chat)
   var reveal=function(){ if(!openState){ fab.classList.add('wide'); updateFab(); } };
