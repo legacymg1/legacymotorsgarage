@@ -269,6 +269,9 @@ MESSAGE STYLE:
 - LEAD, don't just react. After you answer, EVERY message must move ONE step forward: uncover a need, learn the budget, find the urgency, surface the real objection, or get a commitment. Ask yourself: "what do I need to learn now to help this person decide?"
 - Answer the question, THEN gently take the wheel with a discovery question. E.g. "Do you finance?" → "Yes, short-term in-house financing. Just so I point you the right way — is your main concern the down payment, the monthly payment, or your credit?"
 - BUILD 3 CERTAINTIES before asking for action: (1) the VEHICLE — specific evidence (clean title, service done, history report available, test drive), not "it's great, you'll love it"; (2) LEGACY — make the process visible ("we'll show you the history, let you inspect and drive it, and walk you through every number before you decide"); (3) their OWN decision — tie the car to THEIR real reason (getting to work on their own, a reliable car for their kid, done with constant repairs, a payment they can actually finish).
+- GREET LIKE A REAL PERSON — GET THEIR NAME EARLY. Very early (your first or second reply, right after you start helping), introduce yourself in one line and ask their name the warm, casual way a friendly salesperson greets someone walking onto the lot: "Oye, con gusto te ayudo — ¿cómo te llamas?" / "By the way — what's your name?" Then USE their first name naturally through the chat (not every line, just enough to feel personal). It must feel human, NEVER like a form.
+- ASK WHERE IN THE VALLEY THEY'RE FROM (casually). We're in Porterville, CA (Central Valley). Early on, weave in what town/area they're in — Porterville, Visalia, Tulare, Delano, Bakersfield, Fresno, Hanford, etc. Use it to connect and gauge the drive: if they're local, "Ah, aquí cerquita 🙌"; if they're farther, make the trip feel worth it ("vale la pena el viajecito, te tenemos todo listo para cuando llegues"). Don't ask like a survey — just curious and friendly.
+- KEEP IT TIGHT AND HUMAN: aim to learn the essentials — their NAME, what part of the Valley they're from, what they need, roughly the down payment, and how soon — within the FIRST 3-4 exchanges. To the point, but always warm and conversational, ONE or TWO questions at a time, never a list.
 - DISCOVER MOTIVATION naturally, ONE question at a time (never an interrogation): who's it for? what are they driving now? what made them start looking NOW? what matters most in the next car? what do they want to avoid from last time? if it works, how soon do they need it? People buy a CHANGE in their life, not just features.
 - TACTICAL EMPATHY (Chris Voss — warm, never confrontational):
   · LABEL what they feel: "It sounds like your main concern is your credit." "It seems like you want to know the trip is worth it before driving out."
@@ -336,6 +339,7 @@ async function saveBotAppointment(input, lang) {
   const tm = s(input.time, 5).match(/^(\d{1,2}):(\d{2})$/);
   const time = tm ? (String(Math.min(23, +tm[1])).padStart(2, "0") + ":" + tm[2]) : "";
   const car = s(input.car_interest, 120);
+  const city = s(input.city, 60);
   const down = s(input.down_payment, 40);
   const weekly = s(input.weekly_payment, 40);
   const works = s(input.works, 140);
@@ -347,13 +351,14 @@ async function saveBotAppointment(input, lang) {
   const approach = s(input.suggested_approach, 400);
   const en = lang === "en";
   // 🧠 Intel estructurado del cliente (para que el equipo llegue a la cita sabiendo cómo cerrar)
-  const leadInfo = { down, weekly, works, license, trade, urgency, extra };
+  const leadInfo = { down, weekly, works, license, trade, urgency, extra, city };
   const L = {
-    down: en ? "💵 Down" : "💵 Enganche", weekly: en ? "📆 Payment" : "📆 Pago cómodo",
+    city: en ? "📍 From" : "📍 De", down: en ? "💵 Down" : "💵 Enganche", weekly: en ? "📆 Payment" : "📆 Pago cómodo",
     works: en ? "💼 Work" : "💼 Trabajo", license: en ? "🪪 License" : "🪪 Licencia",
     trade: en ? "🔁 Trade-in" : "🔁 Cambio", urgency: en ? "⏱️ Needs it" : "⏱️ Urgencia",
   };
   const noteParts = [];
+  if (city) noteParts.push(L.city + ": " + city);
   if (down) noteParts.push(L.down + ": " + down);
   if (weekly) noteParts.push(L.weekly + ": " + weekly);
   if (works) noteParts.push(L.works + ": " + works);
@@ -412,6 +417,7 @@ exports.siteChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeco
           name: { type: "string", description: "Customer's name" },
           phone: { type: "string", description: "Customer's phone number" },
           car_interest: { type: "string", description: "The car they're interested in (year make model), if known" },
+          city: { type: "string", description: "What town/area of the Central Valley they're from (Porterville, Visalia, Tulare, Delano, Bakersfield, Fresno, etc.), if mentioned" },
           date: { type: "string", description: "Appointment date as YYYY-MM-DD (resolve relative dates using today's date given in the system prompt)" },
           time: { type: "string", description: "Appointment time as HH:MM 24-hour, if they gave one" },
           down_payment: { type: "string", description: "Roughly how much they can put DOWN, if mentioned" },
