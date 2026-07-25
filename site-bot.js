@@ -2,12 +2,11 @@
 (function(){
   var ENDPOINT='https://us-central1-legacy-motors-garage.cloudfunctions.net/siteChat';
   var lang=(navigator.language||'es').toLowerCase().indexOf('en')===0?'en':'es';
-  var T={ es:{ open:'¿Buscas carro? Escríbenos', preview:'¡Hola! 😊 ¿En qué te ayudamos?', writing:'escribiendo', title:'Legacy Motors Garage', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi:'¡Hola! 😊 ¿Cómo estás? Con gusto te ayudamos — ¿qué andas buscando?', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
-           en:{ open:'Looking for a car? Chat with us', preview:'Hi! 😊 How can we help?', writing:'typing', title:'Legacy Motors Garage', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi:'Hi there! 😊 How are you? We’re happy to help — what are you looking for?', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
+  var T={ es:{ open:'¿Buscas carro? Escríbenos', writing:'escribiendo', title:'Legacy Motors Garage', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi1:'¡Hola! 😊 ¿En qué te podemos ayudar hoy?', hi2:'¿Viste algún carro que te haya gustado? 🚗', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
+           en:{ open:'Looking for a car? Chat with us', writing:'typing', title:'Legacy Motors Garage', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi1:'Hi there! 😊 How can we help you today?', hi2:'Did you see a car you liked? 🚗', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
   function t(k){ return (T[lang]&&T[lang][k])||T.es[k]; }
-  var msgs=[{role:'assistant',content:''}]; // el saludo se rellena abajo (según idioma)
-  msgs[0].content=T[lang].hi;
-  var openState=false, busy=false, unread=1;
+  var msgs=[{role:'assistant',content:T[lang].hi1}]; // saludo casual; el 2º mensaje llega con la animación
+  var openState=false, busy=false, unread=0;
   // 🆔 Id de conversación (uno por visitante POR DÍA → para contar personas al día y poder repasar las pláticas).
   function bDay(){ try{ return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles'}).format(new Date()).replace(/-/g,''); }catch(e){ return '00000000'; } }
   var convoId='';
@@ -95,15 +94,28 @@
   function send(){
     var i=document.getElementById('lmb-in'); var txt=(i.value||'').trim(); if(!txt||busy) return;
     i.value=''; msgs.push({role:'user',content:txt}); busy=true; render(); saveMsgs();
-    fetch(ENDPOINT,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lang:lang, convoId:convoId, messages:msgs.slice(-12) }) })
+    // Fusiona mensajes consecutivos del mismo rol (los 2 saludos del bot) para no mandar 2 "assistant" seguidos a la API.
+    var api=[]; msgs.forEach(function(m){ var l=api[api.length-1]; if(l&&l.role===m.role){ l.content+='\n'+m.content; } else { api.push({role:m.role,content:m.content}); } });
+    fetch(ENDPOINT,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ lang:lang, convoId:convoId, messages:api.slice(-12) }) })
       .then(function(r){ return r.json(); })
       .then(function(d){ busy=false; msgs.push({role:'assistant',content:(d&&d.reply)||t('err')}); if(!openState){ unread++; updateFab(); } render(); saveMsgs(); })
       .catch(function(){ busy=false; msgs.push({role:'assistant',content:t('err')}); render(); saveMsgs(); });
   }
-  // 🎣 Enganche: entra como círculo; a los ~2.5s se abre la barra mostrando "escribiendo…" (como un asesor real),
-  // y a los ~5s suelta el saludo casual con el globito rojo "1" (mensaje no leído) para invitar a abrir.
+  // 🎣 Enganche (como un asesor real): círculo → "escribiendo…" → 1er mensaje (globito "1") → "escribiendo…" → 2º mensaje (globito "2").
   function setFabText(html){ var tx=fab.querySelector('.txt'); if(tx) tx.innerHTML=html+'<span id="lmb-badge"></span>'; }
-  setTimeout(function(){ if(openState) return; fab.classList.add('wide'); setFabText('<span style="opacity:.9;">'+t('writing')+'</span><span class="lmb-dots"><i>.</i><i>.</i><i>.</i></span>'); unread=0; updateFab(); }, 2500);
-  setTimeout(function(){ if(openState) return; setFabText(t('preview')); unread=1; updateFab(); }, 5200);
+  function fabWriting(){ setFabText('<span style="opacity:.9;">'+t('writing')+'</span><span class="lmb-dots"><i>.</i><i>.</i><i>.</i></span>'); unread=0; updateFab(); }
+  var fresh=(msgs.length<=1);   // solo el enganche si NO trae plática guardada
+  if(fresh){
+    setTimeout(function(){ if(openState) return; fab.classList.add('wide'); fabWriting(); }, 2500);
+    setTimeout(function(){ if(openState) return; setFabText(t('hi1')); unread=1; updateFab(); }, 5200);
+    setTimeout(function(){ if(openState||msgs.length!==1) return; fabWriting(); }, 8600);   // "escribiendo…" del 2º
+    setTimeout(function(){
+      if(msgs.length!==1) return;                                  // ya interactuó → no metas el 2º teaser
+      msgs.push({role:'assistant',content:t('hi2')}); saveMsgs();
+      if(openState){ render(); } else { setFabText(t('hi2')); unread=2; updateFab(); }
+    }, 10500);
+  } else {
+    setTimeout(function(){ if(!openState){ fab.classList.add('wide'); setFabText(t('open')); updateFab(); } }, 2500);
+  }
   updateFab();
 })();
