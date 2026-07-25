@@ -298,6 +298,25 @@
   <div id="citas-list" style="padding:14px 18px;"></div>
 </div>
 
+<!-- 💬 CONVERSACIONES DEL BOT DE VENTAS (repaso + contador de personas) -->
+<div id="botc-box" style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;" onclick="toggleSection('botc-list','botc-arrow');loadBotConvos()">
+    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">💬 CONVERSACIONES DEL BOT</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <button onclick="event.stopPropagation();loadBotConvos(true)" title="Actualizar" style="background:var(--border);color:var(--muted);border:none;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;">↻</button>
+      <span id="botc-arrow" class="sec-arrow">▸</span>
+    </div>
+  </div>
+  <div id="botc-list" style="padding:14px 18px;display:none;"><div style="color:var(--muted);font-size:13px;">Toca para cargar…</div></div>
+</div>
+
+<!-- Modal: transcripción de una conversación -->
+<div id="botc-modal" class="modal-overlay"><div class="modal" style="max-width:560px;">
+  <div class="modal-title" id="botc-modal-title">💬 Conversación</div>
+  <div id="botc-modal-body" style="max-height:60vh;overflow-y:auto;margin:10px 0;"></div>
+  <button type="button" onclick="closeModal('botc-modal')" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">Cerrar</button>
+</div></div>
+
 <div class="search-wrap">
     <div style="display:flex;gap:10px;align-items:center;">
       <input class="search-input" placeholder="🔍 Buscar cliente, carro o VIN..." id="search-box" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="flex:1;">
@@ -653,6 +672,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, collection, doc, setDoc, updateDoc, runTransaction, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
@@ -665,6 +685,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const functions = getFunctions(app);
 const auth = getAuth(app);
 
 // ---- STAFF AUTH (Firebase Auth) ----
@@ -3270,6 +3291,50 @@ window.generateContract = function(clientId) {
 };
 
 window.closeModal=function(id){document.getElementById(id).classList.remove('active');};
+
+// 💬 CONVERSACIONES DEL BOT DE VENTAS — repaso + contador de personas (datos vía backend, solo dueños).
+let _botcData=null, _botcLoading=false;
+function botcTime(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleString('es-MX',{timeZone:'America/Los_Angeles',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return String(iso).slice(0,16).replace('T',' '); } }
+window.loadBotConvos=async function(force){
+  const box=document.getElementById('botc-list'); if(!box) return;
+  if(_botcData && !force){ renderBotConvos(); return; }
+  if(_botcLoading) return; _botcLoading=true;
+  box.innerHTML='<div style="color:var(--muted);font-size:13px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'botConvos')(); _botcData=r.data||{}; _botcLoading=false; renderBotConvos(); }
+  catch(e){ _botcLoading=false; box.innerHTML='<div style="color:#e08080;font-size:13px;">No se pudo cargar: '+escAppt((e&&e.message)||e)+'</div>'; }
+};
+function renderBotConvos(){
+  const box=document.getElementById('botc-list'); if(!box) return;
+  const d=_botcData||{}; const today=d.today||{convos:0,messages:0}; const list=d.list||[]; const days=(d.days||[]).slice(0,7);
+  let html='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">'
+    +'<div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--gold);border-radius:10px;padding:10px 12px;"><div style="font-size:26px;font-weight:800;color:var(--gold);">'+(today.convos||0)+'</div><div style="font-size:11px;color:var(--muted);">personas hoy</div></div>'
+    +'<div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;"><div style="font-size:26px;font-weight:800;">'+(today.messages||0)+'</div><div style="font-size:11px;color:var(--muted);">mensajes hoy</div></div></div>';
+  if(days.length>1){
+    const mx=Math.max(1,...days.map(x=>x.convos||0));
+    html+='<div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:14px;">'+days.slice().reverse().map(x=>{ const h=Math.max(6,Math.round((x.convos||0)/mx*46)); return '<div style="flex:1;text-align:center;"><div style="font-size:10px;font-weight:700;">'+(x.convos||0)+'</div><div style="background:var(--gold);opacity:.8;height:'+h+'px;border-radius:4px 4px 0 0;"></div><div style="font-size:9px;color:var(--muted);margin-top:3px;">'+String(x.date||'').slice(5)+'</div></div>'; }).join('')+'</div>';
+  }
+  if(!list.length){ box.innerHTML=html+'<div style="color:var(--muted);font-size:13px;">Aún no hay conversaciones registradas.</div>'; return; }
+  html+=list.map(c=>{
+    const badge=c.booked?'<span style="font-size:10px;background:rgba(240,192,64,0.14);color:var(--gold);border:1px solid var(--gold);border-radius:5px;padding:1px 6px;white-space:nowrap;">🤖 agendó</span>':'';
+    return '<div onclick="openBotConvo(\''+c.id+'\')" style="display:flex;gap:10px;align-items:center;padding:10px 2px;border-top:1px solid var(--border);cursor:pointer;">'
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(escAppt(c.firstMsg)||'(sin texto)')+'</div><div style="font-size:11px;color:var(--muted);">'+botcTime(c.lastAt)+' · '+(c.msgCount||0)+' msj</div></div>'
+      +badge+'<span style="color:var(--muted);font-size:18px;">›</span></div>';
+  }).join('');
+  box.innerHTML=html;
+}
+window.openBotConvo=async function(id){
+  const body=document.getElementById('botc-modal-body'), title=document.getElementById('botc-modal-title');
+  body.innerHTML='<div style="color:var(--muted);">Cargando…</div>'; document.getElementById('botc-modal').classList.add('active');
+  try{
+    const r=await httpsCallable(functions,'botConvoGet')({id:id}); const d=r.data||{};
+    if(!d.ok){ body.innerHTML='<div style="color:#e08080;">No encontrada.</div>'; return; }
+    title.textContent='💬 '+botcTime(d.startedAt)+(d.booked?' · 🤖 agendó':'');
+    const msgs=d.messages||[];
+    body.innerHTML=msgs.map(m=>{ const bot=m.role==='assistant';
+      return '<div style="display:flex;justify-content:'+(bot?'flex-start':'flex-end')+';margin:6px 0;"><div style="max-width:82%;padding:8px 11px;border-radius:12px;font-size:13.5px;line-height:1.38;'+(bot?'background:var(--bg);border:1px solid var(--border);':'background:rgba(240,192,64,0.14);border:1px solid var(--gold);')+'"><div style="font-size:10px;color:var(--muted);margin-bottom:2px;">'+(bot?'🤖 Bot':'👤 Cliente')+'</div>'+escAppt(m.text||'').replace(/\n/g,'<br>')+'</div></div>';
+    }).join('')||'<div style="color:var(--muted);">Sin mensajes.</div>';
+  }catch(e){ body.innerHTML='<div style="color:#e08080;">Error: '+escAppt((e&&e.message)||e)+'</div>'; }
+};
 document.querySelectorAll('.modal-overlay').forEach(el=>{
   el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});
 });
