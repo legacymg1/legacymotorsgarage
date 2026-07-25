@@ -14892,7 +14892,7 @@ window.renderCars = function(){
     return true;
   });
   if(_q && !_list.length){ grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--silver);">Sin resultados para “'+_q+'”</div>'; return; }
-  grid.innerHTML=_list.map(function(c,i){
+  var carCard=function(c,i){
     var thumbSrc = (c.photos&&c.photos[0]) ? c.photos[0] : (c.gpsPhotoURL||'');
     var thumb = thumbSrc ? '<img src="'+thumbSrc+'" onerror="imgFallback(this,220)" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;" loading="lazy">' : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;">🚗</div>';
     var videoIcon = c.videoURL ? '<div style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;">▶ Video</div>' : '';
@@ -14930,8 +14930,30 @@ window.renderCars = function(){
       +'</div>'
       +adminBtns
       +'</div>';
-  }).join('');
+  };
+  // 👑 Staff: agrupa por estado con secciones MINIMIZABLES (En venta / En prep / Vendidos). Clientes: lista normal.
+  if(isStaffUser){
+    var _groups=[
+      {key:'venta',label:'🟢 En venta',color:'#4caf50',dc:false,f:function(c){return c.status!=='sold'&&c.status!=='prep';}},
+      {key:'prep',label:'🔧 En prep',color:'#ff9800',dc:false,f:function(c){return c.status==='prep';}},
+      {key:'sold',label:'💰 Vendidos',color:'#f0c040',dc:true,f:function(c){return c.status==='sold';}}
+    ];
+    var _html='';
+    _groups.forEach(function(g){
+      var items=_list.filter(g.f);
+      if(!items.length) return;
+      var raw=null; try{ raw=localStorage.getItem('invcol_'+g.key); }catch(e){}
+      var col=(raw===null)?g.dc:(raw==='1');
+      _html+='<div onclick="toggleInvGroup(\''+g.key+'\')" style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;background:'+g.color+'1f;border:1px solid '+g.color+'55;border-radius:10px;padding:11px 15px;margin:8px 0 2px;font-weight:800;color:'+g.color+';font-size:14px;letter-spacing:0.5px;">'
+        +'<span>'+g.label+' ('+items.length+')</span><span style="font-size:17px;">'+(col?'▸':'▾')+'</span></div>';
+      if(!col) _html+=items.map(carCard).join('');
+    });
+    grid.innerHTML=_html||'<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--silver);">Sin resultados</div>';
+  } else {
+    grid.innerHTML=_list.map(carCard).join('');
+  }
 };
+window.toggleInvGroup=function(key){ var raw=null; try{ raw=localStorage.getItem('invcol_'+key); }catch(e){} var dc=(key==='sold'); var col=(raw===null)?dc:(raw==='1'); try{ localStorage.setItem('invcol_'+key, col?'0':'1'); }catch(e){} renderCars(); };
 
 window.openCarDetail = function(carId){
   var c=cars.find(function(x){return x.id===carId;});
