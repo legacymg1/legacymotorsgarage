@@ -2,8 +2,8 @@
 (function(){
   var ENDPOINT='https://us-central1-legacy-motors-garage.cloudfunctions.net/siteChat';
   var lang=(navigator.language||'es').toLowerCase().indexOf('en')===0?'en':'es';
-  var T={ es:{ open:'¿Buscas carro? Escríbenos', title:'Legacy Motors Garage', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi:'¡Hola! 😊 ¿Cómo estás? Con gusto te ayudamos — ¿qué andas buscando?', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
-           en:{ open:'Looking for a car? Chat with us', title:'Legacy Motors Garage', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi:'Hi there! 😊 How are you? We’re happy to help — what are you looking for?', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
+  var T={ es:{ open:'¿Buscas carro? Escríbenos', preview:'¡Hola! 😊 ¿En qué te ayudamos?', writing:'escribiendo', title:'Legacy Motors Garage', sub:'Te ayudamos a estrenar hoy 🚗', ph:'Escribe tu mensaje…', send:'Enviar', hi:'¡Hola! 😊 ¿Cómo estás? Con gusto te ayudamos — ¿qué andas buscando?', err:'Perdón, tuve un detalle. Llámanos al (559) 540-5145.' },
+           en:{ open:'Looking for a car? Chat with us', preview:'Hi! 😊 How can we help?', writing:'typing', title:'Legacy Motors Garage', sub:'Drive home today 🚗', ph:'Type your message…', send:'Send', hi:'Hi there! 😊 How are you? We’re happy to help — what are you looking for?', err:'Sorry, I had a hiccup. Call us at (559) 540-5145.' } };
   function t(k){ return (T[lang]&&T[lang][k])||T.es[k]; }
   var msgs=[{role:'assistant',content:''}]; // el saludo se rellena abajo (según idioma)
   msgs[0].content=T[lang].hi;
@@ -26,6 +26,8 @@
    +'#lmb-fab.wide .ic{width:44px;}'
    +'#lmb-fab.wide .txt{opacity:1;}'
    +'#lmb-badge{display:none;align-items:center;justify-content:center;background:#c0392b;color:#fff;border-radius:50%;width:21px;height:21px;font-size:11px;font-weight:800;flex:0 0 auto;}'
+   +'.lmb-dots i{font-style:normal;opacity:.3;animation:lmbblink 1.2s infinite;}.lmb-dots i:nth-child(2){animation-delay:.2s}.lmb-dots i:nth-child(3){animation-delay:.4s}'
+   +'@keyframes lmbblink{0%,100%{opacity:.3}50%{opacity:1}}'
    +'@keyframes lmbpulse{0%,100%{box-shadow:0 12px 34px rgba(0,0,0,.5),0 0 0 0 rgba(240,192,64,.55)}50%{box-shadow:0 12px 34px rgba(0,0,0,.5),0 0 0 14px rgba(240,192,64,0)}}'
    +'#lmb-fab.pulse{animation:lmbpulse 2.2s infinite;}'
    +'#lmb-panel{position:fixed;inset:0;z-index:2147482001;background:rgba(0,0,0,.45);display:none;font-family:-apple-system,system-ui,sans-serif;}'
@@ -98,8 +100,10 @@
       .then(function(d){ busy=false; msgs.push({role:'assistant',content:(d&&d.reply)||t('err')}); if(!openState){ unread++; updateFab(); } render(); saveMsgs(); })
       .catch(function(){ busy=false; msgs.push({role:'assistant',content:t('err')}); render(); saveMsgs(); });
   }
-  // Entra como círculo discreto; a los ~3s se "abre" a la barra con el globo rojo para llamar la atención (sin abrir el chat)
-  var reveal=function(){ if(!openState){ fab.classList.add('wide'); updateFab(); } };
-  setTimeout(reveal,3000);
+  // 🎣 Enganche: entra como círculo; a los ~2.5s se abre la barra mostrando "escribiendo…" (como un asesor real),
+  // y a los ~5s suelta el saludo casual con el globito rojo "1" (mensaje no leído) para invitar a abrir.
+  function setFabText(html){ var tx=fab.querySelector('.txt'); if(tx) tx.innerHTML=html+'<span id="lmb-badge"></span>'; }
+  setTimeout(function(){ if(openState) return; fab.classList.add('wide'); setFabText('<span style="opacity:.9;">'+t('writing')+'</span><span class="lmb-dots"><i>.</i><i>.</i><i>.</i></span>'); unread=0; updateFab(); }, 2500);
+  setTimeout(function(){ if(openState) return; setFabText(t('preview')); unread=1; updateFab(); }, 5200);
   updateFab();
 })();
