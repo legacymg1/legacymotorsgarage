@@ -3488,11 +3488,10 @@ window.openEbayMsg=function(i){
     +'<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--gold);">Respuesta (revísala antes de enviar):</div>'
     +'<textarea id="ebm-reply" style="width:100%;min-height:120px;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13.5px;line-height:1.4;" placeholder="Genera un borrador o escribe tu respuesta…"></textarea>'
     +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
-    +'<button type="button" id="ebm-gen" onclick="ebmGenerate('+i+')" style="flex:1;min-width:130px;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">✨ Generar borrador</button>'
-    +'<button type="button" id="ebm-send" onclick="ebmSend('+i+')" style="flex:1;min-width:130px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:800;cursor:pointer;">📤 Enviar</button>'
+    +'<button type="button" id="ebm-gen" onclick="ebmGenerate('+i+')" style="flex:1;min-width:130px;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">✨ Generar de nuevo</button>'
+    +'<button type="button" id="ebm-send" onclick="ebmSendReliable('+i+')" style="flex:1.4;min-width:170px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:800;cursor:pointer;">📋 Copiar y abrir eBay</button>'
     +'</div>'
-    +(m.responseURL?'<div style="margin-top:8px;font-size:12px;"><a href="'+escAppt(m.responseURL)+'" target="_blank" style="color:var(--muted);">↗ Abrir esta conversación en eBay</a></div>':'')
-    +'<div id="ebm-msg" style="font-size:12px;margin-top:8px;"></div>';
+    +'<div id="ebm-msg" style="font-size:12px;margin-top:8px;color:var(--muted);">El bot redacta · tú pegas (Cmd/Ctrl+V) y le das Enviar en eBay.</div>';
   document.getElementById('ebm-modal').classList.add('active');
   ebmGenerate(i);
 };
@@ -3503,22 +3502,20 @@ window.ebmGenerate=async function(i){
   catch(e){ const mm=document.getElementById('ebm-msg'); if(mm){ mm.style.color='#e08080'; mm.textContent='No se pudo generar: '+((e&&e.message)||e); } }
   if(gen){ gen.disabled=false; gen.textContent='✨ Generar de nuevo'; }
 };
-window.ebmSend=async function(i){
+// ✅ Método confiable: copia la respuesta al portapapeles y abre la conversación en eBay (su propia página) para pegar y enviar.
+window.ebmSendReliable=function(i){
   const m=(_ebmData&&_ebmData.list&&_ebmData.list[i]); if(!m) return;
   const ta=document.getElementById('ebm-reply'); const body=(ta?ta.value:'').trim();
-  if(!body){ alert('Escribe o genera una respuesta primero.'); return; }
-  const send=document.getElementById('ebm-send'), mm=document.getElementById('ebm-msg'); if(send){ send.disabled=true; send.textContent='Enviando…'; }
-  try{
-    const r=await httpsCallable(functions,'ebayMsgSend')({ itemId:m.itemId||'', externalId:m.externalId||'', messageId:m.messageId, recipient:m.sender, body:body }); const d=r.data||{};
-    if(d.ok){ if(mm){ mm.style.color='var(--green)'; mm.textContent='✅ Respuesta enviada por eBay.'; } m.replied=true; setTimeout(()=>{ closeModal('ebm-modal'); loadEbayInbox(true); },1200); }
-    else { ebmFallback(m, body, d.error); if(send){ send.disabled=false; send.textContent='📤 Enviar'; } }
-  }catch(e){ ebmFallback(m, body, (e&&e.message)||e); if(send){ send.disabled=false; send.textContent='📤 Enviar'; } }
+  if(!body){ alert('Genera o escribe una respuesta primero.'); return; }
+  const mm=document.getElementById('ebm-msg');
+  try{ navigator.clipboard.writeText(body); }catch(e){}
+  if(m.responseURL){
+    window.open(m.responseURL,'_blank');
+    if(mm){ mm.style.color='var(--green)'; mm.innerHTML='📋 Copié tu respuesta y abrí eBay. Pega (Cmd/Ctrl+V) y dale <b>Enviar</b> en eBay.'; }
+  } else {
+    if(mm){ mm.style.color='#e0a54a'; mm.innerHTML='📋 Copié tu respuesta. Ábrela en tus <a href="https://mesg.ebay.com/mesgweb/ViewMessages/0" target="_blank" style="color:var(--gold);font-weight:800;">mensajes de eBay</a> y pégala para enviar.'; }
+  }
 };
-// Si eBay no deja enviar por API: copia la respuesta y abre el enlace de eBay para pegarla (100% seguro).
-function ebmFallback(m, body, err){
-  const mm=document.getElementById('ebm-msg'); try{ navigator.clipboard.writeText(body); }catch(e){}
-  if(mm){ mm.style.color='#e0a54a'; mm.innerHTML='📋 Copié tu respuesta. '+(m.responseURL?'<a href="'+escAppt(m.responseURL)+'" target="_blank" style="color:var(--gold);font-weight:800;">Ábrela en eBay</a> y pégala (Cmd/Ctrl+V) para enviar.':'Pégala en eBay para enviar.')+'<br><span style="color:var(--muted);font-size:11px;">(API: '+escAppt(err||'')+')</span>'; }
-}
 document.querySelectorAll('.modal-overlay').forEach(el=>{
   el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});
 });
