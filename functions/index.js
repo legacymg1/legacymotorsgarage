@@ -860,19 +860,12 @@ exports.ebayMsgDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUT
   if (req.query.k !== EBAY_VERIFY_TOKEN) { res.status(403).json({ error: "forbidden" }); return; }
   const out = {};
   try {
-    const end = new Date(); const start = new Date(end.getTime() - 30 * 86400000);
-    // Buzón GENERAL de eBay (GetMyMessages, headers) — aquí caen los mensajes que el vendedor ve en "Mensajes".
-    const r = await ebayXmlOAuth("GetMyMessages", `<DetailLevel>ReturnHeaders</DetailLevel>\n<StartTime>${start.toISOString()}</StartTime>\n<EndTime>${end.toISOString()}</EndTime>`, "https://api.ebay.com/oauth/api_scope");
-    if (r.tokenErr) { out.tokenErr = r.tokenErr; res.json(out); return; }
-    const xml = r.xml || "";
-    out.ack = (ebayTags(xml, "Ack")[0] || "").slice(0, 20);
-    out.errors = ebayTags(xml, "LongMessage").slice(0, 3);
-    const blocks = xml.match(/<Message>[\s\S]*?<\/Message>/g) || [];
-    out.myMessagesCount = blocks.length;
-    out.unread = (xml.match(/<Read>false<\/Read>/g) || []).length;
-    out.repliedFalse = (xml.match(/<Replied>false<\/Replied>/g) || []).length;
-    out.firstMessageRaw = (blocks[0] || "").slice(0, 900);   // para ver el formato exacto de tus mensajes
-    out.xmlLen = xml.length;
+    const r = await ebayFetchInbox(2);   // usa el MISMO camino que el panel (headers+bodies+limpieza)
+    out.err = r.err || null;
+    out.unanswered = r.unanswered;
+    out.total = r.total;
+    const m = (r.list || [])[0];
+    out.first = m ? { sender: m.sender, subject: m.subject, itemId: m.itemId, bodyLen: (m.body || "").length, bodyClean: (m.body || "").slice(0, 500) } : null;
   } catch (e) { out.err = (e && e.message) || String(e); }
   res.json(out);
 });
