@@ -3474,7 +3474,7 @@ function renderEbayInbox(){
   box.innerHTML=head+list.map((m,i)=>{
     const tag=m.read?'<span style="font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:1px 6px;">leído</span>':'<span style="font-size:10px;background:rgba(192,57,43,0.15);color:#e57373;border:1px solid #e57373;border-radius:5px;padding:1px 6px;">nuevo</span>';
     return '<div onclick="openEbayMsg('+i+')" style="display:flex;gap:10px;align-items:center;padding:10px 2px;border-top:1px solid var(--border);cursor:pointer;">'
-      +'<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escAppt(m.body||m.subject||'(sin texto)')+'</div><div style="font-size:11px;color:var(--muted);">👤 '+escAppt(m.sender||'')+' · '+botcTime(m.date)+'</div></div>'
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escAppt(m.subject||m.body||'(sin texto)')+'</div><div style="font-size:11px;color:var(--muted);">👤 '+escAppt(m.sender||'')+' · '+botcTime(m.date)+'</div></div>'
       +tag+'<span style="color:var(--muted);font-size:18px;">›</span></div>';
   }).join('');
 }
@@ -3482,7 +3482,8 @@ window.openEbayMsg=function(i){
   const m=(_ebmData&&_ebmData.list&&_ebmData.list[i]); if(!m) return;
   document.getElementById('ebm-modal-title').textContent='📨 '+(m.sender||'Comprador');
   document.getElementById('ebm-modal-body').innerHTML=
-    '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.4;white-space:pre-wrap;">'+escAppt(m.body||'')+'</div>'
+    '<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--text);">'+escAppt(m.subject||'')+'</div>'
+    +'<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.4;white-space:pre-wrap;max-height:200px;overflow-y:auto;">'+escAppt(m.body||'(sin cuerpo — usa el asunto de arriba como contexto)')+'</div>'
     +'<div style="font-size:11px;color:var(--muted);margin:6px 0 10px;">'+(m.itemId?('Artículo #'+escAppt(m.itemId)+' · '):'')+botcTime(m.date)+'</div>'
     +'<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--gold);">Respuesta (revísala antes de enviar):</div>'
     +'<textarea id="ebm-reply" style="width:100%;min-height:120px;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13.5px;line-height:1.4;" placeholder="Genera un borrador o escribe tu respuesta…"></textarea>'

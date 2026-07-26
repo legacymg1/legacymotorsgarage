@@ -878,8 +878,16 @@ exports.ebayMsgDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUT
 });
 // Decodifica entidades HTML y quita etiquetas (los mensajes de eBay traen HTML).
 function ebayDecode(s, stripTags) {
-  let t = String(s || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&amp;/g, "&");
-  if (stripTags) t = t.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  let t = String(s || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&nbsp;/gi, " ").replace(/&amp;/g, "&");
+  if (stripTags) {
+    t = t.replace(/<style[\s\S]*?<\/style>/gi, " ")   // ← quita el CSS que se veía como "@media only screen..."
+         .replace(/<script[\s\S]*?<\/script>/gi, " ")
+         .replace(/<head[\s\S]*?<\/head>/gi, " ")
+         .replace(/<!--[\s\S]*?-->/g, " ")
+         .replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|tr|td|li)>/gi, "\n")
+         .replace(/<[^>]+>/g, " ")
+         .replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
   return t;
 }
 // Lee el BUZÓN GENERAL de eBay (GetMyMessages): headers → filtra mensajes de comprador sin responder → trae los cuerpos.
@@ -938,7 +946,8 @@ exports.ebayMsgDraft = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }, 
 - HONESTA con el fitment: si preguntan si una parte le queda a su carro y no puedes estar 100% seguro, pídele el año/marca/modelo o el número OEM/interchange para confirmar, u ofrece verificarlo — NUNCA prometas compatibilidad que no sabes.
 - Útil: disponibilidad, condición, y que haces envío combinado si compran varias partes.
 - No prometas fechas exactas de entrega ni nada que no controles. Cierra invitando a comprar con confianza.
-- Devuelve SOLO el texto de la respuesta, listo para enviar (sin comillas, sin "Asunto:", sin firma tipo formulario — puedes cerrar con "— Legacy Motors Garage").`;
+- Devuelve SOLO el texto de la respuesta, listo para enviar (sin comillas, sin "Asunto:", sin firma tipo formulario — puedes cerrar con "— Legacy Motors Garage").
+- NOTA: el mensaje del comprador puede traer texto de plantilla/HTML de eBay; IGNÓRALO y enfócate en lo que el comprador realmente pregunta o pide. El "Asunto" te dice de qué ARTÍCULO se trata. Si no queda clara la pregunta, responde de forma útil sobre esa parte e invita al comprador a decirte su año/marca/modelo para confirmar.`;
   const AnthropicMod = require("@anthropic-ai/sdk");
   const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
   const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
