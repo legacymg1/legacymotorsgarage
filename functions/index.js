@@ -871,7 +871,8 @@ exports.ebayMsgDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUT
 });
 // Decodifica entidades HTML y quita etiquetas (los mensajes de eBay traen HTML).
 function ebayDecode(s, stripTags) {
-  let t = String(s || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&nbsp;/gi, " ").replace(/&amp;/g, "&");
+  const ent = (x) => String(x).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&nbsp;/gi, " ").replace(/&bull;/gi, "·").replace(/&#\d+;/g, " ").replace(/&amp;/g, "&");
+  let t = ent(ent(String(s || "")));   // 2 pasadas → maneja doble-encoding (&amp;nbsp;)
   if (stripTags) {
     t = t.replace(/<style[\s\S]*?<\/style>/gi, " ")   // ← quita el CSS que se veía como "@media only screen..."
          .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -880,6 +881,8 @@ function ebayDecode(s, stripTags) {
          .replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|tr|td|li)>/gi, "\n")
          .replace(/<[^>]+>/g, " ")
          .replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    // Recorta el pie de plantilla de eBay (deja la pregunta del comprador arriba).
+    t = t.split(/\n\s*(?:View your listing|Get to know the buyer|View listing|View item|Marketplaces|Report this message|Response options)/i)[0].trim();
   }
   return t;
 }
