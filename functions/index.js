@@ -875,6 +875,77 @@ exports.ebayMsgDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUT
   } catch (e) { out.err = (e && e.message) || String(e); }
   res.json(out);
 });
+// 📨 Bandeja de preguntas de compradores en eBay (solo dueños). Lee vía Trading API (OAuth IAF).
+exports.ebayInbox = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (request) => {
+  salesOwnerOnly(request);
+  const end = new Date(); const start = new Date(end.getTime() - 30 * 86400000);
+  const inner = `<MailMessageType>AskSellerQuestion</MailMessageType>
+<StartCreationTime>${start.toISOString()}</StartCreationTime>
+<EndCreationTime>${end.toISOString()}</EndCreationTime>`;
+  const r = await ebayXmlOAuth("GetMemberMessages", inner);
+  if (r.tokenErr) return { ok: false, needConsent: true, error: "token" };
+  const xml = r.xml || "";
+  if ((ebayTags(xml, "Ack")[0] || "") === "Failure") return { ok: false, error: (ebayTags(xml, "LongMessage")[0] || "eBay error") };
+  const T = (block, tag) => { const m = block.match(new RegExp("<" + tag + ">([\\s\\S]*?)</" + tag + ">")); return m ? m[1] : ""; };
+  const dec = (s) => String(s || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+  const exchanges = xml.match(/<MemberMessageExchange>[\s\S]*?<\/MemberMessageExchange>/g) || [];
+  const list = exchanges.map((ex) => {
+    const q = (ex.match(/<Question>[\s\S]*?<\/Question>/) || [""])[0] || ex;
+    return {
+      messageId: T(q, "MessageID"),
+      itemId: T(q, "ItemID"),
+      sender: T(q, "SenderID") || T(q, "Sender"),
+      subject: dec(T(q, "Subject")).slice(0, 140),
+      body: dec(T(q, "Body")).slice(0, 1500),
+      date: T(q, "CreationDate"),
+      status: T(ex, "MessageStatus"),
+      answered: /Answered/i.test(T(ex, "MessageStatus")),
+    };
+  }).filter((m) => m.messageId);
+  list.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  return { ok: true, count: list.length, unanswered: list.filter((m) => !m.answered).length, list };
+});
+// ✍️ Borrador de respuesta (IA experta en autopartes) — el dueño lo revisa antes de enviar.
+exports.ebayMsgDraft = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }, async (request) => {
+  salesOwnerOnly(request);
+  const q = String((request.data && request.data.question) || "").slice(0, 1500);
+  const item = String((request.data && request.data.item) || "").slice(0, 200);
+  if (!q) throw new HttpsError("invalid-argument", "Falta la pregunta.");
+  const sys = `Eres el equipo de Legacy Motors Garage, vendedor de AUTOPARTES usadas de calidad en eBay (Porterville, CA). Un comprador hizo una pregunta sobre una parte. Redacta la RESPUESTA para enviársela:
+- Cálida, breve, profesional y muy servicial (como un buen vendedor de refacciones). En el MISMO idioma del comprador (en eBay US casi siempre inglés).
+- HONESTA con el fitment: si preguntan si una parte le queda a su carro y no puedes estar 100% seguro, pídele el año/marca/modelo o el número OEM/interchange para confirmar, u ofrece verificarlo — NUNCA prometas compatibilidad que no sabes.
+- Útil: disponibilidad, condición, y que haces envío combinado si compran varias partes.
+- No prometas fechas exactas de entrega ni nada que no controles. Cierra invitando a comprar con confianza.
+- Devuelve SOLO el texto de la respuesta, listo para enviar (sin comillas, sin "Asunto:", sin firma tipo formulario — puedes cerrar con "— Legacy Motors Garage").`;
+  const AnthropicMod = require("@anthropic-ai/sdk");
+  const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+  const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+  const msg = await client.messages.create({ model: SITE_BOT_MODEL, max_tokens: 450, system: [{ type: "text", text: sys }], messages: [{ role: "user", content: (item ? ("Parte del anuncio: " + item + "\n\n") : "") + "Pregunta del comprador:\n" + q }] });
+  const draft = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  return { ok: true, draft };
+});
+// 📤 Enviar la respuesta aprobada (AddMemberMessageRTQ).
+exports.ebayMsgSend = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (request) => {
+  salesOwnerOnly(request);
+  const itemId = String((request.data && request.data.itemId) || "");
+  const parentId = String((request.data && request.data.messageId) || "");
+  const recipient = String((request.data && request.data.recipient) || "");
+  const body = String((request.data && request.data.body) || "").slice(0, 2000);
+  if (!parentId || !recipient || !body) throw new HttpsError("invalid-argument", "Faltan datos.");
+  const x = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inner = `${itemId ? ("<ItemID>" + x(itemId) + "</ItemID>") : ""}
+<MemberMessageRTQ>
+  <Body>${x(body)}</Body>
+  <ParentMessageID>${x(parentId)}</ParentMessageID>
+  <RecipientID>${x(recipient)}</RecipientID>
+  <DisplayToPublic>false</DisplayToPublic>
+</MemberMessageRTQ>`;
+  const r = await ebayXmlOAuth("AddMemberMessageRTQ", inner);
+  if (r.tokenErr) return { ok: false, error: "token" };
+  const ack = (ebayTags(r.xml || "", "Ack")[0] || "");
+  if (ack === "Success" || ack === "Warning") return { ok: true };
+  return { ok: false, error: (ebayTags(r.xml || "", "LongMessage")[0] || "eBay error") };
+});
 exports.ebayOrders = onCall({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const a = await ebayUserAccessToken(EBAY_FULFILL_SCOPE);
