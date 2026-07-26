@@ -876,35 +876,56 @@ exports.ebayMsgDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUT
   } catch (e) { out.err = (e && e.message) || String(e); }
   res.json(out);
 });
-// 📨 Bandeja de preguntas de compradores en eBay (solo dueños). Lee vía Trading API (OAuth IAF).
-exports.ebayInbox = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (request) => {
+// Decodifica entidades HTML y quita etiquetas (los mensajes de eBay traen HTML).
+function ebayDecode(s, stripTags) {
+  let t = String(s || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+  if (stripTags) t = t.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return t;
+}
+// Lee el BUZÓN GENERAL de eBay (GetMyMessages): headers → filtra mensajes de comprador sin responder → trae los cuerpos.
+async function ebayFetchInbox(maxN) {
+  const T = (b, t) => { const m = b.match(new RegExp("<" + t + ">([\\s\\S]*?)</" + t + ">")); return m ? m[1] : ""; };
+  const end = new Date(); const start = new Date(end.getTime() - 45 * 86400000);
+  const h = await ebayXmlOAuth("GetMyMessages", `<DetailLevel>ReturnHeaders</DetailLevel>\n<StartTime>${start.toISOString()}</StartTime>\n<EndTime>${end.toISOString()}</EndTime>`);
+  if (h.tokenErr) return { err: "token" };
+  const xml = h.xml || "";
+  if ((ebayTags(xml, "Ack")[0] || "") === "Failure") return { err: (ebayTags(xml, "LongMessage")[0] || "eBay error") };
+  const blocks = xml.match(/<Message>[\s\S]*?<\/Message>/g) || [];
+  let heads = blocks.map((b) => ({
+    messageId: T(b, "MessageID"),
+    externalId: T(b, "ExternalMessageID"),
+    sender: T(b, "Sender"),
+    subject: ebayDecode(T(b, "Subject")).slice(0, 180),
+    itemId: T(b, "ItemID"),
+    date: T(b, "ReceiveDate"),
+    read: /<Read>true<\/Read>/.test(b),
+    replied: /<Replied>true<\/Replied>/.test(b),
+    responseEnabled: /<ResponseEnabled>true<\/ResponseEnabled>/.test(b),
+    responseURL: ebayDecode(T(b, "ResponseURL")),
+    type: T(b, "MessageType"),
+  }));
+  const total = heads.length;
+  // Solo mensajes de un COMPRADOR real, contestables y sin responder (no avisos del sistema de eBay).
+  heads = heads.filter((m) => m.messageId && m.sender && m.sender.toLowerCase() !== "ebay" && !m.replied && m.responseEnabled && /AskSeller|M2M|ContacteBay|Member/i.test(m.type));
+  heads.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const unanswered = heads.length;
+  heads = heads.slice(0, maxN || 30);
+  // Cuerpos en lotes de 10 (GetMyMessages ReturnMessages).
+  const byId = {};
+  for (let i = 0; i < heads.length; i += 10) {
+    const ids = heads.slice(i, i + 10).map((m) => "<MessageID>" + m.messageId + "</MessageID>").join("");
+    const b = await ebayXmlOAuth("GetMyMessages", `<DetailLevel>ReturnMessages</DetailLevel>\n<MessageIDs>${ids}</MessageIDs>`);
+    (String(b.xml || "").match(/<Message>[\s\S]*?<\/Message>/g) || []).forEach((blk) => { const id = T(blk, "MessageID"); if (id) byId[id] = ebayDecode(T(blk, "Text") || T(blk, "Body"), true).slice(0, 2000); });
+  }
+  heads.forEach((m) => { m.body = byId[m.messageId] || ""; });
+  return { list: heads, unanswered, total };
+}
+// 📨 Bandeja de preguntas de compradores en eBay (solo dueños).
+exports.ebayInbox = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
   salesOwnerOnly(request);
-  const end = new Date(); const start = new Date(end.getTime() - 30 * 86400000);
-  const inner = `<MailMessageType>AskSellerQuestion</MailMessageType>
-<StartCreationTime>${start.toISOString()}</StartCreationTime>
-<EndCreationTime>${end.toISOString()}</EndCreationTime>`;
-  const r = await ebayXmlOAuth("GetMemberMessages", inner);
-  if (r.tokenErr) return { ok: false, needConsent: true, error: "token" };
-  const xml = r.xml || "";
-  if ((ebayTags(xml, "Ack")[0] || "") === "Failure") return { ok: false, error: (ebayTags(xml, "LongMessage")[0] || "eBay error") };
-  const T = (block, tag) => { const m = block.match(new RegExp("<" + tag + ">([\\s\\S]*?)</" + tag + ">")); return m ? m[1] : ""; };
-  const dec = (s) => String(s || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
-  const exchanges = xml.match(/<MemberMessageExchange>[\s\S]*?<\/MemberMessageExchange>/g) || [];
-  const list = exchanges.map((ex) => {
-    const q = (ex.match(/<Question>[\s\S]*?<\/Question>/) || [""])[0] || ex;
-    return {
-      messageId: T(q, "MessageID"),
-      itemId: T(q, "ItemID"),
-      sender: T(q, "SenderID") || T(q, "Sender"),
-      subject: dec(T(q, "Subject")).slice(0, 140),
-      body: dec(T(q, "Body")).slice(0, 1500),
-      date: T(q, "CreationDate"),
-      status: T(ex, "MessageStatus"),
-      answered: /Answered/i.test(T(ex, "MessageStatus")),
-    };
-  }).filter((m) => m.messageId);
-  list.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  return { ok: true, count: list.length, unanswered: list.filter((m) => !m.answered).length, list };
+  const r = await ebayFetchInbox(30);
+  if (r.err) return { ok: false, needConsent: r.err === "token", error: r.err };
+  return { ok: true, count: (r.list || []).length, unanswered: r.unanswered || 0, total: r.total || 0, list: r.list || [] };
 });
 // ✍️ Borrador de respuesta (IA experta en autopartes) — el dueño lo revisa antes de enviar.
 exports.ebayMsgDraft = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }, async (request) => {
@@ -929,7 +950,8 @@ exports.ebayMsgDraft = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }, 
 exports.ebayMsgSend = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (request) => {
   salesOwnerOnly(request);
   const itemId = String((request.data && request.data.itemId) || "");
-  const parentId = String((request.data && request.data.messageId) || "");
+  // AddMemberMessageRTQ.ParentMessageID = el ExternalMessageID (qid) de la pregunta.
+  const parentId = String((request.data && (request.data.externalId || request.data.messageId)) || "");
   const recipient = String((request.data && request.data.recipient) || "");
   const body = String((request.data && request.data.body) || "").slice(0, 2000);
   if (!parentId || !recipient || !body) throw new HttpsError("invalid-argument", "Faltan datos.");

@@ -3468,9 +3468,11 @@ function renderEbayInbox(){
   const badge=document.getElementById('ebm-badge'); const un=d.unanswered||0;
   if(badge){ if(un>0){ badge.style.display='inline-block'; badge.textContent=un+' nueva'+(un>1?'s':''); } else badge.style.display='none'; }
   if(!d.ok){ box.innerHTML='<div style="color:#e0a54a;font-size:13px;">'+(d.needConsent?'Falta autorizar eBay para leer los mensajes.':('No se pudo: '+escAppt(d.error||'')))+'</div>'; return; }
-  if(!list.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;">No hay preguntas de compradores. 🎉</div>'; return; }
-  box.innerHTML=list.map((m,i)=>{
-    const tag=m.answered?'<span style="font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:1px 6px;">respondida</span>':'<span style="font-size:10px;background:rgba(192,57,43,0.15);color:#e57373;border:1px solid #e57373;border-radius:5px;padding:1px 6px;">nueva</span>';
+  if(!list.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;">No hay preguntas de compradores sin responder. 🎉</div>'; return; }
+  const tot=d.total||0, una=d.unanswered||0;
+  const head='<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">'+una+' sin responder'+(una>list.length?(' · mostrando las '+list.length+' más recientes'):'')+'</div>';
+  box.innerHTML=head+list.map((m,i)=>{
+    const tag=m.read?'<span style="font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:1px 6px;">leído</span>':'<span style="font-size:10px;background:rgba(192,57,43,0.15);color:#e57373;border:1px solid #e57373;border-radius:5px;padding:1px 6px;">nuevo</span>';
     return '<div onclick="openEbayMsg('+i+')" style="display:flex;gap:10px;align-items:center;padding:10px 2px;border-top:1px solid var(--border);cursor:pointer;">'
       +'<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escAppt(m.body||m.subject||'(sin texto)')+'</div><div style="font-size:11px;color:var(--muted);">👤 '+escAppt(m.sender||'')+' · '+botcTime(m.date)+'</div></div>'
       +tag+'<span style="color:var(--muted);font-size:18px;">›</span></div>';
@@ -3487,7 +3489,9 @@ window.openEbayMsg=function(i){
     +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
     +'<button type="button" id="ebm-gen" onclick="ebmGenerate('+i+')" style="flex:1;min-width:130px;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">✨ Generar borrador</button>'
     +'<button type="button" id="ebm-send" onclick="ebmSend('+i+')" style="flex:1;min-width:130px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:800;cursor:pointer;">📤 Enviar</button>'
-    +'</div><div id="ebm-msg" style="font-size:12px;margin-top:8px;"></div>';
+    +'</div>'
+    +(m.responseURL?'<div style="margin-top:8px;font-size:12px;"><a href="'+escAppt(m.responseURL)+'" target="_blank" style="color:var(--muted);">↗ Abrir esta conversación en eBay</a></div>':'')
+    +'<div id="ebm-msg" style="font-size:12px;margin-top:8px;"></div>';
   document.getElementById('ebm-modal').classList.add('active');
   ebmGenerate(i);
 };
@@ -3504,11 +3508,16 @@ window.ebmSend=async function(i){
   if(!body){ alert('Escribe o genera una respuesta primero.'); return; }
   const send=document.getElementById('ebm-send'), mm=document.getElementById('ebm-msg'); if(send){ send.disabled=true; send.textContent='Enviando…'; }
   try{
-    const r=await httpsCallable(functions,'ebayMsgSend')({ itemId:m.itemId||'', messageId:m.messageId, recipient:m.sender, body:body }); const d=r.data||{};
-    if(d.ok){ if(mm){ mm.style.color='var(--green)'; mm.textContent='✅ Respuesta enviada.'; } m.answered=true; setTimeout(()=>{ closeModal('ebm-modal'); loadEbayInbox(true); },1100); }
-    else { if(mm){ mm.style.color='#e08080'; mm.textContent='No se envió: '+escAppt(d.error||''); } if(send){ send.disabled=false; send.textContent='📤 Enviar'; } }
-  }catch(e){ if(mm){ mm.style.color='#e08080'; mm.textContent='Error: '+((e&&e.message)||e); } if(send){ send.disabled=false; send.textContent='📤 Enviar'; } }
+    const r=await httpsCallable(functions,'ebayMsgSend')({ itemId:m.itemId||'', externalId:m.externalId||'', messageId:m.messageId, recipient:m.sender, body:body }); const d=r.data||{};
+    if(d.ok){ if(mm){ mm.style.color='var(--green)'; mm.textContent='✅ Respuesta enviada por eBay.'; } m.replied=true; setTimeout(()=>{ closeModal('ebm-modal'); loadEbayInbox(true); },1200); }
+    else { ebmFallback(m, body, d.error); if(send){ send.disabled=false; send.textContent='📤 Enviar'; } }
+  }catch(e){ ebmFallback(m, body, (e&&e.message)||e); if(send){ send.disabled=false; send.textContent='📤 Enviar'; } }
 };
+// Si eBay no deja enviar por API: copia la respuesta y abre el enlace de eBay para pegarla (100% seguro).
+function ebmFallback(m, body, err){
+  const mm=document.getElementById('ebm-msg'); try{ navigator.clipboard.writeText(body); }catch(e){}
+  if(mm){ mm.style.color='#e0a54a'; mm.innerHTML='📋 Copié tu respuesta. '+(m.responseURL?'<a href="'+escAppt(m.responseURL)+'" target="_blank" style="color:var(--gold);font-weight:800;">Ábrela en eBay</a> y pégala (Cmd/Ctrl+V) para enviar.':'Pégala en eBay para enviar.')+'<br><span style="color:var(--muted);font-size:11px;">(API: '+escAppt(err||'')+')</span>'; }
+}
 document.querySelectorAll('.modal-overlay').forEach(el=>{
   el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});
 });
