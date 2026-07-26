@@ -722,6 +722,27 @@ ${inner}
   });
   return await r.text();
 }
+// Trading API con TOKEN OAuth (IAF header) en vez del Auth'n'Auth viejo (revocado). Para GetMemberMessages / AddMemberMessageRTQ, etc.
+async function ebayXmlOAuth(callName, inner, scope){
+  const a = await ebayUserAccessToken(scope || "https://api.ebay.com/oauth/api_scope");
+  if (!a.token) return { xml: "", tokenErr: a.raw || {} };
+  const body = `<?xml version="1.0" encoding="utf-8"?>
+<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">
+${inner}
+</${callName}Request>`;
+  const r = await fetch("https://api.ebay.com/ws/api.dll", {
+    method: "POST",
+    headers: {
+      "X-EBAY-API-CALL-NAME": callName,
+      "X-EBAY-API-SITEID": "0",
+      "X-EBAY-API-COMPATIBILITY-LEVEL": "1193",
+      "X-EBAY-API-IAF-TOKEN": a.token,
+      "Content-Type": "text/xml",
+    },
+    body,
+  });
+  return { xml: await r.text() };
+}
 // Token de aplicación (client-credentials) con App ID + Cert ID — para las APIs REST públicas (Taxonomy)
 async function ebayAppToken(){
   const basic = Buffer.from(EBAY_APP_ID.value() + ":" + EBAY_CERT_ID.value()).toString("base64");
@@ -834,6 +855,26 @@ async function ebayListingPhotos(itemId){
     return [...new Set(urls)].slice(0, 24);
   } catch (e) { return []; }
 }
+// 🧪 DIAGNÓSTICO mensajes eBay (protegido) — ¿nos deja leer las preguntas de compradores? /ebayMsgDiag?k=<EBAY_VERIFY_TOKEN>
+exports.ebayMsgDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (req, res) => {
+  if (req.query.k !== EBAY_VERIFY_TOKEN) { res.status(403).json({ error: "forbidden" }); return; }
+  const out = {};
+  try {
+    const end = new Date(); const start = new Date(end.getTime() - 12 * 86400000);
+    const inner = `<MailMessageType>AskSellerQuestion</MailMessageType>
+<StartCreationTime>${start.toISOString()}</StartCreationTime>
+<EndCreationTime>${end.toISOString()}</EndCreationTime>`;
+    const r = await ebayXmlOAuth("GetMemberMessages", inner, "https://api.ebay.com/oauth/api_scope");
+    if (r.tokenErr) { out.tokenErr = r.tokenErr; res.json(out); return; }
+    const xml = r.xml || "";
+    out.ack = (ebayTags(xml, "Ack")[0] || "").slice(0, 20);
+    out.errors = ebayTags(xml, "LongMessage").slice(0, 3);
+    out.memberMsgCount = ebayTags(xml, "MemberMessage").length;
+    out.sampleBody = (ebayTags(xml, "Body")[0] || "").slice(0, 160);
+    out.xmlLen = xml.length;
+  } catch (e) { out.err = (e && e.message) || String(e); }
+  res.json(out);
+});
 exports.ebayOrders = onCall({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const a = await ebayUserAccessToken(EBAY_FULFILL_SCOPE);
