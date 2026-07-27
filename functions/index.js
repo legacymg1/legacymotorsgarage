@@ -1349,7 +1349,7 @@ async function ebayEnsurePolicies(token, cfg){
   const isFree = (fp) => (fp.shippingOptions || []).some((o) => (o.shippingServices || []).some((s) => s.freeShipping === true));
   const ful = await ebayPickOrCreatePolicy(token, "fulfillment", "fulfillmentPolicies", "fulfillmentPolicyId", isFree, "LMG Free Shipping", {
     categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
-    handlingTime: { value: 3, unit: "DAY" },
+    handlingTime: { value: EBAY_HANDLING_DAYS, unit: "DAY" },   // 1 día → envío gratis + manejo rápido = "Fast 'N Free" / estimado de entrega rápido
     shippingOptions: [{ optionType: "DOMESTIC", costType: "FLAT_RATE",
       shippingServices: [{ sortOrder: 1, shippingServiceCode: "USPSGroundAdvantage", freeShipping: true }] }],
   });
@@ -1449,7 +1449,18 @@ function buildListingDescription(p, vin){
   if (veh) li.push(`<li>🚗 <b>Pulled From:</b> ${esc(veh)}${vin ? ` &nbsp;·&nbsp; <b>VIN:</b> ${esc(vin)}` : ""}</li>`);
   if (li.length) out.push(`<ul style="font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">${li.join("")}</ul>`);
   if (isFreightPart(p)) {
-    out.push(`<div style="border:2px solid #c8960c;background:#fff8e6;border-radius:8px;padding:12px 14px;margin:0 0 12px;font-size:14px;line-height:1.55;color:#3a2c00;"><b>🚛 FREIGHT / TRUCK SHIPPING — PLEASE READ:</b><br>This engine/transmission ships by freight (LTL). <b>Shipping is FREE to the freight terminal nearest to your delivery address — NOT to your home / residential address.</b> You pick it up at the terminal. Need residential or liftgate delivery? <b>Message us before buying</b> for a quote.</div>`);
+    out.push(`<div style="border:2px solid #c8960c;background:#fff8e6;border-radius:10px;padding:14px 16px;margin:0 0 14px;font-size:14px;line-height:1.6;color:#3a2c00;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:6px;">🚛 FREIGHT SHIPPING — PLEASE READ BEFORE BUYING</div>
+      This is a large, heavy item (complete engine/transmission) that ships by <b>freight (LTL truck)</b>, professionally crated/palletized and insured.
+      <ul style="margin:8px 0 8px;padding-left:20px;">
+        <li><b>FREE shipping is to the freight terminal nearest to your delivery ZIP code</b> — <b>NOT</b> to your home or a residential address. You (or your shop) pick it up at the terminal, or we can quote residential/business delivery.</li>
+        <li>The terminal will <b>call you to schedule pickup</b>. Bring a valid ID and a way to load it (the terminal has a forklift).</li>
+        <li>Need it delivered to a <b>home / with a liftgate</b>, or want a delivery quote to your exact address? <b>Message us BEFORE you buy</b> and we'll get you the best rate.</li>
+        <li><b>Inspect the crate before signing</b> the freight receipt. If you see damage, note it on the delivery paperwork and take photos — this protects your insurance claim.</li>
+        <li>Business address with a loading dock/forklift usually ships fastest and cheapest.</li>
+      </ul>
+      Questions about fitment or delivery? <b>Message us any time</b> — we're happy to help before and after the sale. 🙌
+    </div>`);
   }
   out.push(`<hr style="border:none;border-top:1px solid #ddd;margin:14px 0;">`);
   const shipLine = isFreightPart(p) ? `📦 Professionally crated &amp; shipped by freight from Porterville, California.` : `📦 <b>Fast shipping</b> from Porterville, California — carefully packed.`;
