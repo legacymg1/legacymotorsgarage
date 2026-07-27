@@ -1746,6 +1746,7 @@ exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY, EBAY_APP_ID, EBAY_CERT_I
   if (!images.length) throw new HttpsError("failed-precondition", "La parte no tiene fotos para analizar.");
 
   const veh = [p.vYear, p.vMake, p.vModel, p.vTrim].filter(Boolean).join(" ");
+  const vinForPrompt = (p.vVin && String(p.vVin).trim()) ? String(p.vVin).trim() : await loadVehicleVin(p);   // el VIN del carro de donde salió la parte
   const liveFeedback = (request.data && request.data.feedback ? String(request.data.feedback) : "").trim().slice(0, 500);
   // 🧠 Corrección pegajosa: si no mandan una corrección nueva pero esta parte ya tenía una, la seguimos aplicando (no se olvida al regenerar).
   const stickyFeedback = (!liveFeedback && p.ebayDraft && p.ebayDraft.lastFeedback) ? String(p.ebayDraft.lastFeedback).slice(0, 500) : "";
@@ -1756,26 +1757,26 @@ exports.prepareEbay = onCall({ secrets: [ANTHROPIC_KEY, EBAY_APP_ID, EBAY_CERT_I
   const MODEL = MODELS[reqModel] || (Object.values(MODELS).indexOf(reqModel) >= 0 ? reqModel : "claude-sonnet-5");
   const doSave = !(request.data && request.data.save === false);
   let prompt = `You are an expert US used auto-parts lister for eBay Motors.
-This part was removed from a "${veh || "vehicle"}" — BUT that stated vehicle may be wrong; trust the actual part number over it.
+This exact part was PHYSICALLY REMOVED from this specific vehicle: "${veh || "a vehicle"}"${vinForPrompt ? ` (VIN: ${vinForPrompt})` : ""}. The seller pulled it off THIS car, so it is a CONFIRMED fit for this vehicle. TRUST this vehicle — it is correct.${vinForPrompt ? " If the stated year/make/model looks incomplete, DECODE the VIN to get the exact year, make, model and trim, and use that." : ""} ALWAYS build the title and the PRIMARY fitment around THIS exact ${veh ? "year/make/model" : "vehicle"}, and NEVER title it for a different vehicle.
 The seller labeled it: "${p.name || ""}". Stated condition: "${p.condition || "Used"}".
 STEP 1 — Read the photos carefully. Identify the part and read ALL numbers stamped/labeled on it. IGNORE connector pin numbers (e.g. "5 4 3 2 1" printed by the plug) — those are NOT part numbers.
-STEP 2 — USE WEB SEARCH to: (a) verify the real OEM/manufacturer part number, (b) find which vehicles it ACTUALLY fits, and (c) find interchange / superseded numbers (widens buyers). If the read part number does NOT fit the stated vehicle, note it in "fitmentNote".
+STEP 2 — USE WEB SEARCH to ENRICH (never to replace the known vehicle): (a) find/verify the real OEM/manufacturer part number, (b) find INTERCHANGE / superseded numbers, and (c) find ADDITIONAL vehicles this part also fits — to widen buyers. Keep "${veh || "the known vehicle"}" as the PRIMARY confirmed fit. Only if the part number you READ clearly belongs to a completely different type of part, mention it in "fitmentNote" for the human to check — but STILL keep the title on "${veh || "the known vehicle"}".
 STEP 2b — MANY PARTS HAVE NO READABLE NUMBER. When you cannot read a part number on the part, still DETERMINE the OEM number it SHOULD be: use web search with the vehicle (${veh || "the stated vehicle"}) + the part name + what you see in the photos to find the most likely correct OEM/manufacturer part number for THIS exact part on THIS vehicle. Put that in "suggestedPartNumber" (single best number) and briefly say how sure you are in "fitmentNote". If the exact number depends on trim/engine/options you cannot see, give the best candidate and say so — a strong lead the human will verify. Only leave it empty if you truly cannot narrow it down at all.
 STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these keys:
-{"title": "<=80 char keyword-rich eBay title with VERIFIED fitment",
+{"title": "<=80 char keyword-rich eBay title. It MUST lead with the confirmed vehicle (${veh || "year make model"}) + the part, e.g. '${veh || "2013 Nissan Altima"} <Part> OEM <number>'. Use THIS known vehicle, never a guessed different one",
  "description": "2-3 punchy sentences selling THIS specific used OEM part: what it is, why it's a great genuine-OEM buy, and the VERIFIED fitment. Confident and professional, no generic filler. (A separate condition note and the fitment/number lists are added automatically after — do NOT list numbers here.)",
  "conditionNote": "2-3 honest sentences describing THIS exact used part's real condition and any visible wear, scuffs, or damage seen in the photos — this fills eBay's Condition Description field. Be specific and truthful.",
  "partNumbers": ["numbers you actually READ on the part; [] if none"],
  "suggestedPartNumber": "best OEM number this part SHOULD be (from web search) when none was readable; '' if you truly cannot determine one",
  "interchange": ["ALL interchange/alternate/superseded numbers found via web search — be thorough, more numbers = more buyers find it; [] if none"],
- "fitsVehicles": "short verified list of vehicles it fits (from web search)",
+ "fitsVehicles": "list of vehicles it fits — START with the confirmed ${veh || "vehicle"}, then ADD other compatible vehicles found via web search",
  "fitmentNote": "" ,
  "ebayCategory": "the exact eBay Motors category for this part as a short phrase — the specific PART TYPE, e.g. 'Mass Air Flow Sensor', 'Fuel Injector', 'Headlight Assembly', 'Alternator' — so eBay's category search lands on the right Car & Truck Parts category, NOT a generic one. CRITICAL disambiguation: if the part is a piece of GLASS (windshield, door glass, quarter/vent glass, back/rear glass, sunroof glass), the phrase MUST contain the word 'Glass' (e.g. 'Exterior Door Glass', 'Quarter Glass', 'Rear Windshield') and must NEVER say just 'Window' — eBay maps 'Window' to window SWITCHES/REGULATORS, which is wrong for glass. Likewise: a side/rear-view MIRROR → 'Mirror'; a window MOTOR → 'Window Motor'; a window CRANK/REGULATOR → 'Window Regulator'. Pick the phrase for the ACTUAL physical part in the photos.",
  "condition": "Used" | "For parts or not working" | "New",
  "itemSpecifics": {"Brand": "", "Manufacturer Part Number": "", "Type": "<what kind of part, e.g. Mass Air Flow Sensor>", "Placement on Vehicle": "", "Warranty": "", "Country/Region of Manufacture": "", "Superseded Part Number": ""},
  (fill as MANY itemSpecifics as you can from the photos and your knowledge — buyers filter by these; leave a value "" only if truly unknown)
  "confidence": "high" | "medium" | "low"}
-Never invent a number you READ (partNumbers must be real reads). But suggestedPartNumber is EXPECTED to be a researched best-guess — provide it whenever you reasonably can. Base fitment on web search, not guesses. Put a warning in "fitmentNote" if the part does not match the stated vehicle.`;
+Never invent a number you READ (partNumbers must be real reads). But suggestedPartNumber is EXPECTED to be a researched best-guess — provide it whenever you reasonably can. The stated vehicle is a CONFIRMED physical fit — ALWAYS keep it as the primary fit and in the title; only add a note in "fitmentNote" if something looks off. NEVER retitle the listing to a different vehicle than the one the part came from.`;
 
   // 🧠 REGLAS FIJAS que el equipo le ha ido enseñando al bot — SIEMPRE se aplican (aprendizaje acumulado nivel 1).
   try {
