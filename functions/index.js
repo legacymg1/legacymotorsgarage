@@ -1494,6 +1494,45 @@ function buildPackage(p){
   return { weight: { value: lbs, unit: "POUND" }, dimensions };
 }
 
+// 💧 Marca de agua (logo discreto en la esquina) SOLO para las fotos del LISTING de eBay. Las originales del inventario NO se tocan.
+// Cachea en Storage (wm/<hash>.jpg) → se procesa una vez por foto; si algo falla, usa la foto original (nunca rompe el anuncio).
+const WM_LOGO_URL = "https://legacymotorsgarage.com/logo.png";
+let _wmLogoBuf;
+async function wmLogo(){ if (_wmLogoBuf !== undefined) return _wmLogoBuf; try { const r = await fetch(WM_LOGO_URL); _wmLogoBuf = r.ok ? Buffer.from(await r.arrayBuffer()) : null; } catch (e) { _wmLogoBuf = null; } return _wmLogoBuf; }
+function wmTokenUrl(bucketName, key, token){ return "https://firebasestorage.googleapis.com/v0/b/" + bucketName + "/o/" + encodeURIComponent(key) + "?alt=media&token=" + token; }
+async function watermarkForListing(urls){
+  let sharp, crypto;
+  try { sharp = require("sharp"); crypto = require("crypto"); } catch (e) { return urls; }   // si no está la lib, deja las originales
+  const bucket = admin.storage().bucket();
+  const logoBuf = await wmLogo();
+  const out = [];
+  for (const url of urls) {
+    if (!url) continue;
+    try {
+      const key = "wm/" + crypto.createHash("sha1").update(url).digest("hex") + ".jpg";
+      const file = bucket.file(key);
+      const [exists] = await file.exists();
+      if (exists) {
+        try { const [md] = await file.getMetadata(); const tk = md && md.metadata && md.metadata.firebaseStorageDownloadTokens; if (tk) { out.push(wmTokenUrl(bucket.name, key, String(tk).split(",")[0])); continue; } } catch (e) {}
+      }
+      const resp = await fetch(url); if (!resp.ok) throw new Error("fetch " + resp.status);
+      const src = Buffer.from(await resp.arrayBuffer());
+      const meta = await sharp(src).metadata();
+      const targetW = Math.min(1600, meta.width || 1600);
+      let img = sharp(src, { failOn: "none" }).rotate().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true });
+      if (logoBuf) {
+        const lw = Math.max(90, Math.round(targetW * 0.16));
+        const logoR = await sharp(logoBuf).resize({ width: lw }).png().toBuffer();
+        img = img.composite([{ input: logoR, gravity: "southeast" }]);
+      }
+      const buf = await img.jpeg({ quality: 82 }).toBuffer();
+      const token = crypto.randomUUID();
+      await file.save(buf, { contentType: "image/jpeg", resumable: false, metadata: { cacheControl: "public,max-age=31536000", metadata: { firebaseStorageDownloadTokens: token } } });
+      out.push(wmTokenUrl(bucket.name, key, token));
+    } catch (e) { out.push(url); }   // fallback: foto original
+  }
+  return out;
+}
 async function buildInventoryItem(p){
   const d = p.ebayDraft || {};
   const title = (d.title || p.ebayTitle || p.name || "Auto part").slice(0, 80);
@@ -1501,7 +1540,8 @@ async function buildInventoryItem(p){
   const vin = (p.vVin && String(p.vVin).trim()) ? String(p.vVin).trim() : await loadVehicleVin(p);   // artículo rápido guarda su VIN; carro normal se lee de dismantle_vehicles
   const desc = buildListingDescription(p, vin);   // descripción pro con formato
   const condDesc = ((d.conditionNote || d.description || "").trim()).slice(0, 990);   // campo aparte de eBay (máx 1000)
-  const pics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 24);
+  const rawPics = (p.photoURLs || []).filter((u) => u && !/00_QR/.test(u)).slice(0, 24);
+  const pics = await watermarkForListing(rawPics);   // 💧 con marca de agua para eBay
   const specs = await resolveSpecs(p, catId);
   const aspects = {};
   specs.forEach((s) => { aspects[s.name] = s.values; });
@@ -1527,7 +1567,7 @@ async function buildInventoryItem(p){
 }
 
 // 📝 Crear BORRADOR en eBay (Inventory API: inventory item + oferta SIN publicar). No sale en vivo.
-exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
+exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 240, memory: "1GiB" }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const p = await loadPart(request.data && request.data.partId);
   const priceUsd = request.data && request.data.priceUsd;
