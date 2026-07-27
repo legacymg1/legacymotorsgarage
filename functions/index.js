@@ -1801,7 +1801,7 @@ Never invent a number you READ (partNumbers must be real reads). But suggestedPa
   try {
     const msg = await client.messages.create({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 4000,   // subido de 2048: con VIN + fitment más rico el JSON crecía y se cortaba (salía borrador "simple")
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
       // cache_control en el ÚLTIMO bloque → cachea fotos+prompt. Las búsquedas web re-leen ese prefijo
       // desde caché (~10% del costo) en vez de re-procesar las fotos cada vez. Baja mucho el gasto.
