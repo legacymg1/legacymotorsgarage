@@ -889,7 +889,14 @@ function ebayDecode(s, stripTags) {
 // Lee el BUZÓN GENERAL de eBay (GetMyMessages): headers → filtra mensajes de comprador sin responder → trae los cuerpos.
 async function ebayFetchInbox(maxN) {
   const T = (b, t) => { const m = b.match(new RegExp("<" + t + ">([\\s\\S]*?)</" + t + ">")); return m ? m[1] : ""; };
-  const end = new Date(); const start = new Date(end.getTime() - 45 * 86400000);
+  // "Desde" configurable (botón "Empezar desde hoy") → ignora los mensajes viejos. Default: últimos 7 días.
+  let since = "";
+  try { const cfg = await admin.firestore().collection("config").doc("ebayInbox").get(); if (cfg.exists && cfg.data().since) since = cfg.data().since; } catch (e) {}
+  const end = new Date();
+  let start = since ? new Date(since) : new Date(end.getTime() - 7 * 86400000);
+  const minStart = new Date(end.getTime() - 90 * 86400000);   // eBay limita la ventana
+  if (start < minStart) start = minStart;
+  const sinceMs = since ? new Date(since).getTime() : 0;
   const h = await ebayXmlOAuth("GetMyMessages", `<DetailLevel>ReturnHeaders</DetailLevel>\n<StartTime>${start.toISOString()}</StartTime>\n<EndTime>${end.toISOString()}</EndTime>`);
   if (h.tokenErr) return { err: "token" };
   const xml = h.xml || "";
@@ -910,7 +917,7 @@ async function ebayFetchInbox(maxN) {
   }));
   const total = heads.length;
   // Solo mensajes de un COMPRADOR real, contestables y sin responder (no avisos del sistema de eBay).
-  heads = heads.filter((m) => m.messageId && m.sender && m.sender.toLowerCase() !== "ebay" && !m.replied && m.responseEnabled && /AskSeller|M2M|ContacteBay|Member/i.test(m.type));
+  heads = heads.filter((m) => m.messageId && m.sender && m.sender.toLowerCase() !== "ebay" && !m.replied && m.responseEnabled && /AskSeller|M2M|ContacteBay|Member/i.test(m.type) && (!sinceMs || (new Date(m.date).getTime() >= sinceMs)));
   heads.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   const unanswered = heads.length;
   heads = heads.slice(0, maxN || 30);
@@ -930,6 +937,13 @@ exports.ebayInbox = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REF
   const r = await ebayFetchInbox(30);
   if (r.err) return { ok: false, needConsent: r.err === "token", error: r.err };
   return { ok: true, count: (r.list || []).length, unanswered: r.unanswered || 0, total: r.total || 0, list: r.list || [] };
+});
+// 🧹 "Empezar desde hoy": ignora los mensajes viejos (guarda un corte de fecha). NO borra nada en eBay.
+exports.ebaySetSince = onCall({ timeoutSeconds: 20 }, async (request) => {
+  salesOwnerOnly(request);
+  const now = new Date().toISOString();
+  await admin.firestore().collection("config").doc("ebayInbox").set({ since: now, updatedBy: (request.auth.token && request.auth.token.email) || "", updatedAt: now }, { merge: true });
+  return { ok: true, since: now };
 });
 // ✍️ Borrador de respuesta (IA experta en autopartes) — el dueño lo revisa antes de enviar.
 exports.ebayMsgDraft = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }, async (request) => {

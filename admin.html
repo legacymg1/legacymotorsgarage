@@ -669,7 +669,7 @@
   <div class="modal" style="max-width:920px;width:100%;">
     <div class="modal-title">🧮 COTIZADOR DE PAGOS</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Simula el pago de uno o varios carros para que el cliente se lleve el presupuesto impreso. Es informativo, no es un contrato.</div>
-    <div class="form-group"><label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">Cliente (para el presupuesto y seguimiento)<span onclick="cotNueva()" style="color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;">🆕 Cotización nueva</span></label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente" oninput="cotSaveDraft()"></div>
+    <div class="form-group"><label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">Cliente (para el presupuesto y seguimiento)<span onclick="cotNueva()" style="color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;">🆕 Cotización nueva</span></label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente" autocomplete="name" autocapitalize="words" oninput="cotSaveDraft()" onblur="cotTitleName(this)"></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">📱 Teléfono (para seguimiento)</label><input class="form-input" id="cot-phone" type="tel" inputmode="tel" placeholder="(559) 555-1234" oninput="cotSaveDraft()"></div>
       <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">📍 Ciudad o ZIP (calcula impuestos)</label><input class="form-input" id="cot-city" placeholder="Porterville o 93257" autocomplete="off" oninput="cotApplyTax()"></div>
@@ -1621,13 +1621,18 @@ window.cotFilterCars=function(){
   else items.forEach(c=>{ const label=[c.year,c.make,c.model].filter(Boolean).join(' '); html+=`<div onpointerdown="cotAddFromCar('${c.id}')" style="padding:11px 12px;cursor:pointer;border-bottom:1px solid var(--border);touch-action:manipulation;"><div style="font-weight:600;">#${c.inventoryNum||'?'} · ${label}</div><div style="font-size:12px;color:var(--muted);">${c.price?formatMoney(c.price):'sin precio'}${c.vin?' · …'+String(c.vin).slice(-6):''}</div></div>`; });
   box.innerHTML=html; box.style.display='block';
 };
+// Capitaliza nombre y apellido (primera letra de cada palabra).
+window.cotTitleName=function(el){ if(!el) return; el.value=(el.value||'').toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m,p,c)=>p+c.toUpperCase()); cotSaveDraft(); };
 window.cotAddFromCar=function(id){
   const c=cotInventory.find(x=>x.id===id); if(!c) return;
   document.getElementById('cot-car-results').style.display='none';
   document.getElementById('cot-car-search').value='';
   const x=document.getElementById('cot-car-x'); if(x) x.style.display='none';
   const price=Number(c.price)||0;
-  cotOpts.push({ id:++cotSeq, car:[c.year,c.make,c.model].filter(Boolean).join(' '), year:c.year||'', make:c.make||'', model:c.model||'', color:c.color||'', vin:c.vin||'', miles:c.miles||'', price:price, down:0, tax:(_cotTaxRate?Math.round(price*_cotTaxRate*100)/100:0), dmv:0, numpay:52, freq:'weekly' });
+  const opt={ id:++cotSeq, car:[c.year,c.make,c.model].filter(Boolean).join(' '), year:c.year||'', make:c.make||'', model:c.model||'', color:c.color||'', vin:c.vin||'', miles:c.miles||'', price:price, down:0, tax:(_cotTaxRate?Math.round(price*_cotTaxRate*100)/100:0), dmv:0, numpay:52, freq:'weekly' };
+  // Si la opción 1 está en blanco (recién abierto), reemplázala — así el carro cae en la Opción 1, no en la 2.
+  const bi=cotOpts.findIndex(o=>!((o.car||'').trim()) && !Number(o.price) && !Number(o.down));
+  if(bi>=0){ opt.id=cotOpts[bi].id; cotOpts[bi]=opt; } else { cotOpts.push(opt); }
   renderCotOptions();
 };
 // 📤 Compartir el presupuesto: abre MENSAJES (SMS) al cliente con el texto en SU idioma + link del inventario, y guarda el prospecto.
@@ -3479,6 +3484,11 @@ window.loadEbayInbox=async function(force){
   try{ const r=await httpsCallable(functions,'ebayInbox')(); _ebmData=r.data||{}; _ebmLoading=false; renderEbayInbox(); }
   catch(e){ _ebmLoading=false; box.innerHTML='<div style="color:#e08080;font-size:13px;">No se pudo cargar: '+escAppt((e&&e.message)||e)+'</div>'; }
 };
+window.ebaySetSince=async function(){
+  if(!confirm('¿Ignorar los mensajes viejos y mostrar solo los de HOY en adelante?\n\n(No borra nada en eBay — solo deja de listarlos aquí.)')) return;
+  try{ await httpsCallable(functions,'ebaySetSince')(); _ebmData=null; loadEbayInbox(true); }
+  catch(e){ alert('No se pudo: '+((e&&e.message)||e)); }
+};
 function renderEbayInbox(){
   const box=document.getElementById('ebm-list'); if(!box) return;
   const d=_ebmData||{}; const list=d.list||[];
@@ -3487,7 +3497,7 @@ function renderEbayInbox(){
   if(!d.ok){ box.innerHTML='<div style="color:#e0a54a;font-size:13px;">'+(d.needConsent?'Falta autorizar eBay para leer los mensajes.':('No se pudo: '+escAppt(d.error||'')))+'</div>'; return; }
   if(!list.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;">No hay preguntas de compradores sin responder. 🎉</div>'; return; }
   const tot=d.total||0, una=d.unanswered||0;
-  const head='<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">'+una+' sin responder'+(una>list.length?(' · mostrando las '+list.length+' más recientes'):'')+'</div>';
+  const head='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:12px;color:var(--muted);">'+una+' sin responder'+(una>list.length?(' · '+list.length+' recientes'):'')+'</span><button onclick="ebaySetSince()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;">🧹 Empezar desde hoy</button></div>';
   box.innerHTML=head+list.map((m,i)=>{
     const tag=m.read?'<span style="font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:1px 6px;">leído</span>':'<span style="font-size:10px;background:rgba(192,57,43,0.15);color:#e57373;border:1px solid #e57373;border-radius:5px;padding:1px 6px;">nuevo</span>';
     return '<div onclick="openEbayMsg('+i+')" style="display:flex;gap:10px;align-items:center;padding:10px 2px;border-top:1px solid var(--border);cursor:pointer;">'
