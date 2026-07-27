@@ -1489,11 +1489,59 @@ window.printStickerNumber=function(prefill){
   mi.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🖨️ ${t('reprintTitle')}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
     <div class="sub" style="margin-bottom:12px;">${t('reprintHint')}</div>
     <input id="rp-num" inputmode="numeric" autocomplete="off" placeholder="${t('reprintPh')}" value="${esc(prefill||'')}" style="width:100%;font-size:26px;font-weight:800;text-align:center;letter-spacing:3px;" onkeydown="if(event.key==='Enter')doReprint()">
-    <button class="btn" style="width:100%;margin-top:14px;" onclick="doReprint()">${t('reprintBtn')}</button>`;
+    <button class="btn" style="width:100%;margin-top:14px;" onclick="doReprint()">${t('reprintBtn')}</button>
+    <button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--gold);border-color:rgba(240,192,64,.4);" onclick="openStickerBatch()">🧾 ${L==='es'?'Imprimir un ROLLO (varias de golpe)':'Print a ROLL (many at once)'}</button>`;
   document.getElementById('modal2').style.display='block';
   setTimeout(()=>{ const i=document.getElementById('rp-num'); if(i) i.focus(); },100);
 };
 window.doReprint=async function(){ const v=((document.getElementById('rp-num')||{}).value||'').trim(); if(!v) return; await makeNumberLabel(v); };
+// 🧾 ROLLO de estampas (batch): genera un PDF con N estampas (código de barras + número) para imprimir de un jalón a la Rongta.
+function loadScriptOnce(src){ return new Promise((res,rej)=>{ if(Array.from(document.scripts).some(s=>s.src===src)) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load '+src)); document.head.appendChild(s); }); }
+window.openStickerBatch=function(){
+  let mx=0; parts.forEach(p=>{ const n=parseInt(p.stickerNum,10); if(!isNaN(n)&&n>mx) mx=n; });
+  const es=(L==='es');
+  const mi=document.getElementById('modal2-inner'); if(!mi) return;
+  mi.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🧾 ${es?'Imprimir rollo de estampas':'Print sticker roll'}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
+    <div class="sub" style="margin-bottom:12px;">${es?'Genera un PDF con muchas estampas (código de barras + número) para imprimirlas de una vez en la Rongta. El equipo pela la siguiente y la pega.':'Generates a PDF of many stickers (barcode + number) to print all at once on the Rongta.'}</div>
+    <div class="row2"><div><label>${es?'Empieza en #':'Start at #'}</label><input id="sb-start" inputmode="numeric" value="${mx+1}"></div><div><label>${es?'Cuántas':'How many'}</label><input id="sb-qty" inputmode="numeric" value="100"></div></div>
+    <div class="row2"><div><label>${es?'Ancho (mm)':'Width (mm)'}</label><input id="sb-w" inputmode="decimal" value="40"></div><div><label>${es?'Alto (mm)':'Height (mm)'}</label><input id="sb-h" inputmode="decimal" value="30"></div></div>
+    <button class="btn" id="sb-go" style="width:100%;margin-top:14px;" onclick="genStickerBatch()">🖨️ ${es?'Generar PDF del rollo':'Generate roll PDF'}</button>
+    <div class="sub" style="margin-top:10px;">${es?'Pon el ancho/alto igual a tu etiqueta. Luego imprime el PDF a la Rongta (su app o impresión de Android).':'Set width/height to match your label, then print the PDF to the Rongta.'}</div>`;
+  document.getElementById('modal2').style.display='block';
+};
+window.genStickerBatch=async function(){
+  const es=(L==='es');
+  const start=parseInt((document.getElementById('sb-start')||{}).value,10)||1;
+  const qty=Math.min(1000, Math.max(1, parseInt((document.getElementById('sb-qty')||{}).value,10)||100));
+  const wmm=parseFloat((document.getElementById('sb-w')||{}).value)||40;
+  const hmm=parseFloat((document.getElementById('sb-h')||{}).value)||30;
+  const pad=Math.max(4, String(start+qty-1).length);
+  const btn=document.getElementById('sb-go'); if(btn){ btn.disabled=true; btn.textContent=es?'Generando…':'Generating…'; }
+  try{
+    await loadScriptOnce('https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js');
+    await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js');
+    const jsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+    const orient = wmm>=hmm?'landscape':'portrait';
+    const doc=new jsPDF({ unit:'mm', format:[wmm,hmm], orientation:orient });
+    for(let i=0;i<qty;i++){
+      if(i>0) doc.addPage([wmm,hmm], orient);
+      const num=String(start+i).padStart(pad,'0');
+      const cv=document.createElement('canvas');
+      window.JsBarcode(cv, num, { format:'CODE128', displayValue:false, margin:0, width:2, height:70 });
+      const bImg=cv.toDataURL('image/png');
+      const pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight();
+      const bw=pw*0.86, bh=ph*0.46, bx=(pw-bw)/2, by=ph*0.10;
+      doc.addImage(bImg,'PNG',bx,by,bw,bh);
+      doc.setFont('helvetica','bold');
+      let fs=Math.floor(ph*0.9); doc.setFontSize(fs);
+      while(doc.getTextWidth(num) > pw*0.9 && fs>8){ fs-=1; doc.setFontSize(fs); }
+      const ty=by+bh+((ph-(by+bh))/2);
+      doc.text(num, pw/2, ty, { align:'center', baseline:'middle' });
+    }
+    doc.output('dataurlnewwindow');
+  }catch(e){ alert((es?'No se pudo generar: ':'Could not generate: ')+((e&&e.message)||e)); }
+  if(btn){ btn.disabled=false; btn.textContent='🖨️ '+(es?'Generar PDF del rollo':'Generate roll PDF'); }
+};
 async function makeNumberLabel(txt){
   try{
     const LW=384, LH=200;   // 48mm de ancho de la R22/Sunmi
@@ -2226,8 +2274,15 @@ window.finalizePack=async function(id){
 };
 function packSentAnim(p){
   const box=document.getElementById('pack-result'); if(!box) return;
-  box.innerHTML='<div class="card green" style="text-align:center;padding:30px 16px;"><div style="font-size:54px;">📦✅</div><div style="font-weight:800;font-size:20px;margin-top:8px;">'+t('sentAnim')+'</div><div class="sub" style="margin-top:4px;">'+esc((p&&(p.vehicleLabel+' · '+p.name))||'')+'</div></div>';
-  setTimeout(function(){ const b=document.getElementById('pack-result'); if(b) b.innerHTML=''; const s=document.getElementById('scan-input'); if(s){ s.value=''; s.focus(); } },1900);
+  const en=(L==='en');
+  box.innerHTML='<div class="card green" style="text-align:center;padding:24px 16px;">'
+    +'<div style="font-size:50px;">📦✅</div>'
+    +'<div style="font-weight:800;font-size:19px;margin-top:6px;">'+(en?'Packed & ready!':'¡Empacado y listo!')+'</div>'
+    +'<div class="sub" style="margin:4px 0 12px;">'+esc((p&&(p.vehicleLabel+' · '+p.name))||'')+'</div>'
+    +'<div style="font-size:13.5px;color:var(--gold);font-weight:700;margin-bottom:12px;">'+(en?'Now print the shipping label on eBay 👇':'Ahora imprime la etiqueta de envío en eBay 👇')+'</div>'
+    +'<a class="btn" style="display:block;text-decoration:none;font-size:16px;padding:14px;" href="https://www.ebay.com/sh/ord?filter=status%3AAWAITING_SHIPMENT" target="_blank" rel="noopener">🏷️ '+(en?'Print label on eBay':'Imprimir etiqueta en eBay')+'</a>'
+    +'<button class="btn ghost sm" style="width:100%;margin-top:10px;color:var(--muted);" onclick="cancelPack()">'+(en?'Done — next part':'Listo — siguiente pieza')+'</button>'
+    +'</div>';
 }
 // 🔄 Reubicar: función separada de buscar parte
 window.startReloc=function(){
