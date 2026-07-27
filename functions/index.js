@@ -1415,6 +1415,16 @@ async function loadVehicleMake(p){
   try { const vs = await admin.firestore().collection("dismantle_vehicles").doc(p.vehicleId).get(); return vs.exists ? (vs.data().make || "") : ""; } catch (e) { return ""; }
 }
 
+// 🚛 ¿Es un MOTOR o TRANSMISIÓN completa (envío por flete/LTL a terminal)? Decide la IA (freightItem); respaldo por palabras clave.
+function isFreightPart(p){
+  const d = p.ebayDraft || {};
+  if (d.freightItem === true) return true;
+  if (d.freightItem === false) return false;
+  const n = ((p.name || "") + " " + (d.title || p.ebayTitle || "") + " " + (d.ebayCategory || "")).toLowerCase();
+  // Excluir partes chicas que traen "motor"/"trans" pero NO son ensamble completo.
+  if (/(window|blower|wiper|washer|cooling|radiator|starter|door|seat|heater|blend|throttle|hvac|fan)\s*motor|motor\s*mount|transmission\s*(mount|cooler|line|filter|pan|sensor|solenoid|control|module|wire|harness|dipstick)|shift\s*solenoid|valve\s*body|torque\s*converter/.test(n)) return false;
+  return /\bengine\b|long\s*block|short\s*block|engine\s*assembly|motor\s*(completo|complete|long|short|assembly)|\btransmission\b|transmisi[oó]n|transaxle|gearbox/.test(n);
+}
 // 📝 Descripción PRO con formato (HTML): condición + fitment + números + interchange + carro/VIN + cierre de gracias.
 // Se usa en cada anuncio para que todas se vean iguales de fregonas y completas.
 function buildListingDescription(p, vin){
@@ -1438,8 +1448,12 @@ function buildListingDescription(p, vin){
   if (inter.length) li.push(`<li>🔄 <b>Interchange / Compatible Numbers:</b> ${esc(inter.join(", "))}</li>`);
   if (veh) li.push(`<li>🚗 <b>Pulled From:</b> ${esc(veh)}${vin ? ` &nbsp;·&nbsp; <b>VIN:</b> ${esc(vin)}` : ""}</li>`);
   if (li.length) out.push(`<ul style="font-size:14px;line-height:1.8;margin:0 0 12px;padding-left:20px;">${li.join("")}</ul>`);
+  if (isFreightPart(p)) {
+    out.push(`<div style="border:2px solid #c8960c;background:#fff8e6;border-radius:8px;padding:12px 14px;margin:0 0 12px;font-size:14px;line-height:1.55;color:#3a2c00;"><b>🚛 FREIGHT / TRUCK SHIPPING — PLEASE READ:</b><br>This engine/transmission ships by freight (LTL). <b>Shipping is FREE to the freight terminal nearest to your delivery address — NOT to your home / residential address.</b> You pick it up at the terminal. Need residential or liftgate delivery? <b>Message us before buying</b> for a quote.</div>`);
+  }
   out.push(`<hr style="border:none;border-top:1px solid #ddd;margin:14px 0;">`);
-  out.push(`<p style="font-size:14px;line-height:1.6;margin:0;">📦 <b>Fast shipping</b> from Porterville, California — carefully packed.<br>❓ Not 100% sure it fits? <b>Message us your VIN before buying</b> and we'll confirm the fit for you.<br>🙏 <b>Thank you for considering Legacy Motors Garage</b> — we genuinely appreciate your business and stand behind every part we sell!</p>`);
+  const shipLine = isFreightPart(p) ? `📦 Professionally crated &amp; shipped by freight from Porterville, California.` : `📦 <b>Fast shipping</b> from Porterville, California — carefully packed.`;
+  out.push(`<p style="font-size:14px;line-height:1.6;margin:0;">${shipLine}<br>❓ Not 100% sure it fits? <b>Message us your VIN before buying</b> and we'll confirm the fit for you.<br>🙏 <b>Thank you for considering Legacy Motors Garage</b> — we genuinely appreciate your business and stand behind every part we sell!</p>`);
   return out.join("\n");
 }
 
@@ -1772,6 +1786,7 @@ STEP 3 — Return ONLY valid JSON (no markdown, no backticks) with EXACTLY these
  "fitsVehicles": "list of vehicles it fits — START with the confirmed ${veh || "vehicle"}, then ADD other compatible vehicles found via web search",
  "fitmentNote": "" ,
  "ebayCategory": "the exact eBay Motors category for this part as a short phrase — the specific PART TYPE, e.g. 'Mass Air Flow Sensor', 'Fuel Injector', 'Headlight Assembly', 'Alternator' — so eBay's category search lands on the right Car & Truck Parts category, NOT a generic one. CRITICAL disambiguation: if the part is a piece of GLASS (windshield, door glass, quarter/vent glass, back/rear glass, sunroof glass), the phrase MUST contain the word 'Glass' (e.g. 'Exterior Door Glass', 'Quarter Glass', 'Rear Windshield') and must NEVER say just 'Window' — eBay maps 'Window' to window SWITCHES/REGULATORS, which is wrong for glass. Likewise: a side/rear-view MIRROR → 'Mirror'; a window MOTOR → 'Window Motor'; a window CRANK/REGULATOR → 'Window Regulator'. Pick the phrase for the ACTUAL physical part in the photos.",
+ "freightItem": true or false — set TRUE ONLY if this is a COMPLETE engine (long block, short block, engine assembly) or a COMPLETE transmission/transaxle/gearbox that must ship by freight (LTL). Set FALSE for everything else, including small motors (window/blower/wiper/starter/fan motor) and small transmission parts (mount, solenoid, valve body, torque converter),
  "condition": "Used" | "For parts or not working" | "New",
  "itemSpecifics": {"Brand": "", "Manufacturer Part Number": "", "Type": "<what kind of part, e.g. Mass Air Flow Sensor>", "Placement on Vehicle": "", "Warranty": "", "Country/Region of Manufacture": "", "Superseded Part Number": ""},
  (fill as MANY itemSpecifics as you can from the photos and your knowledge — buyers filter by these; leave a value "" only if truly unknown)
