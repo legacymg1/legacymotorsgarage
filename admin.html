@@ -2312,13 +2312,16 @@ window.saveClient=async function(){
         const _docFeeC   = 7000; // $70 doc fee = ingreso de Legacy
         const _taxC = Math.round(Number(data.salesTax || 0) * 100);
         const _dmvC = Math.round(Number(data.dmvFees  || 0) * 100);
+        // createdAt: Finanzas usa este sello para decidir qué entra en "este corte" (inCut).
+        // Si el renglón ya existía, se conserva su createdAt original (no lo re-sella).
+        const _saleCreatedAt = existing.cashSaleCreatedAt || new Date().toISOString();
         await setDoc(doc(db,'transactions','cashsale_'+id), {
           entryId:'cashsale_'+id, type:'cash_sale', dept:'dealer',
           clientId:id, clientName:name, category:'Venta de contado', saleType:'contado',
           amountCents:_carPriceC + _docFeeC, carPriceCents:_carPriceC, docFeeCents:_docFeeC,
           vin:data.vin||'', carLabel:_carLabel, invNum:data.vehicleInventoryNum||'',
           method:'cash', date:_saleDate, note:'Venta de contado · '+_carLabel,
-          createdBy:_who, source:'admin'
+          createdAt:_saleCreatedAt, createdBy:_who, source:'admin'
         }, { merge:true });
         if(_taxC + _dmvC > 0){
           await setDoc(doc(db,'transactions','dmvhold_'+id), {
@@ -2327,9 +2330,11 @@ window.saveClient=async function(){
             amountCents:_taxC + _dmvC, taxCents:_taxC, dmvCents:_dmvC,
             vin:data.vin||'', carLabel:_carLabel, invNum:data.vehicleInventoryNum||'',
             date:_saleDate, note:'Cobrado al cliente para DMV/impuestos',
-            createdBy:_who, source:'admin'
+            createdAt:_saleCreatedAt, createdBy:_who, source:'admin'
           }, { merge:true });
         }
+        // Guarda el sello en el cliente para que un re-guardado futuro no cambie el corte al que pertenece.
+        try{ await setDoc(doc(db,'clients',id), { cashSaleCreatedAt:_saleCreatedAt }, { merge:true }); }catch(_e){}
       }
     }catch(finErr){ console.log('Post venta de contado a finanzas omitido:', finErr); }
 
