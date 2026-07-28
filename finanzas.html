@@ -1957,10 +1957,10 @@ window.saveInc = async function(){
         if(acct.abonos.some(p=>p.entryId===entryId)) return;   // idempotente
         const bal=Math.max(0,(Number(acct.totalCents)||0)-acct.abonos.reduce((s,p)=>s+(Number(p.amountCents)||0),0));
         const realPay=Math.min(pay, bal);   // no se puede pagar más del saldo
-        acct.abonos.push({ entryId, amountCents:realPay, date, method, createdAt:nowISO(), createdBy:who, kind:(realPay>=bal?'liquidacion':'abono') });
-        if(bal-realPay<=0){ acct.settled=true; acct.settledAt=nowISO(); }
+        acct.abonos.push({ entryId, amountCents:realPay, date, method, createdAt:new Date().toISOString(), createdBy:who, kind:(realPay>=bal?'liquidacion':'abono') });
+        if(bal-realPay<=0){ acct.settled=true; acct.settledAt=new Date().toISOString(); }
         accts[ai]=acct;
-        tx.set(doc(db,'transactions',entryId), { entryId, type:'income', dept:_incAccount.dept, clientId:fresh.id, clientName:fresh.name||'', accountId:acct.id, accountConcept:acct.concept||'', category:'Abono a cuenta', amountCents:realPay, private:!!acct.private, method, date, note, createdAt:nowISO(), createdBy:who, source:'finanzas' });
+        tx.set(doc(db,'transactions',entryId), { entryId, type:'income', dept:_incAccount.dept, clientId:fresh.id, clientName:fresh.name||'', accountId:acct.id, accountConcept:acct.concept||'', category:'Abono a cuenta', amountCents:realPay, private:!!acct.private, method, date, note, createdAt:new Date().toISOString(), createdBy:who, source:'finanzas' });
         tx.update(cref, { openAccounts:accts });
       });
       closeInc();
@@ -2006,7 +2006,7 @@ window.saveInc = async function(){
             vehicles:[], make:'',model:'',year:'',color:'',vin:'', weekly:0,numPay:0,total:0,down:0,
             totalOfPayments:0,financeCharge:0,amountFinanced:0,freq:'',schedule:[],settled:false, openAccounts:[],
             smsConsent:{marketing:false,date:null,source:'finanzas'},
-            createdAt:nowISO(), createdBy:who, payments:[] });
+            createdAt:new Date().toISOString(), createdBy:who, payments:[] });
           allClients.push({id:clientId, name, phone, phoneE164:e164, openAccounts:[]});
         }
       }
@@ -2027,8 +2027,8 @@ window.saveInc = async function(){
       // ===== CASO 2: nueva CUENTA ABIERTA (venta a pagos) — el enganche entra como ingreso =====
       const acctId='acct_'+Date.now()+'_'+Math.random().toString(36).slice(2,5);
       const acct={ id:acctId, concept, dept, totalCents, private:priv, warrantyMonths:warranty||0, photoURLs,
-        createdAt:nowISO(), createdBy:who, settled:(downCents>=totalCents), settledAt:(downCents>=totalCents?nowISO():null),
-        abonos:[{ entryId:id, amountCents:downCents, date, method, createdAt:nowISO(), createdBy:who, kind:'enganche' }] };
+        createdAt:new Date().toISOString(), createdBy:who, settled:(downCents>=totalCents), settledAt:(downCents>=totalCents?new Date().toISOString():null),
+        abonos:[{ entryId:id, amountCents:downCents, date, method, createdAt:new Date().toISOString(), createdBy:who, kind:'enganche' }] };
       await runTransaction(db, async(tx)=>{
         const cref=doc(db,'clients',clientId);
         const snap=await tx.get(cref); if(!snap.exists()) throw new Error('El cliente ya no existe');
@@ -2036,13 +2036,13 @@ window.saveInc = async function(){
         const accts=[...(fresh.openAccounts||[])];
         if(accts.some(a=>a.id===acctId)) return;
         accts.push(acct);
-        tx.set(doc(db,'transactions',id), { entryId:id, type:'income', dept, clientId, clientName, accountId:acctId, accountConcept:concept, category:cat, private:priv, amountCents:downCents, saleType:'pagos', saleTotalCents:totalCents, downCents, method, date, note, createdAt:nowISO(), createdBy:who, source:'finanzas' });
+        tx.set(doc(db,'transactions',id), { entryId:id, type:'income', dept, clientId, clientName, accountId:acctId, accountConcept:concept, category:cat, private:priv, amountCents:downCents, saleType:'pagos', saleTotalCents:totalCents, downCents, method, date, note, createdAt:new Date().toISOString(), createdBy:who, source:'finanzas' });
         tx.update(cref, { openAccounts:accts });
       });
     } else if(servicio){
       // ===== CASO 3: SERVICIO — registra el ingreso + carro + entra a recordatorios del CRM =====
       const carLabel=document.getElementById('i-car').value.trim();
-      const txData={ entryId:id, type:'income', dept, clientId, clientName, category:'Servicio', saleType:'servicio', private:priv, amountCents, method, date, note, createdAt:nowISO(), createdBy:who, source:'finanzas' };
+      const txData={ entryId:id, type:'income', dept, clientId, clientName, category:'Servicio', saleType:'servicio', private:priv, amountCents, method, date, note, createdAt:new Date().toISOString(), createdBy:who, source:'finanzas' };
       if(carLabel) txData.carLabel=carLabel;
       if(photoURLs.length) txData.photoURLs=photoURLs;
       await runTransaction(db, async(tx)=>{
@@ -2053,7 +2053,7 @@ window.saveInc = async function(){
         if(carLabel){
           const vi=vehicles.findIndex(v=>((v.label||'').toLowerCase()===carLabel.toLowerCase()));
           if(vi>=0) vehicles[vi]={...vehicles[vi], lastServiceDate:date};
-          else vehicles.push({ vin:'', label:carLabel, lastServiceDate:date, addedAt:nowISO() });
+          else vehicles.push({ vin:'', label:carLabel, lastServiceDate:date, addedAt:new Date().toISOString() });
         }
         tx.set(doc(db,'transactions',id), txData);
         tx.update(cref, { vehicles, lastServiceDate:date });
@@ -2061,7 +2061,7 @@ window.saveInc = async function(){
     } else {
       // ===== CASO 4: ingreso normal (contado / otro) =====
       const data={ entryId:id, type:'income', dept, category:cat, private:priv, amountCents, method, date, note,
-        createdAt:nowISO(), createdBy:who, source:'finanzas' };
+        createdAt:new Date().toISOString(), createdBy:who, source:'finanzas' };
       if(clientId){ data.clientId=clientId; data.clientName=clientName; }
       if(cat==='Venta de contado') data.saleType='contado';
       if(warranty>0) data.warrantyMonths=warranty;
@@ -2252,7 +2252,7 @@ window.dmvPayout=async function(){
     await setDoc(doc(db,'transactions',id), {
       entryId:id, type:'dmv_payout', dept:'dealer', category:'Placas / DMV (dinero de clientes)',
       amountCents:cents, method:'cash', date:new Date().toISOString().slice(0,10), note:concepto,
-      createdAt:nowISO(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
+      createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
     });
     setTimeout(renderDmv, 200);
   }catch(e){ alert('Error: '+e.message); }
@@ -2264,7 +2264,7 @@ window.dmvReconcile=async function(id){
   const cents=Math.round(Number(v)*100);
   if(!(cents>=0)){ alert('Monto inválido.'); return; }
   try{
-    await updateDoc(doc(db,'transactions',id), { realChargeCents:cents, reconciledAt:nowISO(), reconciledBy:(auth.currentUser&&auth.currentUser.email)||'' });
+    await updateDoc(doc(db,'transactions',id), { realChargeCents:cents, reconciledAt:new Date().toISOString(), reconciledBy:(auth.currentUser&&auth.currentUser.email)||'' });
     setTimeout(renderDmv, 200);
   }catch(e){ alert('Error: '+e.message); }
 };
