@@ -336,6 +336,32 @@
   <button type="button" onclick="closeModal('ebm-modal')" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">Cerrar</button>
 </div></div>
 
+<!-- 👥 CUENTAS DEL EQUIPO (SOLO dueño) — poner/cambiar contraseñas sin depender de correos -->
+<div id="team-box" style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:none;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;" onclick="toggleSection('team-list','team-arrow');loadTeamUsers()">
+    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">👥 CUENTAS DEL EQUIPO</div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <button onclick="event.stopPropagation();loadTeamUsers(true)" title="Actualizar" style="background:var(--border);color:var(--muted);border:none;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;">↻</button>
+      <span id="team-arrow" class="sec-arrow">▸</span>
+    </div>
+  </div>
+  <div id="team-list" style="padding:14px 18px;display:none;"><div style="color:var(--muted);font-size:13px;">Toca para cargar…</div></div>
+</div>
+
+<!-- Modal: poner contraseña a un usuario -->
+<div id="team-modal" class="modal-overlay"><div class="modal" style="max-width:440px;">
+  <div class="modal-title">🔑 Poner contraseña</div>
+  <div id="team-modal-who" style="color:var(--muted);font-size:13px;margin:6px 0 12px;"></div>
+  <label style="font-size:12px;color:var(--muted);">Nueva contraseña (mínimo 6)</label>
+  <div style="display:flex;gap:8px;align-items:center;margin:4px 0 14px;">
+    <input id="team-pass" type="text" autocomplete="off" placeholder="ej: legacy2026" style="flex:1;background:var(--navy2,#0f1420);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:15px;">
+  </div>
+  <div style="display:flex;gap:10px;">
+    <button type="button" onclick="closeModal('team-modal')" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:14px;cursor:pointer;">Cancelar</button>
+    <button type="button" id="team-save-btn" onclick="saveTeamPassword()" style="flex:1;background:#22a06b;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">Guardar contraseña</button>
+  </div>
+</div></div>
+
 <div class="search-wrap">
     <div style="display:flex;gap:10px;align-items:center;">
       <input class="search-input" placeholder="🔍 Buscar cliente, carro o VIN..." id="search-box" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="flex:1;">
@@ -822,6 +848,7 @@ onAuthStateChanged(auth, async (user) => {
   const isOwner = email === OWNER_EMAIL;
   document.body.classList.toggle('role-owner', isOwner);
   document.body.classList.toggle('role-viewer', !isOwner);   // Ivan: solo ver clientes
+  try{ const _tb=document.getElementById('team-box'); if(_tb) _tb.style.display = isOwner ? '' : 'none'; }catch(e){}   // 👥 Cuentas del equipo: solo el dueño
   if(!_listeningStarted){ _listeningStarted = true; startListening(); }
 });
 
@@ -3493,6 +3520,51 @@ window.generateContract = function(clientId) {
 };
 
 window.closeModal=function(id){document.getElementById(id).classList.remove('active');};
+
+// 👥 CUENTAS DEL EQUIPO — listar usuarios y ponerles contraseña (backend owner-only ev@).
+let _teamUsers=null, _teamLoading=false, _teamTarget=null;
+window.loadTeamUsers=async function(force){
+  const box=document.getElementById('team-list'); if(!box) return;
+  if(_teamUsers && !force){ renderTeamUsers(); return; }
+  if(_teamLoading) return; _teamLoading=true;
+  box.innerHTML='<div style="color:var(--muted);font-size:13px;">Cargando usuarios…</div>';
+  try{
+    const r=await httpsCallable(functions,'teamListUsers')();
+    _teamUsers=(r.data&&r.data.users)||[]; _teamLoading=false; renderTeamUsers();
+  }catch(e){ _teamLoading=false; box.innerHTML='<div style="color:#ff6b6b;font-size:13px;">No se pudo cargar: '+(e.message||e)+'</div>'; }
+};
+function _teamFmt(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ return String(iso).slice(0,10); } }
+function renderTeamUsers(){
+  const box=document.getElementById('team-list'); if(!box) return;
+  const us=_teamUsers||[];
+  if(!us.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;">Sin usuarios.</div>'; return; }
+  box.innerHTML='<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Toca 🔑 para ponerle una contraseña nueva a cualquiera (sin correos). Se aplica al instante.</div>'
+    + us.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);">
+        <div style="min-width:0;"><div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.email||'(sin correo)'}${u.disabled?' <span style=\"color:#ff6b6b;font-size:11px;\">(deshabilitado)</span>':''}</div>
+        <div style="font-size:11px;color:var(--muted);">Último acceso: ${_teamFmt(u.lastSignIn)}</div></div>
+        <button onclick="openTeamPass('${u.uid}','${(u.email||'').replace(/'/g,'')}')" style="flex-shrink:0;background:var(--gold);color:#0b0e14;border:none;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;">🔑 Contraseña</button>
+      </div>`).join('');
+}
+window.openTeamPass=function(uid,email){
+  _teamTarget={uid,email};
+  document.getElementById('team-modal-who').textContent='Usuario: '+(email||uid);
+  document.getElementById('team-pass').value='';
+  document.getElementById('team-modal').classList.add('active');
+  setTimeout(()=>{ const p=document.getElementById('team-pass'); if(p) p.focus(); },100);
+};
+window.saveTeamPassword=async function(){
+  if(!_teamTarget) return;
+  const pass=(document.getElementById('team-pass').value||'').trim();
+  if(pass.length<6){ alert('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if(!confirm('¿Poner esta contraseña a '+(_teamTarget.email||_teamTarget.uid)+'?\n\nEntrará con su correo y esta contraseña nueva.')) return;
+  const btn=document.getElementById('team-save-btn'); btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    await httpsCallable(functions,'teamSetPassword')({ uid:_teamTarget.uid, email:_teamTarget.email, password:pass });
+    closeModal('team-modal');
+    alert('✅ Contraseña actualizada para '+(_teamTarget.email||_teamTarget.uid)+'.\n\nDile que entre con su correo y la contraseña nueva. Si el navegador le ofrece una guardada vieja, que la ignore y la escriba a mano.');
+  }catch(e){ alert('Error: '+(e.message||e)); }
+  btn.disabled=false; btn.textContent='Guardar contraseña';
+};
 
 // 💬 CONVERSACIONES DEL BOT DE VENTAS — repaso + contador de personas (datos vía backend, solo dueños).
 let _botcData=null, _botcLoading=false;

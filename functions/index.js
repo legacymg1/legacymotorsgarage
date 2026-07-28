@@ -522,6 +522,45 @@ function salesOwnerOnly(request) {
   const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
   if (email !== "ev@legacymotorsgarage.com" && email !== "ivan.garcia@legacymotorsgarage.com") throw new HttpsError("permission-denied", "Solo dueños.");
 }
+// 👥 CUENTAS DEL EQUIPO — SOLO el dueño (ev@). Poner/cambiar contraseñas sin depender de correos.
+function ownerStrict(request) {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  if (email !== "ev@legacymotorsgarage.com") throw new HttpsError("permission-denied", "Solo el dueño puede administrar cuentas.");
+}
+exports.teamListUsers = onCall({ timeoutSeconds: 30 }, async (request) => {
+  ownerStrict(request);
+  const out = [];
+  let pageToken;
+  do {
+    const res = await admin.auth().listUsers(1000, pageToken);
+    res.users.forEach((u) => out.push({
+      uid: u.uid,
+      email: u.email || "",
+      disabled: !!u.disabled,
+      lastSignIn: (u.metadata && u.metadata.lastSignInTime) || "",
+      created: (u.metadata && u.metadata.creationTime) || "",
+    }));
+    pageToken = res.pageToken;
+  } while (pageToken);
+  out.sort((a, b) => (a.email || "").localeCompare(b.email || ""));
+  return { users: out };
+});
+exports.teamSetPassword = onCall({ timeoutSeconds: 30 }, async (request) => {
+  ownerStrict(request);
+  const d = request.data || {};
+  const password = String(d.password || "");
+  if (password.length < 6) throw new HttpsError("invalid-argument", "La contraseña debe tener al menos 6 caracteres.");
+  let uid = String(d.uid || "").trim();
+  const email = String(d.email || "").trim().toLowerCase();
+  if (!uid && email) {
+    const u = await admin.auth().getUserByEmail(email);
+    uid = u.uid;
+  }
+  if (!uid) throw new HttpsError("invalid-argument", "Falta el usuario.");
+  await admin.auth().updateUser(uid, { password });
+  return { ok: true };
+});
 exports.botConvos = onCall({ timeoutSeconds: 30 }, async (request) => {
   salesOwnerOnly(request);
   const db = admin.firestore();
