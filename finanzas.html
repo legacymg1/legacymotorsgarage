@@ -230,6 +230,7 @@
     <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
     <button class="btn-add" onclick="openComis()" style="font-size:15px;" title="Total pagado en comisiones/sueldos">💼 Comisiones</button>
     <button class="btn-add" onclick="openBulkAssign()" style="font-size:15px;" title="Asignar gastos a un carro por búsqueda (dueño)">🔗 Asignar a carro</button>
+    <button class="btn-add" onclick="openDmv()" style="font-size:15px;" title="Impuestos y DMV cobrados al cliente, por cotejar contra el cobro real del DMV">🏛️ DMV / Impuestos</button>
   </div>
 
   <div class="coll-head" style="margin-top:22px;" onclick="toggleSubs()">
@@ -544,6 +545,14 @@
   <div class="sheet" style="max-width:640px;">
     <div class="sheet-head"><div class="sheet-title">💳 Cuentas por cobrar</div><button class="close" onclick="closePorCobrar()">✕</button></div>
     <div id="porcobrar-body"></div>
+  </div>
+</div>
+
+<!-- 🏛️ DMV / IMPUESTOS por cotejar: lo cobrado al cliente para taxes+DMV, contra el cobro real del DMV -->
+<div class="overlay" id="dmv-overlay">
+  <div class="sheet" style="max-width:660px;">
+    <div class="sheet-head"><div class="sheet-title">🏛️ DMV / Impuestos por cotejar</div><button class="close" onclick="closeDmv()">✕</button></div>
+    <div id="dmv-body"></div>
   </div>
 </div>
 
@@ -2156,6 +2165,69 @@ function applyMovsCollapse(){
     const ar=document.getElementById('movs-arrow'); if(ar) ar.textContent=c?'▸':'▾';
   }catch(e){}
 }
+// 🏛️ DMV / IMPUESTOS por cotejar — lo cobrado al cliente para taxes+DMV en ventas de contado,
+// contra el cobro REAL que hace el DMV cuando se procesan los papeles. NO cuenta como ganancia.
+window.openDmv=function(){ renderDmv(); document.getElementById('dmv-overlay').classList.add('open'); };
+window.closeDmv=function(){ document.getElementById('dmv-overlay').classList.remove('open'); };
+function renderDmv(){
+  const box=document.getElementById('dmv-body'); if(!box) return;
+  const holds=liveTxns().filter(t=>t.type==='dmv_holding')
+    .sort((a,b)=>(b.date||b.createdAt||'').localeCompare(a.date||a.createdAt||''));
+  if(!holds.length){ box.innerHTML='<div style="color:var(--faint);font-size:14px;padding:16px 4px;line-height:1.5;">Aún no hay ventas de contado con impuestos/DMV por cotejar.<br>Al registrar una venta de contado, lo que el cliente pague para <strong>taxes y DMV</strong> aparece aquí, separado de la ganancia.</div>'; return; }
+  let totCol=0, totPend=0, totDiff=0, nPend=0;
+  const rows=holds.map(t=>{
+    const col=Number(t.amountCents)||0, tax=Number(t.taxCents)||0, dmv=Number(t.dmvCents)||0;
+    const has=t.realChargeCents!=null && t.realChargeCents!=='';
+    const real=has?(Number(t.realChargeCents)||0):0;
+    const diff=col-real;   // + = sobró (a favor) · − = faltó (pagamos de más)
+    totCol+=col;
+    if(has){ totDiff+=diff; } else { totPend+=col; nPend++; }
+    const diffLine = has
+      ? `<div style="font-size:12px;margin-top:4px;color:${diff>=0?'#3ecf8e':'#ff6b6b'};font-weight:700;">Cobro real DMV: ${centsToUSD(real)} · ${diff>=0?'Sobró (a favor)':'Faltó (pagamos de más)'} ${centsToUSD(Math.abs(diff))}</div>`
+      : `<div style="font-size:12px;margin-top:4px;color:#f0c040;font-weight:700;">⏳ Por cotejar</div>`;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;">
+        <span style="font-weight:700;font-size:14px;">${t.clientName||'Cliente'}</span>
+        <span style="font-weight:800;color:#f0c040;">${centsToUSD(col)}</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">${t.carLabel||''}${t.vin?(' · VIN '+t.vin):''} · ${fmtDate(t.date)}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px;">Impuesto: ${centsToUSD(tax)} · DMV: ${centsToUSD(dmv)}</div>
+      ${diffLine}
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <span style="font-size:12px;color:var(--muted);white-space:nowrap;">Cobro real DMV $</span>
+        <input id="dmv-real-${t.id}" type="number" inputmode="decimal" value="${has?(real/100).toFixed(2):''}" placeholder="0.00" style="flex:1;min-width:0;background:var(--navy2,#141a2b);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:14px;">
+        <button onclick="dmvReconcile('${t.id}')" style="background:#22a06b;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">Cotejar</button>
+        ${has?`<button onclick="dmvClear('${t.id}')" title="Quitar conciliación" style="background:transparent;color:var(--faint);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer;">↺</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  const summary=`<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13px;">
+    <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Cobrado a clientes (impuestos+DMV)</span><span style="font-weight:700;">${centsToUSD(totCol)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Por cotejar (${nPend})</span><span style="color:#f0c040;font-weight:700;">${centsToUSD(totPend)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Diferencia ya cotejada</span><span style="color:${totDiff>=0?'#3ecf8e':'#ff6b6b'};font-weight:700;">${totDiff>=0?'+':'−'}${centsToUSD(Math.abs(totDiff))}</span></div>
+    <div style="font-size:11px;color:var(--faint);margin-top:6px;line-height:1.5;">Este dinero NO cuenta como ganancia de Legacy. Es lo que cobraste al cliente para pagar impuestos y placas; aquí lo cotejas contra lo que realmente cobra el DMV.</div>
+  </div>`;
+  box.innerHTML=summary+rows;
+}
+window.dmvReconcile=async function(id){
+  const inp=document.getElementById('dmv-real-'+id); if(!inp) return;
+  const v=(inp.value||'').trim();
+  if(v===''){ alert('Escribe el cobro real del DMV.'); return; }
+  const cents=Math.round(Number(v)*100);
+  if(!(cents>=0)){ alert('Monto inválido.'); return; }
+  try{
+    await updateDoc(doc(db,'transactions',id), { realChargeCents:cents, reconciledAt:nowISO(), reconciledBy:(auth.currentUser&&auth.currentUser.email)||'' });
+    setTimeout(renderDmv, 200);
+  }catch(e){ alert('Error: '+e.message); }
+};
+window.dmvClear=async function(id){
+  if(!confirm('¿Quitar la conciliación de este renglón? Volverá a quedar "por cotejar".')) return;
+  try{
+    await updateDoc(doc(db,'transactions',id), { realChargeCents:null, reconciledAt:null, reconciledBy:null });
+    setTimeout(renderDmv, 200);
+  }catch(e){ alert('Error: '+e.message); }
+};
+
 window.toggleSubs = function(){
   const el=document.getElementById('sub-list'); if(!el) return;
   const show = el.style.display==='none';
