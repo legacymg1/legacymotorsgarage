@@ -3536,9 +3536,12 @@ window.loadTeamUsers=async function(force){
 function _teamFmt(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ return String(iso).slice(0,10); } }
 function renderTeamUsers(){
   const box=document.getElementById('team-list'); if(!box) return;
-  const us=_teamUsers||[];
-  if(!us.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;">Sin usuarios.</div>'; return; }
-  box.innerHTML='<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Toca 🔑 para ponerle una contraseña nueva a cualquiera (sin correos). Se aplica al instante.</div>'
+  const all=_teamUsers||[];
+  const us=all.filter(u=>u.email);                       // SOLO cuentas con correo = el equipo real
+  const anon=all.length-us.length;                       // el resto = sesiones anónimas del sitio (visitantes/bot)
+  if(!us.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;">Sin cuentas del equipo (con correo).</div>'; return; }
+  box.innerHTML='<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Toca 🔑 para ponerle una contraseña nueva a cualquiera del equipo (sin correos). Se aplica al instante.'
+    + (anon>0?(' <span style="color:var(--faint);">('+anon+' sesiones anónimas del sitio ocultas — visitantes/bot, no son del equipo)</span>'):'') + '</div>'
     + us.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);">
         <div style="min-width:0;"><div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${u.email||'(sin correo)'}${u.disabled?' <span style=\"color:#ff6b6b;font-size:11px;\">(deshabilitado)</span>':''}</div>
         <div style="font-size:11px;color:var(--muted);">Último acceso: ${_teamFmt(u.lastSignIn)}</div></div>

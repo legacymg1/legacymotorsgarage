@@ -534,13 +534,16 @@ exports.teamListUsers = onCall({ timeoutSeconds: 30 }, async (request) => {
   let pageToken;
   do {
     const res = await admin.auth().listUsers(1000, pageToken);
-    res.users.forEach((u) => out.push({
-      uid: u.uid,
-      email: u.email || "",
-      disabled: !!u.disabled,
-      lastSignIn: (u.metadata && u.metadata.lastSignInTime) || "",
-      created: (u.metadata && u.metadata.creationTime) || "",
-    }));
+    res.users.forEach((u) => {
+      if (!u.email) return; // ignora sesiones anónimas del sitio (visitantes/bot): solo el equipo con correo
+      out.push({
+        uid: u.uid,
+        email: u.email,
+        disabled: !!u.disabled,
+        lastSignIn: (u.metadata && u.metadata.lastSignInTime) || "",
+        created: (u.metadata && u.metadata.creationTime) || "",
+      });
+    });
     pageToken = res.pageToken;
   } while (pageToken);
   out.sort((a, b) => (a.email || "").localeCompare(b.email || ""));
