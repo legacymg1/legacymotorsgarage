@@ -2314,12 +2314,11 @@ window.saveClient=async function(){
         const _taxC = Math.round(Number(data.salesTax || 0) * 100);
         const _dmvC = Math.round(Number(data.dmvFees  || 0) * 100);
         // createdAt: Finanzas usa este sello para decidir en qué CORTE cae el movimiento (inCut).
-        // Se sella con la FECHA REAL de la venta (contractDate), NO con hoy, para que caiga en
-        // su mes/corte correcto y no en el corte actual. Si el renglón ya tenía sello, se conserva.
-        const _saleCreatedAt = existing.saleCreatedAt || existing.cashSaleCreatedAt
-          || (contractDate ? new Date(contractDate+'T12:00:00').toISOString()
+        // SIEMPRE se deriva de la FECHA REAL de la venta (contractDate) — nunca de "hoy" ni de un
+        // sello pegado — para que caiga en su corte/mes correcto y no en el corte actual.
+        const _saleCreatedAt = (contractDate ? new Date(contractDate+'T12:00:00').toISOString()
              : (startDate ? new Date(startDate+'T12:00:00').toISOString()
-             : new Date().toISOString()));
+             : (existing.saleCreatedAt || new Date().toISOString())));
         // Bolsa DMV/impuestos — para contado Y pagos (lo cargado al cliente para taxes+DMV).
         if(_taxC + _dmvC > 0){
           await setDoc(doc(db,'transactions','dmvhold_'+id), {
@@ -2358,8 +2357,6 @@ window.saveClient=async function(){
             }, { merge:true });
           }
         }
-        // Sello guardado en el cliente para que un re-guardado no cambie el corte al que pertenece.
-        try{ await setDoc(doc(db,'clients',id), { saleCreatedAt:_saleCreatedAt }, { merge:true }); }catch(_e){}
       }
     }catch(finErr){ console.log('Post venta a finanzas omitido:', finErr); }
 
