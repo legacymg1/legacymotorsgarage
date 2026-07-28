@@ -231,6 +231,7 @@
     <button class="btn-add" onclick="openComis()" style="font-size:15px;" title="Total pagado en comisiones/sueldos">💼 Comisiones</button>
     <button class="btn-add" onclick="openBulkAssign()" style="font-size:15px;" title="Asignar gastos a un carro por búsqueda (dueño)">🔗 Asignar a carro</button>
     <button class="btn-add" onclick="openDmv()" style="font-size:15px;" title="Impuestos y DMV cobrados al cliente, por cotejar contra el cobro real del DMV">🏛️ DMV / Impuestos</button>
+    <button class="btn-add" onclick="openAudit()" style="font-size:15px;" title="Revisar (solo lectura) que cada venta de Dealer tenga su ingreso correcto (carro+$70) y sus taxes/DMV en la caja">🔎 Auditar Dealer</button>
   </div>
 
   <div class="coll-head" style="margin-top:22px;" onclick="toggleSubs()">
@@ -553,6 +554,14 @@
   <div class="sheet" style="max-width:660px;">
     <div class="sheet-head"><div class="sheet-title">🏛️ DMV / Impuestos por cotejar</div><button class="close" onclick="closeDmv()">✕</button></div>
     <div id="dmv-body"></div>
+  </div>
+</div>
+
+<!-- 🔎 AUDITORÍA (solo lectura) de ventas Dealer: ingreso correcto vs registrado + taxes/DMV -->
+<div class="overlay" id="audit-overlay">
+  <div class="sheet" style="max-width:720px;">
+    <div class="sheet-head"><div class="sheet-title">🔎 Auditoría de ventas Dealer</div><button class="close" onclick="closeAudit()">✕</button></div>
+    <div id="audit-body"></div>
   </div>
 </div>
 
@@ -2227,6 +2236,57 @@ window.dmvClear=async function(id){
     setTimeout(renderDmv, 200);
   }catch(e){ alert('Error: '+e.message); }
 };
+
+// 🔎 AUDITORÍA (solo lectura) de ventas de Dealer: ¿el ingreso está correcto (carro+$70)
+// o inflado con taxes/DMV? ¿está su renglón de DMV en la caja? NO escribe nada.
+window.openAudit=function(){ renderAudit(); document.getElementById('audit-overlay').classList.add('open'); };
+window.closeAudit=function(){ document.getElementById('audit-overlay').classList.remove('open'); };
+function renderAudit(){
+  const box=document.getElementById('audit-body'); if(!box) return;
+  const LT=liveTxns();
+  const sales=(allClients||[]).filter(c=> Number(c.total)>0 && !c.private && c.kind!=='service'
+    && !(c.openAccounts&&c.openAccounts.length) && (c.year||c.make||c.model||c.vin));
+  if(!sales.length){ box.innerHTML='<div style="color:var(--faint);padding:16px 4px;">No hay ventas de Dealer registradas.</div>'; return; }
+  let nOk=0,nInf=0,nMiss=0,nDup=0;
+  const rows=sales.slice().sort((a,b)=>((b.contractDate||b.startDate||'')+'').localeCompare((a.contractDate||a.startDate||'')+'')).map(c=>{
+    const cash = c.freq==='cash';
+    const carC=Math.round(Number(c.total)*100), docC=7000;
+    const taxdmvC=Math.round((Number(c.salesTax||0)+Number(c.dmvFees||0))*100);
+    const clean=carC+docC;   // ingreso correcto de Legacy (contado, pagado completo)
+    const incTx=LT.filter(t=>t.clientId===c.id && INCOME_TYPES.includes(t.type) && !t.accountId);
+    const rec=incTx.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+    const hasDmv = txns.some(t=>(t.id==='dmvhold_'+c.id) && t.type==='dmv_holding');
+    let chip, color;
+    if(cash){
+      if(rec===0){ chip='FALTA'; color='#ff6b6b'; nMiss++; }
+      else if(taxdmvC>0 && Math.abs(rec-(clean+taxdmvC))<50){ chip='INFLADA (incluye tax/DMV)'; color='#f0c040'; nInf++; }
+      else if(rec>clean+taxdmvC+50){ chip='POSIBLE DUPLICADO'; color='#ff6b6b'; nDup++; }
+      else if(Math.abs(rec-clean)<50){ chip='OK'; color='#3ecf8e'; nOk++; }
+      else { chip='REVISAR'; color='#f0c040'; }
+    } else {
+      chip = rec===0 ? 'Pagos · sin abonos' : ('Pagos · '+centsToUSD(rec)+' abonado');
+      color = '#8fa9c9';
+    }
+    const movs = incTx.length
+      ? incTx.map(t=>'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:2px 0;"><span>'+t.type+' · '+fmtDate(t.date)+(t.source?(' · '+t.source):'')+'</span><span>'+centsToUSD(t.amountCents)+'</span></div>').join('')
+      : '<div style="font-size:11px;color:var(--faint);">Sin ingreso registrado en Finanzas.</div>';
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:9px;">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><span style="font-weight:700;font-size:14px;">'+(c.name||'(sin nombre)')+'</span><span style="font-weight:800;color:'+color+';font-size:11.5px;text-align:right;">'+chip+'</span></div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+[c.year,c.make,c.model].filter(Boolean).join(' ')+(c.vin?(' · '+c.vin):'')+' · '+(cash?'contado':'pagos')+'</div>'
+      +'<div style="font-size:12px;margin-top:6px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;">'
+        +'<span style="color:var(--muted);">Ingreso correcto (carro+$70)</span><span style="text-align:right;">'+centsToUSD(clean)+'</span>'
+        +'<span style="color:var(--muted);">Registrado hoy</span><span style="text-align:right;color:'+color+';font-weight:600;">'+centsToUSD(rec)+'</span>'
+        +'<span style="color:var(--muted);">Taxes+DMV</span><span style="text-align:right;">'+centsToUSD(taxdmvC)+' · '+(hasDmv?'<span style="color:#3ecf8e;">✓ en caja</span>':'<span style="color:#ff6b6b;">✗ falta</span>')+'</span>'
+      +'</div>'
+      +'<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:5px;">'+movs+'</div>'
+      +'</div>';
+  }).join('');
+  const sum='<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:12px;padding:11px 13px;margin-bottom:12px;font-size:13px;line-height:1.6;">'
+    +'<strong>'+sales.length+'</strong> ventas Dealer · <span style="color:#3ecf8e;">OK '+nOk+'</span> · <span style="color:#f0c040;">Inflada '+nInf+'</span> · <span style="color:#ff6b6b;">Falta '+nMiss+'</span> · <span style="color:#ff6b6b;">Dup '+nDup+'</span>'
+    +'<div style="font-size:11px;color:var(--faint);margin-top:6px;">Solo lectura, no cambia nada. <strong>FALTA</strong> = re-guárdala en el admin (crea el ingreso limpio y su DMV, en su corte original). <strong>INFLADA / DUPLICADO</strong> = NO la re-guardes aún (duplicaría); avísame y la limpiamos juntos anulando el renglón viejo. En <strong>pagos</strong> el ingreso llega por abonos (por eso no compara contra carro+$70).</div>'
+    +'</div>';
+  box.innerHTML=sum+rows;
+}
 
 window.toggleSubs = function(){
   const el=document.getElementById('sub-list'); if(!el) return;
