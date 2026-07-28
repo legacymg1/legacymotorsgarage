@@ -2313,9 +2313,13 @@ window.saveClient=async function(){
         const _docFeeC   = 7000; // $70 doc fee = ingreso de Legacy
         const _taxC = Math.round(Number(data.salesTax || 0) * 100);
         const _dmvC = Math.round(Number(data.dmvFees  || 0) * 100);
-        // createdAt: Finanzas usa este sello para decidir qué entra en "este corte" (inCut).
-        // Se conserva el createdAt original si el renglón ya existía (no re-sella el corte).
-        const _saleCreatedAt = existing.saleCreatedAt || existing.cashSaleCreatedAt || new Date().toISOString();
+        // createdAt: Finanzas usa este sello para decidir en qué CORTE cae el movimiento (inCut).
+        // Se sella con la FECHA REAL de la venta (contractDate), NO con hoy, para que caiga en
+        // su mes/corte correcto y no en el corte actual. Si el renglón ya tenía sello, se conserva.
+        const _saleCreatedAt = existing.saleCreatedAt || existing.cashSaleCreatedAt
+          || (contractDate ? new Date(contractDate+'T12:00:00').toISOString()
+             : (startDate ? new Date(startDate+'T12:00:00').toISOString()
+             : new Date().toISOString()));
         // Bolsa DMV/impuestos — para contado Y pagos (lo cargado al cliente para taxes+DMV).
         if(_taxC + _dmvC > 0){
           await setDoc(doc(db,'transactions','dmvhold_'+id), {
