@@ -2297,46 +2297,52 @@ window.saveClient=async function(){
     await setDoc(doc(db,'clients',id), data, { merge: true });
     console.log('Saved successfully!');
 
-    // 💵 VENTA DE CONTADO → Finanzas. Antes NO se pasaba nada (el carro salía liquidado pero
-    // Finanzas quedaba en cero). Ahora, al guardar una venta de contado, se registran 2 renglones:
-    //   • cash_sale (INGRESO real de Legacy = precio del carro + $70 de doc fee)
-    //   • dmv_holding (lo cobrado para impuestos + DMV, BOLSA APARTE por cotejar; NO es ganancia)
-    // Idempotente: el id es fijo por cliente, así que reeditar la venta ACTUALIZA los mismos
-    // renglones en vez de duplicarlos. merge:true conserva la conciliación del DMV si ya se hizo.
+    // 💵 VENTA → Finanzas. Antes una venta de CONTADO no pasaba nada (carro liquidado pero
+    // Finanzas en cero). Ahora, al guardar CUALQUIER venta de carro (contado o pagos):
+    //   • dmv_holding — impuestos + DMV de la venta, BOLSA APARTE por cotejar (NO es ganancia). SIEMPRE.
+    //   • cash_sale  — INGRESO real de Legacy = precio del carro + $70 doc fee. SOLO en CONTADO
+    //                  (en pagos el ingreso entra por los abonos, no aquí, para no duplicar).
+    // Idempotente: id fijo por cliente → reeditar ACTUALIZA los mismos renglones, no duplica.
+    // merge:true conserva la conciliación del DMV (realChargeCents) si ya se hizo.
     try{
-      if(!isService && freq === 'cash' && Number(data.total) > 0){
+      if(!isService && Number(data.total) > 0){
         const _who = (auth.currentUser && auth.currentUser.email) || '';
-        const _saleDate = contractDate || today();
+        const _saleDate = contractDate || startDate || today();
         const _carLabel = [data.year, data.make, data.model].filter(Boolean).join(' ');
         const _carPriceC = Math.round(Number(data.total) * 100);
         const _docFeeC   = 7000; // $70 doc fee = ingreso de Legacy
         const _taxC = Math.round(Number(data.salesTax || 0) * 100);
         const _dmvC = Math.round(Number(data.dmvFees  || 0) * 100);
         // createdAt: Finanzas usa este sello para decidir qué entra en "este corte" (inCut).
-        // Si el renglón ya existía, se conserva su createdAt original (no lo re-sella).
-        const _saleCreatedAt = existing.cashSaleCreatedAt || new Date().toISOString();
-        await setDoc(doc(db,'transactions','cashsale_'+id), {
-          entryId:'cashsale_'+id, type:'cash_sale', dept:'dealer',
-          clientId:id, clientName:name, category:'Venta de contado', saleType:'contado',
-          amountCents:_carPriceC + _docFeeC, carPriceCents:_carPriceC, docFeeCents:_docFeeC,
-          vin:data.vin||'', carLabel:_carLabel, invNum:data.vehicleInventoryNum||'',
-          method:'cash', date:_saleDate, note:'Venta de contado · '+_carLabel,
-          createdAt:_saleCreatedAt, createdBy:_who, source:'admin'
-        }, { merge:true });
+        // Se conserva el createdAt original si el renglón ya existía (no re-sella el corte).
+        const _saleCreatedAt = existing.saleCreatedAt || existing.cashSaleCreatedAt || new Date().toISOString();
+        // Bolsa DMV/impuestos — para contado Y pagos (lo cargado al cliente para taxes+DMV).
         if(_taxC + _dmvC > 0){
           await setDoc(doc(db,'transactions','dmvhold_'+id), {
             entryId:'dmvhold_'+id, type:'dmv_holding', dept:'dealer',
             clientId:id, clientName:name, category:'DMV / impuestos (por cotejar)',
             amountCents:_taxC + _dmvC, taxCents:_taxC, dmvCents:_dmvC,
+            saleType:(freq==='cash'?'contado':'pagos'),
             vin:data.vin||'', carLabel:_carLabel, invNum:data.vehicleInventoryNum||'',
-            date:_saleDate, note:'Cobrado al cliente para DMV/impuestos',
+            date:_saleDate, note:'Impuestos + DMV de la venta',
             createdAt:_saleCreatedAt, createdBy:_who, source:'admin'
           }, { merge:true });
         }
-        // Guarda el sello en el cliente para que un re-guardado futuro no cambie el corte al que pertenece.
-        try{ await setDoc(doc(db,'clients',id), { cashSaleCreatedAt:_saleCreatedAt }, { merge:true }); }catch(_e){}
+        // Ingreso del carro SOLO en contado.
+        if(freq === 'cash'){
+          await setDoc(doc(db,'transactions','cashsale_'+id), {
+            entryId:'cashsale_'+id, type:'cash_sale', dept:'dealer',
+            clientId:id, clientName:name, category:'Venta de contado', saleType:'contado',
+            amountCents:_carPriceC + _docFeeC, carPriceCents:_carPriceC, docFeeCents:_docFeeC,
+            vin:data.vin||'', carLabel:_carLabel, invNum:data.vehicleInventoryNum||'',
+            method:'cash', date:_saleDate, note:'Venta de contado · '+_carLabel,
+            createdAt:_saleCreatedAt, createdBy:_who, source:'admin'
+          }, { merge:true });
+        }
+        // Sello guardado en el cliente para que un re-guardado no cambie el corte al que pertenece.
+        try{ await setDoc(doc(db,'clients',id), { saleCreatedAt:_saleCreatedAt }, { merge:true }); }catch(_e){}
       }
-    }catch(finErr){ console.log('Post venta de contado a finanzas omitido:', finErr); }
+    }catch(finErr){ console.log('Post venta a finanzas omitido:', finErr); }
 
     closeModal('add-modal');
   }catch(e){console.error('Save error:',e);alert('Error guardando: '+e.message);}
