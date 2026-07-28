@@ -232,6 +232,7 @@
     <button class="btn-add" onclick="openBulkAssign()" style="font-size:15px;" title="Asignar gastos a un carro por búsqueda (dueño)">🔗 Asignar a carro</button>
     <button class="btn-add" onclick="openDmv()" style="font-size:15px;" title="Impuestos y DMV cobrados al cliente, por cotejar contra el cobro real del DMV">🏛️ DMV / Impuestos</button>
     <button class="btn-add" onclick="openAudit()" style="font-size:15px;" title="Revisar (solo lectura) que cada venta de Dealer tenga su ingreso correcto (carro+$70) y sus taxes/DMV en la caja">🔎 Auditar Dealer</button>
+    <button class="btn-add" onclick="platePayout()" style="font-size:15px;" title="Sacar efectivo del corte para pagar placas/DMV (dinero de clientes). No es gasto ni baja la ganancia.">🪪 Salida placas</button>
   </div>
 
   <div class="coll-head" style="margin-top:22px;" onclick="toggleSubs()">
@@ -2185,21 +2186,9 @@ window.openDmv=function(){ renderDmv(); document.getElementById('dmv-overlay').c
 window.closeDmv=function(){ document.getElementById('dmv-overlay').classList.remove('open'); };
 function renderDmv(){
   const box=document.getElementById('dmv-body'); if(!box) return;
-  const LTd=liveTxns();
-  const holds=LTd.filter(t=>t.type==='dmv_holding')
+  const holds=liveTxns().filter(t=>t.type==='dmv_holding')
     .sort((a,b)=>(b.date||b.createdAt||'').localeCompare(a.date||a.createdAt||''));
-  const payouts=LTd.filter(t=>t.type==='dmv_payout')
-    .sort((a,b)=>(b.date||b.createdAt||'').localeCompare(a.date||a.createdAt||''));
-  const totPaidOut=payouts.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
-  const payBtn='<button onclick="dmvPayout()" style="width:100%;background:#c9a84c;color:#0b0e14;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:12px;">➖ Registrar salida para placas (dinero de clientes)</button>';
-  const payList = payouts.length ? ('<div style="font-size:12px;font-weight:800;color:#c9a84c;margin:6px 0 4px;">🏛️ Salidas para placas / DMV</div>'
-    + payouts.map(t=>'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:4px 0;border-bottom:1px solid var(--border);"><span>'+fmtDate(t.date)+' · '+(t.note||'placas')+'</span><span style="color:#ff6b6b;font-weight:700;">−'+centsToUSD(t.amountCents)+'</span></div>').join('')) : '';
-  if(!holds.length){
-    box.innerHTML=payBtn
-      +(totPaidOut>0?'<div style="background:rgba(201,168,76,0.10);border:1px solid rgba(201,168,76,0.4);border-radius:12px;padding:11px 13px;margin-bottom:12px;font-size:13px;"><div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Usado para placas/DMV</span><span style="color:#c9a84c;font-weight:800;">'+centsToUSD(totPaidOut)+'</span></div><div style="font-size:11px;color:var(--faint);margin-top:5px;">Salió del efectivo del corte. NO es gasto ni baja tu ganancia.</div></div>'+payList:'')
-      +'<div style="color:var(--faint);font-size:14px;padding:12px 4px;line-height:1.5;">Aún no hay ventas con impuestos/DMV por cotejar. Al registrar una venta, lo que el cliente pague para <strong>taxes y DMV</strong> aparece aquí, separado de la ganancia.</div>';
-    return;
-  }
+  if(!holds.length){ box.innerHTML='<div style="color:var(--faint);font-size:14px;padding:16px 4px;line-height:1.5;">Aún no hay ventas con impuestos/DMV por cotejar.<br>Al registrar una venta, lo que el cliente pague para <strong>taxes y DMV</strong> aparece aquí, separado de la ganancia.</div>'; return; }
   let totCol=0, totPend=0, totDiff=0, nPend=0;
   const rows=holds.map(t=>{
     const col=Number(t.amountCents)||0, tax=Number(t.taxCents)||0, dmv=Number(t.dmvCents)||0;
@@ -2227,26 +2216,24 @@ function renderDmv(){
       </div>
     </div>`;
   }).join('');
-  const saldoCaja=totCol-totPaidOut;
   const summary=`<div style="background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13px;">
     <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Cobrado a clientes (impuestos+DMV)</span><span style="font-weight:700;">${centsToUSD(totCol)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Por cotejar (${nPend})</span><span style="color:#f0c040;font-weight:700;">${centsToUSD(totPend)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Diferencia ya cotejada</span><span style="color:${totDiff>=0?'#3ecf8e':'#ff6b6b'};font-weight:700;">${totDiff>=0?'+':'−'}${centsToUSD(Math.abs(totDiff))}</span></div>
-    ${totPaidOut>0?`<div style="display:flex;justify-content:space-between;padding:2px 0;"><span style="color:var(--muted);">Usado para placas/DMV</span><span style="color:#c9a84c;font-weight:700;">−${centsToUSD(totPaidOut)}</span></div>`:''}
-    <div style="display:flex;justify-content:space-between;padding:6px 0 0;margin-top:4px;border-top:1px solid var(--border);"><span style="font-weight:800;">Saldo en caja DMV</span><span style="font-weight:800;color:${saldoCaja>=0?'#3ecf8e':'#ff6b6b'};">${centsToUSD(saldoCaja)}</span></div>
-    <div style="font-size:11px;color:var(--faint);margin-top:6px;line-height:1.5;">Este dinero NO es ganancia de Legacy. Es lo que cobraste al cliente para impuestos y placas. La salida para placas baja el efectivo del corte pero NO cuenta como gasto.</div>
+    <div style="font-size:11px;color:var(--faint);margin-top:6px;line-height:1.5;">Este dinero NO cuenta como ganancia de Legacy. Es lo que cobraste al cliente para impuestos y placas; aquí lo cotejas contra lo que realmente cobra el DMV. (Esta caja es solo de cotejo, no se mueve al pagar placas.)</div>
   </div>`;
-  box.innerHTML=payBtn+summary+rows+payList;
+  box.innerHTML=summary+rows;
 }
-// Registrar SALIDA de dinero de clientes para placas/DMV: baja el efectivo del corte (sale del
-// reparto entre socios), aparece etiquetado, y NO cuenta como gasto ni reduce la ganancia.
-window.dmvPayout=async function(){
+// Registrar SALIDA de efectivo para placas/DMV (dinero de clientes): SOLO baja el efectivo del
+// corte / bolsa Dealer (sale del reparto entre socios). NO es gasto, NO baja la ganancia, y NO
+// toca la caja de "impuestos por cotejar".
+window.platePayout=async function(){
   const v=prompt('¿Cuánto SALIÓ del efectivo para pagar placas/DMV? (dinero que ya te habían pagado los clientes)\n\nMonto en dólares:');
   if(v===null) return;
   const cents=Math.round(Number((v||'').trim())*100);
   if(!(cents>0)){ alert('Monto inválido.'); return; }
   const concepto=(prompt('Concepto / referencia (ej: 2 placas — Fulano y Mengano):','Placas')||'Placas').trim();
-  if(!confirm('Registrar salida de '+centsToUSD(cents)+' para placas/DMV.\n\n• Baja el efectivo de ESTE corte.\n• NO cuenta como gasto ni baja tu ganancia.\n\n¿Confirmar?')) return;
+  if(!confirm('Registrar salida de '+centsToUSD(cents)+' para placas/DMV.\n\n• Baja el efectivo de ESTE corte (bolsa Dealer).\n• NO cuenta como gasto ni baja tu ganancia.\n• NO toca la caja de impuestos por cotejar.\n\n¿Confirmar?')) return;
   const id='dmvpay_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   try{
     await setDoc(doc(db,'transactions',id), {
@@ -2254,7 +2241,7 @@ window.dmvPayout=async function(){
       amountCents:cents, method:'cash', date:new Date().toISOString().slice(0,10), note:concepto,
       createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
     });
-    setTimeout(renderDmv, 200);
+    alert('✅ Registrado. Bajó '+centsToUSD(cents)+' del efectivo del corte (Dealer). No afecta ganancia ni la caja de cotejo.');
   }catch(e){ alert('Error: '+e.message); }
 };
 window.dmvReconcile=async function(id){
