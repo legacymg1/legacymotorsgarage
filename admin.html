@@ -2338,6 +2338,21 @@ window.saveClient=async function(){
             method:'cash', date:_saleDate, note:'Venta de contado · '+_carLabel,
             createdAt:_saleCreatedAt, createdBy:_who, source:'admin'
           }, { merge:true });
+        } else {
+          // PAGOS: el ENGANCHE es donde entra el dinero por adelantado (down + tax + dmv).
+          // El down (pie del carro) = ingreso; tax+dmv ya fueron a la caja de DMV arriba.
+          // Los abonos semanales entran aparte por confirmPayment. Idempotente por id fijo.
+          const _downC = Math.round(Number(data.down || 0) * 100);
+          if(_downC > 0){
+            await setDoc(doc(db,'transactions','downpay_'+id), {
+              entryId:'downpay_'+id, type:'down', dept:'dealer',
+              clientId:id, clientName:name, category:'Enganche', saleType:'pagos',
+              amountCents:_downC, saleTotalCents:Math.round(Number(data.total)*100),
+              vin:data.vin||'', carLabel:_carLabel, invNum:data.vehicleInventoryNum||'',
+              method:'cash', date:_saleDate, note:'Enganche · '+_carLabel,
+              createdAt:_saleCreatedAt, createdBy:_who, source:'admin'
+            }, { merge:true });
+          }
         }
         // Sello guardado en el cliente para que un re-guardado no cambie el corte al que pertenece.
         try{ await setDoc(doc(db,'clients',id), { saleCreatedAt:_saleCreatedAt }, { merge:true }); }catch(_e){}
