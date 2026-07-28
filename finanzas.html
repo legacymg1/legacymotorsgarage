@@ -550,7 +550,7 @@
 </div>
 
 <!-- 🏛️ DMV / IMPUESTOS por cotejar: lo cobrado al cliente para taxes+DMV, contra el cobro real del DMV -->
-<div class="overlay" id="dmv-overlay">
+<div class="overlay" id="dmv-overlay" onclick="if(event.target===this)closeDmv()">
   <div class="sheet" style="max-width:660px;">
     <div class="sheet-head"><div class="sheet-title">🏛️ DMV / Impuestos por cotejar</div><button class="close" onclick="closeDmv()">✕</button></div>
     <div id="dmv-body"></div>
@@ -558,7 +558,7 @@
 </div>
 
 <!-- 🔎 AUDITORÍA (solo lectura) de ventas Dealer: ingreso correcto vs registrado + taxes/DMV -->
-<div class="overlay" id="audit-overlay">
+<div class="overlay" id="audit-overlay" onclick="if(event.target===this)closeAudit()">
   <div class="sheet" style="max-width:720px;">
     <div class="sheet-head"><div class="sheet-title">🔎 Auditoría de ventas Dealer</div><button class="close" onclick="closeAudit()">✕</button></div>
     <div id="audit-body"></div>
