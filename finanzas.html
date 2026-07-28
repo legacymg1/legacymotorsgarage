@@ -2281,12 +2281,16 @@ function renderAudit(){
       +'<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:5px;">'+movs+'</div>'
       +'</div>';
   }).join('');
-  // Detector de ingresos Dealer SUELTOS (no ligados a ninguna de estas ventas): si hay dinero
-  // aquí, esas ventas quizá SÍ estén registradas a mano → re-guardar duplicaría.
+  // Detector de ingresos Dealer SUELTOS. OJO: los abonos ('payment') y enganches ('down') NO
+  // se duplican al re-guardar (re-guardar no crea abonos). El riesgo real de duplicar es un
+  // ingreso "de bulto" capturado A MANO ('income' o 'cash_sale') que represente una venta.
+  // Además ignoramos los que YA están ligados a algún cliente real (aunque no esté en la lista).
   const saleIds=new Set(sales.map(c=>c.id));
-  const unlinked=LT.filter(t=>INCOME_TYPES.includes(t.type) && (t.dept==='dealer'||!t.dept)
+  const allIds=new Set((allClients||[]).map(c=>c.id));
+  const unlinked=LT.filter(t=>(t.type==='income'||t.type==='cash_sale') && (t.dept==='dealer'||!t.dept)
     && !t.accountId && t.private!==true && t.saleType!=='servicio'
-    && (!t.clientId || !saleIds.has(t.clientId)));
+    && String(t.id||'').indexOf('cashsale_')!==0
+    && (!t.clientId || (!saleIds.has(t.clientId) && !allIds.has(t.clientId))));
   const unlinkedTot=unlinked.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
   let warn='';
   if(unlinkedTot>0){
