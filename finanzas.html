@@ -1000,52 +1000,74 @@ window.reverseExp = async function(id){
 // ---------- DEVOLUCIONES (revierte un gasto; el dinero va a FONDO de esa caja, no se reparte) ----------
 window.openDevol = function(){ const s=document.getElementById('devol-search'); if(s) s.value=''; renderDevolList(); document.getElementById('devol-overlay').classList.add('open'); };
 window.closeDevol = function(){ document.getElementById('devol-overlay').classList.remove('open'); };
+// Suma de lo YA devuelto (reversado) por gasto — habilita DEVOLUCIONES PARCIALES (varias piezas de un invoice).
+function _reversedMap(){
+  const m={};
+  liveTxns().forEach(t=>{ if(t.type==='expense_reversal' && t.reversalOf){ m[t.reversalOf]=(m[t.reversalOf]||0)+(Number(t.amountCents)||0); } });
+  return m;
+}
 window.renderDevolList = function(){
   const box=document.getElementById('devol-body'); if(!box) return;
   const q=((document.getElementById('devol-search')||{}).value||'').trim().toLowerCase();
-  const reversed=new Set(txns.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
-  let list=txns.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id) && canEditTx(t.id));
+  const revMap=_reversedMap();
+  const remOf=t=>(Number(t.amountCents)||0)-(revMap[t.entryId||t.id]||0);
+  let list=txns.filter(t=>t.type==='expense' && remOf(t)>0 && canEditTx(t.id));   // muestra mientras quede saldo por devolver
   if(q){ const w=q.split(/\s+/); list=list.filter(t=>{ const hay=((t.note||'')+' '+(t.category||'')+' '+(t.vendor||'')+' '+(t.carLabel||'')+' '+((DEPT_LABEL[t.dept]||''))).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); }); }
   list.sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||''));
   if(!list.length){ box.innerHTML='<div style="color:var(--faint);text-align:center;padding:24px;">No hay gastos para devolver.</div>'; return; }
   box.innerHTML=list.map(t=>{
     const dept=DEPT_LABEL[t.dept]||t.dept;
+    const full=Number(t.amountCents)||0, rem=remOf(t), partial=rem<full;
+    const amtLine = partial
+      ? ('Saldo '+centsToUSD(rem)+' <span style="color:var(--faint);">(de '+centsToUSD(full)+' · ya devuelto '+centsToUSD(full-rem)+')</span>')
+      : centsToUSD(full);
     return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:11px 12px;margin-bottom:8px;">'
-      +'<div style="min-width:0;"><div style="font-weight:700;">'+(t.note||t.category||'Gasto')+'</div><div style="font-size:12px;color:var(--muted);">'+dept+' · '+centsToUSD(t.amountCents)+(t.carLabel?(' · '+t.carLabel):'')+' · '+((t.date||'').slice(0,10))+'</div></div>'
+      +'<div style="min-width:0;"><div style="font-weight:700;">'+(t.note||t.category||'Gasto')+'</div><div style="font-size:12px;color:var(--muted);">'+dept+' · '+amtLine+(t.carLabel?(' · '+t.carLabel):'')+' · '+((t.date||'').slice(0,10))+'</div></div>'
       +'<button class="btn-add" style="flex:0 0 auto;font-size:13px;" onclick="doDevol(\''+t.id+'\')">Devolver</button></div>';
   }).join('');
 };
 window.doDevol = async function(id){
   if(!canEditTx(id)){ alert('Solo puedes devolver gastos de tu bolsa.'); return; }
   const e=txns.find(x=>x.id===id); if(!e) return;
-  const cents=Number(e.amountCents)||0;
+  const full=Number(e.amountCents)||0;
+  const already=(_reversedMap()[e.entryId||e.id]||0);
+  const remaining=full-already;
+  if(remaining<=0){ alert('Este gasto ya está devuelto por completo.'); return; }
   const cajaTxt=(e.dept==='parts')?'🔧 Partes':'🚗 Dealer';
+  const origDesc=(e.note||e.category||'gasto')+(e.vendor?(' · '+e.vendor):'')+(e.carLabel?(' · '+e.carLabel):'');
+  // 💡 DEVOLUCIÓN PARCIAL: pregunta cuánto. Default = saldo completo. Puedes poner menos (una pieza del invoice).
+  const v=prompt('¿Cuánto vas a devolver de "'+(e.note||e.category||'gasto')+'"?\n\nSaldo disponible: '+centsToUSD(remaining)+(already>0?(' (de '+centsToUSD(full)+', ya devuelto '+centsToUSD(already)+')'):'')+'\n\n• Deja el monto completo para devolver TODO.\n• Pon MENOS para devolver solo una parte (ej. una pieza del invoice) — el resto se queda.', (remaining/100).toFixed(2));
+  if(v===null) return;
+  const cents=Math.round(Number(v)*100);
+  if(!(cents>0)){ alert('Monto inválido.'); return; }
+  if(cents>remaining){ alert('No puedes devolver más que el saldo ('+centsToUSD(remaining)+').'); return; }
+  const isPartial = (cents<remaining) || already>0;
   // ¿el gasto es de un corte YA cerrado? Solo entonces el reembolso es dinero nuevo que va a fondo;
   // si es del período actual, la reversa ya lo neutraliza (queda como efectivo en la caja, no se reparte).
   const _lcD=lastClosing(); const _since=_lcD?(_lcD.closedAt||''):'';
   const prior = _since ? ((e.createdAt||e.date||'') <= _since) : false;
-  if(!confirm('Devolver este gasto de '+centsToUSD(cents)+' ('+(e.note||e.category||'gasto')+').\n\nSe cancela el gasto y ese dinero se queda como FONDO de '+cajaTxt+' (no cuenta como ingreso ni se reparte). ¿Confirmar?')) return;
-  const origDesc=(e.note||e.category||'gasto')+(e.vendor?(' · '+e.vendor):'')+(e.carLabel?(' · '+e.carLabel):'');
+  if(!confirm('Devolver '+centsToUSD(cents)+(isPartial?' (parcial)':'')+' de "'+origDesc+'".\n\nEse dinero se queda como FONDO de '+cajaTxt+' (no cuenta como ingreso ni se reparte).'+(cents<remaining?('\n\nQuedará un saldo de '+centsToUSD(remaining-cents)+' por si devuelves otra pieza.'):'')+'\n\n¿Confirmar?')) return;
   const rid='dev_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   try{
     await setDoc(doc(db,'transactions',rid), {
-      entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id, devolucion:prior, esDevolucion:true, origDesc:origDesc,
+      entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id, devolucion:prior, esDevolucion:true, partial:isPartial, origDesc:origDesc,
       dept:e.dept, category:e.category||'', amountCents:cents,
       method:e.method||'', date:new Date().toISOString().slice(0,10),
       vendor:e.vendor||'', carId:e.carId||'', carLabel:e.carLabel||'',
-      note:'Devolución: '+origDesc, createdAt:new Date().toISOString(),
+      note:(isPartial?'Devolución parcial: ':'Devolución: ')+origDesc, createdAt:new Date().toISOString(),
       createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
     });
-    closeDevol();
-    alert('✅ Devolución registrada. El gasto quedó cancelado y '+centsToUSD(cents)+' se queda como fondo de '+cajaTxt+'. En el corte lo verás como fondo (no se reparte).');
+    alert('✅ Devolución registrada ('+centsToUSD(cents)+(isPartial?' · parcial':'')+'). Se queda como fondo de '+cajaTxt+'.'+((remaining-cents)>0?(' Saldo restante del gasto: '+centsToUSD(remaining-cents)+'.'):''));
+    setTimeout(renderDevolList, 200);   // refresca saldos y deja el panel abierto para devolver otra pieza
   }catch(err){ alert('Error: '+err.message); }
 };
 
 // Todos los movimientos (gastos + ingresos), ordenados FIEL a como se fueron ingresando (más reciente arriba), sin distinción.
 function _movAll(){
   const LT=liveTxns();
-  const reversed=new Set(LT.filter(t=>t.type==='expense_reversal').map(r=>r.reversalOf));
-  const exps=LT.filter(t=>t.type==='expense' && !reversed.has(t.entryId||t.id));
+  const rev={}; LT.forEach(t=>{ if(t.type==='expense_reversal'&&t.reversalOf){ rev[t.reversalOf]=(rev[t.reversalOf]||0)+(Number(t.amountCents)||0); } });
+  const exps=LT.filter(t=>t.type==='expense').map(x=>{ const r=rev[x.entryId||x.id]||0; return {...x,_reversedCents:r,_remCents:(Number(x.amountCents)||0)-r}; })
+    .filter(x=>x._remCents>0);   // solo oculta los YA devueltos por completo; los parciales siguen con su saldo
   const incomes=LT.filter(t=>t.type==='income');
   return [...exps.map(x=>({...x,_kind:'exp'})), ...incomes.map(x=>({...x,_kind:'inc'}))]
     .sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||''));
@@ -1056,8 +1078,11 @@ function movRowHtml(e){
   const car=e.carLabel?`<span class="chip">${e.carLabel}</span>`:'';
   const who = e.vendor || e.clientName || e.source_name || '';
   const concepto = e.note || e.category || (inc?'Ingreso':'Gasto');
-  const catChip = e.note ? `<span class="chip">${e.category||''}</span>` : '';
-  const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(e.amountCents)}`;
+  const partReturned = (!inc && e._reversedCents>0);   // gasto parcialmente devuelto → muestra saldo + aviso
+  const catChip = (e.note ? `<span class="chip">${e.category||''}</span>` : '')
+    + (partReturned ? `<span class="chip" style="color:#f0c040;border-color:#f0c04066;">↩ devuelto ${centsToUSD(e._reversedCents)}</span>` : '');
+  const shownCents = partReturned ? e._remCents : e.amountCents;
+  const amt = inc ? `+${centsToUSD(e.amountCents)}` : `-${centsToUSD(shownCents)}`;
   const canEdit = canEditTx(e.id);
   const act = !canEdit ? '' : (inc ? `<span onclick="deleteInc('${e.id}')" style="cursor:pointer;color:var(--faint);">🗑 borrar</span>` : `<span onclick="openAssignCar('${e.id}')" style="cursor:pointer;color:var(--gold);">🔗 carro</span> &nbsp; <span onclick="reverseExp('${e.id}')" style="cursor:pointer;color:var(--faint);">↩</span>`);
   return `<div class="row">
