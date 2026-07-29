@@ -14887,7 +14887,8 @@ window.renderCars = function(){
   }
   var _q=(document.getElementById('inv-search')?document.getElementById('inv-search').value:'').trim().toLowerCase();
   var _list=cars.filter(function(c){
-    if(!(c.status!=='prep' || isStaffUser)) return false;
+    // Público: NO ve carros en prep NI carros marcados "unpublished" (ej. vendido desde prep, sin publicar). Staff sí.
+    if(!isStaffUser && (c.status==='prep' || c.unpublished)) return false;
     if(_q){ var hay=((c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.vin||'')+' '+(c.inventoryNum||'')).toLowerCase(); if(hay.indexOf(_q)<0) return false; }
     return true;
   });
@@ -14901,6 +14902,7 @@ window.renderCars = function(){
     var certifiedSeal = '<div style="position:absolute;'+sealPos+'width:58px;height:58px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.55));z-index:5;pointer-events:none;"><svg viewBox="0 0 100 100" width="58" height="58" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="lmgGold" cx="42%" cy="33%" r="72%"><stop offset="0%" stop-color="#fff6d2"/><stop offset="42%" stop-color="#e9bf59"/><stop offset="100%" stop-color="#c4900e"/></radialGradient></defs><circle cx="89.00" cy="50.00" r="4.3" fill="#d8a32b"/><circle cx="86.65" cy="63.34" r="4.3" fill="#d8a32b"/><circle cx="79.88" cy="75.07" r="4.3" fill="#d8a32b"/><circle cx="69.50" cy="83.77" r="4.3" fill="#d8a32b"/><circle cx="56.77" cy="88.41" r="4.3" fill="#d8a32b"/><circle cx="43.23" cy="88.41" r="4.3" fill="#d8a32b"/><circle cx="30.50" cy="83.77" r="4.3" fill="#d8a32b"/><circle cx="20.12" cy="75.07" r="4.3" fill="#d8a32b"/><circle cx="13.35" cy="63.34" r="4.3" fill="#d8a32b"/><circle cx="11.00" cy="50.00" r="4.3" fill="#d8a32b"/><circle cx="13.35" cy="36.66" r="4.3" fill="#d8a32b"/><circle cx="20.12" cy="24.93" r="4.3" fill="#d8a32b"/><circle cx="30.50" cy="16.23" r="4.3" fill="#d8a32b"/><circle cx="43.23" cy="11.59" r="4.3" fill="#d8a32b"/><circle cx="56.77" cy="11.59" r="4.3" fill="#d8a32b"/><circle cx="69.50" cy="16.23" r="4.3" fill="#d8a32b"/><circle cx="79.88" cy="24.93" r="4.3" fill="#d8a32b"/><circle cx="86.65" cy="36.66" r="4.3" fill="#d8a32b"/><circle cx="50" cy="50" r="39" fill="url(#lmgGold)" stroke="#8a6a12" stroke-width="1.3"/><circle cx="50" cy="50" r="31.5" fill="none" stroke="#7a5d11" stroke-width="1" stroke-dasharray="1.5 2.6" opacity="0.65"/><text x="50" y="38" font-size="19" text-anchor="middle" fill="#6b520d" font-family="Arial,sans-serif">&#9733;</text><path d="M7,60 L7,70 L16,63 Z" fill="#0d1426"/><path d="M93,60 L93,70 L84,63 Z" fill="#0d1426"/><rect x="8" y="45" width="84" height="17" rx="2" fill="#16203a" stroke="#e9bf59" stroke-width="1"/><text x="50" y="57" font-size="9.3" font-weight="bold" fill="#f0c040" text-anchor="middle" font-family="Arial,sans-serif" letter-spacing="0.3">CERTIFIED</text></svg></div>';
     if(c.status==='prep') certifiedSeal='';
     var prepBadge = c.status==='prep' ? '<div style="position:absolute;top:8px;right:8px;background:rgba(255,152,0,0.95);color:#000;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:800;z-index:6;">🔧 EN PREP</div>' : '';
+    var noPubBadge = (c.unpublished && c.status!=='prep') ? '<div style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.78);color:#f0c040;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;z-index:7;">🔒 No publicado</div>' : '';
     var invBadge = (c.status==='sold'?
     '<div style="position:absolute;top:0;right:0;width:0;height:0;border-style:solid;border-width:0 80px 80px 0;border-color:transparent #c8960c transparent transparent;"></div>'+
     '<div style="position:absolute;top:10px;right:-4px;transform:rotate(45deg);background:linear-gradient(135deg,#c8960c,#f0c040);color:#000;font-size:13px;font-weight:900;letter-spacing:2px;padding:4px 18px;text-align:center;width:90px;">SOLD</div>'
@@ -14911,11 +14913,12 @@ window.renderCars = function(){
     var soldLabel = c.status==='sold' ? '↩ Disponible' : '✓ Vendido';
     var actionBtn = c.status==='prep'
       ? '<button data-cid="'+cid+'" onclick="publishCar(this.dataset.cid)" style="flex:1;background:rgba(76,175,80,0.15);color:#4caf50;border:1px solid #4caf50;border-radius:6px;padding:5px;font-size:11px;cursor:pointer;">🚀 Publicar</button>'
+        +'<button data-cid="'+cid+'" onclick="sellUnpublished(this.dataset.cid)" title="Marcar vendido SIN publicarlo en la página" style="flex:1;background:rgba(240,192,64,0.15);color:#f0c040;border:1px solid #f0c040;border-radius:6px;padding:5px;font-size:11px;cursor:pointer;">💰 Vendido</button>'
       : '<button data-cid="'+cid+'" onclick="toggleSold(this.dataset.cid)" style="flex:1;background:'+soldStyle+';border-radius:6px;padding:5px;font-size:11px;cursor:pointer;">'+soldLabel+'</button>';
     var adminBtns = isAdmin ? '<div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid rgba(255,255,255,0.06);" onclick="event.stopPropagation()"><button data-cid="'+cid+'" onclick="openCarModal(this.dataset.cid)" style="flex:1;background:rgba(255,214,0,0.15);color:#ffd700;border:1px solid #ffd700;border-radius:6px;padding:5px;font-size:11px;cursor:pointer;">✏️ Edit</button>'+actionBtn+'<button data-cid="'+cid+'" onclick="deleteCar(this.dataset.cid)" style="background:rgba(255,59,59,0.15);color:#ff4444;border:1px solid #ff4444;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;">🗑</button></div>' : '';
     return '<div data-cid="'+cid+'" onclick="openCarDetail(this.dataset.cid)" style="background:#12161f;border-radius:12px;overflow:hidden;cursor:pointer;transition:transform 0.2s;border:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;" onmouseover="this.style.transform=\'translateY(-3px)\'" onmouseout="this.style.transform=\'none\'">'
       +'<div style="display:flex;align-items:stretch;">'
-      +'<div style="position:relative;width:42%;flex-shrink:0;min-height:175px;background:#1a1f2e;">'+thumb+videoIcon+photoCount+invBadge+certifiedSeal+prepBadge+'</div>'
+      +'<div style="position:relative;width:42%;flex-shrink:0;min-height:175px;background:#1a1f2e;">'+thumb+videoIcon+photoCount+invBadge+certifiedSeal+prepBadge+noPubBadge+'</div>'
       +'<div style="flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;">'
       +'<div style="font-size:22px;font-weight:800;color:#f0c040;letter-spacing:0.5px;margin-bottom:1px;">'+c.year+' '+c.make+'</div>'
       +'<div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:8px;line-height:1.15;">'+c.model+'</div>'
@@ -15242,15 +15245,28 @@ window.imgFallback = function(img,h){ img.onerror=null; img.outerHTML='<div styl
 window.toggleSold = async function(id){
   const c=cars.find(x=>x.id===id);
   if(!c) return;
-  const newStatus = c.status==='sold' ? 'available' : 'sold';
-  if(newStatus==='sold' && !confirm('¿Marcar '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' como VENDIDO?')) return;
-  await setDoc(doc(db,'inventory',id), {...c, status:newStatus, updatedAt:Date.now()});
+  if(c.status==='sold'){
+    // Revertir: si estaba VENDIDO SIN PUBLICAR, regresa a prep (sigue oculto al público). Si no, a la venta.
+    const back = c.unpublished ? 'prep' : 'available';
+    await setDoc(doc(db,'inventory',id), {...c, status:back, updatedAt:Date.now()});
+    return;
+  }
+  if(!confirm('¿Marcar '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' como VENDIDO?')) return;
+  await setDoc(doc(db,'inventory',id), {...c, status:'sold', updatedAt:Date.now()});
+};
+
+// 💰 Vendido SIN publicar: se marca sold + unpublished → va a "Vendidos" con su badge, pero el público NO lo ve.
+window.sellUnpublished = async function(id){
+  const c=cars.find(x=>x.id===id); if(!c) return;
+  if(!confirm('¿Marcar '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' como VENDIDO sin publicarlo?\n\n• Se va a "Vendidos" con su badge SOLD.\n• NO aparece en la página para los clientes.')) return;
+  await setDoc(doc(db,'inventory',id), {...c, status:'sold', unpublished:true, updatedAt:Date.now()});
+  alert('💰 Marcado como vendido (sin publicar). No aparece en la página pública.');
 };
 
 window.publishCar = async function(id){
   const c=cars.find(x=>x.id===id); if(!c) return;
   if(!confirm('¿Publicar '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' en la página?\n\nYa aparecerá para los clientes. Asegúrate de que tenga sus fotos finales.')) return;
-  await setDoc(doc(db,'inventory',id), {...c, status:'available', updatedAt:Date.now()});
+  await setDoc(doc(db,'inventory',id), {...c, status:'available', unpublished:false, updatedAt:Date.now()});
   alert('🚀 Publicado. Ya está a la venta en la página.');
 };
 window.setMainPhoto = async function(carId, idx){
