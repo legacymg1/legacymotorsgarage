@@ -1077,6 +1077,50 @@ exports.ebayOrders = onCall({ secrets: [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, 
   return { ok: true, count: orders.length, orders };
 });
 
+// 🚚 SINCRONIZA "enviado" desde eBay → cuando marcas el pedido como shipped en eBay (compras la etiqueta),
+// la pieza en nuestro almacén avanza SOLA a "en_transito" (ya no lo marcas a mano). Match por SKU/itemId.
+exports.ebaySyncShipped = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 120 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const a = await ebayUserAccessToken(EBAY_ALL_SCOPES);
+  if (!a.token) {
+    const err = a.raw || {};
+    return { ok: false, needConsent: /scope/i.test((err.error || "") + (err.error_description || "")), error: (err.error || "?") };
+  }
+  // Pedidos YA ENVIADOS (FULFILLED) — de aquí sacamos los SKU que ya salieron.
+  const filter = encodeURIComponent("orderfulfillmentstatus:{FULFILLED}");
+  const url = "https://api.ebay.com/sell/fulfillment/v1/order?limit=200&filter=" + filter;
+  const r = await fetch(url, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json", "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" } });
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (r.status < 200 || r.status >= 300) {
+    return { ok: false, status: r.status, error: (j && j.errors && j.errors[0] && j.errors[0].message) || ("HTTP " + r.status) };
+  }
+  const db = admin.firestore();
+  // Estados desde los que SÍ avanzamos a en_transito al detectar el envío en eBay.
+  const ADVANCE_FROM = ["empaquetando", "publicado", "borrador", "disponible"];
+  let updated = 0; const done = [];
+  for (const o of (j.orders || [])) {
+    for (const li of (o.lineItems || [])) {
+      const sku = (li.sku || "").trim();
+      const itemId = String(li.legacyItemId || "").trim();
+      let ref = null, data = null;
+      if (sku) {
+        const q = await db.collection("parts").where("stickerNum", "==", sku).limit(1).get();
+        if (!q.empty) { ref = q.docs[0].ref; data = q.docs[0].data(); }
+      }
+      if (!ref && itemId) {
+        const q = await db.collection("parts").where("ebayItemId", "==", itemId).limit(1).get();
+        if (!q.empty) { ref = q.docs[0].ref; data = q.docs[0].data(); }
+      }
+      if (!ref || !data) continue;
+      if (data.warehouseOnly) continue;                        // piezas viejas ya en eBay: no se tocan
+      if (!ADVANCE_FROM.includes(data.status)) continue;       // ya está en_transito/vendido: no re-toca
+      await ref.update({ status: "en_transito", ebayShippedAt: o.creationDate || new Date().toISOString(), ebayOrderId: o.orderId, packPending: false });
+      updated++; done.push(sku || itemId);
+    }
+  }
+  return { ok: true, updated, done };
+});
+
 async function loadPart(partId){
   if (!partId) throw new HttpsError("invalid-argument", "Falta partId.");
   const snap = await admin.firestore().collection("parts").doc(partId).get();
