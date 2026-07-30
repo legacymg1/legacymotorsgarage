@@ -2275,12 +2275,19 @@ window.finalizePack=async function(id){
 function packSentAnim(p){
   const box=document.getElementById('pack-result'); if(!box) return;
   const en=(L==='en');
+  // Busca la ORDEN de eBay ligada a esta pieza (en la cola cargada) → link DIRECTO a comprar/imprimir
+  // la etiqueta de ESA orden (ahí metes peso/medidas y compras con tus descuentos de eBay). Si no la
+  // encuentra (ej. venta en persona), cae al link general de órdenes por enviar.
+  const qi=(_qItems||[]).find(x=>x.partId===p.id && x.orderId);
+  const labelUrl = qi
+    ? ('https://www.ebay.com/sh/ord/details?orderid='+encodeURIComponent(qi.orderId))
+    : 'https://www.ebay.com/sh/ord?filter=status%3AAWAITING_SHIPMENT';
   box.innerHTML='<div class="card green" style="text-align:center;padding:24px 16px;">'
     +'<div style="font-size:50px;">📦✅</div>'
     +'<div style="font-weight:800;font-size:19px;margin-top:6px;">'+(en?'Packed & ready!':'¡Empacado y listo!')+'</div>'
     +'<div class="sub" style="margin:4px 0 12px;">'+esc((p&&(p.vehicleLabel+' · '+p.name))||'')+'</div>'
-    +'<div style="font-size:13.5px;color:var(--gold);font-weight:700;margin-bottom:12px;">'+(en?'Now print the shipping label on eBay 👇':'Ahora imprime la etiqueta de envío en eBay 👇')+'</div>'
-    +'<a class="btn" style="display:block;text-decoration:none;font-size:16px;padding:14px;" href="https://www.ebay.com/sh/ord?filter=status%3AAWAITING_SHIPMENT" target="_blank" rel="noopener">🏷️ '+(en?'Print label on eBay':'Imprimir etiqueta en eBay')+'</a>'
+    +'<div style="font-size:13.5px;color:var(--gold);font-weight:700;margin-bottom:12px;">'+(qi?(en?'Opens THIS order — enter weight/size & buy the label 👇':'Abre ESTA orden — mete peso/medidas y compra la etiqueta 👇'):(en?'Now print the shipping label on eBay 👇':'Ahora imprime la etiqueta de envío en eBay 👇'))+'</div>'
+    +'<a class="btn" style="display:block;text-decoration:none;font-size:16px;padding:14px;" href="'+labelUrl+'" target="_blank" rel="noopener">🏷️ '+(en?'Buy / print label on eBay':'Comprar / imprimir etiqueta en eBay')+'</a>'
     +'<button class="btn ghost sm" style="width:100%;margin-top:10px;color:var(--muted);" onclick="cancelPack()">'+(en?'Done — next part':'Listo — siguiente pieza')+'</button>'
     +'</div>';
 }
@@ -2484,7 +2491,7 @@ function renderEbayQueue(){
       const p=matchPartBySku(it.sku)||matchPartByItemId(it.itemId);
       // Fotos: primero las REALES del anuncio de eBay; si no vinieron, las de nuestra parte.
       const photos=(it.photos&&it.photos.length)?it.photos:(p?((p.photoURLs||[]).filter(x=>x&&!/00_QR/.test(x))):[]);
-      const qi=_qItems.push({photos:photos, title:(it.title||''), partId:(p?p.id:''), sku:(it.sku||''), itemId:(it.itemId||'')})-1;
+      const qi=_qItems.push({photos:photos, title:(it.title||''), partId:(p?p.id:''), sku:(it.sku||''), itemId:(it.itemId||''), orderId:(o.orderId||'')})-1;
       const thumb=photos[0]||'';
       const th=thumb
         ? '<img src="'+thumb+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;flex:0 0 auto;">'
