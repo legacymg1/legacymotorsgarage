@@ -2187,7 +2187,9 @@ window.scanLookup=function(){
       : p.status==='en_transito'
         ? `<button class="btn" style="width:100%;font-size:16px;padding:14px;" onclick="advanceStatus('${p.id}','vendido')">${t('markPaid')}</button>`
         : p.status==='empaquetando'
-          ? `<button class="btn" style="width:100%;font-size:16px;padding:14px;" onclick="advanceStatus('${p.id}','en_transito')">${t('markShipped')}</button>`
+          ? `<a class="btn" style="display:block;text-decoration:none;text-align:center;font-size:16px;padding:14px;" href="${(function(){var qi=(_qItems||[]).find(x=>x.partId===p.id&&x.orderId);return qi?('https://www.ebay.com/sh/ord/details?orderid='+encodeURIComponent(qi.orderId)):'https://www.ebay.com/sh/ord?filter=status%3AAWAITING_SHIPMENT';})()}" target="_blank" rel="noopener">🏷️ ${L==='en'?'Buy / print label on eBay':'Comprar / imprimir etiqueta en eBay'}</a>
+             <div class="sub" style="text-align:center;margin:8px 0 4px;">${L==='en'?'When eBay marks it shipped, it updates by itself.':'Cuando eBay lo marque enviado, se actualiza solo.'}</div>
+             <button class="btn ghost sm" style="width:100%;margin-top:4px;color:var(--muted);" onclick="advanceStatus('${p.id}','en_transito')">${t('markShipped')}</button>`
           : `<button class="btn" style="width:100%;font-size:17px;padding:15px;" onclick="startConfirmSell('${p.id}')">${t('confirmSellBtn')}</button>`}
     <button class="btn ghost sm" style="width:100%;margin-top:8px;color:var(--muted);" onclick="cancelPack()">${t('cancelPack')}</button>
   </div>`;
