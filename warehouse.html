@@ -740,7 +740,10 @@ function startListening(){
     if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); if(_view==='pack') renderPending(); }, e=>console.log('parts',e));
   // Taxímetro acumulado (contador real del gasto del bot)
   onSnapshot(doc(db,'config','aiUsage'), s=>{ _aiUsage = (s&&s.exists&&s.exists()) ? s.data() : null; if(_view==='lister') renderTaximetro(); }, e=>console.log('aiUsage',e));
+  // 🧾 Historial de rollos de estampas impresos (para no repetir números)
+  onSnapshot(doc(db,'config','stickerBatch'), s=>{ _stickerHist = (s&&s.exists&&s.exists()&&Array.isArray(s.data().history)) ? s.data().history : []; }, e=>console.log('stickerHist',e));
 }
+let _stickerHist=[];
 
 // ---- VIN decode (NHTSA, GRATIS) — captura la ficha completa ----
 let _vSpec=null;   // ficha decodificada del carro actual (para guardarla y heredarla a las partes)
@@ -1505,13 +1508,26 @@ function loadScriptOnce(src){ return new Promise((res,rej)=>{ if(Array.from(docu
 window.openStickerBatch=function(){
   let mx=0; parts.forEach(p=>{ const n=parseInt(p.stickerNum,10); if(!isNaN(n)&&n>mx) mx=n; });
   const es=(L==='es');
+  // Historial: el número más alto ya IMPRESO en un rollo (aunque la pieza no se haya capturado aún).
+  let lastEnd=0; (_stickerHist||[]).forEach(b=>{ const e=parseInt(b.end,10); if(!isNaN(e)&&e>lastEnd) lastEnd=e; });
+  const suggested=Math.max(mx+1, lastEnd+1, 1);
+  const pad=n=>String(n).padStart(4,'0');
+  const fmtD=iso=>{ try{ return new Date(iso).toLocaleDateString('es-MX',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return (iso||'').slice(0,10); } };
+  const hist=(_stickerHist||[]).slice(0,6);
+  const histHtml = hist.length
+    ? `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:10px;"><div style="font-weight:800;font-size:13px;margin-bottom:6px;">🧾 ${es?'Rollos ya impresos':'Printed rolls'}</div>`
+      + hist.map((b,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;${i===0?'font-weight:800;color:var(--gold);':'color:var(--muted);'}"><span>${i===0?(es?'Último: ':'Last: '):''}#${pad(b.start)}–#${pad(b.end)} <span style="color:var(--faint);font-weight:500;">(${b.qty})</span></span><span style="color:var(--faint);white-space:nowrap;">${fmtD(b.at)}</span></div>`).join('')
+      + `</div>`
+    : `<div class="sub" style="margin-top:14px;color:var(--faint);">${es?'Aún no hay rollos impresos.':'No rolls printed yet.'}</div>`;
   const mi=document.getElementById('modal2-inner'); if(!mi) return;
   mi.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🧾 ${es?'Imprimir rollo de estampas':'Print sticker roll'}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
-    <div class="sub" style="margin-bottom:12px;">${es?'Genera un PDF con muchas estampas (código de barras + número) para imprimirlas de una vez en la Rongta. El equipo pela la siguiente y la pega.':'Generates a PDF of many stickers (barcode + number) to print all at once on the Rongta.'}</div>
-    <div class="row2"><div><label>${es?'Empieza en #':'Start at #'}</label><input id="sb-start" inputmode="numeric" value="${mx+1}"></div><div><label>${es?'Cuántas':'How many'}</label><input id="sb-qty" inputmode="numeric" value="100"></div></div>
+    <div class="sub" style="margin-bottom:12px;">${es?'Genera un PDF con muchas estampas (código de barras + número) para imprimirlas de una vez. El equipo pela la siguiente y la pega.':'Generates a PDF of many stickers (barcode + number) to print all at once.'}</div>
+    ${lastEnd>0?`<div style="background:rgba(240,192,64,0.12);border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:8px 11px;font-size:12.5px;margin-bottom:10px;">${es?'El último rollo terminó en':'Last roll ended at'} <b>#${pad(lastEnd)}</b> → ${es?'empezamos en':'starting at'} <b>#${pad(suggested)}</b> ${es?'para no repetir.':'to avoid repeats.'}</div>`:''}
+    <div class="row2"><div><label>${es?'Empieza en #':'Start at #'}</label><input id="sb-start" inputmode="numeric" value="${suggested}"></div><div><label>${es?'Cuántas':'How many'}</label><input id="sb-qty" inputmode="numeric" value="100"></div></div>
     <div class="row2"><div><label>${es?'Ancho (mm)':'Width (mm)'}</label><input id="sb-w" inputmode="decimal" value="50"></div><div><label>${es?'Alto (mm)':'Height (mm)'}</label><input id="sb-h" inputmode="decimal" value="30"></div></div>
     <button class="btn" id="sb-go" style="width:100%;margin-top:14px;" onclick="genStickerBatch()">🖨️ ${es?'Generar e imprimir el rollo':'Generate & print roll'}</button>
-    <div class="sub" style="margin-top:10px;">${es?'Pon el ancho/alto igual a tu etiqueta. Al generar, se abre la hoja de compartir → elige RLabel (o la impresora) para imprimir todas.':'When you generate, the share sheet opens → pick RLabel (or the printer) to print them all.'}</div>`;
+    <div class="sub" style="margin-top:10px;">${es?'Pon el ancho/alto igual a tu etiqueta. Al generar, se abre la hoja de compartir → elige RLabel (o la impresora) para imprimir todas.':'When you generate, the share sheet opens → pick RLabel (or the printer) to print them all.'}</div>
+    ${histHtml}`;
   document.getElementById('modal2').style.display='block';
 };
 window.genStickerBatch=async function(){
@@ -1555,6 +1571,12 @@ window.genStickerBatch=async function(){
         const url=URL.createObjectURL(blob); window.open(url,'_blank');   // respaldo: abre el PDF
       }
     }catch(shareErr){ /* el usuario canceló el compartir */ }
+    // 🧾 Guarda el rollo en el historial (para no repetir números en el siguiente). Se registra al generar.
+    try{
+      const entry={ start:start, end:start+qty-1, qty:qty, wmm:wmm, hmm:hmm, at:new Date().toISOString(), by:(myEmail||'') };
+      const prev=Array.isArray(_stickerHist)?_stickerHist:[];
+      await setDoc(doc(db,'config','stickerBatch'), { history:[entry, ...prev].slice(0,40) }, { merge:true });
+    }catch(histErr){ console.log('sticker hist', histErr); }
   }catch(e){ alert((es?'No se pudo generar: ':'Could not generate: ')+((e&&e.message)||e)); }
   if(btn){ btn.disabled=false; btn.textContent='🖨️ '+(es?'Generar e imprimir el rollo':'Generate & print roll'); }
 };
