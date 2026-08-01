@@ -155,6 +155,10 @@
       <span>🧾 <span data-i18n="rollBtn">Imprimir rollo de estampas (varias de golpe)</span></span>
       <span class="gold" style="font-size:18px;">🖨️</span>
     </button>
+    <button onclick="openBinBatch()" class="card" style="width:100%;text-align:left;justify-content:space-between;align-items:center;cursor:pointer;font-weight:800;color:var(--gold);margin-bottom:14px;border-color:rgba(240,192,64,0.4);">
+      <span>🗄️ <span data-i18n="binRollBtn">Imprimir rollo de bines (4×6, números grandes)</span></span>
+      <span class="gold" style="font-size:18px;">🖨️</span>
+    </button>
     <button id="cars-toggle" onclick="toggleCarsList()" class="card" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:800;color:var(--text);">
       <span>🚗 <span data-i18n="carsDismantling">Carros en desmantelamiento</span> <span id="cars-count" class="muted" style="font-weight:600;"></span></span>
       <span id="cars-arrow" class="gold">▾</span>
@@ -306,7 +310,7 @@ const T={
     eConfiguring:'⚙️ Configurando…', eSetupConfirm:'⚙️ Esto configura tu cuenta de eBay para la API:\n• Crea la ubicación de envío (Porterville, CA 93257)\n• Crea/usa las políticas de pago, envío ($15 USPS Priority) y devolución (30 días)\n\nSe hace UNA sola vez. ¿Continuar?', eSetupOk:'✅ ¡Cuenta configurada!', eLoc:'Ubicación', eShip:'Envío', ePay:'Pago', eRet:'Devolución', eHandling:'Handling/zonas', eSetupOkEnd:'Ya puedes crear borradores.', eSetupFail:'⚠️ Falta algo en la configuración:', eSetupFailHint:'(Si menciona "Business Policies"/"opt in", hay que activarlas en eBay — dime y te guío.)',
     ePricePrompt:'💵 Precio de venta en eBay ($):', eInvalidPrice:'Precio inválido', eCreatingDraft:'📝 Creando borrador…', eDraftOk:'✅ ¡Borrador creado en eBay!', eTitleW:'Título', eCatW:'Categoría', eSpecsW:'Item specifics', ePhotosW:'Fotos', ePriceW:'Precio', eDraftOkEnd:'Revísalo en eBay (Seller Hub → Listings → Drafts). Cuando esté OK, pica "🚀 Publicar (en vivo)".', eDraftFail:'⚠️ No se creó el borrador', eSetupFirst:'👉 Primero pica "⚙️ Configurar eBay (1 vez)".',
     ePublishConfirm:'⚠️ Esto PUBLICA el borrador EN VIVO en eBay (aplica tarifa de eBay como siempre).\n\n¿Publicar ahora?', ePublishing:'🚀 Publicando…', ePublishedOk:'✅ ¡PUBLICADO EN EBAY!', eViewW:'Ver', ePublishedEnd:'La parte pasó a Publicadas.', ePublishFail:'⚠️ eBay no publicó', priceAsk:'¿A qué precio la publicaste? (opcional, en $)', confirmUnpublish:'¿Quitar "publicada"? Vuelve a Pendientes. (La venta se marca en Empaque, no aquí.)',
-    scanTitle:'🔎 Busca una parte', scanHint:'Escribe el número de estampa o el nombre de la pieza.', multiMatch:'Varias coinciden — elige la parte:', searchBtn:'Buscar', scanCam:'📷 Escanear con cámara', saveNewLoc:'Guardar nueva ubicación', relocBtn:'📍 Asignar ubicación', relocMode:'📥 Recibir / asignar ubicación', relocHint:'Escanea con el láser (o escribe el número) de la pieza que llegó de la yarda, y asígnale su bin.', confirmSellBtn:'✅ Es esta pieza', takeFromBin:'Ve al bin, saca la pieza y, para confirmar que sí la tienes en la mano, teclea o escanea el número directo de la pieza. 👇', itIsHere:'✅ Sí, ya la tengo en la mano', alreadySold:'Ya vendida / empacada', undoSold:'↩️ Regresar a inventario', undoSoldConfirm:'¿Regresar esta pieza a inventario? (deshacer la venta)', undoSoldOk:'✅ Regresada a inventario (disponible).', markShipped:'🚚 Marcar como enviada (en tránsito)', markPaid:'💵 Marcar como VENDIDA (eBay pagó)', confirmScanTitle:'📷 Confírmala en su lugar', confirmScanHint:'Escanea el código de la pieza para confirmar que la tienes en la mano.', keepScan:'Escanea otra vez la parte correcta.', wrongPart:'⚠️ Esa NO es. Escaneaste:', soldOk:'✅ ¡Es esta! Confirmada y lista para enviar', notFoundBtn:'❌ No la encuentro', leftPending:'Quedó en pendientes — la verás abajo para no perderla.', leftPendingChat:'Quedó pendiente y avisé a los supervisores en el chat.', removePending:'✓ Quitar', empacarTitle:'Empaca tu producto', dims:'Medidas de la caja (pulgadas)', lengthL:'Largo', widthW:'Ancho', heightH:'Alto', weightLbl:'Peso (como sale en la báscula, en libras)', weightPh:'ej. 15.85', irregular:'Producto irregular', labelNextPhase:'La etiqueta de eBay se conecta en la siguiente fase.', packDone:'✅ Empacado y listo', sentAnim:'¡Enviado!', toolsTitle:'🛠️ Herramientas de almacén', receiveBtn:'📥 Recibir / asignar ubicación', oldItemBtn:'🏷️ Alta de pieza vieja (estampa + bin)', consolidateBtn:'📦 Consolidar bins', rollBtn:'🧾 Imprimir rollo de estampas (varias de golpe)', consolidateTitle:'Consolidar bins', consolidateHint:'Junta los bins con pocas piezas en uno solo. Empieza por el que tiene menos.', emptyBin:'Vaciar este', piezas:'piezas', noBins:'No hay bins con piezas para consolidar.', moveTo:'Mover las {n} piezas de {bin} a:', orPick:'O elige un bin que ya existe:', moveConfirm:'✅ Mover todo', moveDone:'Movidas {n} piezas de {src} → {tgt}', setAside:'Aparta el bin {bin} vacío para entregarlo a Captura. ¡Gracias! 🙌', sameBin:'Es el mismo bin — elige otro destino.', pendingTitle:'📋 Pendientes de encontrar', qTitle:'Por enviar (eBay)', qLoading:'Cargando órdenes de eBay…', qEmpty:'No hay órdenes pendientes de enviar. 🎉', qError:'No se pudo cargar:', qRetry:'↻ Reintentar', qNeedConsent:'Falta el permiso para leer las órdenes de eBay. Enrique tiene que autorizar una sola vez.', qAuthorize:'🔗 Autorizar eBay (órdenes)', qToday:'HOY', qTomorrow:'Mañana', qLate:'¡Atrasada!', qNoDate:'Sin fecha', qNoMatch:'Sin match en inventario', qItem:'Artículo', manualHint:'Esta venta de eBay todavía no está ligada a una pieza del inventario. Abre la foto, busca el número de la pieza, cierra la foto y escríbelo aquí para encontrarla. 👇', manualSearchPh:'Escribe el número o nombre de la pieza…', manualNoResults:'No aparece en el inventario. Revisa el número o avísale a un supervisor.', manualNoBin:'Sin bin asignado', manualNoPhotos:'Esta orden no trajo fotos de eBay. Búscala por el número.', manualNotInSys:'❌ No está en el sistema todavía', notInSysHint:'Compárala con las fotos. Si ya la tienes en la mano y es la correcta, confírmalo y sigue a empacar.', notInSysConfirm:'✅ Ya la tengo — no está en el sistema pero es esta', back:'‹ Regresar', soldInPerson:'💰 Se vendió en persona', soldInPersonConfirm:'¿Marcar esta pieza como VENDIDA en persona?', soldOkPerson:'✅ Marcada como vendida en persona.', reassignBin:'📍 Reasignar bin', saveBin:'✅ Guardar bin', binSaved:'✅ Bin guardado', editFull:'✏️ Editar (nombre, bin, foto)', closeResult:'✕ Cerrar', cancelPack:'✕ Cancelar', notFoundPart:'No encontré esa parte.', codeLbl:'Código', locSaved:'✓ Ubicación guardada', noCamera:'Este dispositivo no soporta escaneo por cámara. Usa el lector físico o teclea el código.', camErr:'No se pudo abrir la cámara: ', installHint:'Para instalar: menú del navegador (⋮) → "Agregar a inicio" / "Instalar app".',
+    scanTitle:'🔎 Busca una parte', scanHint:'Escribe el número de estampa o el nombre de la pieza.', multiMatch:'Varias coinciden — elige la parte:', searchBtn:'Buscar', scanCam:'📷 Escanear con cámara', saveNewLoc:'Guardar nueva ubicación', relocBtn:'📍 Asignar ubicación', relocMode:'📥 Recibir / asignar ubicación', relocHint:'Escanea con el láser (o escribe el número) de la pieza que llegó de la yarda, y asígnale su bin.', confirmSellBtn:'✅ Es esta pieza', takeFromBin:'Ve al bin, saca la pieza y, para confirmar que sí la tienes en la mano, teclea o escanea el número directo de la pieza. 👇', itIsHere:'✅ Sí, ya la tengo en la mano', alreadySold:'Ya vendida / empacada', undoSold:'↩️ Regresar a inventario', undoSoldConfirm:'¿Regresar esta pieza a inventario? (deshacer la venta)', undoSoldOk:'✅ Regresada a inventario (disponible).', markShipped:'🚚 Marcar como enviada (en tránsito)', markPaid:'💵 Marcar como VENDIDA (eBay pagó)', confirmScanTitle:'📷 Confírmala en su lugar', confirmScanHint:'Escanea el código de la pieza para confirmar que la tienes en la mano.', keepScan:'Escanea otra vez la parte correcta.', wrongPart:'⚠️ Esa NO es. Escaneaste:', soldOk:'✅ ¡Es esta! Confirmada y lista para enviar', notFoundBtn:'❌ No la encuentro', leftPending:'Quedó en pendientes — la verás abajo para no perderla.', leftPendingChat:'Quedó pendiente y avisé a los supervisores en el chat.', removePending:'✓ Quitar', empacarTitle:'Empaca tu producto', dims:'Medidas de la caja (pulgadas)', lengthL:'Largo', widthW:'Ancho', heightH:'Alto', weightLbl:'Peso (como sale en la báscula, en libras)', weightPh:'ej. 15.85', irregular:'Producto irregular', labelNextPhase:'La etiqueta de eBay se conecta en la siguiente fase.', packDone:'✅ Empacado y listo', sentAnim:'¡Enviado!', toolsTitle:'🛠️ Herramientas de almacén', receiveBtn:'📥 Recibir / asignar ubicación', oldItemBtn:'🏷️ Alta de pieza vieja (estampa + bin)', consolidateBtn:'📦 Consolidar bins', rollBtn:'🧾 Imprimir rollo de estampas (varias de golpe)', binRollBtn:'🗄️ Imprimir rollo de bines (4×6, números grandes)', consolidateTitle:'Consolidar bins', consolidateHint:'Junta los bins con pocas piezas en uno solo. Empieza por el que tiene menos.', emptyBin:'Vaciar este', piezas:'piezas', noBins:'No hay bins con piezas para consolidar.', moveTo:'Mover las {n} piezas de {bin} a:', orPick:'O elige un bin que ya existe:', moveConfirm:'✅ Mover todo', moveDone:'Movidas {n} piezas de {src} → {tgt}', setAside:'Aparta el bin {bin} vacío para entregarlo a Captura. ¡Gracias! 🙌', sameBin:'Es el mismo bin — elige otro destino.', pendingTitle:'📋 Pendientes de encontrar', qTitle:'Por enviar (eBay)', qLoading:'Cargando órdenes de eBay…', qEmpty:'No hay órdenes pendientes de enviar. 🎉', qError:'No se pudo cargar:', qRetry:'↻ Reintentar', qNeedConsent:'Falta el permiso para leer las órdenes de eBay. Enrique tiene que autorizar una sola vez.', qAuthorize:'🔗 Autorizar eBay (órdenes)', qToday:'HOY', qTomorrow:'Mañana', qLate:'¡Atrasada!', qNoDate:'Sin fecha', qNoMatch:'Sin match en inventario', qItem:'Artículo', manualHint:'Esta venta de eBay todavía no está ligada a una pieza del inventario. Abre la foto, busca el número de la pieza, cierra la foto y escríbelo aquí para encontrarla. 👇', manualSearchPh:'Escribe el número o nombre de la pieza…', manualNoResults:'No aparece en el inventario. Revisa el número o avísale a un supervisor.', manualNoBin:'Sin bin asignado', manualNoPhotos:'Esta orden no trajo fotos de eBay. Búscala por el número.', manualNotInSys:'❌ No está en el sistema todavía', notInSysHint:'Compárala con las fotos. Si ya la tienes en la mano y es la correcta, confírmalo y sigue a empacar.', notInSysConfirm:'✅ Ya la tengo — no está en el sistema pero es esta', back:'‹ Regresar', soldInPerson:'💰 Se vendió en persona', soldInPersonConfirm:'¿Marcar esta pieza como VENDIDA en persona?', soldOkPerson:'✅ Marcada como vendida en persona.', reassignBin:'📍 Reasignar bin', saveBin:'✅ Guardar bin', binSaved:'✅ Bin guardado', editFull:'✏️ Editar (nombre, bin, foto)', closeResult:'✕ Cerrar', cancelPack:'✕ Cancelar', notFoundPart:'No encontré esa parte.', codeLbl:'Código', locSaved:'✓ Ubicación guardada', noCamera:'Este dispositivo no soporta escaneo por cámara. Usa el lector físico o teclea el código.', camErr:'No se pudo abrir la cámara: ', installHint:'Para instalar: menú del navegador (⋮) → "Agregar a inicio" / "Instalar app".',
     alertPart:'Escribe qué parte es.', alertCar:'Pon al menos VIN o marca/modelo.', carNotFound:'Carro no encontrado.', vinShort:'El VIN se ve corto (deben ser ~17).', decoding:'Decodificando…', decodeOk:'✓ Datos rellenados — revisa y corrige si hace falta.', decodeNone:'No se encontró info de ese VIN; captura a mano.', decodeErr:'No se pudo decodificar (sin internet o VIN inválido). Captura a mano.', error:'Error: ' },
   en:{ installApp:'📲 Install Warehouse as app', teamAccess:'Team access', email:'Email', pass:'Password', enter:'Sign in', logout:'Log out', logoutConfirm:'Log out? You\'ll have to enter your email and password again.',
     needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Warehouse.',
@@ -326,7 +330,7 @@ const T={
     eConfiguring:'⚙️ Setting up…', eSetupConfirm:'⚙️ This sets up your eBay account for the API:\n• Creates the ship-from location (Porterville, CA 93257)\n• Creates/uses the payment, shipping ($15 USPS Priority) and return (30 days) policies\n\nThis is done ONCE. Continue?', eSetupOk:'✅ Account set up!', eLoc:'Location', eShip:'Shipping', ePay:'Payment', eRet:'Returns', eHandling:'Handling/zones', eSetupOkEnd:'You can now create drafts.', eSetupFail:'⚠️ Something is missing in the setup:', eSetupFailHint:'(If it mentions "Business Policies"/"opt in", they must be enabled on eBay — tell me and I\'ll guide you.)',
     ePricePrompt:'💵 eBay sale price ($):', eInvalidPrice:'Invalid price', eCreatingDraft:'📝 Creating draft…', eDraftOk:'✅ Draft created on eBay!', eTitleW:'Title', eCatW:'Category', eSpecsW:'Item specifics', ePhotosW:'Photos', ePriceW:'Price', eDraftOkEnd:'Review it on eBay (Seller Hub → Listings → Drafts). When it looks good, tap "🚀 Publish (live)".', eDraftFail:'⚠️ Draft was not created', eSetupFirst:'👉 First tap "⚙️ Set up eBay (once)".',
     ePublishConfirm:'⚠️ This PUBLISHES the draft LIVE on eBay (eBay fees apply as usual).\n\nPublish now?', ePublishing:'🚀 Publishing…', ePublishedOk:'✅ PUBLISHED ON EBAY!', eViewW:'View', ePublishedEnd:'The part moved to Published.', ePublishFail:'⚠️ eBay did not publish', priceAsk:'What price did you list it at? (optional, in $)', confirmUnpublish:'Remove "published"? Goes back to To-publish. (Sales are marked in Packing, not here.)',
-    scanTitle:'🔎 Find a part', scanHint:'Type the sticker number or name of the part.', multiMatch:'Several match — pick the part:', searchBtn:'Search', scanCam:'📷 Scan with camera', saveNewLoc:'Save new location', relocBtn:'📍 Assign location', relocMode:'📥 Receive / assign location', relocHint:'Scan with the laser (or type the number) of the part that arrived from the yard, then assign its bin.', confirmSellBtn:'✅ This is the part', takeFromBin:'Take it from the bin and confirm it is there', itIsHere:'✅ Yes, it is here', alreadySold:'Already sold / packed', undoSold:'↩️ Return to inventory', undoSoldConfirm:'Return this part to inventory? (undo the sale)', undoSoldOk:'✅ Returned to inventory (available).', markShipped:'🚚 Mark as shipped (in transit)', markPaid:'💵 Mark as SOLD (eBay paid)', confirmScanTitle:'📷 Confirm it in place', confirmScanHint:'Scan the part code to confirm you have it in hand.', keepScan:'Scan the correct part again.', wrongPart:'⚠️ That is NOT it. You scanned:', soldOk:'✅ This is it! Confirmed & ready to ship', notFoundBtn:"❌ Can't find it", leftPending:'Left in pending — see it below so you do not miss it.', leftPendingChat:'Left pending and I notified the supervisors in the chat.', removePending:'✓ Remove', empacarTitle:'Pack your product', dims:'Box size (inches)', lengthL:'Length', widthW:'Width', heightH:'Height', weightLbl:'Weight (as the scale shows it, in pounds)', weightPh:'e.g. 15.85', irregular:'Irregular product', labelNextPhase:'The eBay label connects in the next phase.', packDone:'✅ Packed & ready', sentAnim:'Sent!', toolsTitle:'🛠️ Warehouse tools', receiveBtn:'📥 Receive / assign location', oldItemBtn:'🏷️ Add old part (sticker + bin)', consolidateBtn:'📦 Consolidate bins', rollBtn:'🧾 Print sticker roll (many at once)', consolidateTitle:'Consolidate bins', consolidateHint:'Merge low-count bins into one. Start with the one that has the fewest.', emptyBin:'Empty this one', piezas:'items', noBins:'No bins with items to consolidate.', moveTo:'Move the {n} items from {bin} to:', orPick:'Or pick an existing bin:', moveConfirm:'✅ Move all', moveDone:'Moved {n} items from {src} → {tgt}', setAside:'Set the empty {bin} bin aside to hand to Capture. Thanks! 🙌', sameBin:'Same bin — pick a different target.', pendingTitle:'📋 Pending to find', qTitle:'To ship (eBay)', qLoading:'Loading eBay orders…', qEmpty:'No orders pending shipment. 🎉', qError:'Could not load:', qRetry:'↻ Retry', qNeedConsent:'Missing permission to read eBay orders. Enrique must authorize once.', qAuthorize:'🔗 Authorize eBay (orders)', qToday:'TODAY', qTomorrow:'Tomorrow', qLate:'Late!', qNoDate:'No date', qNoMatch:'No inventory match', qItem:'Item', manualHint:'This eBay sale isn’t linked to an inventory part yet. Open the photo, find the part number, close the photo and type it here to locate it. 👇', manualSearchPh:'Type the part number or name…', manualNoResults:'Not found in inventory. Check the number or tell a supervisor.', manualNoBin:'No bin assigned', manualNoPhotos:'This order didn’t bring eBay photos. Search by the number.', manualNotInSys:'❌ Not in the system yet', notInSysHint:'Compare it with the photos. If you have it in hand and it’s the right one, confirm and go to packing.', notInSysConfirm:'✅ I have it — not in the system but it’s this one', back:'‹ Back', soldInPerson:'💰 Sold in person', soldInPersonConfirm:'Mark this part as SOLD in person?', soldOkPerson:'✅ Marked as sold in person.', reassignBin:'📍 Reassign bin', saveBin:'✅ Save bin', binSaved:'✅ Bin saved', editFull:'✏️ Edit (name, bin, photo)', closeResult:'✕ Close', cancelPack:'✕ Cancel', notFoundPart:"Couldn't find that part.", codeLbl:'Code', locSaved:'✓ Location saved', noCamera:'This device does not support camera scanning. Use the hardware scanner or type the code.', camErr:'Could not open camera: ', installHint:'To install: browser menu (⋮) → "Add to Home screen" / "Install app".',
+    scanTitle:'🔎 Find a part', scanHint:'Type the sticker number or name of the part.', multiMatch:'Several match — pick the part:', searchBtn:'Search', scanCam:'📷 Scan with camera', saveNewLoc:'Save new location', relocBtn:'📍 Assign location', relocMode:'📥 Receive / assign location', relocHint:'Scan with the laser (or type the number) of the part that arrived from the yard, then assign its bin.', confirmSellBtn:'✅ This is the part', takeFromBin:'Take it from the bin and confirm it is there', itIsHere:'✅ Yes, it is here', alreadySold:'Already sold / packed', undoSold:'↩️ Return to inventory', undoSoldConfirm:'Return this part to inventory? (undo the sale)', undoSoldOk:'✅ Returned to inventory (available).', markShipped:'🚚 Mark as shipped (in transit)', markPaid:'💵 Mark as SOLD (eBay paid)', confirmScanTitle:'📷 Confirm it in place', confirmScanHint:'Scan the part code to confirm you have it in hand.', keepScan:'Scan the correct part again.', wrongPart:'⚠️ That is NOT it. You scanned:', soldOk:'✅ This is it! Confirmed & ready to ship', notFoundBtn:"❌ Can't find it", leftPending:'Left in pending — see it below so you do not miss it.', leftPendingChat:'Left pending and I notified the supervisors in the chat.', removePending:'✓ Remove', empacarTitle:'Pack your product', dims:'Box size (inches)', lengthL:'Length', widthW:'Width', heightH:'Height', weightLbl:'Weight (as the scale shows it, in pounds)', weightPh:'e.g. 15.85', irregular:'Irregular product', labelNextPhase:'The eBay label connects in the next phase.', packDone:'✅ Packed & ready', sentAnim:'Sent!', toolsTitle:'🛠️ Warehouse tools', receiveBtn:'📥 Receive / assign location', oldItemBtn:'🏷️ Add old part (sticker + bin)', consolidateBtn:'📦 Consolidate bins', rollBtn:'🧾 Print sticker roll (many at once)', binRollBtn:'🗄️ Print bin roll (4×6, big numbers)', consolidateTitle:'Consolidate bins', consolidateHint:'Merge low-count bins into one. Start with the one that has the fewest.', emptyBin:'Empty this one', piezas:'items', noBins:'No bins with items to consolidate.', moveTo:'Move the {n} items from {bin} to:', orPick:'Or pick an existing bin:', moveConfirm:'✅ Move all', moveDone:'Moved {n} items from {src} → {tgt}', setAside:'Set the empty {bin} bin aside to hand to Capture. Thanks! 🙌', sameBin:'Same bin — pick a different target.', pendingTitle:'📋 Pending to find', qTitle:'To ship (eBay)', qLoading:'Loading eBay orders…', qEmpty:'No orders pending shipment. 🎉', qError:'Could not load:', qRetry:'↻ Retry', qNeedConsent:'Missing permission to read eBay orders. Enrique must authorize once.', qAuthorize:'🔗 Authorize eBay (orders)', qToday:'TODAY', qTomorrow:'Tomorrow', qLate:'Late!', qNoDate:'No date', qNoMatch:'No inventory match', qItem:'Item', manualHint:'This eBay sale isn’t linked to an inventory part yet. Open the photo, find the part number, close the photo and type it here to locate it. 👇', manualSearchPh:'Type the part number or name…', manualNoResults:'Not found in inventory. Check the number or tell a supervisor.', manualNoBin:'No bin assigned', manualNoPhotos:'This order didn’t bring eBay photos. Search by the number.', manualNotInSys:'❌ Not in the system yet', notInSysHint:'Compare it with the photos. If you have it in hand and it’s the right one, confirm and go to packing.', notInSysConfirm:'✅ I have it — not in the system but it’s this one', back:'‹ Back', soldInPerson:'💰 Sold in person', soldInPersonConfirm:'Mark this part as SOLD in person?', soldOkPerson:'✅ Marked as sold in person.', reassignBin:'📍 Reassign bin', saveBin:'✅ Save bin', binSaved:'✅ Bin saved', editFull:'✏️ Edit (name, bin, photo)', closeResult:'✕ Close', cancelPack:'✕ Cancel', notFoundPart:"Couldn't find that part.", codeLbl:'Code', locSaved:'✓ Location saved', noCamera:'This device does not support camera scanning. Use the hardware scanner or type the code.', camErr:'Could not open camera: ', installHint:'To install: browser menu (⋮) → "Add to Home screen" / "Install app".',
     alertPart:'Type what part it is.', alertCar:'Enter at least VIN or make/model.', carNotFound:'Car not found.', vinShort:'The VIN looks short (should be ~17).', decoding:'Decoding…', decodeOk:'✓ Filled in — review and fix if needed.', decodeNone:'No info found for that VIN; enter by hand.', decodeErr:'Could not decode (no internet or invalid VIN). Enter by hand.', error:'Error: ' }
 };
 let L = localStorage.getItem('lmg_lang_pref') || (String(navigator.language||'').toLowerCase().startsWith('es') ? 'es' : 'en');
@@ -742,8 +746,10 @@ function startListening(){
   onSnapshot(doc(db,'config','aiUsage'), s=>{ _aiUsage = (s&&s.exists&&s.exists()) ? s.data() : null; if(_view==='lister') renderTaximetro(); }, e=>console.log('aiUsage',e));
   // 🧾 Historial de rollos de estampas impresos (para no repetir números)
   onSnapshot(doc(db,'config','stickerBatch'), s=>{ _stickerHist = (s&&s.exists&&s.exists()&&Array.isArray(s.data().history)) ? s.data().history : []; }, e=>console.log('stickerHist',e));
+  // 🗄️ Historial de rollos de BINES impresos (numeración aparte de las estampas)
+  onSnapshot(doc(db,'config','binBatch'), s=>{ _binHist = (s&&s.exists&&s.exists()&&Array.isArray(s.data().history)) ? s.data().history : []; }, e=>console.log('binHist',e));
 }
-let _stickerHist=[];
+let _stickerHist=[], _binHist=[], _batchKind='sticker';
 
 // ---- VIN decode (NHTSA, GRATIS) — captura la ficha completa ----
 let _vSpec=null;   // ficha decodificada del carro actual (para guardarla y heredarla a las partes)
@@ -1505,78 +1511,102 @@ window.printStickerNumber=function(prefill){
 window.doReprint=async function(){ const v=((document.getElementById('rp-num')||{}).value||'').trim(); if(!v) return; await makeNumberLabel(v); };
 // 🧾 ROLLO de estampas (batch): genera un PDF con N estampas (código de barras + número) para imprimir de un jalón a la Rongta.
 function loadScriptOnce(src){ return new Promise((res,rej)=>{ if(Array.from(document.scripts).some(s=>s.src===src)) return res(); const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load '+src)); document.head.appendChild(s); }); }
-window.openStickerBatch=function(){
-  let mx=0; parts.forEach(p=>{ const n=parseInt(p.stickerNum,10); if(!isNaN(n)&&n>mx) mx=n; });
-  const es=(L==='es');
-  // Historial: el número más alto ya IMPRESO en un rollo (aunque la pieza no se haya capturado aún).
-  let lastEnd=0; (_stickerHist||[]).forEach(b=>{ const e=parseInt(b.end,10); if(!isNaN(e)&&e>lastEnd) lastEnd=e; });
+window.openStickerBatch=function(){ _openBatch('sticker'); };
+window.openBinBatch=function(){ _openBatch('bin'); };
+function _openBatch(kind){
+  _batchKind=kind;
+  const es=(L==='es'), isBin=(kind==='bin');
+  const hist=((isBin?_binHist:_stickerHist)||[]);
+  let mx=0;
+  if(isBin){ parts.forEach(p=>{ const n=parseInt((p.location&&p.location.bin),10); if(!isNaN(n)&&n>mx) mx=n; }); }
+  else { parts.forEach(p=>{ const n=parseInt(p.stickerNum,10); if(!isNaN(n)&&n>mx) mx=n; }); }
+  let lastEnd=0; hist.forEach(b=>{ const e=parseInt(b.end,10); if(!isNaN(e)&&e>lastEnd) lastEnd=e; });
   const suggested=Math.max(mx+1, lastEnd+1, 1);
-  const pad=n=>String(n).padStart(4,'0');
+  const padN=isBin?2:4, pad=n=>String(n).padStart(padN,'0');
   const fmtD=iso=>{ try{ return new Date(iso).toLocaleDateString('es-MX',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }catch(e){ return (iso||'').slice(0,10); } };
-  const hist=(_stickerHist||[]).slice(0,6);
-  const histHtml = hist.length
-    ? `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:10px;"><div style="font-weight:800;font-size:13px;margin-bottom:6px;">🧾 ${es?'Rollos ya impresos':'Printed rolls'}</div>`
-      + hist.map((b,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;${i===0?'font-weight:800;color:var(--gold);':'color:var(--muted);'}"><span>${i===0?(es?'Último: ':'Last: '):''}#${pad(b.start)}–#${pad(b.end)} <span style="color:var(--faint);font-weight:500;">(${b.qty})</span></span><span style="color:var(--faint);white-space:nowrap;">${fmtD(b.at)}</span></div>`).join('')
+  const histRows=hist.slice(0,6);
+  const emoji=isBin?'🗄️':'🧾';
+  const histHtml = histRows.length
+    ? `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:10px;"><div style="font-weight:800;font-size:13px;margin-bottom:6px;">${emoji} ${es?'Rollos ya impresos':'Printed rolls'}</div>`
+      + histRows.map((b,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;${i===0?'font-weight:800;color:var(--gold);':'color:var(--muted);'}"><span>${i===0?(es?'Último: ':'Last: '):''}#${pad(b.start)}–#${pad(b.end)} <span style="color:var(--faint);font-weight:500;">(${b.qty})</span></span><span style="color:var(--faint);white-space:nowrap;">${fmtD(b.at)}</span></div>`).join('')
       + `</div>`
     : `<div class="sub" style="margin-top:14px;color:var(--faint);">${es?'Aún no hay rollos impresos.':'No rolls printed yet.'}</div>`;
+  const title=isBin?(es?'Imprimir rollo de BINES':'Print bin roll'):(es?'Imprimir rollo de estampas':'Print sticker roll');
+  const desc=isBin?(es?'Etiquetas 4×6 con el número GRANDE (y código de barras) para pegar en los bines.':'4×6 labels with a BIG number (and barcode) to stick on the bins.'):(es?'Estampas (código de barras + número) para imprimir de una vez.':'Stickers (barcode + number) to print all at once.');
+  const rangeRow=isBin
+    ? `<div class="row2"><div><label>${es?'Del bin #':'From bin #'}</label><input id="sb-start" inputmode="numeric" value="${suggested}"></div><div><label>${es?'Al bin #':'To bin #'}</label><input id="sb-to" inputmode="numeric" value="${suggested+9}"></div></div>`
+    : `<div class="row2"><div><label>${es?'Empieza en #':'Start at #'}</label><input id="sb-start" inputmode="numeric" value="${suggested}"></div><div><label>${es?'Cuántas':'How many'}</label><input id="sb-qty" inputmode="numeric" value="100"></div></div>`;
+  const defW=isBin?'101.6':'50', defH=isBin?'152.4':'30';
   const mi=document.getElementById('modal2-inner'); if(!mi) return;
-  mi.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🧾 ${es?'Imprimir rollo de estampas':'Print sticker roll'}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
-    <div class="sub" style="margin-bottom:12px;">${es?'Genera un PDF con muchas estampas (código de barras + número) para imprimirlas de una vez. El equipo pela la siguiente y la pega.':'Generates a PDF of many stickers (barcode + number) to print all at once.'}</div>
+  mi.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">${emoji} ${title}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
+    <div class="sub" style="margin-bottom:12px;">${desc}</div>
     ${lastEnd>0?`<div style="background:rgba(240,192,64,0.12);border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:8px 11px;font-size:12.5px;margin-bottom:10px;">${es?'El último rollo terminó en':'Last roll ended at'} <b>#${pad(lastEnd)}</b> → ${es?'empezamos en':'starting at'} <b>#${pad(suggested)}</b> ${es?'para no repetir.':'to avoid repeats.'}</div>`:''}
-    <div class="row2"><div><label>${es?'Empieza en #':'Start at #'}</label><input id="sb-start" inputmode="numeric" value="${suggested}"></div><div><label>${es?'Cuántas':'How many'}</label><input id="sb-qty" inputmode="numeric" value="100"></div></div>
-    <div class="row2"><div><label>${es?'Ancho (mm)':'Width (mm)'}</label><input id="sb-w" inputmode="decimal" value="50"></div><div><label>${es?'Alto (mm)':'Height (mm)'}</label><input id="sb-h" inputmode="decimal" value="30"></div></div>
+    ${rangeRow}
+    <div class="row2"><div><label>${es?'Ancho (mm)':'Width (mm)'}</label><input id="sb-w" inputmode="decimal" value="${defW}"></div><div><label>${es?'Alto (mm)':'Height (mm)'}</label><input id="sb-h" inputmode="decimal" value="${defH}"></div></div>
     <button class="btn" id="sb-go" style="width:100%;margin-top:14px;" onclick="genStickerBatch()">🖨️ ${es?'Generar e imprimir el rollo':'Generate & print roll'}</button>
-    <div class="sub" style="margin-top:10px;">${es?'Pon el ancho/alto igual a tu etiqueta. Al generar, se abre la hoja de compartir → elige RLabel (o la impresora) para imprimir todas.':'When you generate, the share sheet opens → pick RLabel (or the printer) to print them all.'}</div>
+    <div class="sub" style="margin-top:10px;">${es?'Al generar, se abre la hoja de compartir → elige RLabel (o la impresora) para imprimir todas.':'The share sheet opens → pick RLabel (or the printer).'}</div>
     ${histHtml}`;
   document.getElementById('modal2').style.display='block';
-};
+}
 window.genStickerBatch=async function(){
-  const es=(L==='es');
+  const es=(L==='es'), isBin=(_batchKind==='bin');
   const start=parseInt((document.getElementById('sb-start')||{}).value,10)||1;
-  const qty=Math.min(1000, Math.max(1, parseInt((document.getElementById('sb-qty')||{}).value,10)||100));
-  const wmm=parseFloat((document.getElementById('sb-w')||{}).value)||40;
-  const hmm=parseFloat((document.getElementById('sb-h')||{}).value)||30;
-  const pad=Math.max(4, String(start+qty-1).length);
+  let qty;
+  if(isBin){ const to=parseInt((document.getElementById('sb-to')||{}).value,10)||start; qty=to-start+1; }
+  else { qty=parseInt((document.getElementById('sb-qty')||{}).value,10)||100; }
+  qty=Math.min(1000, Math.max(1, qty));
+  const wmm=parseFloat((document.getElementById('sb-w')||{}).value)||(isBin?101.6:50);
+  const hmm=parseFloat((document.getElementById('sb-h')||{}).value)||(isBin?152.4:30);
+  const pad=Math.max(isBin?2:4, String(start+qty-1).length);
   const btn=document.getElementById('sb-go'); if(btn){ btn.disabled=true; btn.textContent=es?'Generando…':'Generating…'; }
   try{
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js');
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js');
     const jsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
-    // FORZAR landscape cuando el ancho > alto (ej. 50×30). Si no, jsPDF por defecto lo hace portrait
-    // y VOLTEA a 30×50 → mocha arriba. Con landscape queda 50 de ancho × 30 de alto exacto.
+    // OJO: la var del PDF es 'pdf' (NO 'doc') para no tapar el doc() de Firestore al guardar el historial.
+    // Orientación: si ancho>=alto → landscape (estampa 50×30). Si alto>ancho → portrait (bin 4×6 vertical).
     const orient = wmm>=hmm ? 'landscape' : 'portrait';
-    const doc=new jsPDF({ unit:'mm', format:[wmm,hmm], orientation:orient });
+    const pdf=new jsPDF({ unit:'mm', format:[wmm,hmm], orientation:orient });
     for(let i=0;i<qty;i++){
-      if(i>0) doc.addPage([wmm,hmm], orient);
+      if(i>0) pdf.addPage([wmm,hmm], orient);
       const num=String(start+i).padStart(pad,'0');
       const cv=document.createElement('canvas');
       window.JsBarcode(cv, num, { format:'CODE128', displayValue:false, margin:0, width:3, height:110 });
       const bImg=cv.toDataURL('image/png');
-      const pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight();
-      const bw=pw*0.94, bh=ph*0.60, bx=(pw-bw)/2, by=ph*0.06;   // más ancho y alto → barcode grueso y escaneable
-      doc.addImage(bImg,'PNG',bx,by,bw,bh);
-      doc.setFont('helvetica','bold');
-      let fs=Math.floor(ph*0.72); doc.setFontSize(fs);
-      while(doc.getTextWidth(num) > pw*0.9 && fs>8){ fs-=1; doc.setFontSize(fs); }
-      const ty=by+bh+((ph-(by+bh))/2);
-      doc.text(num, pw/2, ty, { align:'center', baseline:'middle' });
+      const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+      pdf.setFont('helvetica','bold');
+      if(isBin){
+        // 🗄️ BIN 4×6 VERTICAL: barcode chico arriba + NÚMERO GIGANTE (para verlo y pegarlo)
+        const bw=pw*0.80, bh=ph*0.13, bx=(pw-bw)/2, by=ph*0.05;
+        pdf.addImage(bImg,'PNG',bx,by,bw,bh);
+        let fs=Math.floor(ph*2.4); pdf.setFontSize(fs);
+        while(pdf.getTextWidth(num) > pw*0.86 && fs>24){ fs-=6; pdf.setFontSize(fs); }
+        pdf.text(num, pw/2, ph*0.60, { align:'center', baseline:'middle' });
+      } else {
+        // 🧾 ESTAMPA 50×30 LANDSCAPE: barcode ancho + número
+        const bw=pw*0.94, bh=ph*0.60, bx=(pw-bw)/2, by=ph*0.06;
+        pdf.addImage(bImg,'PNG',bx,by,bw,bh);
+        let fs=Math.floor(ph*0.72); pdf.setFontSize(fs);
+        while(pdf.getTextWidth(num) > pw*0.9 && fs>8){ fs-=1; pdf.setFontSize(fs); }
+        pdf.text(num, pw/2, by+bh+((ph-(by+bh))/2), { align:'center', baseline:'middle' });
+      }
     }
     // Abre la hoja de COMPARTIR de Android directo → eliges RLabel (o la impresora) e imprime.
-    const blob=doc.output('blob');
-    const file=new File([blob], (es?'estampas.pdf':'stickers.pdf'), { type:'application/pdf' });
+    const blob=pdf.output('blob');
+    const file=new File([blob], (isBin?'bines.pdf':'estampas.pdf'), { type:'application/pdf' });
     try{
       if(navigator.canShare && navigator.canShare({files:[file]})){
-        await navigator.share({ files:[file], title:(es?'Rollo de estampas':'Sticker roll') });
+        await navigator.share({ files:[file], title:(isBin?(es?'Rollo de bines':'Bin roll'):(es?'Rollo de estampas':'Sticker roll')) });
       } else {
         const url=URL.createObjectURL(blob); window.open(url,'_blank');   // respaldo: abre el PDF
       }
     }catch(shareErr){ /* el usuario canceló el compartir */ }
-    // 🧾 Guarda el rollo en el historial (para no repetir números en el siguiente). Se registra al generar.
+    // Guarda el rollo en su historial (estampas o bines, por separado) — para no repetir números.
     try{
       const entry={ start:start, end:start+qty-1, qty:qty, wmm:wmm, hmm:hmm, at:new Date().toISOString(), by:(myEmail||'') };
-      const prev=Array.isArray(_stickerHist)?_stickerHist:[];
-      await setDoc(doc(db,'config','stickerBatch'), { history:[entry, ...prev].slice(0,40) }, { merge:true });
-    }catch(histErr){ console.log('sticker hist', histErr); }
+      const prev=Array.isArray(isBin?_binHist:_stickerHist)?(isBin?_binHist:_stickerHist):[];
+      await setDoc(doc(db,'config',(isBin?'binBatch':'stickerBatch')), { history:[entry, ...prev].slice(0,40) }, { merge:true });
+    }catch(histErr){ console.log('batch hist', histErr); }
   }catch(e){ alert((es?'No se pudo generar: ':'Could not generate: ')+((e&&e.message)||e)); }
   if(btn){ btn.disabled=false; btn.textContent='🖨️ '+(es?'Generar e imprimir el rollo':'Generate & print roll'); }
 };
