@@ -1573,10 +1573,22 @@ window.genStickerBatch=async function(){
       const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
       pdf.setFont('helvetica','bold');
       if(isBin){
-        // 🗄️ BIN 4×6 VERTICAL: SOLO el número, lo más GRANDE posible (sin barcode).
-        let fs=Math.floor(ph*2.2); pdf.setFontSize(fs);
-        while(pdf.getTextWidth(num) > pw*0.88 && fs>24){ fs-=4; pdf.setFontSize(fs); }
-        pdf.text(num, pw/2, ph*0.52, { align:'center', baseline:'middle' });
+        // 🗄️ BIN 4×6: número GIGANTE. Se dibuja en canvas (recorte justo) y se ESTIRA a lo ALTO de la
+        // etiqueta — el texto normal se queda chico porque lo limita el ancho; así llena ~80% del alto.
+        const ref=300;
+        const tctx=document.createElement('canvas').getContext('2d');
+        tctx.font='bold '+ref+'px Arial';
+        const m=tctx.measureText(num);
+        const natW=Math.max(1,m.width);
+        const asc=(m.actualBoundingBoxAscent||ref*0.72), dsc=(m.actualBoundingBoxDescent||0);
+        const natH=Math.max(1, asc+dsc);
+        const cnv=document.createElement('canvas'); cnv.width=Math.ceil(natW); cnv.height=Math.ceil(natH);
+        const g=cnv.getContext('2d');
+        g.font='bold '+ref+'px Arial'; g.textAlign='center'; g.textBaseline='alphabetic'; g.fillStyle='#000';
+        g.fillText(num, cnv.width/2, asc);
+        const img=cnv.toDataURL('image/png');
+        const ih=ph*0.80; let iw=ih*(natW/natH); if(iw>pw*0.92) iw=pw*0.92;
+        pdf.addImage(img,'PNG',(pw-iw)/2,(ph-ih)/2,iw,ih);
       } else {
         // 🧾 ESTAMPA 50×30 LANDSCAPE: barcode ancho + número
         const cv=document.createElement('canvas');
