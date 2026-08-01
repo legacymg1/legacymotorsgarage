@@ -106,10 +106,39 @@ window.signAndSave = async function(){
       if(ib && chk && chk.textContent.indexOf('✓')>=0){ ib.innerHTML='<img src="'+iniData+'" alt="initials" style="height:24px;display:block;margin:1px auto;">'; }
     });
   }
+  // ✍️ FIRMA DEL VENDEDOR: guardada UNA vez en config/sellerSignature (desde el admin) → se estampa
+  // SOLA en la(s) línea(s) del vendedor. Así el contrato queda firmado por AMBOS.
+  try{
+    var _SFS=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    var _SAP=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+    var _sapp=_SAP.getApps().length?_SAP.getApps()[0]:_SAP.initializeApp(__FBCFG);
+    var _sdb=_SFS.getFirestore(_sapp);
+    var _ss=await _SFS.getDoc(_SFS.doc(_sdb,'config','sellerSignature'));
+    var sellerImg=(_ss.exists()&&_ss.data().dataUrl)||'';
+    if(sellerImg){
+      var sellerLines=Array.prototype.slice.call(document.querySelectorAll('.sign-line')).filter(function(el){
+        var tx=(el.textContent||'');
+        return /(seller|vendedor|representative|representante)/i.test(tx) && !/(buyer|comprador)/i.test(tx);
+      });
+      sellerLines.forEach(function(line){
+        var label=line.innerHTML;
+        line.innerHTML='<img src="'+sellerImg+'" alt="seller signature" style="height:52px;display:block;margin:0 auto 2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:7pt;color:#888;">Firmado electr&oacute;nicamente / e-signed</span></div>';
+        var srow=line.parentNode;
+        if(srow && srow.querySelectorAll){
+          var ss2=srow.querySelectorAll('.sign-line');
+          for(var k=0;k<ss2.length;k++){ var slk=ss2[k]; var dk=(slk.textContent||'').replace(/\s/g,'').toLowerCase(); if(slk!==line && dk && dk.length<=12 && (dk.indexOf('date')>=0 || dk.indexOf('fecha')>=0)){ slk.innerHTML=stampNice+'<br><span style="font-size:8pt;color:#555;">Date / Fecha</span>'; } }
+        }
+      });
+    }
+  }catch(sellerErr){ /* si no hay firma de vendedor guardada, el contrato se guarda igual (solo faltaría tu firma) */ }
+
   document.querySelectorAll('.esign-wrap, .action-bar, .lmg-banner').forEach(function(el){el.remove();});
   document.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); el.style.cursor=''; });
   document.querySelectorAll('script').forEach(function(s){s.remove();});
   var snapshotHTML='<!doctype html>'+document.documentElement.outerHTML;
+  // 🔒 Hash de integridad (SHA-256) de la copia firmada → detecta cualquier alteración posterior.
+  var hashHex='';
+  try{ var _enc=new TextEncoder().encode(snapshotHTML); var _hb=await crypto.subtle.digest('SHA-256', _enc); hashHex=Array.prototype.map.call(new Uint8Array(_hb), function(b){ return ('0'+b.toString(16)).slice(-2); }).join(''); }catch(e){}
   try{
     var A2=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
     var FS=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
@@ -128,7 +157,7 @@ window.signAndSave = async function(){
     var url=await ST.getDownloadURL(sref);
     var nowIso=new Date().toISOString();
     versions=versions.map(function(v){ if(v.status==='active'){ v.status='voided'; v.voidedAt=nowIso; v.voidReason=reason||'Correccion'; } return v; });
-    var entry={version:newVer,url:url,contractNumber:cnum,signedAt:nowIso,method:'esign',status:'active'};
+    var entry={version:newVer,url:url,contractNumber:cnum,signedAt:nowIso,method:'esign',status:'active',hash:hashHex,signedBy:((__user&&__user.email)||'')};
     if(reason) entry.correctionReason=reason;
     versions.push(entry);
     await FS.setDoc(FS.doc(db,'clients',clientId),{signedContractVersions:versions,signedContract:entry},{merge:true});

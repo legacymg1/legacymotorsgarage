@@ -269,7 +269,7 @@
     <div class="stat-card"><div class="stat-label">Esta semana</div><div class="stat-value sv-yellow" id="stat-soon">0</div></div>
     <div class="stat-card"><div class="stat-label">Al corriente</div><div class="stat-value sv-green" id="stat-ok">0</div></div>
   </div>
-  <div style="text-align:right;margin:4px 2px 0;"><button type="button" onclick="repairDocs()" title="Convierte a imagen los ID/seguros que sean PDF o HEIC. Hazlo en el iPad para las fotos de iPhone." style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">🛠 Reparar fotos ID/seguro (PDF→imagen)</button></div>
+  <div style="text-align:right;margin:4px 2px 0;"><button type="button" id="seller-sign-btn" onclick="openSellerSign()" title="Tu firma como vendedor: firmas una vez y se estampa sola en cada contrato firmado." style="display:none;background:transparent;color:var(--gold);border:1px solid rgba(240,192,64,0.5);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:8px;">✍️ Mi firma (vendedor)</button><button type="button" onclick="repairDocs()" title="Convierte a imagen los ID/seguros que sean PDF o HEIC. Hazlo en el iPad para las fotos de iPhone." style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">🛠 Reparar fotos ID/seguro (PDF→imagen)</button></div>
 
   <div class="sec-head" onclick="toggleSection('fin-summary-box','fin-arrow')"><span>Finanzas</span><span id="fin-arrow" class="sec-arrow">▾</span></div>
 <div id="fin-summary-box"></div>
@@ -359,6 +359,19 @@
   <div style="display:flex;gap:10px;">
     <button type="button" onclick="closeModal('team-modal')" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:14px;cursor:pointer;">Cancelar</button>
     <button type="button" id="team-save-btn" onclick="saveTeamPassword()" style="flex:1;background:#22a06b;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">Guardar contraseña</button>
+  </div>
+</div></div>
+
+<!-- ✍️ Mi firma (vendedor): se firma UNA vez y se estampa sola en cada contrato -->
+<div id="sellersign-modal" class="modal-overlay"><div class="modal" style="max-width:520px;">
+  <div class="modal-title">✍️ Mi firma (vendedor)</div>
+  <div style="color:var(--muted);font-size:13px;margin:6px 0 10px;">Firma aquí con el dedo o lápiz. Se guarda y se pondrá <b>automáticamente</b> como firma del vendedor en cada contrato que firme un cliente.</div>
+  <div id="sellersign-current" style="margin-bottom:8px;"></div>
+  <canvas id="sellersign-pad" width="640" height="200" style="width:100%;border:1px solid var(--border);border-radius:8px;background:#fff;touch-action:none;"></canvas>
+  <div style="display:flex;gap:10px;margin-top:12px;">
+    <button type="button" onclick="clearSellerSign()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:14px;cursor:pointer;">Limpiar</button>
+    <button type="button" onclick="closeModal('sellersign-modal')" style="flex:1;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:14px;cursor:pointer;">Cerrar</button>
+    <button type="button" id="sellersign-save-btn" onclick="saveSellerSign()" style="flex:1;background:#22a06b;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">Guardar mi firma</button>
   </div>
 </div></div>
 
@@ -849,6 +862,7 @@ onAuthStateChanged(auth, async (user) => {
   document.body.classList.toggle('role-owner', isOwner);
   document.body.classList.toggle('role-viewer', !isOwner);   // Ivan: solo ver clientes
   try{ const _tb=document.getElementById('team-box'); if(_tb) _tb.style.display = isOwner ? '' : 'none'; }catch(e){}   // 👥 Cuentas del equipo: solo el dueño
+  try{ const _ss=document.getElementById('seller-sign-btn'); if(_ss) _ss.style.display = isOwner ? '' : 'none'; }catch(e){}   // ✍️ Mi firma (vendedor): solo el dueño
   if(!_listeningStarted){ _listeningStarted = true; startListening(); }
 });
 
@@ -3567,6 +3581,41 @@ window.saveTeamPassword=async function(){
     alert('✅ Contraseña actualizada para '+(_teamTarget.email||_teamTarget.uid)+'.\n\nDile que entre con su correo y la contraseña nueva. Si el navegador le ofrece una guardada vieja, que la ignore y la escriba a mano.');
   }catch(e){ alert('Error: '+(e.message||e)); }
   btn.disabled=false; btn.textContent='Guardar contraseña';
+};
+
+// ✍️ FIRMA DEL VENDEDOR — se firma UNA vez (config/sellerSignature) y contract-esign.js la estampa sola.
+let _sellerPad=null;
+window.openSellerSign=function(){
+  document.getElementById('sellersign-modal').classList.add('active');
+  setTimeout(_setupSellerPad, 60);
+  try{ getDoc(doc(db,'config','sellerSignature')).then(s=>{
+    const box=document.getElementById('sellersign-current'); if(!box) return;
+    box.innerHTML = (s.exists()&&s.data().dataUrl)
+      ? '<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Firma guardada actual (firma de nuevo para cambiarla):</div><img src="'+s.data().dataUrl+'" style="height:46px;background:#fff;border:1px solid var(--border);border-radius:6px;padding:2px;">'
+      : '<div style="font-size:12px;color:var(--muted);">Aún no has guardado tu firma.</div>';
+  }).catch(()=>{}); }catch(e){}
+};
+function _setupSellerPad(){
+  const cv=document.getElementById('sellersign-pad'); if(!cv) return;
+  const ctx=cv.getContext('2d'); ctx.lineWidth=2.6; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#0a0a2a';
+  let drawing=false, has=false, lx=0, ly=0;
+  const pos=e=>{ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*(cv.width/r.width), y:(e.clientY-r.top)*(cv.height/r.height)}; };
+  cv.onpointerdown=e=>{ drawing=true; const q=pos(e); lx=q.x; ly=q.y; e.preventDefault(); };
+  cv.onpointermove=e=>{ if(!drawing)return; const q=pos(e); ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(q.x,q.y); ctx.stroke(); lx=q.x; ly=q.y; has=true; e.preventDefault(); };
+  cv.onpointerup=()=>{ drawing=false; }; cv.onpointerleave=()=>{ drawing=false; };
+  _sellerPad={ cv, ctx, hasInk:()=>has, clear:()=>{ ctx.clearRect(0,0,cv.width,cv.height); has=false; } };
+}
+window.clearSellerSign=function(){ if(_sellerPad) _sellerPad.clear(); };
+window.saveSellerSign=async function(){
+  if(!_sellerPad || !_sellerPad.hasInk()){ alert('Firma primero en el recuadro.'); return; }
+  const btn=document.getElementById('sellersign-save-btn'); btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    const dataUrl=_sellerPad.cv.toDataURL('image/png');
+    await setDoc(doc(db,'config','sellerSignature'), { dataUrl, name:'Enrique Ivan Villagomez Linares', updatedAt:new Date().toISOString(), by:(auth.currentUser&&auth.currentUser.email)||'' }, { merge:true });
+    closeModal('sellersign-modal');
+    alert('✅ Firma guardada. A partir de ahora se pone SOLA como firma del vendedor en cada contrato que firme un cliente.');
+  }catch(e){ alert('Error: '+(e.message||e)); }
+  btn.disabled=false; btn.textContent='Guardar mi firma';
 };
 
 // 💬 CONVERSACIONES DEL BOT DE VENTAS — repaso + contador de personas (datos vía backend, solo dueños).

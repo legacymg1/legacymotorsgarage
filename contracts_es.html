@@ -664,6 +664,23 @@ window.signAndSave = async function(){
       if(ib && chk && chk.textContent.indexOf('\u2713')>=0){ ib.innerHTML='<img src="'+iniData+'" alt="initials" style="height:24px;display:block;margin:1px auto;">'; }
     });
   }
+  // ✍️ FIRMA DEL VENDEDOR: guardada UNA vez (config/sellerSignature, desde el admin) → se estampa SOLA.
+  try{
+    var _SFS=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    var _sdb=_SFS.getFirestore(_app);
+    var _ss=await _SFS.getDoc(_SFS.doc(_sdb,'config','sellerSignature'));
+    var sellerImg=(_ss.exists()&&_ss.data().dataUrl)||'';
+    if(sellerImg){
+      var sellerLines=Array.prototype.slice.call(document.querySelectorAll('.sign-line')).filter(function(el){ var tx=(el.textContent||''); return /(seller|vendedor|representative|representante)/i.test(tx) && !/(buyer|comprador)/i.test(tx); });
+      sellerLines.forEach(function(line){
+        var label=line.innerHTML;
+        line.innerHTML='<img src="'+sellerImg+'" alt="seller signature" style="height:52px;display:block;margin:0 auto 2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:7pt;color:#888;">Firmado electr&oacute;nicamente / e-signed</span></div>';
+        var srow=line.parentNode;
+        if(srow && srow.querySelectorAll){ var ss2=srow.querySelectorAll('.sign-line'); for(var k=0;k<ss2.length;k++){ var slk=ss2[k]; var dk=(slk.textContent||'').replace(/\s/g,'').toLowerCase(); if(slk!==line && dk && dk.length<=12 && (dk.indexOf('date')>=0 || dk.indexOf('fecha')>=0)){ slk.innerHTML=stampNice+'<br><span style="font-size:8pt;color:#555;">Date / Fecha</span>'; } } }
+      });
+    }
+  }catch(sellerErr){}
+
   document.querySelectorAll('.esign-wrap, .action-bar, .lmg-banner').forEach(function(el){el.remove();});
   document.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); el.style.cursor=''; });
   document.querySelectorAll('script').forEach(function(s){s.remove();});
