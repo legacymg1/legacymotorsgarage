@@ -3611,7 +3611,7 @@ window.saveSellerSign=async function(){
   const btn=document.getElementById('sellersign-save-btn'); btn.disabled=true; btn.textContent='Guardando…';
   try{
     const dataUrl=_sellerPad.cv.toDataURL('image/png');
-    await setDoc(doc(db,'config','sellerSignature'), { dataUrl, name:'Enrique Ivan Villagomez Linares', updatedAt:new Date().toISOString(), by:(auth.currentUser&&auth.currentUser.email)||'' }, { merge:true });
+    await httpsCallable(functions,'cfgSet')({ docId:'sellerSignature', data:{ dataUrl, name:'Enrique Ivan Villagomez Linares', updatedAt:new Date().toISOString(), by:(auth.currentUser&&auth.currentUser.email)||'' } });
     closeModal('sellersign-modal');
     alert('✅ Firma guardada. A partir de ahora se pone SOLA como firma del vendedor en cada contrato que firme un cliente.');
   }catch(e){ alert('Error: '+(e.message||e)); }

@@ -1615,7 +1615,7 @@ window.genStickerBatch=async function(){
     try{
       const entry={ start:start, end:start+qty-1, qty:qty, wmm:wmm, hmm:hmm, at:new Date().toISOString(), by:(myEmail||'') };
       const prev=Array.isArray(isBin?_binHist:_stickerHist)?(isBin?_binHist:_stickerHist):[];
-      await setDoc(doc(db,'config',(isBin?'binBatch':'stickerBatch')), { history:[entry, ...prev].slice(0,40) }, { merge:true });
+      await httpsCallable(functions,'cfgSet')({ docId:(isBin?'binBatch':'stickerBatch'), data:{ history:[entry, ...prev].slice(0,40) } });
     }catch(histErr){ console.log('batch hist', histErr); }
   }catch(e){ alert((es?'No se pudo generar: ':'Could not generate: ')+((e&&e.message)||e)); }
   if(btn){ btn.disabled=false; btn.textContent='🖨️ '+(es?'Generar e imprimir el rollo':'Generate & print roll'); }

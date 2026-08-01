@@ -564,6 +564,21 @@ exports.teamSetPassword = onCall({ timeoutSeconds: 30 }, async (request) => {
   await admin.auth().updateUser(uid, { password });
   return { ok: true };
 });
+// ⚙️ Escribe docs de config vía backend (evita tocar las reglas de Firestore). Whitelist por doc:
+//   sellerSignature = SOLO dueño ev@ · stickerBatch/binBatch = cualquier usuario del almacén (staff).
+exports.cfgSet = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  const docId = String((request.data && request.data.docId) || "").trim();
+  const data = (request.data && request.data.data) || {};
+  const RULES = { sellerSignature: "owner", stickerBatch: "staff", binBatch: "staff" };
+  const level = RULES[docId];
+  if (!level) throw new HttpsError("permission-denied", "Documento de config no permitido.");
+  if (level === "owner" && email !== "ev@legacymotorsgarage.com") throw new HttpsError("permission-denied", "Solo el dueño.");
+  if (typeof data !== "object" || Array.isArray(data)) throw new HttpsError("invalid-argument", "Datos inválidos.");
+  await admin.firestore().collection("config").doc(docId).set(data, { merge: true });
+  return { ok: true };
+});
 exports.botConvos = onCall({ timeoutSeconds: 30 }, async (request) => {
   salesOwnerOnly(request);
   const db = admin.firestore();
