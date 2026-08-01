@@ -1532,7 +1532,7 @@ function _openBatch(kind){
       + `</div>`
     : `<div class="sub" style="margin-top:14px;color:var(--faint);">${es?'Aún no hay rollos impresos.':'No rolls printed yet.'}</div>`;
   const title=isBin?(es?'Imprimir rollo de BINES':'Print bin roll'):(es?'Imprimir rollo de estampas':'Print sticker roll');
-  const desc=isBin?(es?'Etiquetas 4×6 con el número GRANDE (y código de barras) para pegar en los bines.':'4×6 labels with a BIG number (and barcode) to stick on the bins.'):(es?'Estampas (código de barras + número) para imprimir de una vez.':'Stickers (barcode + number) to print all at once.');
+  const desc=isBin?(es?'Etiquetas 4×6 con el número GRANDE para pegar en los bines.':'4×6 labels with a BIG number to stick on the bins.'):(es?'Estampas (código de barras + número) para imprimir de una vez.':'Stickers (barcode + number) to print all at once.');
   const rangeRow=isBin
     ? `<div class="row2"><div><label>${es?'Del bin #':'From bin #'}</label><input id="sb-start" inputmode="numeric" value="${suggested}"></div><div><label>${es?'Al bin #':'To bin #'}</label><input id="sb-to" inputmode="numeric" value="${suggested+9}"></div></div>`
     : `<div class="row2"><div><label>${es?'Empieza en #':'Start at #'}</label><input id="sb-start" inputmode="numeric" value="${suggested}"></div><div><label>${es?'Cuántas':'How many'}</label><input id="sb-qty" inputmode="numeric" value="100"></div></div>`;
@@ -1570,20 +1570,18 @@ window.genStickerBatch=async function(){
     for(let i=0;i<qty;i++){
       if(i>0) pdf.addPage([wmm,hmm], orient);
       const num=String(start+i).padStart(pad,'0');
-      const cv=document.createElement('canvas');
-      window.JsBarcode(cv, num, { format:'CODE128', displayValue:false, margin:0, width:3, height:110 });
-      const bImg=cv.toDataURL('image/png');
       const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
       pdf.setFont('helvetica','bold');
       if(isBin){
-        // 🗄️ BIN 4×6 VERTICAL: barcode chico arriba + NÚMERO GIGANTE (para verlo y pegarlo)
-        const bw=pw*0.80, bh=ph*0.13, bx=(pw-bw)/2, by=ph*0.05;
-        pdf.addImage(bImg,'PNG',bx,by,bw,bh);
-        let fs=Math.floor(ph*2.4); pdf.setFontSize(fs);
-        while(pdf.getTextWidth(num) > pw*0.86 && fs>24){ fs-=6; pdf.setFontSize(fs); }
-        pdf.text(num, pw/2, ph*0.60, { align:'center', baseline:'middle' });
+        // 🗄️ BIN 4×6 VERTICAL: SOLO el número, lo más GRANDE posible (sin barcode).
+        let fs=Math.floor(ph*2.2); pdf.setFontSize(fs);
+        while(pdf.getTextWidth(num) > pw*0.88 && fs>24){ fs-=4; pdf.setFontSize(fs); }
+        pdf.text(num, pw/2, ph*0.52, { align:'center', baseline:'middle' });
       } else {
         // 🧾 ESTAMPA 50×30 LANDSCAPE: barcode ancho + número
+        const cv=document.createElement('canvas');
+        window.JsBarcode(cv, num, { format:'CODE128', displayValue:false, margin:0, width:3, height:110 });
+        const bImg=cv.toDataURL('image/png');
         const bw=pw*0.94, bh=ph*0.60, bx=(pw-bw)/2, by=ph*0.06;
         pdf.addImage(bImg,'PNG',bx,by,bw,bh);
         let fs=Math.floor(ph*0.72); pdf.setFontSize(fs);
