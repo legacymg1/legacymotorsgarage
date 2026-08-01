@@ -50,7 +50,7 @@
   .thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;} .thumbs img{width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
   .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;}
   .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
-  #quick-item-btn{display:none;} body.owner-nav #quick-item-btn{display:flex;}   /* Artículo rápido: SOLO dueños */
+  #quick-item-btn{display:none;} body.owner-nav #quick-item-btn, body.yard-quick #quick-item-btn{display:flex;}   /* Artículo rápido: dueños + captura (rol yard) */
   #ebay-test-btn,#ebay-setup-btn{display:none;} body.owner-nav #ebay-test-btn,body.owner-nav #ebay-setup-btn{display:inline-block;}   /* Prueba/Config eBay: SOLO dueños */
   a{color:var(--gold);}
   #print-area{display:none;}
@@ -417,6 +417,7 @@ onAuthStateChanged(auth,(user)=>{
     try{ const lp=document.getElementById('l-pass'); if(lp){ lp.value=''; lp.type='text'; lp.setAttribute('autocomplete','off'); lp.disabled=true; } }catch(e){}
     document.getElementById('who').textContent = whoLabel(email,role);
     document.body.classList.toggle('owner-nav', role==='owner');
+    document.body.classList.toggle('yard-quick', role==='yard');   // captura (rol yard) también ve "⚡ Artículo rápido"
     buildTabs();
     const acCard=document.getElementById('addcar-card'); if(acCard) acCard.style.display = (role==='owner') ? '' : 'none';   // solo el dueño agrega carros
     if(!_listening){ _listening=true; startListening(); }
@@ -2256,8 +2257,8 @@ window.updateWeight=function(){ const el=document.getElementById('pk-wt'), out=d
 window.finalizePack=async function(id){
   const p=parts.find(x=>x.id===id);
   try{
-    // Solo marca "empaquetando". El peso/medidas y la etiqueta se hacen en eBay; y cuando eBay lo
-    // marque enviado, ebaySyncShipped avanza esta pieza SOLA a en_transito (no se marca a mano).
+    // Marca "empaquetando" (así se queda, con el botón de comprar/imprimir etiqueta, hasta que eBay
+    // la marque enviada → ebaySyncShipped la avanza SOLA a en_transito). El peso/etiqueta se hacen en eBay.
     await updateDoc(doc(db,'parts',id),{ status:'empaquetando', packPending:false, packedAt:new Date().toISOString() });
     packSentAnim(p);
   }catch(e){ alert(t('error')+e.message); }
