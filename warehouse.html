@@ -1845,9 +1845,24 @@ async function normalizeImg(f){
 }
 // Agrega archivos a un array (convirtiendo HEIC uno por uno), re-renderizando conforme entran
 async function pushImgs(arr, inp, render){ const list=Array.from(inp.files||[]); inp.value=''; for(const f of list){ arr.push(await normalizeImg(f)); render(); } }
+async function _looksHeic(blob){
+  try{ const b=new Uint8Array(await blob.slice(0,12).arrayBuffer());
+    if(b[4]===0x66&&b[5]===0x74&&b[6]===0x79&&b[7]===0x70){ const brand=String.fromCharCode(b[8],b[9],b[10],b[11]).toLowerCase(); if(/^(hei|hev|mif|msf)/.test(brand)) return true; }
+  }catch(e){}
+  const n=(blob&&blob.name||'').toLowerCase(), ty=(blob&&blob.type||'').toLowerCase();
+  return /\.(heic|heif)$/.test(n)||ty.indexOf('heic')>=0||ty.indexOf('heif')>=0;
+}
+async function _heicToJpeg(blob){
+  if(!window.heic2any) await loadScriptOnce('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
+  let out=await window.heic2any({blob:blob, toType:'image/jpeg', quality:0.9});
+  if(Array.isArray(out)) out=out[0];
+  return out;
+}
 async function toJpeg(file){
   try{
-    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(file); });
+    let src=file;
+    if(await _looksHeic(file)){ try{ src=await _heicToJpeg(file); }catch(e){ console.warn('HEIC no convertida', e); } }
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(src); });
     const max=1400, sc=Math.min(1,max/Math.max(img.width,img.height));
     const c=document.createElement('canvas'); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
     c.getContext('2d').drawImage(img,0,0,c.width,c.height);

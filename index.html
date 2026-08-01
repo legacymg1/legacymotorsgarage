@@ -15107,7 +15107,22 @@ window.generateInvNum = function generateInvNum(){
 // Convert any picked image (including iPhone HEIC) to a web-friendly JPEG via canvas.
 // Runs on the phone where the browser can decode HEIC; if a browser can't decode
 // the format it safely falls back to uploading the original file.
-function toJpeg(file){
+function _loadScriptOnce(src){ return new Promise(function(res,rej){ if(Array.prototype.some.call(document.scripts,function(s){return s.src===src;})) return res(); var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=function(){rej(new Error('load '+src));}; document.head.appendChild(s); }); }
+async function _looksHeic(blob){
+  try{ var b=new Uint8Array(await blob.slice(0,12).arrayBuffer());
+    if(b[4]===0x66&&b[5]===0x74&&b[6]===0x79&&b[7]===0x70){ var brand=String.fromCharCode(b[8],b[9],b[10],b[11]).toLowerCase(); if(/^(hei|hev|mif|msf)/.test(brand)) return true; }
+  }catch(e){}
+  var n=(blob&&blob.name||'').toLowerCase(), ty=(blob&&blob.type||'').toLowerCase();
+  return /\.(heic|heif)$/.test(n)||ty.indexOf('heic')>=0||ty.indexOf('heif')>=0;
+}
+async function _heicToJpeg(blob){
+  if(!window.heic2any) await _loadScriptOnce('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
+  var out=await window.heic2any({blob:blob, toType:'image/jpeg', quality:0.9});
+  if(Array.isArray(out)) out=out[0];
+  return out;
+}
+async function toJpeg(file){
+  if(file && await _looksHeic(file)){ try{ file = new File([await _heicToJpeg(file)],(file.name||'photo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}); }catch(e){ console.warn('HEIC no convertida', e); } }
   return new Promise(function(resolve){
     if(!file || (file.type && file.type.indexOf('image/')!==0 && !/\.(heic|heif)$/i.test(file.name||''))){ resolve(file); return; }
     var url=URL.createObjectURL(file);
