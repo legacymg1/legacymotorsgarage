@@ -245,11 +245,11 @@
 </div>
 
 <!-- Modal genérico (ficha VIN / agregar parte) -->
-<div id="modal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);padding:14px;overflow:auto;" onclick="if(event.target===this)closeModal()">
+<div id="modal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);padding:14px;overflow:auto;">
   <div id="modal-inner" class="card" style="max-width:600px;margin:20px auto;"></div>
 </div>
 <!-- Modal secundario (etiqueta) — encima del formulario, sin destruirlo -->
-<div id="modal2" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.7);padding:14px;overflow:auto;" onclick="if(event.target===this)closeModal2()">
+<div id="modal2" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(0,0,0,.7);padding:14px;overflow:auto;">
   <div id="modal2-inner" class="card" style="max-width:520px;margin:20px auto;"></div>
 </div>
 <!-- Área que se imprime (solo el QR) -->
@@ -1509,9 +1509,9 @@ window.openStickerBatch=function(){
   mi.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;">🧾 ${es?'Imprimir rollo de estampas':'Print sticker roll'}</div><button class="btn ghost sm" onclick="closeModal2()">✕</button></div>
     <div class="sub" style="margin-bottom:12px;">${es?'Genera un PDF con muchas estampas (código de barras + número) para imprimirlas de una vez en la Rongta. El equipo pela la siguiente y la pega.':'Generates a PDF of many stickers (barcode + number) to print all at once on the Rongta.'}</div>
     <div class="row2"><div><label>${es?'Empieza en #':'Start at #'}</label><input id="sb-start" inputmode="numeric" value="${mx+1}"></div><div><label>${es?'Cuántas':'How many'}</label><input id="sb-qty" inputmode="numeric" value="100"></div></div>
-    <div class="row2"><div><label>${es?'Ancho (mm)':'Width (mm)'}</label><input id="sb-w" inputmode="decimal" value="40"></div><div><label>${es?'Alto (mm)':'Height (mm)'}</label><input id="sb-h" inputmode="decimal" value="30"></div></div>
-    <button class="btn" id="sb-go" style="width:100%;margin-top:14px;" onclick="genStickerBatch()">🖨️ ${es?'Generar PDF del rollo':'Generate roll PDF'}</button>
-    <div class="sub" style="margin-top:10px;">${es?'Pon el ancho/alto igual a tu etiqueta. Luego imprime el PDF a la Rongta (su app o impresión de Android).':'Set width/height to match your label, then print the PDF to the Rongta.'}</div>`;
+    <div class="row2"><div><label>${es?'Ancho (mm)':'Width (mm)'}</label><input id="sb-w" inputmode="decimal" value="50"></div><div><label>${es?'Alto (mm)':'Height (mm)'}</label><input id="sb-h" inputmode="decimal" value="30"></div></div>
+    <button class="btn" id="sb-go" style="width:100%;margin-top:14px;" onclick="genStickerBatch()">🖨️ ${es?'Generar e imprimir el rollo':'Generate & print roll'}</button>
+    <div class="sub" style="margin-top:10px;">${es?'Pon el ancho/alto igual a tu etiqueta. Al generar, se abre la hoja de compartir → elige RLabel (o la impresora) para imprimir todas.':'When you generate, the share sheet opens → pick RLabel (or the printer) to print them all.'}</div>`;
   document.getElementById('modal2').style.display='block';
 };
 window.genStickerBatch=async function(){
@@ -1526,10 +1526,11 @@ window.genStickerBatch=async function(){
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js');
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js');
     const jsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
-    const orient = wmm>=hmm?'landscape':'portrait';
-    const doc=new jsPDF({ unit:'mm', format:[wmm,hmm], orientation:orient });
+    // Tamaño EXACTO de la etiqueta, SIN 'orientation' (si se pasa, jsPDF gira/confunde el tamaño y
+    // el código sale en una esquina). Con solo format:[w,h] cada página mide w×h exacto.
+    const doc=new jsPDF({ unit:'mm', format:[wmm,hmm] });
     for(let i=0;i<qty;i++){
-      if(i>0) doc.addPage([wmm,hmm], orient);
+      if(i>0) doc.addPage([wmm,hmm]);
       const num=String(start+i).padStart(pad,'0');
       const cv=document.createElement('canvas');
       window.JsBarcode(cv, num, { format:'CODE128', displayValue:false, margin:0, width:2, height:70 });
@@ -1543,9 +1544,18 @@ window.genStickerBatch=async function(){
       const ty=by+bh+((ph-(by+bh))/2);
       doc.text(num, pw/2, ty, { align:'center', baseline:'middle' });
     }
-    doc.output('dataurlnewwindow');
+    // Abre la hoja de COMPARTIR de Android directo → eliges RLabel (o la impresora) e imprime.
+    const blob=doc.output('blob');
+    const file=new File([blob], (es?'estampas.pdf':'stickers.pdf'), { type:'application/pdf' });
+    try{
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({ files:[file], title:(es?'Rollo de estampas':'Sticker roll') });
+      } else {
+        const url=URL.createObjectURL(blob); window.open(url,'_blank');   // respaldo: abre el PDF
+      }
+    }catch(shareErr){ /* el usuario canceló el compartir */ }
   }catch(e){ alert((es?'No se pudo generar: ':'Could not generate: ')+((e&&e.message)||e)); }
-  if(btn){ btn.disabled=false; btn.textContent='🖨️ '+(es?'Generar PDF del rollo':'Generate roll PDF'); }
+  if(btn){ btn.disabled=false; btn.textContent='🖨️ '+(es?'Generar e imprimir el rollo':'Generate & print roll'); }
 };
 async function makeNumberLabel(txt){
   try{
