@@ -1526,20 +1526,21 @@ window.genStickerBatch=async function(){
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js');
     await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js');
     const jsPDF=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
-    // Tamaño EXACTO de la etiqueta, SIN 'orientation' (si se pasa, jsPDF gira/confunde el tamaño y
-    // el código sale en una esquina). Con solo format:[w,h] cada página mide w×h exacto.
-    const doc=new jsPDF({ unit:'mm', format:[wmm,hmm] });
+    // FORZAR landscape cuando el ancho > alto (ej. 50×30). Si no, jsPDF por defecto lo hace portrait
+    // y VOLTEA a 30×50 → mocha arriba. Con landscape queda 50 de ancho × 30 de alto exacto.
+    const orient = wmm>=hmm ? 'landscape' : 'portrait';
+    const doc=new jsPDF({ unit:'mm', format:[wmm,hmm], orientation:orient });
     for(let i=0;i<qty;i++){
-      if(i>0) doc.addPage([wmm,hmm]);
+      if(i>0) doc.addPage([wmm,hmm], orient);
       const num=String(start+i).padStart(pad,'0');
       const cv=document.createElement('canvas');
-      window.JsBarcode(cv, num, { format:'CODE128', displayValue:false, margin:0, width:2, height:70 });
+      window.JsBarcode(cv, num, { format:'CODE128', displayValue:false, margin:0, width:3, height:110 });
       const bImg=cv.toDataURL('image/png');
       const pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight();
-      const bw=pw*0.86, bh=ph*0.46, bx=(pw-bw)/2, by=ph*0.10;
+      const bw=pw*0.94, bh=ph*0.60, bx=(pw-bw)/2, by=ph*0.06;   // más ancho y alto → barcode grueso y escaneable
       doc.addImage(bImg,'PNG',bx,by,bw,bh);
       doc.setFont('helvetica','bold');
-      let fs=Math.floor(ph*0.9); doc.setFontSize(fs);
+      let fs=Math.floor(ph*0.72); doc.setFontSize(fs);
       while(doc.getTextWidth(num) > pw*0.9 && fs>8){ fs-=1; doc.setFontSize(fs); }
       const ty=by+bh+((ph-(by+bh))/2);
       doc.text(num, pw/2, ty, { align:'center', baseline:'middle' });
