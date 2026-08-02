@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Mis Finanzas — Privado</title>
 <style>
   :root{ --bg:#0b0e14; --surface:#141924; --surface2:#1b2130; --border:#2a3141; --text:#e7e9ee; --muted:#9aa3b4; --gold:#f0c040; --gold2:#d9a92b; --green:#3ecf8e; --red:#e56a6a; --blue:#5b9dff; }
@@ -89,7 +92,7 @@ const OWNER='ev@legacymotorsgarage.com';
 const REF=doc(db,'private_finance','ev');
 
 const CG={ BTC:'bitcoin', ETH:'ethereum', SOL:'solana', DOGE:'dogecoin', ADA:'cardano', XRP:'ripple', BNB:'binancecoin', LTC:'litecoin', MATIC:'matic-network', AVAX:'avalanche-2', DOT:'polkadot', LINK:'chainlink', SHIB:'shiba-inu' };
-const DEF={ crypto:[], stocks:[], cash:0, cards:[], insurance:[], expenses:[], income:[], coRevenue:[], coExpenses:[], debtExtra:0, plaidIgnore:[], cardPromo:{} };
+const DEF={ crypto:[], stocks:[], cash:0, cards:[], insurance:[], expenses:[], income:[], coRevenue:[], coExpenses:[], debtExtra:0, plaidIgnore:[], cardPromo:{}, cardApr:{} };
 let D=JSON.parse(JSON.stringify(DEF)), prices={crypto:{},stocks:{},at:''}, section='resumen', unsub=null;
 let plaid={ items:[], totals:{cash:0,cardDebt:0,invest:0}, at:'' };
 
@@ -223,6 +226,13 @@ window.setCardPromo=async function(kEnc){
   if(String(v).trim()) D.cardPromo[key]={until:String(v).trim()}; else delete D.cardPromo[key];
   await save();
 };
+window.setCardApr=async function(kEnc){
+  const key=decodeURIComponent(kEnc); const cur=(D.cardApr&&D.cardApr[key])||'';
+  const v=prompt('¿Cuál es el APR REAL de esta tarjeta? (%)\nEjemplo: 24.99\n\n(El banco no lo mandó por Plaid; ponlo a mano para que el cálculo salga bien.)', cur);
+  if(v==null) return; D.cardApr=D.cardApr||{};
+  if(String(v).trim()) D.cardApr[key]=num(v); else delete D.cardApr[key];
+  await save();
+};
 
 function vConectar(){
   const t=plaidTotals();
@@ -340,7 +350,9 @@ function vResumen(){
 // ---- DEUDA (estrategia) ----
 function daysUntil(dateStr){ if(!dateStr) return null; const d=new Date(dateStr+'T00:00:00'); if(isNaN(d)) return null; const n=new Date(); n.setHours(0,0,0,0); return Math.round((d-n)/86400000); }
 function cardMin(k){ const bal=num(k.balance); if(bal<=0) return 0; const m=num(k.minPayment); return m>0?m:Math.max(25, bal*0.02); }
-function effApr(k){ const du=daysUntil(k.promoUntil); return (du!=null && du>0)?0:num(k.apr); } // promo 0% vigente = 0
+function cardApr(k){ if(k._plaid){ const o=(D.cardApr||{})[k._key]; if(o!=null && String(o).trim()!=='') return num(o); } return num(k.apr); } // override manual gana
+function effApr(k){ const du=daysUntil(k.promoUntil); return (du!=null && du>0)?0:cardApr(k); } // promo 0% vigente = 0
+function aprUnknown(k){ const du=daysUntil(k.promoUntil); if(du!=null && du>0) return false; return cardApr(k)<=0; } // Plaid no dio APR y no es promo
 function simulatePayoff(list, extra){
   let cs=(list||[]).map(k=>({bal:num(k.balance), r:effApr(k)/1200, min:cardMin(k)})).filter(c=>c.bal>0.005);
   if(!cs.length) return {months:0,interest:0,unpayable:false,budget:0};
@@ -367,22 +379,26 @@ function vDebt(){
   const totalDebt=cards.reduce((a,k)=>a+num(k.balance),0), totalLimit=ALL.reduce((a,k)=>a+num(k.limit),0);
   const util=totalLimit>0?(totalDebt/totalLimit*100):0;
   const monthlyInterest=cards.reduce((a,k)=>a+num(k.balance)*effApr(k)/1200,0);
-  const wApr=totalDebt>0?cards.reduce((a,k)=>a+num(k.balance)*num(k.apr),0)/totalDebt:0;
+  const wApr=totalDebt>0?cards.reduce((a,k)=>a+num(k.balance)*cardApr(k),0)/totalDebt:0;
   const order=[...cards].sort((a,b)=> effApr(b)-effApr(a) || num(b.balance)-num(a.balance));
   const attack=order.find(k=>effApr(k)>0);
   const promos=cards.map(k=>({k,du:daysUntil(k.promoUntil)})).filter(x=>x.du!=null && x.du>0).sort((a,b)=>a.du-b.du);
 
   const orderHtml=order.map((k)=>{
-    const e=effApr(k), mi=num(k.balance)*e/1200, isAttack=(attack && k.id===attack.id), promo=(daysUntil(k.promoUntil)>0);
-    const aprLabel=promo?`<span class="pos">0% (promo)</span>`:`${e.toFixed(1)}% APR`;
-    const promoBtn=k._plaid?`<button class="iconbtn" title="Marcar/quitar promo 0%" onclick="setCardPromo('${encodeURIComponent(k._key).replace(/'/g,'%27')}')">🎁</button>`:'';
+    const e=effApr(k), mi=num(k.balance)*e/1200, isAttack=(attack && k.id===attack.id), promo=(daysUntil(k.promoUntil)>0), unknown=aprUnknown(k);
+    const kEnc=k._plaid?encodeURIComponent(k._key).replace(/'/g,'%27'):'';
+    const aprLabel=promo?`<span class="pos">0% (promo)</span>`:(unknown?`<span class="neg">APR ? — ponlo 👉</span>`:`${e.toFixed(1)}% APR`);
+    const aprBtn=k._plaid?`<button class="iconbtn" title="Poner APR real" onclick="setCardApr('${kEnc}')">✏️</button>`:'';
+    const promoBtn=k._plaid?`<button class="iconbtn" title="Marcar/quitar promo 0%" onclick="setCardPromo('${kEnc}')">🎁</button>`:'';
     return `<div class="row" style="${isAttack?'background:rgba(240,192,64,.08);border-radius:10px;padding:10px 8px;':''}">
       <div class="l"><b>${isAttack?'🎯 ':''}${esc(k.name)}</b><div class="s">${aprLabel}${mi>0?(' · interés ~'+fmt(mi)+'/mes'):''}${isAttack?' · <b>ataca esta primero</b>':''}</div></div>
-      <div class="r"><b class="neg">${fmt(num(k.balance))}</b>${promoBtn}</div></div>`;
+      <div class="r"><b class="neg">${fmt(num(k.balance))}</b>${aprBtn}${promoBtn}</div></div>`;
   }).join('');
+  const unknownCount=cards.filter(aprUnknown).length;
+  const warnBanner=unknownCount?`<div class="card" style="border-color:var(--red);"><div class="s neg">⚠️ ${unknownCount} tarjeta(s) sin APR — el banco no lo mandó. Tócales el ✏️ y pon su APR real para que el interés y el orden salgan correctos.</div></div>`:'';
 
   const promoHtml=promos.length?promos.map(({k,du})=>{
-    const jump=num(k.apr), afterInt=num(k.balance)*jump/1200, warn=(du<=60);
+    const jump=cardApr(k), afterInt=num(k.balance)*jump/1200, warn=(du<=60);
     return `<div class="row"><div class="l"><b>🎁 ${esc(k.name)}</b><div class="s">0% termina en <b class="${warn?'neg':''}">${du} días</b> (${esc(k.promoUntil)})${jump?(' · luego '+jump.toFixed(1)+'% APR'):''}</div>${warn&&jump?`<div class="s neg">⚠️ Bájala antes de que expire — al terminar le pega ~${fmt(afterInt)}/mes de interés</div>`:''}</div><div class="r"><b class="neg">${fmt(num(k.balance))}</b></div></div>`;
   }).join(''):'<div class="empty">Ninguna tarjeta en promo 0% capturada.</div>';
 
@@ -404,6 +420,7 @@ function vDebt(){
     <div class="kpi"><div class="t">APR promedio</div><div class="v">${wApr.toFixed(1)}%</div></div>
     <div class="kpi"><div class="t">Uso del crédito</div><div class="v ${util>30?'neg':''}">${util?util.toFixed(0)+'%':'—'}</div></div>
   </div>
+  ${warnBanner}
   <div class="card">
     <h2>🪜 Orden para pagar (avalancha)</h2>
     <div class="s mut" style="margin-bottom:8px;">Paga el mínimo de todas y échale todo lo extra a la de <b>APR más alto</b> primero. Es lo que menos interés te cuesta.</div>
