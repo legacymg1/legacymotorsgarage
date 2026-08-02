@@ -89,7 +89,7 @@ const OWNER='ev@legacymotorsgarage.com';
 const REF=doc(db,'private_finance','ev');
 
 const CG={ BTC:'bitcoin', ETH:'ethereum', SOL:'solana', DOGE:'dogecoin', ADA:'cardano', XRP:'ripple', BNB:'binancecoin', LTC:'litecoin', MATIC:'matic-network', AVAX:'avalanche-2', DOT:'polkadot', LINK:'chainlink', SHIB:'shiba-inu' };
-const DEF={ crypto:[], stocks:[], cash:0, cards:[], insurance:[], expenses:[], income:[], coRevenue:[], coExpenses:[], debtExtra:0 };
+const DEF={ crypto:[], stocks:[], cash:0, cards:[], insurance:[], expenses:[], income:[], coRevenue:[], coExpenses:[], debtExtra:0, plaidIgnore:[], cardPromo:{} };
 let D=JSON.parse(JSON.stringify(DEF)), prices={crypto:{},stocks:{},at:''}, section='resumen', unsub=null;
 let plaid={ items:[], totals:{cash:0,cardDebt:0,invest:0}, at:'' };
 
@@ -185,13 +185,58 @@ window.plaidUnlink=async function(itemId){
   try{ await httpsCallable(functions,'plaidRemove')({itemId}); await plaidSyncNow(true); }
   catch(e){ alert('Plaid: '+((e&&e.message)||e)); }
 };
+// clave estable por cuenta (login + últimos 4 + tipo + nombre) para poder ignorar duplicadas
+function accKey(itemId, a){ return itemId+'|'+(a.mask||'')+'|'+(a.type||'')+'|'+(a.name||''); }
+function isIgnored(key){ return (D.plaidIgnore||[]).indexOf(key)>=0; }
+window.toggleIgnoreAcc=async function(kEnc){
+  const key=decodeURIComponent(kEnc); D.plaidIgnore=D.plaidIgnore||[];
+  const i=D.plaidIgnore.indexOf(key); if(i>=0) D.plaidIgnore.splice(i,1); else D.plaidIgnore.push(key);
+  await save();
+};
+// recalcula totales de Plaid EXCLUYENDO las cuentas marcadas como duplicadas
+function plaidTotals(){
+  let cash=0, cardDebt=0, invest=0;
+  (plaid.items||[]).forEach(it=>(it.accounts||[]).forEach(a=>{
+    if(isIgnored(accKey(it.itemId,a))) return;
+    const b=num(a.balance);
+    if(a.type==='depository') cash+=b;
+    else if(a.type==='credit') cardDebt+=b;
+    else if(a.type==='investment'||a.type==='brokerage') invest+=b;
+  }));
+  return {cash,cardDebt,invest};
+}
+// tarjetas de crédito conectadas por Plaid, normalizadas para la estrategia de deuda
+function plaidCards(){
+  const out=[];
+  (plaid.items||[]).forEach(it=>(it.accounts||[]).forEach(a=>{
+    if(a.type!=='credit') return; const key=accKey(it.itemId,a); if(isIgnored(key)) return;
+    const promo=(D.cardPromo&&D.cardPromo[key])||{};
+    out.push({ id:'plaid:'+key, name:(a.name||'Tarjeta')+(a.mask?(' ••'+a.mask):''), balance:num(a.balance), apr:num(a.apr), minPayment:num(a.minPayment), promoUntil:promo.until||'', limit:0, _plaid:true, _key:key });
+  }));
+  return out;
+}
+function allDebtCards(){ return plaidCards().concat((D.cards||[]).map(k=>Object.assign({_plaid:false},k))); }
+window.setCardPromo=async function(kEnc){
+  const key=decodeURIComponent(kEnc); const cur=(D.cardPromo&&D.cardPromo[key]&&D.cardPromo[key].until)||'';
+  const v=prompt('¿Hasta qué fecha tiene promo 0% esta tarjeta? (AAAA-MM-DD)\nDéjalo vacío para quitar la promo.', cur);
+  if(v==null) return; D.cardPromo=D.cardPromo||{};
+  if(String(v).trim()) D.cardPromo[key]={until:String(v).trim()}; else delete D.cardPromo[key];
+  await save();
+};
+
 function vConectar(){
-  const t=plaid.totals||{cash:0,cardDebt:0,invest:0};
+  const t=plaidTotals();
+  const dupMap={}; (plaid.items||[]).forEach(it=>(it.accounts||[]).forEach(a=>{ const kk=(a.type||'')+'|'+(a.mask||''); dupMap[kk]=(dupMap[kk]||0)+1; }));
   const itemsHtml=(plaid.items&&plaid.items.length)?plaid.items.map(it=>{
     const accs=(it.accounts||[]).map(a=>{
+      const key=accKey(it.itemId,a), ign=isIgnored(key), kEnc=encodeURIComponent(key).replace(/'/g,'%27');
       const due=a.dueDate?(' · 📆 vence '+esc(a.dueDate)):'';
-      const cls=a.type==='credit'?'neg':((a.type==='depository'||a.type==='investment'||a.type==='brokerage')?'pos':'');
-      return `<div class="row"><div class="l"><b>${esc(a.name||a.type)}${a.mask?(' ••'+esc(a.mask)):''}</b><div class="s">${esc(a.subtype||a.type)}${due}${a.apr?(' · '+esc(a.apr)+'% APR'):''}</div></div><div class="r"><b class="${cls}">${fmt(a.balance)}</b></div></div>`;
+      const cls=ign?'mut':(a.type==='credit'?'neg':((a.type==='depository'||a.type==='investment'||a.type==='brokerage')?'pos':''));
+      const dup=(dupMap[(a.type||'')+'|'+(a.mask||'')]>1);
+      const dupHint=dup?' · <span class="mut">🔁 en 2 logins</span>':'';
+      const ignNote=ign?' · <b class="mut">no se cuenta (duplicada)</b>':'';
+      const btn=`<button class="btn ghost sm" style="margin-top:5px;" onclick="toggleIgnoreAcc('${kEnc}')">${ign?'✔️ Contar':'🚫 No contar'}</button>`;
+      return `<div class="row" style="${ign?'opacity:.55;':''}"><div class="l"><b>${esc(a.name||a.type)}${a.mask?(' ••'+esc(a.mask)):''}</b><div class="s">${esc(a.subtype||a.type)}${due}${a.apr?(' · '+esc(a.apr)+'% APR'):''}${dupHint}${ignNote}</div>${dup?btn:''}</div><div class="r"><b class="${cls}">${fmt(a.balance)}</b></div></div>`;
     }).join('');
     const own=(it.owner==='ella');
     return `<div class="card"><h2>🏦 ${esc(it.institution||'Cuenta')}<button class="btn ghost sm" style="margin-left:auto;" onclick="plaidToggleOwner('${it.itemId}','${own?'yo':'ella'}')">${own?'👩 Esposa':'👤 Tú'}</button><button class="iconbtn" style="color:#e57373;" onclick="plaidUnlink('${it.itemId}')">✕</button></h2>${accs||'<div class="empty">Sin cuentas.</div>'}${it.error?('<div class="s neg" style="margin-top:4px;">⚠️ '+esc(it.error)+'</div>'):''}</div>`;
@@ -223,7 +268,7 @@ function calc(){
   const stockVal=D.stocks.reduce((a,s)=>a+num(s.shares)*(syPrice(s)||num(s.buyPrice)),0);
   const stockCost=D.stocks.reduce((a,s)=>a+num(s.shares)*num(s.buyPrice),0);
   const invVal=cryptoVal+stockVal, invCost=cryptoCost+stockCost;   // manual (para ganancia/pérdida)
-  const pt=plaid.totals||{}; const plaidCash=num(pt.cash), plaidInvest=num(pt.invest), plaidDebt=num(pt.cardDebt);
+  const pt=plaidTotals(); const plaidCash=num(pt.cash), plaidInvest=num(pt.invest), plaidDebt=num(pt.cardDebt);
   const cash=num(D.cash)+plaidCash;
   const debt=sum(D.cards,'balance')+plaidDebt;
   const invTotal=invVal+plaidInvest;
@@ -316,9 +361,10 @@ function simulatePayoff(list, extra){
 window.editDebtExtra=async function(){ const v=prompt('¿Cuánto EXTRA puedes echarle a las deudas cada mes? ($)\n\nEs aparte de los pagos mínimos.', D.debtExtra||0); if(v==null) return; D.debtExtra=num(v); await save(); };
 function futureDate(months){ const d=new Date(); d.setMonth(d.getMonth()+Math.max(0,months)); return d.toLocaleDateString('es-MX',{month:'short',year:'numeric'}); }
 function vDebt(){
-  const cards=(D.cards||[]).filter(k=>num(k.balance)>0);
-  if(!cards.length) return `<div class="card"><h2>💳 Estrategia de deuda</h2><div class="empty">No tienes tarjetas con saldo capturadas.<br>Ve a <b>💳 Tarjetas</b> y agrega cada tarjeta con su <b>saldo</b>, <b>APR</b> y, si tiene, la fecha en que <b>termina su promo 0%</b>.</div></div>`;
-  const totalDebt=sum(D.cards,'balance'), totalLimit=sum(D.cards,'limit');
+  const ALL=allDebtCards();
+  const cards=ALL.filter(k=>num(k.balance)>0);
+  if(!cards.length) return `<div class="card"><h2>💳 Estrategia de deuda</h2><div class="empty">No hay tarjetas con saldo.<br>Conéctalas en <b>🔗 Conectar</b> (jalan saldo, APR y pago mínimo solitas) o agrégalas a mano en <b>💳 Tarjetas</b>.</div></div>`;
+  const totalDebt=cards.reduce((a,k)=>a+num(k.balance),0), totalLimit=ALL.reduce((a,k)=>a+num(k.limit),0);
   const util=totalLimit>0?(totalDebt/totalLimit*100):0;
   const monthlyInterest=cards.reduce((a,k)=>a+num(k.balance)*effApr(k)/1200,0);
   const wApr=totalDebt>0?cards.reduce((a,k)=>a+num(k.balance)*num(k.apr),0)/totalDebt:0;
@@ -329,9 +375,10 @@ function vDebt(){
   const orderHtml=order.map((k)=>{
     const e=effApr(k), mi=num(k.balance)*e/1200, isAttack=(attack && k.id===attack.id), promo=(daysUntil(k.promoUntil)>0);
     const aprLabel=promo?`<span class="pos">0% (promo)</span>`:`${e.toFixed(1)}% APR`;
+    const promoBtn=k._plaid?`<button class="iconbtn" title="Marcar/quitar promo 0%" onclick="setCardPromo('${encodeURIComponent(k._key).replace(/'/g,'%27')}')">🎁</button>`:'';
     return `<div class="row" style="${isAttack?'background:rgba(240,192,64,.08);border-radius:10px;padding:10px 8px;':''}">
       <div class="l"><b>${isAttack?'🎯 ':''}${esc(k.name)}</b><div class="s">${aprLabel}${mi>0?(' · interés ~'+fmt(mi)+'/mes'):''}${isAttack?' · <b>ataca esta primero</b>':''}</div></div>
-      <div class="r"><b class="neg">${fmt(num(k.balance))}</b></div></div>`;
+      <div class="r"><b class="neg">${fmt(num(k.balance))}</b>${promoBtn}</div></div>`;
   }).join('');
 
   const promoHtml=promos.length?promos.map(({k,du})=>{
@@ -339,7 +386,7 @@ function vDebt(){
     return `<div class="row"><div class="l"><b>🎁 ${esc(k.name)}</b><div class="s">0% termina en <b class="${warn?'neg':''}">${du} días</b> (${esc(k.promoUntil)})${jump?(' · luego '+jump.toFixed(1)+'% APR'):''}</div>${warn&&jump?`<div class="s neg">⚠️ Bájala antes de que expire — al terminar le pega ~${fmt(afterInt)}/mes de interés</div>`:''}</div><div class="r"><b class="neg">${fmt(num(k.balance))}</b></div></div>`;
   }).join(''):'<div class="empty">Ninguna tarjeta en promo 0% capturada.</div>';
 
-  const extra=num(D.debtExtra), base=simulatePayoff(D.cards,0), plan=simulatePayoff(D.cards,extra);
+  const extra=num(D.debtExtra), base=simulatePayoff(cards,0), plan=simulatePayoff(cards,extra);
   let planHtml;
   if(plan.unpayable){
     planHtml=`<div class="s neg">⚠️ Con ${fmt(plan.budget)}/mes la deuda casi no baja — el interés se la come. Necesitas apartar más al mes para poder salir.</div>`;
