@@ -482,13 +482,33 @@ function connCardHtml({it,a,key}){
     <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn ghost sm" style="flex:1;" onclick="setCardApr('${kEnc}')">✏️ APR real</button><button class="btn ghost sm" style="flex:1;" onclick="setCardPromo('${kEnc}')">🎁 Promo 0%</button></div>
   </div>`;
 }
+function manualCardHtml(k){
+  const promoUntil=k.promoUntil||'', du=daysUntil(promoUntil), promoOn=(du!=null && du>0);
+  const apr=num(k.apr), util=(num(k.limit)>0)?(num(k.balance)/num(k.limit)*100):0;
+  const aprCell = promoOn?`<span class="pos">0% — promo hasta ${fmtD(promoUntil)} (${du} días)</span>`:(apr>0?apr.toFixed(2)+'%':'—');
+  const detail=[
+    ['📅 Día de corte', k.closeDay?('Día '+esc(k.closeDay)+' de cada mes'):'—'],
+    ['💳 Día de pago', k.dueDay?('Día '+esc(k.dueDay)+' de cada mes'):'—'],
+    ['🚫 Paga sin generar intereses', k.stmtBalance?fmt(num(k.stmtBalance)):'—'],
+    ['🔻 Pago mínimo', k.minPayment?fmt(num(k.minPayment)):'—'],
+    ['💠 APR (compra)', aprCell],
+  ].map(([l,v])=>`<div class="row"><div class="l"><b>${l}</b></div><div class="r"><b>${v}</b></div></div>`).join('');
+  return `<div class="card">
+    <h2>💳 ${esc(k.name||'Tarjeta')}<span class="asof" style="margin-left:auto;font-weight:400;">a mano</span></h2>
+    <div class="row"><div class="l"><b>Saldo actual</b>${num(k.limit)>0?('<div class="s">límite '+fmt0(k.limit)+' · uso '+util.toFixed(0)+'%</div>'):''}</div><div class="r"><b class="neg">${fmt(num(k.balance))}</b></div></div>
+    ${detail}
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn ghost sm" style="flex:1;" onclick="editRow('cards','${k.id}')">✏️ Editar</button><button class="btn ghost sm" style="flex:1;color:#e57373;" onclick="delRow('cards','${k.id}')">🗑️ Borrar</button></div>
+  </div>`;
+}
 function vCards(){
   const conn=connCreditCards();
   const connHtml = conn.length
     ? `<div class="card"><h2>🔗 Conectadas por Plaid</h2><div class="s mut">Se actualizan solas. Lo que tu banco no mande (APR, promo) lo pones a mano con ✏️ / 🎁.</div></div>`+conn.map(connCardHtml).join('')
     : '';
-  const body=rowsHtml(D.cards,(k)=>itemRow('cards',k, esc(k.name), `Día de pago ${esc(k.dueDay)||'—'}${k.apr?(' · '+esc(k.apr)+'% APR'):''}`, fmt(num(k.balance)), k.limit?('límite '+fmt0(num(k.limit))):''),'Agregar tarjeta a mano','cards');
-  return connHtml+`<div class="card"><h2>✍️ Tarjetas a mano</h2><div class="s mut">Para tarjetas que no conectas por Plaid.</div>${body}</div>`;
+  const manualList=(D.cards||[]).length?(D.cards||[]).map(manualCardHtml).join(''):'<div class="card"><div class="empty">Sin tarjetas a mano todavía.</div></div>';
+  const manualHead=`<div class="card"><h2>✍️ Tarjetas a mano</h2><div class="s mut">Para tarjetas que no conectas por Plaid — captura los mismos datos.</div></div>`;
+  const addBtn=`<button class="btn gold" style="width:100%;margin:2px 0 20px;" onclick="addRow('cards')">➕ Agregar tarjeta a mano</button>`;
+  return connHtml+manualHead+manualList+addBtn;
 }
 // ---- INSURANCE ----
 function vInsurance(){
@@ -519,7 +539,7 @@ function vCompany(){
 const FIELDS={
   crypto:[['coin','Moneda (ej. BTC, ETH)','text'],['amount','Cantidad','number'],['buyPrice','Precio de compra (por unidad $)','number'],['buyDate','Fecha de compra','date']],
   stocks:[['symbol','Símbolo (ej. AAPL, TSLA)','text'],['shares','Acciones','number'],['buyPrice','Precio de compra ($)','number'],['buyDate','Fecha de compra','date']],
-  cards:[['name','Nombre de la tarjeta','text'],['balance','Saldo actual ($)','number'],['limit','Límite ($)','number'],['dueDay','Día de pago (1-31)','number'],['apr','APR %','number'],['promoUntil','Promo 0% termina (si aplica)','date'],['minPayment','Pago mínimo mensual ($, opcional)','number']],
+  cards:[['name','Nombre de la tarjeta','text'],['balance','Saldo actual ($)','number'],['limit','Límite ($)','number'],['stmtBalance','Saldo del corte — pagar esto = sin intereses ($)','number'],['minPayment','Pago mínimo del corte ($)','number'],['apr','APR % (de compra)','number'],['closeDay','Día de corte (1-31)','number'],['dueDay','Día de pago (1-31)','number'],['promoUntil','Promo 0% termina (si aplica)','date']],
   insurance:[['policy','Póliza / nombre','text'],['provider','Aseguradora','text'],['coverage','Cobertura','text'],['premium','Prima mensual ($)','number'],['renewDate','Renovación','date']],
   expenses:[['name','Gasto','text'],['amount','Monto mensual ($)','number'],['category','Categoría','text']],
   income:[['name','Ingreso','text'],['amount','Monto mensual ($)','number']],
