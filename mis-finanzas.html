@@ -100,6 +100,7 @@ const uid=()=> 'x'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toStrin
 const num=(v)=>{ const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
 const fmt=(n)=>'$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmt0=(n)=>'$'+Number(n||0).toLocaleString('en-US',{maximumFractionDigits:0});
+const fmtD=(d)=>{ if(!d) return '—'; const x=new Date(String(d)+'T00:00:00'); return isNaN(x)?String(d):x.toLocaleDateString('es-MX',{day:'numeric',month:'short'}); };
 const esc=(s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const sum=(arr,k)=>(arr||[]).reduce((a,x)=>a+num(x[k]),0);
 
@@ -453,9 +454,41 @@ function cashCard(){ return `<div class="card"><h2>💵 Efectivo / Ahorros</h2><
 window.editCash=async function(){ const v=prompt('Efectivo / ahorros totales ($):', D.cash||0); if(v==null) return; D.cash=num(v); await save(); };
 
 // ---- CARDS ----
+function connCreditCards(){ const out=[]; (plaid.items||[]).forEach(it=>(it.accounts||[]).forEach(a=>{ if(a.type==='credit' && !isIgnored(accKey(it.itemId,a))) out.push({it,a,key:accKey(it.itemId,a)}); })); return out; }
+function connCardHtml({it,a,key}){
+  const kEnc=encodeURIComponent(key).replace(/'/g,'%27');
+  const promoUntil=(D.cardPromo&&D.cardPromo[key]&&D.cardPromo[key].until)||'';
+  const du=daysUntil(promoUntil), promoOn=(du!=null && du>0);
+  const aprOv=(D.cardApr||{})[key], apr=(aprOv!=null && String(aprOv).trim()!=='')?num(aprOv):num(a.apr);
+  const util=(num(a.limit)>0)?(num(a.balance)/num(a.limit)*100):0;
+  let aprCell;
+  if(promoOn) aprCell=`<span class="pos">0% — promo hasta ${fmtD(promoUntil)} (${du} días)</span>`;
+  else if(a.promoApr===0) aprCell=`<span class="pos">0% detectado</span> · <span class="neg">¿hasta cuándo? 🎁</span>`;
+  else if(apr>0) aprCell=`${apr.toFixed(2)}%`;
+  else aprCell=`<span class="neg">falta ponerlo ✏️</span>`;
+  const detail=[
+    ['📅 Fecha de corte', fmtD(a.stmtCloseDate)],
+    ['💳 Fecha de pago', fmtD(a.dueDate)],
+    ['🚫 Paga sin generar intereses', a.stmtBalance!=null?fmt(a.stmtBalance):'—'],
+    ['🔻 Pago mínimo', (a.minPayment!==''&&a.minPayment!=null)?fmt(a.minPayment):'—'],
+    ['💠 APR (compra)', aprCell],
+  ].map(([l,v])=>`<div class="row"><div class="l"><b>${l}</b></div><div class="r"><b>${v}</b></div></div>`).join('');
+  const last=(a.lastPayAmount!=null)?`<div class="s mut" style="margin-top:6px;">Último pago: ${fmt(a.lastPayAmount)}${a.lastPayDate?(' · '+fmtD(a.lastPayDate)):''}</div>`:'';
+  const over=a.isOverdue?`<div class="s neg" style="margin-top:4px;">⚠️ Pago vencido</div>`:'';
+  return `<div class="card">
+    <h2>💳 ${esc(a.name||'Tarjeta')}${a.mask?(' ••'+esc(a.mask)):''}<span class="asof" style="margin-left:auto;font-weight:400;">${esc(it.institution||'')}</span></h2>
+    <div class="row"><div class="l"><b>Saldo actual</b>${num(a.limit)>0?('<div class="s">límite '+fmt0(a.limit)+' · uso '+util.toFixed(0)+'%</div>'):''}</div><div class="r"><b class="neg">${fmt(num(a.balance))}</b></div></div>
+    ${detail}${last}${over}
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn ghost sm" style="flex:1;" onclick="setCardApr('${kEnc}')">✏️ APR real</button><button class="btn ghost sm" style="flex:1;" onclick="setCardPromo('${kEnc}')">🎁 Promo 0%</button></div>
+  </div>`;
+}
 function vCards(){
-  const body=rowsHtml(D.cards,(k)=>itemRow('cards',k, esc(k.name), `Día de pago ${esc(k.dueDay)||'—'}${k.apr?(' · '+esc(k.apr)+'% APR'):''}`, fmt(num(k.balance)), k.limit?('límite '+fmt0(num(k.limit))):''),'Agregar tarjeta','cards');
-  return `<div class="card"><h2>💳 Tarjetas de crédito</h2>${body}</div>`;
+  const conn=connCreditCards();
+  const connHtml = conn.length
+    ? `<div class="card"><h2>🔗 Conectadas por Plaid</h2><div class="s mut">Se actualizan solas. Lo que tu banco no mande (APR, promo) lo pones a mano con ✏️ / 🎁.</div></div>`+conn.map(connCardHtml).join('')
+    : '';
+  const body=rowsHtml(D.cards,(k)=>itemRow('cards',k, esc(k.name), `Día de pago ${esc(k.dueDay)||'—'}${k.apr?(' · '+esc(k.apr)+'% APR'):''}`, fmt(num(k.balance)), k.limit?('límite '+fmt0(num(k.limit))):''),'Agregar tarjeta a mano','cards');
+  return connHtml+`<div class="card"><h2>✍️ Tarjetas a mano</h2><div class="s mut">Para tarjetas que no conectas por Plaid.</div>${body}</div>`;
 }
 // ---- INSURANCE ----
 function vInsurance(){

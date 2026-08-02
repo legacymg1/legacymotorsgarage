@@ -140,11 +140,29 @@ exports.plaidSync = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeoutSe
       try { const l = await client.liabilitiesGet({ access_token: it.accessToken }); liab = l.data.liabilities; } catch (e) { /* sin liabilities */ }
       for (const a of bal.data.accounts) {
         const b = (a.balances && (a.balances.current != null ? a.balances.current : a.balances.available)) || 0;
-        const acc = { name: a.name || a.official_name || "", mask: a.mask || "", type: a.type, subtype: a.subtype, balance: _r2(b) };
+        const acc = { name: a.name || a.official_name || "", mask: a.mask || "", type: a.type, subtype: a.subtype, balance: _r2(b), limit: (a.balances && a.balances.limit != null) ? _r2(a.balances.limit) : null };
         if (a.type === "depository") cash += b;
         else if (a.type === "credit") {
           cardDebt += b;
-          if (liab && liab.credit) { const cl = liab.credit.find((c) => c.account_id === a.account_id); if (cl) { acc.dueDate = cl.next_payment_due_date || cl.last_payment_due_date || ""; acc.apr = (cl.aprs && cl.aprs[0] && cl.aprs[0].apr_percentage) || ""; acc.minPayment = cl.minimum_payment_amount || ""; } }
+          if (liab && liab.credit) {
+            const cl = liab.credit.find((c) => c.account_id === a.account_id);
+            if (cl) {
+              acc.stmtCloseDate = cl.last_statement_issue_date || "";                       // fecha de corte
+              acc.dueDate = cl.next_payment_due_date || cl.last_payment_due_date || "";      // fecha de pago
+              acc.stmtBalance = cl.last_statement_balance != null ? _r2(cl.last_statement_balance) : null; // pagar esto = sin intereses
+              acc.minPayment = cl.minimum_payment_amount != null ? _r2(cl.minimum_payment_amount) : "";     // pago mínimo
+              acc.lastPayAmount = cl.last_payment_amount != null ? _r2(cl.last_payment_amount) : null;
+              acc.lastPayDate = cl.last_payment_date || "";
+              acc.isOverdue = !!cl.is_overdue;
+              const aprs = cl.aprs || [];
+              const purchase = aprs.find((x) => x.apr_type === "purchase_apr");
+              const special = aprs.find((x) => x.apr_type === "special");
+              acc.apr = (purchase && purchase.apr_percentage != null) ? purchase.apr_percentage
+                      : ((aprs[0] && aprs[0].apr_percentage != null) ? aprs[0].apr_percentage : "");  // preferir APR de COMPRA
+              acc.aprs = aprs.map((x) => ({ type: x.apr_type, pct: x.apr_percentage, bal: x.balance_subject_to_apr, interest: x.interest_charge_amount }));
+              if (special && special.apr_percentage != null) acc.promoApr = special.apr_percentage;  // 0%/promo detectado (sin fecha fin desde Plaid)
+            }
+          }
         } else if (a.type === "investment" || a.type === "brokerage") invest += b;
         entry.accounts.push(acc);
       }
