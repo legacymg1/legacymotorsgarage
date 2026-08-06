@@ -1084,11 +1084,12 @@ window.openPhoto=function(url, all, idx, onClose){
   let scale=1, tx=0, ty=0;
   function applyT(anim){ img.style.transition=anim?'transform .2s':''; img.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')'; }
   function resetZoom(anim){ scale=1; tx=0; ty=0; applyT(anim); }
-  function show(){ img.src=urls[i]; resetZoom(false); cap.textContent=(urls.length>1?((i+1)+' / '+urls.length+' · '):'')+(L==='es'?(urls.length>1?'desliza · pellizca/doble-tap para zoom · toca afuera para cerrar':'pellizca/doble-tap para zoom · toca afuera para cerrar'):(urls.length>1?'swipe · pinch/double-tap to zoom · tap outside to close':'pinch/double-tap to zoom · tap outside to close')); }
+  function show(){ img.src=urls[i]; resetZoom(false); cap.textContent=(urls.length>1?((i+1)+' / '+urls.length+' · '):'')+(L==='es'?(urls.length>1?'desliza · toca la foto para zoom · toca afuera para cerrar':'toca la foto para zoom · toca afuera para cerrar'):(urls.length>1?'swipe · tap photo to zoom · tap outside to close':'tap photo to zoom · tap outside to close')); }
   function go(d){ if(scale>1){ resetZoom(true); return; } if(urls.length<2) return; i=(i+d+urls.length)%urls.length; show(); }
   function close(){ document.removeEventListener('keydown',onKey); ov.remove(); if(typeof onClose==='function'){ try{ onClose(); }catch(_){} } }
   prev.onclick=(e)=>{ e.stopPropagation(); go(-1); }; next.onclick=(e)=>{ e.stopPropagation(); go(1); };
-  ov.onclick=(e)=>{ if(e.target===ov) close(); };   // solo cerrar al tocar el fondo negro (no la foto)
+  let armed=false; setTimeout(()=>{ armed=true; },350);   // ignora el MISMO toque que abrió el visor (iOS)
+  ov.onclick=(e)=>{ if(armed && e.target===ov) close(); };   // solo cerrar al tocar el fondo negro (no la foto)
   // Gestos: pellizco = zoom, arrastre = mover (con zoom), doble-tap = acercar/alejar, deslizar = cambiar de foto
   const pts=new Map(); let startDist=0, startScale=1, panStart=null, swipeStart=null, lastTap=0, moved=false;
   img.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ img.setPointerCapture(e.pointerId); }catch(_){} pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); moved=false;
@@ -1101,7 +1102,7 @@ window.openPhoto=function(url, all, idx, onClose){
     else if(swipeStart && Math.abs(e.clientX-swipeStart.x)>8){ moved=true; } });
   function endPtr(e){ const p=pts.get(e.pointerId); pts.delete(e.pointerId);
     if(scale<=1 && swipeStart && p){ const dx=p.x-swipeStart.x; if(Math.abs(dx)>45 && urls.length>1){ i=(i+(dx<0?1:-1)+urls.length)%urls.length; show(); swipeStart=null; return; } }
-    if(!moved){ const now=Date.now(); if(now-lastTap<300){ if(scale>1) resetZoom(true); else { scale=2.5; applyT(true); } lastTap=0; } else lastTap=now; }
+    if(!moved && armed){ if(scale>1) resetZoom(true); else { scale=2.5; applyT(true); } }   // UN solo toque = acercar/alejar
     if(scale<=1) resetZoom(false);
     swipeStart=null;
     if(pts.size===1 && scale>1){ const rem=[...pts.values()][0]; panStart={x:rem.x-tx,y:rem.y-ty}; }
@@ -2234,11 +2235,15 @@ function inlineSwiper(urls){
     +'</div>';
 }
 window.swNav=function(id,d){ const s=_swReg[id]; if(!s) return; s.i=(s.i+d+s.urls.length)%s.urls.length; const el=document.getElementById(id); if(!el) return; const img=el.querySelector('img'); if(img) img.src=s.urls[s.i]; const c=document.getElementById(id+'-c'); if(c) c.textContent=(s.i+1)+' / '+s.urls.length+' · '+(L==='es'?'desliza':'swipe'); };
-// Tocar la foto del detalle → abre el visor grande CON zoom, en la foto actual del swiper
-window.swOpen=function(id){ const s=_swReg[id]; if(!s||!s.urls.length) return; openPhoto(s.urls[s.i], s.urls, s.i); };
-(function(){ let x=null,sid=null;   // swipe táctil delegado (sobrevive re-dibujos)
-  document.addEventListener('touchstart',function(e){ const el=e.target.closest&&e.target.closest('.inl-sw'); if(el){ x=e.touches[0].clientX; sid=el.getAttribute('data-sw'); } },{passive:true});
-  document.addEventListener('touchend',function(e){ if(x==null||!sid) return; const dx=e.changedTouches[0].clientX-x; if(Math.abs(dx)>40) swNav(sid, dx<0?1:-1); x=null; sid=null; },{passive:true});
+// Tocar la foto del detalle → abre el visor grande CON zoom, en la foto actual del swiper.
+// Guarda: si el visor ya está abierto, no abrir otro (evita doble-apertura click+touch en iOS).
+window.swOpen=function(id){ if(document.querySelector('.lmg-photo-ov')) return; const s=_swReg[id]; if(!s||!s.urls.length) return; openPhoto(s.urls[s.i], s.urls, s.i); };
+(function(){ let x=null,sid=null,tgt=null;   // swipe/tap táctil delegado (sobrevive re-dibujos)
+  document.addEventListener('touchstart',function(e){ const el=e.target.closest&&e.target.closest('.inl-sw'); if(el){ x=e.touches[0].clientX; sid=el.getAttribute('data-sw'); tgt=e.target; } },{passive:true});
+  document.addEventListener('touchend',function(e){ if(x==null||!sid) return; const dx=e.changedTouches[0].clientX-x, id=sid, t=tgt; x=null; sid=null; tgt=null;
+    if(Math.abs(dx)>40){ swNav(id, dx<0?1:-1); }                     // deslizó → cambia de foto
+    else if(t && t.tagName==='IMG'){ swOpen(id); }                   // toque en la foto → abre el visor grande (iOS)
+  },{passive:true});
 })();
 // Mejores fotos para mostrar: primero las NUESTRAS (sin QR); si la pieza no tiene (ej. pieza vieja),
 // cae a las fotos REALES del anuncio de eBay que trae la cola (_qItems por partId).
