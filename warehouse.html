@@ -1381,6 +1381,12 @@ window.openPartEdit=function(id){
     <label>🏷️ ${t('stickerLbl')}</label><input id="epa-sticker" value="${esc(p.stickerNum||'')}" inputmode="numeric" autocomplete="off" placeholder="${t('stickerPh')}">
     <label>${t('whichPart')}</label><input id="epa-name" value="${esc(p.name)}">
     <div class="row2"><div><label>${t('condition')}</label><select id="epa-cond">${condOptions()}</select></div><div><label>${t('partNum')}</label><input id="epa-num" value="${esc(p.partNumber)}"></div></div>
+    ${(p.standalone || !p.vehicleId) ? `
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+      <label style="color:var(--gold);">🚗 ${L==='en'?'Reference vehicle (loose item)':'Carro de referencia (artículo suelto)'}</label>
+      <div class="row2"><div><label>${t('year')}</label><input id="epa-vyear" value="${esc(p.vYear||'')}" inputmode="numeric"></div><div><label>${t('make')}</label><input id="epa-vmake" value="${esc(p.vMake||'')}"></div></div>
+      <div class="row2"><div><label>${t('model')}</label><input id="epa-vmodel" value="${esc(p.vModel||'')}"></div><div><label>${L==='en'?'Trim':'Versión / Trim'}</label><input id="epa-vtrim" value="${esc(p.vTrim||'')}"></div></div>
+    </div>` : ''}
     <label>${t('binLbl')}</label><input id="epa-bin" value="${esc(oldBin)}" autocapitalize="characters" inputmode="text" placeholder="${t('binPh')}">
     <button type="button" id="epa-airbag" class="btn ghost sm" style="width:100%;margin:6px 0;${p.airbag?'background:#c084fc;color:#0b0e14;border-color:#c084fc;':''}" onclick="toggleAirbagEdit()">🎈 ${p.airbag?t('airbagOn'):t('airbagBtn')}</button>
     <label>${t('photos')}</label>
@@ -1458,13 +1464,23 @@ window.savePartEdit=async function(id){
   const bin=_editAirbag ? 'AIRBAGS' : (document.getElementById('epa-bin').value||'').trim().toUpperCase();
   const stkEl=document.getElementById('epa-sticker'); const sticker=(stkEl?stkEl.value:'').trim();
   if(sticker){ const dupS=parts.find(x=>x.id!==id && (x.stickerNum||'')===sticker && x.status!=='vendido'); if(dupS && !confirm(t('stickerDupConfirm')+'\n\nbin '+((dupS.location&&dupS.location.bin)||'?'))) return; }
-  const ebayTitle=[p.vYear,p.vMake,p.vModel,p.vTrim||'',name,(num?'OEM '+num:''),'-',cond].filter(Boolean).join(' ').replace(' - -',' -');
+  // Carro de referencia (solo artículo suelto): permite corregir un carro mal capturado
+  const isStd=(p.standalone || !p.vehicleId);
+  let vYear=p.vYear||'', vMake=p.vMake||'', vModel=p.vModel||'', vTrim=p.vTrim||'', vehicleLabel=p.vehicleLabel||'';
+  if(isStd){
+    vYear=(document.getElementById('epa-vyear')?.value||'').trim();
+    vMake=titleCase((document.getElementById('epa-vmake')?.value||'').trim());
+    vModel=titleCase((document.getElementById('epa-vmodel')?.value||'').trim());
+    vTrim=(document.getElementById('epa-vtrim')?.value||'').trim();
+    vehicleLabel=[vYear,vMake,vModel,vTrim].filter(Boolean).join(' ') || name || (L==='en'?'Loose item':'Artículo suelto');
+  }
+  const ebayTitle=[vYear,vMake,vModel,vTrim,name,(num?'OEM '+num:''),'-',cond].filter(Boolean).join(' ').replace(' - -',' -');
   const btn=document.getElementById('epa-save'); if(btn){ btn.disabled=true; btn.textContent=t('savingPhotos'); }
   try{
     const newURLs=[];
     for(const f of _editPartNew){ const jpg=await toJpeg(f); const r=ref(storage,'parts/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); newURLs.push(await getDownloadURL(r)); }
     const photoURLs=_editPartKeep.concat(newURLs); if(_editPartQR) photoURLs.push(_editPartQR);   // QR siempre al final
-    await updateDoc(doc(db,'parts',id),{ name, condition:cond, partNumber:num, stickerNum:sticker, location:{bin}, airbag:_editAirbag, ebayTitle, photoURLs });
+    await updateDoc(doc(db,'parts',id),{ name, condition:cond, partNumber:num, stickerNum:sticker, location:{bin}, airbag:_editAirbag, ebayTitle, photoURLs, vYear, vMake, vModel, vTrim, vehicleLabel });
     _editPartNew=[]; closeModal(); if(_carView) renderCarDetail();
   }catch(e){ alert(t('error')+e.message); if(btn){ btn.disabled=false; btn.textContent=t('saveChanges'); } }
 };
