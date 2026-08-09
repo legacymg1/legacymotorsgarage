@@ -3357,10 +3357,17 @@ window.generateContractFromForm = function() {
   // OJO iPad/Safari: window.open DESPUÉS de un 'await' (guardar) ya no cuenta como
   // gesto del usuario → se bloquea (y peor si son 2 ventanas). Por eso mostramos
   // BOTONES: cada toque abre su contrato (gesto directo = permitido en iPhone/iPad).
-  const enFile = freq === 'cash' ? 'contracts_cash.html' : 'contracts.html';
-  const esFile = freq === 'cash' ? 'contracts_cash_es.html' : 'contracts_es.html';
   const qs = '?' + params.toString() + '&_cb=' + Date.now();
-  _showContractLinks(enFile + qs, (clientLang === 'es') ? (esFile + qs) : '');
+  if(clientLang === 'es' && freq !== 'cash'){
+    // Cliente español a PAGOS: UN solo documento bilingüe (todo inglés + todo español) con UNA firma.
+    _showContractLinks('contracts_bilingual.html' + qs, '');
+  } else if(clientLang === 'es'){
+    // Contado en español: por ahora dos documentos (el bilingüe de contado va enseguida).
+    _showContractLinks('contracts_cash.html' + qs, 'contracts_cash_es.html' + qs);
+  } else {
+    // Cliente en inglés: un solo contrato en inglés.
+    _showContractLinks((freq === 'cash' ? 'contracts_cash.html' : 'contracts.html') + qs, '');
+  }
 };
 // Modal con botones para abrir el/los contrato(s) con un TOQUE (evita el bloqueo de popups del iPad)
 window._showContractLinks = function(enUrl, esUrl){
