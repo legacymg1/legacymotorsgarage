@@ -233,6 +233,7 @@
     <button class="btn-add" onclick="openDmv()" style="font-size:15px;" title="Impuestos y DMV cobrados al cliente, por cotejar contra el cobro real del DMV">🏛️ DMV / Impuestos</button>
     <button class="btn-add" onclick="openAudit()" style="font-size:15px;" title="Revisar (solo lectura) que cada venta de Dealer tenga su ingreso correcto (carro+$70) y sus taxes/DMV en la caja">🔎 Auditar Dealer</button>
     <button class="btn-add" onclick="platePayout()" style="font-size:15px;" title="Sacar efectivo del corte para pagar placas/DMV (dinero de clientes). No es gasto ni baja la ganancia.">🪪 Salida placas</button>
+    <button class="btn-add" onclick="openDcarReport()" style="font-size:15px;" title="Cuánto va dejando cada carro del yonke: ventas de partes registradas − lo que costó el carro.">🔧 Por carro (yonke)</button>
   </div>
 
   <div class="coll-head" style="margin-top:22px;" onclick="toggleSubs()">
@@ -530,6 +531,10 @@
       <select id="i-warranty"><option value="0">Sin garantía</option><option value="1">1 mes</option><option value="2">2 meses</option><option value="3">3 meses</option><option value="6">6 meses</option><option value="12">12 meses</option></select>
     </div>
 
+    <div class="field" id="i-dcar-section" style="display:none;"><label>🔧 Carro del yonke (de qué carro salió la parte)</label>
+      <select id="i-dcar" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:14px;"><option value="">— Ninguno —</option></select>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px;background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.25);border-radius:8px;padding:8px 10px;">Opcional. Liga esta venta a un carro del yonke para ver <b>cuánto va dejando</b> ese carro (botón 🔧 Por carro).</div>
+    </div>
     <div class="field" id="i-photos-section" style="display:none;"><label>📷 Fotos (parte, hologramas, identificadores)</label>
       <input type="file" id="i-photos" accept="image/*" multiple onchange="incPhotosPreview()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
       <div id="i-photos-preview" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"></div>
@@ -563,6 +568,14 @@
   <div class="sheet" style="max-width:720px;">
     <div class="sheet-head"><div class="sheet-title">🔎 Auditoría de ventas Dealer</div><button class="close" onclick="closeAudit()">✕</button></div>
     <div id="audit-body"></div>
+  </div>
+</div>
+
+<!-- 🔧 POR CARRO (yonke): cuánto va dejando cada carro de desmantelar -->
+<div class="overlay" id="dcar-overlay" onclick="if(event.target===this)closeDcarReport()">
+  <div class="sheet" style="max-width:720px;">
+    <div class="sheet-head"><div class="sheet-title">🔧 Por carro del yonke</div><button class="close" onclick="closeDcarReport()">✕</button></div>
+    <div id="dcar-body"></div>
   </div>
 </div>
 
@@ -733,6 +746,7 @@ const PARTNERS = ['Enrique V','Ivan G'];   // 50/50 siempre
 let subs = [];
 let txns = [];
 let inventory = [];
+let dismantleCars = [];   // carros del yonke (dismantle_vehicles)
 let editingId = null;
 let _listening = false;
 let _deepLinkDone = false;
@@ -880,6 +894,19 @@ function loadInventory(){
     inventory=snap.docs.map(d=>({id:d.id,...d.data()}));
     populateCarPicker();
   }, function(e){ console.log('inv load', e); });
+  // 🔧 Carros del YONKE (desmantelar) — para ligar ventas de partes fuera de eBay y ver cuánto deja cada carro
+  onSnapshot(collection(db,'dismantle_vehicles'), function(snap){
+    dismantleCars=snap.docs.map(d=>({id:d.id,...d.data()}));
+    fillDcarSelect();
+  }, function(e){ console.log('dismantle load', e); });
+}
+function dcarLabel(c){ return [c.year,c.make,c.model].filter(Boolean).join(' ') + (c.vin?(' · '+String(c.vin).slice(-6)):'') || 'Carro'; }
+function fillDcarSelect(){
+  const sel=document.getElementById('i-dcar'); if(!sel) return;
+  const cur=sel.value;
+  const list=[...dismantleCars].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  sel.innerHTML='<option value="">— Ninguno —</option>'+list.map(c=>`<option value="${c.id}">${dcarLabel(c)}</option>`).join('');
+  if(cur) sel.value=cur;
 }
 function carLabelOf(c){ return '#'+(c.inventoryNum||'?')+' · '+[c.year,c.make,c.model].filter(Boolean).join(' '); }
 function populateCarPicker(){
@@ -1503,6 +1530,9 @@ window.updateIncMode = function(){
   set('i-private-wrap', !abono);
   set('i-warranty-section', !abono && isSale && !servicio);   // garantía no aplica a servicio
   set('i-photos-section', !abono && isSale);                  // fotos sí (antes/después)
+  const showDcar = !abono && d==='parts' && !servicio;        // ligar la venta de parte a un carro del yonke
+  set('i-dcar-section', showDcar);
+  if(showDcar) fillDcarSelect();
 };
 // ---- BUSCADOR DE CLIENTE (como el buscador de afuera: ✕ + cerrar al click afuera) ----
 function incClientResults(q){
@@ -2062,6 +2092,11 @@ window.saveInc = async function(){
     for(const f of files){ btn.textContent='Subiendo fotos…'; const jpg=await toJpeg(f); const r=ref(storage,'receipts/'+id+'/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); photoURLs.push(await getDownloadURL(r)); }
     const warranty = isSale ? Number(document.getElementById('i-warranty').value||0) : 0;
     const priv = document.getElementById('i-private').checked;
+    // 🔧 Carro del yonke ligado (ventas de partes) → para el reporte "cuánto deja cada carro"
+    const _dcarEl=document.getElementById('i-dcar');
+    const dcarId=(dept==='parts' && _dcarEl && _dcarEl.style.display!=='none' && document.getElementById('i-dcar-section') && document.getElementById('i-dcar-section').style.display!=='none') ? (_dcarEl.value||'') : '';
+    const dcar=dismantleCars.find(c=>c.id===dcarId);
+    const dcarLabelStr=dcar?dcarLabel(dcar):'';
     btn.textContent='Guardando…';
 
     if(aPagos){
@@ -2077,7 +2112,7 @@ window.saveInc = async function(){
         const accts=[...(fresh.openAccounts||[])];
         if(accts.some(a=>a.id===acctId)) return;
         accts.push(acct);
-        tx.set(doc(db,'transactions',id), { entryId:id, type:'income', dept, clientId, clientName, accountId:acctId, accountConcept:concept, category:cat, private:priv, amountCents:downCents, saleType:'pagos', saleTotalCents:totalCents, downCents, method, date, note, createdAt:new Date().toISOString(), createdBy:who, source:'finanzas' });
+        tx.set(doc(db,'transactions',id), { entryId:id, type:'income', dept, clientId, clientName, accountId:acctId, accountConcept:concept, category:cat, private:priv, amountCents:downCents, saleType:'pagos', saleTotalCents:totalCents, downCents, method, date, note, dismantleCarId:dcarId||'', dismantleCarLabel:dcarLabelStr||'', createdAt:new Date().toISOString(), createdBy:who, source:'finanzas' });
         tx.update(cref, { openAccounts:accts });
       });
     } else if(servicio){
@@ -2107,6 +2142,7 @@ window.saveInc = async function(){
       if(cat==='Venta de contado') data.saleType='contado';
       if(warranty>0) data.warrantyMonths=warranty;
       if(photoURLs.length) data.photoURLs=photoURLs;
+      if(dcarId){ data.dismantleCarId=dcarId; data.dismantleCarLabel=dcarLabelStr; }
       await setDoc(doc(db,'transactions',id), data);
     }
     closeInc();
@@ -2307,6 +2343,30 @@ window.dmvClear=async function(id){
 // o inflado con taxes/DMV? ¿está su renglón de DMV en la caja? NO escribe nada.
 window.openAudit=function(){ renderAudit(); document.getElementById('audit-overlay').classList.add('open'); };
 window.closeAudit=function(){ document.getElementById('audit-overlay').classList.remove('open'); };
+
+// 🔧 POR CARRO (yonke): cuánto va dejando cada carro = ventas de partes registradas en Finanzas − costo del carro
+window.openDcarReport=function(){ renderDcarReport(); document.getElementById('dcar-overlay').classList.add('open'); };
+window.closeDcarReport=function(){ document.getElementById('dcar-overlay').classList.remove('open'); };
+function renderDcarReport(){
+  const box=document.getElementById('dcar-body'); if(!box) return;
+  const m=c=>'$'+(Number(c||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const byCar={};
+  liveTxns().forEach(t=>{ const id=t.dismantleCarId; if(!id||!INCOME_TYPES.includes(t.type)) return;
+    if(!byCar[id]) byCar[id]={id, label:t.dismantleCarLabel||'', rev:0, n:0};
+    byCar[id].rev += Number(t.amountCents)||0; byCar[id].n++; });
+  Object.values(byCar).forEach(x=>{ const c=dismantleCars.find(d=>d.id===x.id); x.cost=c?(Number(c.costCents)||0):0; if(!x.label && c) x.label=dcarLabel(c); });
+  const rows=Object.values(byCar).sort((a,b)=>b.rev-a.rev);
+  if(!rows.length){ box.innerHTML='<div style="color:var(--faint);font-size:14px;padding:16px 4px;line-height:1.5;">Aún no hay ventas de partes ligadas a un carro del yonke.<br>Al registrar un ＋Ingreso de <b>Partes</b>, elige el <b>🔧 carro del yonke</b> y aquí verás cuánto va dejando cada uno.</div>'; return; }
+  let totRev=0,totCost=0;
+  const html=rows.map(x=>{ totRev+=x.rev; totCost+=(x.cost||0); const net=x.rev-(x.cost||0);
+    return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="font-weight:800;">${esc(x.label||'Carro')}</div><div style="font-weight:800;color:${net>=0?'var(--green)':'var(--red)'};">${m(net)}</div></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Ventas de partes: <b style="color:var(--green);">${m(x.rev)}</b> (${x.n}) · Costo del carro: <b>${x.cost?m(x.cost):'—'}</b></div>
+    </div>`; }).join('');
+  const totNet=totRev-totCost;
+  box.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5;">Ventas de partes <b>registradas en Finanzas</b> por carro del yonke, menos lo que costó el carro. (Lo vendido por eBay se lleva aparte; esto es sobre todo para tus ventas <b>fuera de eBay</b>.)</div>`+html+
+    `<div style="border-top:2px solid var(--border);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;font-weight:800;"><span>TOTAL neto</span><span style="color:${totNet>=0?'var(--green)':'var(--red)'};">${m(totNet)}</span></div>`;
+}
 function renderAudit(){
   const box=document.getElementById('audit-body'); if(!box) return;
   const LT=liveTxns();
