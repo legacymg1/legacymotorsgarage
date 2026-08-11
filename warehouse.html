@@ -2429,11 +2429,12 @@ function packSentAnim(p){
   // la etiqueta de ESA orden (ahí metes peso/medidas y compras con tus descuentos de eBay). Si no la
   // encuentra (ej. venta en persona), cae al link general de órdenes por enviar.
   const labelUrl = labelUrlFor(p);
+  const hasOrder = labelUrl.indexOf('orderid=')>=0;   // ¿tenemos la orden directa?
   box.innerHTML='<div class="card green" style="text-align:center;padding:24px 16px;">'
     +'<div style="font-size:50px;">📦✅</div>'
     +'<div style="font-weight:800;font-size:19px;margin-top:6px;">'+(en?'Packed & ready!':'¡Empacado y listo!')+'</div>'
     +'<div class="sub" style="margin:4px 0 12px;">'+esc((p&&(p.vehicleLabel+' · '+p.name))||'')+'</div>'
-    +'<div style="font-size:13.5px;color:var(--gold);font-weight:700;margin-bottom:12px;">'+(qi?(en?'Opens THIS order — enter weight/size & buy the label 👇':'Abre ESTA orden — mete peso/medidas y compra la etiqueta 👇'):(en?'Now print the shipping label on eBay 👇':'Ahora imprime la etiqueta de envío en eBay 👇'))+'</div>'
+    +'<div style="font-size:13.5px;color:var(--gold);font-weight:700;margin-bottom:12px;">'+(hasOrder?(en?'Opens THIS order — enter weight/size & buy the label 👇':'Abre ESTA orden — mete peso/medidas y compra la etiqueta 👇'):(en?'Now print the shipping label on eBay 👇':'Ahora imprime la etiqueta de envío en eBay 👇'))+'</div>'
     +'<a class="btn" style="display:block;text-decoration:none;font-size:16px;padding:14px;" href="'+labelUrl+'" target="_blank" rel="noopener">🏷️ '+(en?'Buy / print label on eBay':'Comprar / imprimir etiqueta en eBay')+'</a>'
     +'<button class="btn ghost sm" style="width:100%;margin-top:10px;color:var(--muted);" onclick="cancelPack()">'+(en?'Done — next part':'Listo — siguiente pieza')+'</button>'
     +'</div>';
