@@ -1752,11 +1752,18 @@ window.printNewPart=async function(vid){
   if(_carView) renderCarDetail();
   await makeLabel({ id:r.id, name:r.name, partNumber:r.num, location:{bin:r.bin}, vYear:r.v.year||'', vMake:r.v.make||'', vModel:r.v.model||'', vTrim:r.sp.trim||'' });
 };
-window.printLabelNow=function(){
-  // iOS bloquea window.print() dentro de la app instalada (PWA) → abrimos la etiqueta en una vista aparte
+window.printLabelNow=async function(){
+  // Camino DIRECTO a RLabel/Rongta: la hoja de COMPARTIR (RLabel aparece como destino de un toque).
+  // Es lo más directo posible desde el navegador — no hay forma de saltarse la hoja de compartir.
+  if(_labelFile && navigator.canShare && navigator.canShare({files:[_labelFile]})){
+    try{ await navigator.share({files:[_labelFile], title:t('labelTitle')}); }
+    catch(e){ /* el usuario cerró la hoja de compartir */ }
+    return;
+  }
+  // Fallback (equipo sin compartir de archivos): abrir la vista de impresión / PDF.
   try{
     const w=window.open('','_blank');
-    if(!w){ shareLabel(); return; }   // si el navegador lo bloquea, caemos al compartir
+    if(!w){ shareLabel(); return; }
     w.document.write('<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>QR</title><style>@page{size:50mm 30mm;margin:0}html,body{margin:0;padding:0}body{display:flex;align-items:center;justify-content:center;height:100vh}img{width:50mm;height:30mm}</style></head><body><img src="'+_labelDataUrl+'"></body></html>');
     w.document.close(); w.focus();
     setTimeout(function(){ try{ w.print(); }catch(e){} }, 500);
@@ -2329,7 +2336,7 @@ window.scanLookup=function(){
       : p.status==='en_transito'
         ? `<button class="btn" style="width:100%;font-size:16px;padding:14px;" onclick="advanceStatus('${p.id}','vendido')">${t('markPaid')}</button>`
         : p.status==='empaquetando'
-          ? `<a class="btn" style="display:block;text-decoration:none;text-align:center;font-size:16px;padding:14px;" href="${(function(){var qi=(_qItems||[]).find(x=>x.partId===p.id&&x.orderId);return qi?('https://www.ebay.com/sh/ord/details?orderid='+encodeURIComponent(qi.orderId)):'https://www.ebay.com/sh/ord?filter=status%3AAWAITING_SHIPMENT';})()}" target="_blank" rel="noopener">🏷️ ${L==='en'?'Buy / print label on eBay':'Comprar / imprimir etiqueta en eBay'}</a>
+          ? `<a class="btn" style="display:block;text-decoration:none;text-align:center;font-size:16px;padding:14px;" href="${labelUrlFor(p)}" target="_blank" rel="noopener">🏷️ ${L==='en'?'Buy / print label on eBay':'Comprar / imprimir etiqueta en eBay'}</a>
              <div class="sub" style="text-align:center;margin:8px 0 4px;">${L==='en'?'When eBay marks it shipped, it updates by itself.':'Cuando eBay lo marque enviado, se actualiza solo.'}</div>
              <button class="btn ghost sm" style="width:100%;margin-top:4px;color:var(--muted);" onclick="advanceStatus('${p.id}','en_transito')">${t('markShipped')}</button>`
           : `<button class="btn" style="width:100%;font-size:17px;padding:15px;" onclick="startConfirmSell('${p.id}')">${t('confirmSellBtn')}</button>`}
@@ -2395,12 +2402,23 @@ window.openEmpacar=function(id, p){
   </div>`;
 };
 window.updateWeight=function(){ const el=document.getElementById('pk-wt'), out=document.getElementById('pk-wt-conv'); if(!el||!out) return; const r=lbToLbOz(el.value); out.textContent=r?('= '+r.lb+' lb '+r.oz+' oz'):''; };
+// Link para comprar/imprimir la etiqueta: SIEMPRE directo a la orden si la conocemos.
+// Prioridad: orderId GUARDADO en la pieza (ebayOrderId) → la cola cargada (_qItems) → lista general (último recurso).
+function labelUrlFor(p){
+  var oid=(p&&p.ebayOrderId)||(((_qItems||[]).find(function(x){return x.partId===(p&&p.id)&&x.orderId;})||{}).orderId||'');
+  return oid ? ('https://www.ebay.com/sh/ord/details?orderid='+encodeURIComponent(oid))
+             : 'https://www.ebay.com/sh/ord?filter=status%3AAWAITING_SHIPMENT';
+}
 window.finalizePack=async function(id){
   const p=parts.find(x=>x.id===id);
   try{
-    // Marca "empaquetando" (así se queda, con el botón de comprar/imprimir etiqueta, hasta que eBay
-    // la marque enviada → ebaySyncShipped la avanza SOLA a en_transito). El peso/etiqueta se hacen en eBay.
-    await updateDoc(doc(db,'parts',id),{ status:'empaquetando', packPending:false, packedAt:new Date().toISOString() });
+    // Guarda el NUMERO DE ORDEN de eBay en la pieza (de la cola) → el botón de etiqueta abre SIEMPRE directo,
+    // aunque después la orden ya no esté en la cola. Marca "empaquetando" hasta que eBay la marque enviada.
+    const qi=(_qItems||[]).find(x=>x.partId===id && x.orderId);
+    const upd={ status:'empaquetando', packPending:false, packedAt:new Date().toISOString() };
+    if(qi && qi.orderId) upd.ebayOrderId=qi.orderId;
+    await updateDoc(doc(db,'parts',id), upd);
+    if(p && qi && qi.orderId) p.ebayOrderId=qi.orderId;   // reflejar local para el link inmediato
     packSentAnim(p);
   }catch(e){ alert(t('error')+e.message); }
 };
@@ -2410,10 +2428,7 @@ function packSentAnim(p){
   // Busca la ORDEN de eBay ligada a esta pieza (en la cola cargada) → link DIRECTO a comprar/imprimir
   // la etiqueta de ESA orden (ahí metes peso/medidas y compras con tus descuentos de eBay). Si no la
   // encuentra (ej. venta en persona), cae al link general de órdenes por enviar.
-  const qi=(_qItems||[]).find(x=>x.partId===p.id && x.orderId);
-  const labelUrl = qi
-    ? ('https://www.ebay.com/sh/ord/details?orderid='+encodeURIComponent(qi.orderId))
-    : 'https://www.ebay.com/sh/ord?filter=status%3AAWAITING_SHIPMENT';
+  const labelUrl = labelUrlFor(p);
   box.innerHTML='<div class="card green" style="text-align:center;padding:24px 16px;">'
     +'<div style="font-size:50px;">📦✅</div>'
     +'<div style="font-weight:800;font-size:19px;margin-top:6px;">'+(en?'Packed & ready!':'¡Empacado y listo!')+'</div>'
