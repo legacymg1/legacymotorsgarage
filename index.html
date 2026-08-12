@@ -14669,6 +14669,12 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <input type="file" class="cf-input" id="car-gps-photo" accept="image/*" style="padding:8px;cursor:pointer;">
     <div id="car-gps-preview" style="margin-top:6px;"></div>
     <div id="car-upload-progress" style="display:none;margin-top:8px;font-size:13px;color:#ccc;text-align:center;">Subiendo archivos...</div>
+    <div id="car-manage-section" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#f0c040;margin-bottom:8px;">🔧 Mover / devolver este carro</div>
+      <button type="button" id="car-toparts-btn" onclick="sendCarToParts(editingCarId)" style="width:100%;background:rgba(240,192,64,0.12);color:#f0c040;border:1px solid rgba(240,192,64,0.5);border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">🔧 Mandar a partes (yonke)</button>
+      <button type="button" id="car-return-btn" onclick="returnCar(editingCarId)" style="width:100%;background:rgba(255,152,0,0.12);color:#ffb74d;border:1px solid rgba(255,152,0,0.5);border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">↩️ Devolví este carro (reversa su costo)</button>
+      <div style="font-size:11px;color:#888;margin-top:6px;line-height:1.4;">"A partes" copia el carro al yonke con su VIN/fotos/costo y lo quita de ventas. "Devolví" reversa su costo en Finanzas (te regresaron el dinero) y lo quita.</div>
+    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeCarModal()">Cancel</button>
       <button class="btn-save" id="car-save-btn" onclick="saveCar()">Save / Guardar</button>
@@ -15051,6 +15057,7 @@ window.openCarModal = function(carId){
   // Nuevo = etapa PREP (solo costo); Editar = etapa EXHIBICIÓN (formulario completo)
   document.getElementById('car-prep-only').style.display = carId ? 'none' : 'block';
   document.getElementById('car-exhib-only').style.display = carId ? 'block' : 'none';
+  const _ms=document.getElementById('car-manage-section'); if(_ms) _ms.style.display = carId ? 'block' : 'none';   // mover/devolver solo al editar
   const _cc=document.getElementById('car-cost'); if(_cc) _cc.value='';
   if(!carId) title.textContent='Agregar (Preparación) / Add (Prep)';
   _carSpec = carId ? ((cars.find(x=>x.id===carId)||{}).spec||null) : null;
@@ -15298,6 +15305,54 @@ window.deleteCar = async function(id){
   if(!confirm('Delete this vehicle?')) return;
   await deleteDoc(doc(db,'inventory',id));
 }
+
+// ↩️ Devolví este carro: reversa TODOS sus costos en Finanzas (te regresaron el dinero) y lo quita del inventario.
+window.returnCar = async function(id){
+  const c=cars.find(x=>x.id===id); if(!c){ alert('Carro no encontrado.'); return; }
+  const exps=(carExpenses[c.id]||[]).filter(e=>e.type==='expense' && Number(e.amountCents)>0);
+  const totalCents=exps.reduce((s,e)=>s+(Number(e.amountCents)||0),0);
+  const label=[c.year,c.make,c.model].filter(Boolean).join(' ')||'este carro';
+  const totalStr='$'+(totalCents/100).toLocaleString('en-US',{maximumFractionDigits:2});
+  if(!confirm('↩️ DEVOLVÍ "'+label+'"\n\nSe van a REVERSAR sus costos en Finanzas ('+totalStr+' — porque te regresaron el dinero) y se quita del inventario.\n\n¿Confirmar?')) return;
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
+  try{
+    for(const e of exps){
+      const rid='dev_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      const origDesc=(e.note||e.category||'gasto')+(e.vendor?(' · '+e.vendor):'')+(e.carLabel?(' · '+e.carLabel):'');
+      await setDoc(doc(db,'transactions',rid), {
+        entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id, esDevolucion:true, partial:false, origDesc:origDesc,
+        dept:e.dept||'dealer', category:e.category||'', amountCents:Number(e.amountCents)||0,
+        method:e.method||'', date:new Date().toISOString().slice(0,10),
+        vendor:e.vendor||'', carId:e.carId||id, carLabel:e.carLabel||label,
+        note:'Carro devuelto: '+origDesc, createdAt:new Date().toISOString(), createdBy:who, source:'index-return-car'
+      });
+    }
+    await deleteDoc(doc(db,'inventory',id));
+    closeCarModal();
+    alert('✅ Listo. Se reversaron '+totalStr+' en Finanzas y se quitó "'+label+'" del inventario.');
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
+
+// 🔧 Mandar a partes: copia el carro al yonke (dismantle_vehicles) con su VIN/fotos/costo y lo quita de ventas.
+window.sendCarToParts = async function(id){
+  const c=cars.find(x=>x.id===id); if(!c){ alert('Carro no encontrado.'); return; }
+  const label=[c.year,c.make,c.model].filter(Boolean).join(' ')||'este carro';
+  const costCents=(carExpenses[c.id]||[]).reduce((s,e)=>s+(Number(e.amountCents)||0),0);
+  const costNote=costCents>0?('\n\nSu costo ($'+(costCents/100).toLocaleString('en-US',{maximumFractionDigits:0})+') se copia al yonke para el reporte "Por carro". El gasto original se queda en las cuentas del Dealer.'):'';
+  if(!confirm('🔧 MANDAR "'+label+'" A PARTES (yonke)\n\nSe copia al almacén como carro a desmantelar (VIN, fotos'+(costCents>0?', costo':'')+') y se quita del inventario de ventas.'+costNote+'\n\n¿Confirmar?')) return;
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
+  try{
+    const did='dv_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    await setDoc(doc(db,'dismantle_vehicles',did), {
+      year:c.year||'', make:c.make||'', model:c.model||'', vin:c.vin||'', color:c.color||'', miles:c.miles||'',
+      photoURLs:(c.photos||[]).slice(), status:'llego', costCents:costCents||null, spec:c.spec||null,
+      fromInventoryId:id, createdAt:new Date().toISOString(), createdBy:who
+    });
+    await deleteDoc(doc(db,'inventory',id));
+    closeCarModal();
+    alert('✅ "'+label+'" pasó a PARTES. Ya lo puedes desmantelar en el Almacén y ligarle ventas. Se quitó del inventario de ventas.');
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
 
 window.removePhoto = async function(carId, photoIndex){
   const c=cars.find(x=>x.id===carId);
