@@ -14671,8 +14671,8 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <div id="car-upload-progress" style="display:none;margin-top:8px;font-size:13px;color:#ccc;text-align:center;">Subiendo archivos...</div>
     <div id="car-manage-section" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#f0c040;margin-bottom:8px;">🔧 Mover / devolver este carro</div>
-      <button type="button" id="car-toparts-btn" onclick="sendCarToParts(editingCarId)" style="width:100%;background:rgba(240,192,64,0.12);color:#f0c040;border:1px solid rgba(240,192,64,0.5);border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">🔧 Mandar a partes (yonke)</button>
-      <button type="button" id="car-return-btn" onclick="returnCar(editingCarId)" style="width:100%;background:rgba(255,152,0,0.12);color:#ffb74d;border:1px solid rgba(255,152,0,0.5);border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">↩️ Devolví este carro (reversa su costo)</button>
+      <button type="button" id="car-toparts-btn" onclick="sendCarToParts(this.dataset.cid)" style="width:100%;background:rgba(240,192,64,0.12);color:#f0c040;border:1px solid rgba(240,192,64,0.5);border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">🔧 Mandar a partes (yonke)</button>
+      <button type="button" id="car-return-btn" onclick="returnCar(this.dataset.cid)" style="width:100%;background:rgba(255,152,0,0.12);color:#ffb74d;border:1px solid rgba(255,152,0,0.5);border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">↩️ Devolví este carro (reversa su costo)</button>
       <div style="font-size:11px;color:#888;margin-top:6px;line-height:1.4;">"A partes" copia el carro al yonke con su VIN/fotos/costo y lo quita de ventas. "Devolví" reversa su costo en Finanzas (te regresaron el dinero) y lo quita.</div>
     </div>
     <div class="modal-actions">
@@ -15058,6 +15058,7 @@ window.openCarModal = function(carId){
   document.getElementById('car-prep-only').style.display = carId ? 'none' : 'block';
   document.getElementById('car-exhib-only').style.display = carId ? 'block' : 'none';
   const _ms=document.getElementById('car-manage-section'); if(_ms) _ms.style.display = carId ? 'block' : 'none';   // mover/devolver solo al editar
+  if(carId){ const _tp=document.getElementById('car-toparts-btn'), _rt=document.getElementById('car-return-btn'); if(_tp) _tp.dataset.cid=carId; if(_rt) _rt.dataset.cid=carId; }
   const _cc=document.getElementById('car-cost'); if(_cc) _cc.value='';
   if(!carId) title.textContent='Agregar (Preparación) / Add (Prep)';
   _carSpec = carId ? ((cars.find(x=>x.id===carId)||{}).spec||null) : null;
