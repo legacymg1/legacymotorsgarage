@@ -624,6 +624,7 @@
     <div class="payment-history" id="pay-history"></div>
     <button type="button" onclick="resendLastReceipt()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:10px;">📩 Reenviar recibo del último pago</button>
     <button type="button" onclick="closeModal('pay-modal');openApptModal(payingId)" style="width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:8px;">📅 Agendar cita de servicio</button>
+    <button type="button" onclick="settleToday(payingId)" style="width:100%;background:rgba(76,175,80,0.15);border:1px solid #4caf50;color:#4caf50;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💰 Liquidar HOY (tú pones el monto / con descuento)</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('pay-modal')">Cancelar</button>
       <button class="btn-save" onclick="confirmPayment()">CONFIRMAR</button>
@@ -971,6 +972,48 @@ window.markSettled = async function(id) {
     alert('✅ Registrado como liquidado.');
     auditBalances();
   } catch(e) { alert('Error: ' + e.message); }
+};
+
+// 💰 LIQUIDAR HOY con un monto que TÚ decides (payoff con descuento). Registra el pago (entra a Finanzas)
+// + marca el contrato liquidado + guarda el descuento perdonado. Atómico como un pago normal.
+window.settleToday = async function(id){
+  const c = clients.find(x => x.id === id); if(!c){ alert('Cliente no encontrado'); return; }
+  if(c.settled === true){ alert('Este contrato ya está liquidado.'); return; }
+  const bal = calcBalance(c);
+  if(bal <= 0.005){ alert('Este contrato ya no tiene saldo.'); return; }
+  const v = prompt('💰 LIQUIDAR HOY — '+c.name+'\n\nSaldo actual: '+formatMoney(bal)+'\n\n¿Con cuánto se liquida HOY?\n(Pon MENOS que el saldo si le das descuento para cerrar):', bal.toFixed(2));
+  if(v === null) return;
+  const amount = Math.round(Number(v)*100)/100;
+  if(!(amount > 0)){ alert('Monto inválido.'); return; }
+  if(amount > bal + 0.005 && !confirm('Pusiste MÁS que el saldo ('+formatMoney(bal)+'). ¿Seguro?')) return;
+  const discount = Math.max(0, Math.round((bal - amount)*100)/100);
+  const method = document.getElementById('pay-method') ? document.getElementById('pay-method').value : 'cash';
+  if(!confirm('Liquidar a '+c.name+' ('+[c.year,c.make,c.model].filter(Boolean).join(' ')+') HOY con '+formatMoney(amount)+'.\n\nSaldo: '+formatMoney(bal)+(discount>0?('\nDescuento perdonado: '+formatMoney(discount)):'')+'\n\nEl contrato queda LIQUIDADO (saldo $0) y el pago entra a Finanzas.\n\n¿Confirmar?')) return;
+  const entryId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+  try{
+    await runTransaction(db, async (tx) => {
+      const ref = doc(db,'clients',c.id);
+      const snap = await tx.get(ref);
+      if(!snap.exists()) throw new Error('El cliente ya no existe');
+      const fresh = { id:c.id, ...snap.data() };
+      const payments = [...(fresh.payments||[])];
+      if(payments.some(p => p.entryId === entryId)) return;
+      const nowISO = new Date().toISOString();
+      const who = (auth.currentUser && auth.currentUser.email) || '';
+      const date = today();
+      payments.push({ entryId, amount, date, method, schedDate: getNextPayDate(fresh), createdAt: nowISO, createdBy: who, settlement:true });
+      tx.set(doc(db,'transactions',entryId), {
+        entryId, type:'payment', dept:'dealer', clientId:fresh.id, clientName:fresh.name||'',
+        amountCents: Math.round(amount*100), method, date, schedDate: getNextPayDate(fresh),
+        createdAt: nowISO, createdBy: who,
+        note: 'Liquidación'+(discount>0?(' (descuento '+formatMoney(discount)+')'):''), source:'payoff'
+      });
+      tx.update(ref, { payments, settled:true, settledAt:nowISO, settledBy:who, settlementAmount:amount, settlementDiscount:discount });
+    });
+    const pm = document.getElementById('pay-modal'); if(pm) pm.classList.remove('active');
+    alert('✅ '+c.name+' LIQUIDADO con '+formatMoney(amount)+(discount>0?(' — descuento '+formatMoney(discount)):'')+'. Saldo en $0. El pago ya está en Finanzas.');
+    if(typeof auditBalances==='function') auditBalances();
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
 };
 function getNextPayDate(c) {
   if (isPaidOff(c)) return null;
