@@ -624,7 +624,7 @@
     <div class="payment-history" id="pay-history"></div>
     <button type="button" onclick="resendLastReceipt()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:10px;">📩 Reenviar recibo del último pago</button>
     <button type="button" onclick="closeModal('pay-modal');openApptModal(payingId)" style="width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:8px;">📅 Agendar cita de servicio</button>
-    <button type="button" onclick="settleToday(payingId)" style="width:100%;background:rgba(76,175,80,0.15);border:1px solid #4caf50;color:#4caf50;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💰 Liquidar HOY (tú pones el monto / con descuento)</button>
+    <button type="button" onclick="settleToday()" style="width:100%;background:rgba(76,175,80,0.15);border:1px solid #4caf50;color:#4caf50;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💰 Liquidar HOY (tú pones el monto / con descuento)</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('pay-modal')">Cancelar</button>
       <button class="btn-save" onclick="confirmPayment()">CONFIRMAR</button>
@@ -985,6 +985,7 @@ window.markSettled = async function(id) {
 // 💰 LIQUIDAR HOY con un monto que TÚ decides (payoff con descuento). Registra el pago (entra a Finanzas)
 // + marca el contrato liquidado + guarda el descuento perdonado. Atómico como un pago normal.
 window.settleToday = async function(id){
+  id = id || payingId;   // el botón llama sin argumento; payingId es la del módulo (lo abrió openPayModal)
   const c = clients.find(x => x.id === id); if(!c){ alert('Cliente no encontrado'); return; }
   if(c.settled === true){ alert('Este contrato ya está liquidado.'); return; }
   const bal = calcBalance(c);
