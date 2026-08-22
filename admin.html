@@ -1020,8 +1020,13 @@ window.settleToday = async function(id){
       tx.update(ref, { payments, settled:true, settledAt:nowISO, settledBy:who, settlementAmount:amount, settlementDiscount:discount });
     });
     const pm = document.getElementById('pay-modal'); if(pm) pm.classList.remove('active');
-    alert('✅ '+c.name+' LIQUIDADO con '+formatMoney(amount)+(discount>0?(' — descuento '+formatMoney(discount)):'')+'. Saldo en $0. El pago ya está en Finanzas.');
-    if(typeof auditBalances==='function') auditBalances();
+    const cc = clients.find(x=>x.id===id) || c;
+    // 🎊 Mismo mensaje de FELICIDADES que un pago que liquida (getPaidOffMsg → modal de SMS).
+    if(confirm('🎊 '+cc.name+' LIQUIDADO con '+formatMoney(amount)+(discount>0?(' (descuento '+formatMoney(discount)+')'):'')+'. Saldo en $0. El pago ya está en Finanzas.\n\n¿Enviar mensaje de FELICIDADES al cliente?')){
+      const msg = getPaidOffMsg(cc);
+      if(msg){ waPhone=(cc.phone||'').replace(/\D/g,''); const wp=document.getElementById('wa-preview'), wt=document.getElementById('wa-text'); if(wp) wp.textContent=msg; if(wt) wt.value=msg; document.getElementById('wa-modal').classList.add('active'); }
+      else alert('No se pudo generar el mensaje. Usa "Reenviar recibo del último pago" si hace falta.');
+    }
   }catch(e){ alert('Error: '+((e&&e.message)||e)); }
 };
 function getNextPayDate(c) {
