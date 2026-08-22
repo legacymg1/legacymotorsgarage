@@ -948,13 +948,21 @@ function calcBalance(c) {
 // Lo que debe pagar AHORA = lo menor entre su mensualidad y su saldo.
 // Si pagó de más, el saldo bajó, así que la última mensualidad se reduce sola.
 function dueNow(c){ const w=Number(c.weekly)||0; const b=calcBalance(c); return Math.max(0, Math.min(w, b)); }
+// Total de pagos que REALMENTE se necesitan: si pagó de MENOS, crecen (no se cierra por conteo).
+// Ej. Teresa: 15 pagos hechos + $900 de saldo con pago de $150 = necesita 6 más -> muestra 15/21, no 15/16.
+function payTotalNeeded(c){
+  const base=(c.schedule||[]).length;
+  const w=Number(c.weekly)||0, bal=calcBalance(c);
+  if(w>0 && bal>0.005) return Math.max(base, getPaidCount(c)+Math.ceil((bal-0.005)/w));
+  return base;
+}
 function isPaidOff(c) {
   if(c.settled === true) return true;              // hecho grabado, gana sobre cualquier calculo
   if((c.freq||'') === 'cash') return true;
   // TRANSICION: contratos firmados antes de este arreglo (sin totalOfPayments congelado)
   // que ya completaron todas sus mensualidades. Se apaga sola al volver a guardar al cliente.
   // Declaralos liquidados desde la auditoria para convertir esta inferencia en un hecho.
-  if(!Number(c.totalOfPayments) && (c.schedule||[]).length > 0 && getPaidCount(c) >= (c.schedule||[]).length) return true;
+  if(!Number(c.totalOfPayments) && (c.schedule||[]).length > 0 && getPaidCount(c) >= (c.schedule||[]).length && calcBalance(c) <= 0.005) return true;   // completó los pagos POR CONTEO **y** ya no debe saldo
   return calcBalance(c) <= 0.005;                  // un abono parcial ya NO cierra una mensualidad
 }
 
@@ -1020,6 +1028,15 @@ function getNextPayDate(c) {
   const s=c.schedule||[];
   const pd=getPaidDates(c);
   for(const d of s){if(!pd.has(d))return d;}
+  // Se acabó el calendario pero AÚN debe saldo (pagó de menos) → sigue generando pagos con la misma cadencia
+  if(calcBalance(c) > 0.005 && s.length){
+    const last=s[s.length-1], prev=s.length>1?s[s.length-2]:null;
+    let step=(c.freq==='monthly')?30:(c.freq==='biweekly')?14:7;
+    if(prev){ const dd=Math.round((new Date(last+'T12:00:00')-new Date(prev+'T12:00:00'))/86400000); if(dd>0) step=dd; }
+    const extra=(getPaidCount(c) - s.length) + 1;   // pagos extra ya hechos + 1 = el siguiente
+    const nd=new Date(last+'T12:00:00'); nd.setDate(nd.getDate() + step*Math.max(1,extra));
+    return nd.toISOString().slice(0,10);
+  }
   return null;
 }
 function getStatus(c) {
@@ -2020,7 +2037,7 @@ window.renderAll = function() {
       const nextPay=getNextPayDate(c);
       const days=daysUntil(nextPay);
       const paidCount=getPaidCount(c);
-      const totalPay=(c.schedule||[]).length;
+      const totalPay=payTotalNeeded(c);
       const paidDates=getPaidDates(c);
       const progress=calcProgress(c);
       const balance=calcBalance(c);
@@ -2522,7 +2539,7 @@ window.openPayModal=function(id){
   document.getElementById('pay-client-info').innerHTML=
     `<strong>${c.name}</strong> · ${c.year} ${c.make} ${c.model}<br>
      Próximo: <span style="color:var(--yellow)">${formatDate(nextPay)}</span> &nbsp;|&nbsp;
-     Pagos: <span style="color:var(--gold)">${getPaidCount(c)}/${(c.schedule||[]).length}</span> &nbsp;|&nbsp;
+     Pagos: <span style="color:var(--gold)">${getPaidCount(c)}/${payTotalNeeded(c)}</span> &nbsp;|&nbsp;
      Saldo: <span style="color:var(--gold)">${formatMoney(calcBalance(c))}</span>`;
   document.getElementById('pay-amount').value=c.weekly;
   document.getElementById('pay-date').value=today();
