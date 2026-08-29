@@ -451,6 +451,13 @@
     </div>
     <!-- INVENTORY & ID - moved to top -->
     <div class="form-row">
+      <div class="form-group" style="position:relative;">
+        <label class="form-label">🚗 Buscar carro del inventario (nombre o número)</label>
+        <input class="form-input" id="f-car-search" placeholder="Ej: Tahoe, 2015 Honda, 0001…" autocomplete="off" oninput="carSearchInput(this.value)">
+        <div id="f-car-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--surface,#141924);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:44vh;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.5);"></div>
+      </div>
+    </div>
+    <div class="form-row">
       <div class="form-group">
         <label class="form-label">🔑 No. Inventario del Vehículo</label>
         <input class="form-input" id="f-inventory-num" placeholder="Ej: 0001" oninput="lookupInventory(this.value)">
@@ -1142,6 +1149,44 @@ window.lookupInventory = function(invNum) {
     });
   });
 };
+
+// 🔎 Buscar carro del inventario por NOMBRE (año/marca/modelo/VIN) o número — al elegir, llena todo.
+let _invCache=[], _invCacheAt=0;
+window.loadInvCache=async function(force){
+  if(!force && _invCache.length && (Date.now()-_invCacheAt)<60000) return _invCache;
+  try{
+    const {getFirestore, collection, getDocs}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const snap=await getDocs(collection(getFirestore(),'inventory'));
+    _invCache=snap.docs.map(d=>({id:d.id,...d.data()})); _invCacheAt=Date.now();
+  }catch(e){ console.warn('inv cache', e); }
+  return _invCache;
+};
+window.carSearchInput=async function(q){
+  const box=document.getElementById('f-car-results'); if(!box) return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+  await loadInvCache();
+  const w=q.split(/\s+/);
+  const matches=_invCache.filter(c=>{
+    const hay=('#'+(c.inventoryNum||'')+' '+[c.year,c.make,c.model,c.color,c.vin].filter(Boolean).join(' ')).toLowerCase();
+    return w.every(x=>hay.indexOf(x)>=0);
+  }).sort((a,b)=>(parseInt(a.inventoryNum)||0)-(parseInt(b.inventoryNum)||0)).slice(0,20);
+  if(!matches.length){ box.style.display='block'; box.innerHTML='<div style="padding:10px 12px;color:var(--muted);font-size:13px;">Sin resultados</div>'; return; }
+  box.innerHTML=matches.map(c=>`<div onclick="pickInvCar('${c.id}')" style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:11px 12px;cursor:pointer;border-bottom:1px solid var(--border);"><span style="font-weight:600;">#${c.inventoryNum||'?'} · ${[c.year,c.make,c.model].filter(Boolean).join(' ')}</span><span style="color:var(--muted);font-size:12px;">${c.status==='sold'?'vendido':''}</span></div>`).join('');
+  box.style.display='block';
+};
+window.pickInvCar=function(id){
+  const c=_invCache.find(x=>x.id===id); if(!c) return;
+  const set=(f,v)=>{ const el=document.getElementById(f); if(el) el.value=(v==null?'':v); };
+  set('f-inventory-num', c.inventoryNum||''); set('f-year', c.year); set('f-make', c.make); set('f-model', c.model);
+  set('f-vin', c.vin); set('f-total', c.price); set('f-miles', c.miles);
+  const st=document.getElementById('inv-lookup-status'); if(st) st.textContent='✅ '+[c.year,c.make,c.model].filter(Boolean).join(' ');
+  const search=document.getElementById('f-car-search'); if(search) search.value='#'+(c.inventoryNum||'')+' · '+[c.year,c.make,c.model].filter(Boolean).join(' ');
+  const box=document.getElementById('f-car-results'); if(box){ box.style.display='none'; box.innerHTML=''; }
+  if(typeof window.calcFinancing==='function') window.calcFinancing();
+};
+// cerrar el desplegable al tocar afuera
+document.addEventListener('click',function(e){ const box=document.getElementById('f-car-results'); if(!box||box.style.display==='none') return; if(e.target.closest && (e.target.closest('#f-car-results')||e.target.closest('#f-car-search'))) return; box.style.display='none'; }, true);
 
 window.calcFinancing = function(changedField) {
   const price = parseFloat(document.getElementById('f-total')?.value) || 0;

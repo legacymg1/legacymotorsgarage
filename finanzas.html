@@ -877,6 +877,7 @@ function isOwnerUser(){ return ((auth.currentUser&&auth.currentUser.email)||'').
 // Los demás (Ivan) solo su bolsa: así nadie toca por accidente los movimientos del otro.
 function canEditTx(id){ if(isOwnerUser()) return true; var tx=(typeof txns!=='undefined'?txns:[]).find(function(x){return x.id===id;}); return !tx || myDepts().indexOf(tx.dept)>=0; }
 const centsToUSD = c => '$'+(Number(c||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 // Movimientos VIVOS: excluye los anulados (type='void') y sus originales.
 function liveTxns(){
   const voided=new Set(txns.filter(t=>t.type==='void').map(v=>v.voidOf));
