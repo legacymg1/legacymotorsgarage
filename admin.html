@@ -3407,12 +3407,28 @@ window.editPayment=async function(clientId, idx, field, value){
 };
 
 window.deletePayment=async function(clientId, idx){
-  if(!confirm('¿Eliminar este pago?')) return;
+  if(!confirm('¿Eliminar este pago? También se anula en Finanzas.')) return;
   const c=clients.find(x=>x.id===clientId);
   if(!c) return;
+  const pay=c.payments[idx];
   c.payments.splice(idx,1);
   try{
     await setDoc(doc(db,'clients',clientId),c);
+    // 📒 ANULAR también el renglón del libro (Finanzas) para que el pago borrado deje de contar.
+    if(pay){
+      const who=(auth.currentUser&&auth.currentUser.email)||'';
+      const cents=Math.round((Number(pay.amount)||0)*100);
+      const mkVoid=async(tx,refId)=>{ const vid='void_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+        await setDoc(doc(db,'transactions',vid),{ entryId:vid, type:'void', voidOf:(tx&&tx.entryId)||refId, refType:(tx&&tx.type)||'payment', refDept:(tx&&tx.dept)||'dealer', amountCents:(tx&&Number(tx.amountCents))||cents, clientId, clientName:c.name||'', note:'Pago eliminado (monto equivocado)', createdAt:new Date().toISOString(), createdBy:who, source:'admin' }); };
+      let voided=false;
+      if(pay.entryId){ try{ const s=await getDoc(doc(db,'transactions',pay.entryId)); if(s.exists()){ await mkVoid(s.data(), pay.entryId); voided=true; } }catch(e){} }
+      if(!voided){   // respaldo: pagos viejos sin entryId → buscar por cliente + monto + fecha
+        try{ const qs=await getDocs(query(collection(db,'transactions'), where('clientId','==',clientId)));
+          const m=qs.docs.find(d=>{ const t=d.data(); return (t.type==='payment'||t.type==='down') && Number(t.amountCents)===cents && t.date===pay.date; });
+          if(m) await mkVoid(m.data(), m.id);
+        }catch(e){ console.log('void pago', e); }
+      }
+    }
     closeModal('pay-modal');
   }catch(e){alert('Error: '+e.message);}
 };
