@@ -2471,11 +2471,11 @@ window.saveClient=async function(){
         // sello pegado — para que caiga en su corte/mes correcto y no en el corte actual.
         // Fecha PASADA (backfill) → mediodía de ese día (cae en su corte histórico).
         // Fecha de HOY (o sin fecha) → hora REAL (ahora) para que caiga en el CORTE ACTUAL aunque cierres temprano.
-        const _todayStr = new Date().toISOString().slice(0,10);
-        const _saleDate = contractDate || startDate || '';
-        const _saleCreatedAt = (_saleDate && _saleDate < _todayStr)
-             ? new Date(_saleDate+'T12:00:00').toISOString()
-             : (_saleDate ? new Date().toISOString()
+        const _todayStrCA = new Date().toISOString().slice(0,10);
+        const _saleDtCA = contractDate || startDate || '';
+        const _saleCreatedAt = (_saleDtCA && _saleDtCA < _todayStrCA)
+             ? new Date(_saleDtCA+'T12:00:00').toISOString()
+             : (_saleDtCA ? new Date().toISOString()
              : (existing.saleCreatedAt || new Date().toISOString()));
         // Bolsa DMV/impuestos — para contado Y pagos (lo cargado al cliente para taxes+DMV).
         if(_taxC + _dmvC > 0){
