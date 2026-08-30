@@ -632,6 +632,7 @@
     <button type="button" onclick="resendLastReceipt()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:10px;">📩 Reenviar recibo del último pago</button>
     <button type="button" onclick="closeModal('pay-modal');openApptModal(payingId)" style="width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:8px;">📅 Agendar cita de servicio</button>
     <button type="button" onclick="settleToday()" style="width:100%;background:rgba(76,175,80,0.15);border:1px solid #4caf50;color:#4caf50;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💰 Liquidar HOY (tú pones el monto / con descuento)</button>
+    <button type="button" onclick="fixOrphanPayments()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px;font-size:12px;cursor:pointer;margin-top:8px;">🧹 Revisar pagos vs Finanzas (anular borrados)</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('pay-modal')">Cancelar</button>
       <button class="btn-save" onclick="confirmPayment()">CONFIRMAR</button>
@@ -3406,6 +3407,27 @@ window.editPayment=async function(clientId, idx, field, value){
   }catch(e){alert('Error: '+e.message);}
 };
 
+// 🧹 Reconciliar: busca PAGOS en Finanzas que ya NO están en el cliente (borrados antes de este arreglo) y los anula.
+// Seguro: solo pagos type='payment' con entryId 'p_...' (los que crea el CRM), muestra cuáles y pides confirmar.
+window.fixOrphanPayments = async function(){
+  const id = payingId; const c = clients.find(x=>x.id===id); if(!c){ alert('Cliente no encontrado'); return; }
+  try{
+    const qs = await getDocs(query(collection(db,'transactions'), where('clientId','==',id)));
+    const payIds = new Set((c.payments||[]).map(p=>p.entryId).filter(Boolean));
+    const voided = new Set(qs.docs.map(d=>d.data()).filter(t=>t.type==='void').map(v=>v.voidOf));
+    const orphans = qs.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(t => t.type==='payment' && String(t.entryId||'').startsWith('p_') && !payIds.has(t.entryId) && !voided.has(t.entryId));
+    if(!orphans.length){ alert('✅ Todo cuadra. No hay pagos borrados colgados en Finanzas para '+c.name+'.'); return; }
+    const total = orphans.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+    if(!confirm('Encontré '+orphans.length+' pago(s) en Finanzas que YA no están en el cliente (los borraste):\n\n'+orphans.map(t=>'• '+formatMoney((Number(t.amountCents)||0)/100)+' · '+(t.date||'')).join('\n')+'\n\nTotal: '+formatMoney(total/100)+'\n\n¿Anularlos en Finanzas ahora?')) return;
+    const who=(auth.currentUser&&auth.currentUser.email)||'';
+    for(const t of orphans){
+      const vid='void_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      await setDoc(doc(db,'transactions',vid),{ entryId:vid, type:'void', voidOf:t.entryId, refType:'payment', refDept:t.dept||'dealer', amountCents:Number(t.amountCents)||0, clientId:id, clientName:c.name||'', note:'Pago borrado — anulado (reconciliación)', createdAt:new Date().toISOString(), createdBy:who, source:'admin' });
+    }
+    alert('✅ Anulé '+orphans.length+' pago(s) en Finanzas ('+formatMoney(total/100)+'). Ya cuadra.');
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
 window.deletePayment=async function(clientId, idx){
   if(!confirm('¿Eliminar este pago? También se anula en Finanzas.')) return;
   const c=clients.find(x=>x.id===clientId);
