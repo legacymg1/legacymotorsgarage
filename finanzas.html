@@ -1456,17 +1456,32 @@ window.openCorteHist = function(){
   const cls=txns.filter(t=>t.type==='closing').sort((a,b)=>(b.closedAt||'').localeCompare(a.closedAt||''));
   const box=document.getElementById('cortehist-body');
   if(!cls.length){ box.innerHTML='<div style="color:var(--faint);text-align:center;padding:24px;">Aún no hay cortes cerrados.</div>'; }
-  else box.innerHTML=cls.map(c=>{
+  else box.innerHTML=cls.map((c,i)=>{
     const d=fmtDate((c.closedAt||c.date||'').slice(0,10));
+    const reopenBtn=(i===0 && isOwnerUser()) ? '<button onclick="reopenCorte(\''+c.id+'\')" style="margin-top:8px;width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">↩️ Reabrir este corte (deshacer)</button>' : '';
     return '<div style="background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:10px;">'
       +'<div style="display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-bottom:6px;"><span>🧮 '+d+'</span><span style="color:'+((c.totalCents||0)>=0?'#3ecf8e':'#ff6b6b')+';">'+centsToUSD(c.totalCents||0)+'</span></div>'
       +'<div style="font-size:12px;color:var(--muted);line-height:1.8;">🚗 Dealer neto: '+centsToUSD(c.dealerNetCents||0)+' · 🔧 Partes neto: '+centsToUSD(c.partesNetCents||0)
       +(c.oweCents?('<br>🔁 Cuadre: '+(c.oweDir||'')+' '+centsToUSD(Math.abs(c.oweCents))):'')
-      +'<br>💰 Fondo: '+((c.fondoDealerCents!=null||c.fondoPartsCents!=null)?('🚗 '+centsToUSD(c.fondoDealerCents||0)+' · 🔧 '+centsToUSD(c.fondoPartsCents||0)):(centsToUSD(c.fondoCents||0)+(c.fondoDept?(' (se lo quedó '+(c.fondoDept==='parts'?'🔧 Partes':'🚗 Dealer')+')'):'')))+' · Repartido: '+centsToUSD(c.repartirCents||0)+' ('+centsToUSD(c.cadaCents||0)+' c/u)</div></div>';
+      +'<br>💰 Fondo: '+((c.fondoDealerCents!=null||c.fondoPartsCents!=null)?('🚗 '+centsToUSD(c.fondoDealerCents||0)+' · 🔧 '+centsToUSD(c.fondoPartsCents||0)):(centsToUSD(c.fondoCents||0)+(c.fondoDept?(' (se lo quedó '+(c.fondoDept==='parts'?'🔧 Partes':'🚗 Dealer')+')'):'')))+' · Repartido: '+centsToUSD(c.repartirCents||0)+' ('+centsToUSD(c.cadaCents||0)+' c/u)</div>'+reopenBtn+'</div>';
   }).join('');
   document.getElementById('cortehist-overlay').classList.add('open');
 };
 window.closeCorteHist = function(){ document.getElementById('cortehist-overlay').classList.remove('open'); };
+// ↩️ Reabrir (deshacer) el ÚLTIMO corte: borra su cierre → los movimientos vuelven al corte ACTUAL
+// (incluido lo que quedó colgado). Luego lo vuelves a cerrar. Solo el dueño y solo el más reciente.
+window.reopenCorte = async function(id){
+  if(!isOwnerUser()){ alert('Solo el dueño puede reabrir un corte.'); return; }
+  const lc=lastClosing();
+  if(!lc || lc.id!==id){ alert('Solo puedes reabrir el ÚLTIMO corte cerrado.'); return; }
+  if(!confirm('↩️ Reabrir (deshacer) el corte del '+fmtDate((lc.closedAt||'').slice(0,10))+'.\n\nEl corte vuelve a quedar ABIERTO: los movimientos (incluido el contrato que quedó colgado) regresan al corte actual. Podrás cerrarlo otra vez.\n\n¿Confirmar?')) return;
+  try{
+    await deleteDoc(doc(db,'transactions',id));
+    closeCorteHist();
+    alert('✅ Corte reabierto. Revisa el corte y ciérralo de nuevo cuando estés listo.');
+    if(typeof openCorte==='function') openCorte();
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
 
 // ---------- CUENTAS DE SOCIOS ----------
 window.openSocios = function(){ renderSocios(); document.getElementById('socios-overlay').classList.add('open'); };

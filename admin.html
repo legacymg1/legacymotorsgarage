@@ -2469,9 +2469,14 @@ window.saveClient=async function(){
         // createdAt: Finanzas usa este sello para decidir en qué CORTE cae el movimiento (inCut).
         // SIEMPRE se deriva de la FECHA REAL de la venta (contractDate) — nunca de "hoy" ni de un
         // sello pegado — para que caiga en su corte/mes correcto y no en el corte actual.
-        const _saleCreatedAt = (contractDate ? new Date(contractDate+'T12:00:00').toISOString()
-             : (startDate ? new Date(startDate+'T12:00:00').toISOString()
-             : (existing.saleCreatedAt || new Date().toISOString())));
+        // Fecha PASADA (backfill) → mediodía de ese día (cae en su corte histórico).
+        // Fecha de HOY (o sin fecha) → hora REAL (ahora) para que caiga en el CORTE ACTUAL aunque cierres temprano.
+        const _todayStr = new Date().toISOString().slice(0,10);
+        const _saleDate = contractDate || startDate || '';
+        const _saleCreatedAt = (_saleDate && _saleDate < _todayStr)
+             ? new Date(_saleDate+'T12:00:00').toISOString()
+             : (_saleDate ? new Date().toISOString()
+             : (existing.saleCreatedAt || new Date().toISOString()));
         // Bolsa DMV/impuestos — para contado Y pagos (lo cargado al cliente para taxes+DMV).
         if(_taxC + _dmvC > 0){
           await setDoc(doc(db,'transactions','dmvhold_'+id), {
