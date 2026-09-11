@@ -733,14 +733,32 @@ function initPush(){
 
 // ---- DATA ----
 let _listening=false;
+// 🛡️ NO re-dibujar la vista mientras el usuario está ESCRIBIENDO o tiene un modal abierto
+// (si no, un cambio remoto de 'parts' le borra lo que está llenando — "se refresca y pierdo todo").
+let _pendingRender=false;
+function _uiBusy(){
+  const m=document.getElementById('modal'), m2=document.getElementById('modal2');
+  if((m&&m.style.display==='block')||(m2&&m2.style.display==='block')) return true;
+  const a=document.activeElement;
+  if(a && (a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'||a.isContentEditable)){
+    if(a.id==='lister-search'||a.id==='veh-search'||a.id==='scan-input'||a.id==='whmain-search'||a.id==='manual-search') return false;   // buscadores SÍ re-filtran
+    return true;
+  }
+  return false;
+}
+function _renderCurrent(){ if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); if(_view==='pack') renderPending(); }
+function _flushPending(){ if(!_pendingRender||_uiBusy()) return; _pendingRender=false; _renderCurrent(); }
+document.addEventListener('focusout', function(){ setTimeout(_flushPending, 350); }, true);
 function startListening(){
   onSnapshot(collection(db,'dismantle_vehicles'), s=>{ vehicles=s.docs.map(d=>({id:d.id,...d.data()}));
     if(!_restoredCar){ _restoredCar=true; let cid=''; try{ cid=localStorage.getItem('lmg_wh_car')||''; }catch(e){}
       if(cid && !_pendingScan && vehicles.find(v=>v.id===cid) && (role==='owner'||role==='warehouse'||role==='yard')){ openCar(cid); return; } }
+    if(_uiBusy()){ _pendingRender=true; return; }   // no re-dibujar mientras escribe/edita
     if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); }, e=>console.log('veh',e));
   onSnapshot(collection(db,'parts'), s=>{ parts=s.docs.map(d=>({id:d.id,...d.data()}));
     if(_pendingScan && role){ const pid=_pendingScan; _pendingScan=''; try{ history.replaceState({},'',location.pathname); }catch(e){} closeCar(); setView('pack'); const inp=document.getElementById('scan-input'); if(inp) inp.value=pid; scanLookup(); return; }
     if(_pendingEdit && role){ const pid=_pendingEdit; _pendingEdit=''; try{ history.replaceState({},'',location.pathname); }catch(e){} if(parts.find(x=>x.id===pid)){ closeCar(); setView('lister'); try{ openPartEdit(pid); }catch(e){} } }
+    if(_uiBusy()){ _pendingRender=true; return; }   // está escribiendo/editando → no le borres; se actualiza al terminar
     if(_carView) renderCarDetail(); else if(_view==='yard') renderVehicles(); if(_view==='lister') renderLister(); if(_view==='pack') renderPending(); }, e=>console.log('parts',e));
   // Taxímetro acumulado (contador real del gasto del bot)
   onSnapshot(doc(db,'config','aiUsage'), s=>{ _aiUsage = (s&&s.exists&&s.exists()) ? s.data() : null; if(_view==='lister') renderTaximetro(); }, e=>console.log('aiUsage',e));
@@ -1141,7 +1159,7 @@ window.filterSpec=function(q){
   const el=document.getElementById('spec-rows'); if(!el) return;
   el.innerHTML = rows.length ? rows.map(f=>`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--border);"><span class="muted">${f.label}</span><span style="font-weight:600;text-align:right;">${f.value}</span></div>`).join('') : '<div class="sub">—</div>';
 };
-window.closeModal=function(){ const m=document.getElementById('modal'); if(m) m.style.display='none'; const mi=document.getElementById('modal-inner'); if(mi) mi.innerHTML=''; };
+window.closeModal=function(){ const m=document.getElementById('modal'); if(m) m.style.display='none'; const mi=document.getElementById('modal-inner'); if(mi) mi.innerHTML=''; if(typeof _flushPending==='function') setTimeout(_flushPending,50); };
 // Agregar parte (botón flotante) → formulario en modal
 window.openPartModal=function(vid){
   if(!vid){ vid=_carView; } if(!vid) return;
@@ -1529,7 +1547,7 @@ async function makeLabel(p){
     document.getElementById('modal2').style.display='block';
   }catch(e){ alert(t('error')+e.message); }
 };
-window.closeModal2=function(){ const m=document.getElementById('modal2'); if(m) m.style.display='none'; const mi=document.getElementById('modal2-inner'); if(mi) mi.innerHTML=''; };
+window.closeModal2=function(){ const m=document.getElementById('modal2'); if(m) m.style.display='none'; const mi=document.getElementById('modal2-inner'); if(mi) mi.innerHTML=''; if(typeof _flushPending==='function') setTimeout(_flushPending,50); };
 // 🖨️ REIMPRIMIR NÚMERO DE ESTAMPA: teclado numérico → imprime el número GRANDE (sin QR) en la Sunmi.
 // Para cuando la estampa de la parte ya está borrosa/no se ve.
 window.printStickerNumber=function(prefill){
