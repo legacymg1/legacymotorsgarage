@@ -2088,7 +2088,13 @@ window.renderLister=function(){
   if(pipeline.length)     html+=secHead('#3ecf8e',t('secPublicadas'),pipeline.length)+pipeline.map(listerCard).join('');
   if(g.vendido.length)    html+=secHead('#f0c040',t('secVendidas'),g.vendido.length)+g.vendido.map(listerCard).join('');
   if(airbags.length) html+='<details style="margin-top:18px;"><summary style="cursor:pointer;font-size:13px;font-weight:800;color:#c084fc;padding:6px 2px;">🎈 '+t('secAirbags')+' ('+airbags.length+')</summary><div class="sub" style="margin:4px 2px 8px;">'+t('airbagNote')+'</div>'+airbags.map(listerCard).join('')+'</details>';
-  box.innerHTML=html;
+  // 🛡️ Evita re-dibujar de gancho: si lo VISIBLE no cambió (otra persona movió una pieza que no se muestra),
+  // no toques el DOM → no brinca ni se pierde el lugar. Y si SÍ cambió, conserva la posición del scroll.
+  const _sig=q+'|'+JSON.stringify([...working,...pipeline,...g.vendido,...airbags].map(p=>[p.id,p.status,p.name,p.partNumber,p.stickerNum,p.vehicleLabel,p.ebayDraft?1:0]));
+  if(box.getAttribute('data-sig')===_sig && box.innerHTML){ return; }
+  const _sy=(window.pageYOffset||document.documentElement.scrollTop||0);
+  box.innerHTML=html; box.setAttribute('data-sig',_sig);
+  try{ window.scrollTo(0,_sy); }catch(_e){}
 };
 window.copyText=function(btn,txt){ navigator.clipboard&&navigator.clipboard.writeText(txt); btn.textContent=t('copied'); setTimeout(()=>btn.textContent=t('copy'),1200); };
 // 💬 Cuadro de mensaje COPIABLE (los alert nativos del iPhone no dejan copiar). Texto seleccionable + botón Copiar.
