@@ -634,6 +634,7 @@
     <button type="button" onclick="settleToday()" style="width:100%;background:rgba(76,175,80,0.15);border:1px solid #4caf50;color:#4caf50;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💰 Liquidar HOY (tú pones el monto / con descuento)</button>
     <button type="button" onclick="fixOrphanPayments()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px;font-size:12px;cursor:pointer;margin-top:8px;">🧹 Revisar pagos vs Finanzas (anular borrados)</button>
     <button type="button" onclick="cancelSale()" style="width:100%;background:rgba(255,59,59,0.12);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">🚫 Cancelar venta (cliente cambia de carro)</button>
+    <button type="button" onclick="releaseContract()" style="width:100%;background:transparent;border:1px solid #b45309;color:#f0c040;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">📁 Archivar contrato firmado (para firmar el nuevo)</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('pay-modal')">Cancelar</button>
       <button class="btn-save" onclick="confirmPayment()">CONFIRMAR</button>
@@ -3490,17 +3491,46 @@ window.cancelSale = async function(){
       const vid='void_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
       await setDoc(doc(db,'transactions',vid), { entryId:vid, type:'void', voidOf:frozenDmv, refType:'dmv_holding', refDept:'dealer', amountCents:taxCents, clientId:id, clientName:c.name||'', note:'Venta cancelada — impuestos/DMV no traspasados (crédito al carro nuevo)', createdAt:nowISO, createdBy:who, source:'admin-cancel-sale' });
     }
-    // 4) Limpiar el contrato; el cliente se queda para el carro nuevo.
+    // 4) Contrato firmado viejo → ARCHIVAR como ANULADO (queda en el registro) y LIBERAR la firma:
+    //    limpiar signedContract + contractNumber para que el carro NUEVO abra un contrato fresco
+    //    y firmable (sin el candado de "documento oficial bloqueado").
+    let _vers = Array.isArray(c.signedContractVersions) ? c.signedContractVersions.slice() : [];
+    _vers = _vers.map(v => (v && v.status==='active') ? {...v, status:'voided', voidedAt:nowISO, voidReason:'Venta cancelada — cliente cambió de carro'} : v);
+    if(c.signedContract && c.signedContract.status==='active' && !_vers.some(v=>v && v.version===c.signedContract.version)){
+      _vers.push({...c.signedContract, status:'voided', voidedAt:nowISO, voidReason:'Venta cancelada — cliente cambió de carro'});
+    }
+    // 5) Limpiar el contrato; el cliente se queda para el carro nuevo.
     await updateDoc(doc(db,'clients',id), {
       payments:[], settled:false, saleCancelled:true, cancelledAt:nowISO, cancelledBy:who, cancelledPaidCents:collectedCents,
       make:'', model:'', year:'', color:'', vin:'', weekly:0, numPay:0, total:0, down:0,
       totalOfPayments:0, financeCharge:0, amountFinanced:0, freq:'', schedule:[], vehicleInventoryNum:'',
-      salesTax:0, dmvFees:0
+      salesTax:0, dmvFees:0,
+      contractNumber:'', signedContract:null, signedContractVersions:_vers
     });
     const pm=document.getElementById('pay-modal'); if(pm) pm.classList.remove('active');
     alert('✅ Venta cancelada.\n\n• Devolución de '+formatMoney(collectedCents/100)+' registrada (baja el ingreso de hoy).'
       +(taxCents>0?'\n• '+formatMoney(taxCents/100)+' de impuestos/DMV salieron de "por cotejar".':'')
       +'\n• La venta original quedó archivada en el registro.\n\nAhora edita al cliente (✏️), ponle el CARRO NUEVO con su enganche e impuestos → todo vuelve a entrar y el neto de hoy queda en $0.');
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
+// 📁 Archivar el contrato firmado ACTIVO (queda ANULADO en el registro) y liberar la firma,
+//    para que el cliente pueda firmar un contrato NUEVO (p.ej. cambió de carro y ya se re-capturó).
+window.releaseContract = async function(){
+  const id = payingId; const c = clients.find(x=>x.id===id); if(!c){ alert('Cliente no encontrado'); return; }
+  const sc = c.signedContract;
+  if(!(sc && sc.url)){ alert('Este cliente no tiene un contrato firmado que archivar. Ya puedes generar y firmar su contrato nuevo.'); return; }
+  if(!confirm('📁 Archivar el contrato firmado de '+(c.name||'este cliente')+'.\n\n• El contrato viejo queda ANULADO pero SE GUARDA en el registro (historial de versiones).\n• Se libera la firma para que puedas generar y firmar el contrato NUEVO sin candado.\n\n¿Confirmar?')) return;
+  const reason='Cliente cambió de carro / se corrigió la venta';
+  const nowISO=new Date().toISOString(); const who=(auth.currentUser&&auth.currentUser.email)||'';
+  try{
+    let vers = Array.isArray(c.signedContractVersions) ? c.signedContractVersions.slice() : [];
+    vers = vers.map(v => (v && v.status==='active') ? {...v, status:'voided', voidedAt:nowISO, voidReason:reason} : v);
+    if(!vers.some(v=>v && v.version===sc.version)){
+      vers.push({...sc, status:'voided', voidedAt:nowISO, voidReason:reason});
+    }
+    await updateDoc(doc(db,'clients',id), { contractNumber:'', signedContract:null, signedContractVersions:vers, contractReleasedAt:nowISO, contractReleasedBy:who });
+    alert('✅ Contrato viejo archivado (anulado, queda en el registro).\n\nAhora genera el contrato del cliente y fírmalo — abrirá fresco, sin candado. El viejo lo puedes ver siempre en el historial de versiones.');
+    const pm=document.getElementById('pay-modal'); if(pm) pm.classList.remove('active');
   }catch(e){ alert('Error: '+((e&&e.message)||e)); }
 };
 window.deletePayment=async function(clientId, idx){
