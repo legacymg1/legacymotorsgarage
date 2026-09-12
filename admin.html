@@ -3441,14 +3441,25 @@ window.cancelSale = async function(){
   const id = payingId; const c = clients.find(x=>x.id===id); if(!c){ alert('Cliente no encontrado'); return; }
   let qs; try{ qs = await getDocs(query(collection(db,'transactions'), where('clientId','==',id))); }
   catch(e){ alert('No se pudo leer Finanzas: '+((e&&e.message)||e)); return; }
-  const voided = new Set(qs.docs.map(d=>d.data()).filter(t=>t.type==='void').map(v=>v.voidOf));
-  const collectedCents = qs.docs.map(d=>d.data())
-    .filter(t=>(t.type==='payment'||t.type==='down'||t.type==='cash_sale') && !voided.has(t.entryId||t.id))
+  const allT = qs.docs.map(d=>({_id:d.id, ...d.data()}));
+  const voided = new Set(allT.filter(t=>t.type==='void').map(v=>v.voidOf));
+  const collectedCents = allT
+    .filter(t=>(t.type==='payment'||t.type==='down'||t.type==='cash_sale') && !voided.has(t.entryId||t._id))
     .reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+  const taxHold = allT.find(t=>t.type==='dmv_holding' && !voided.has(t.entryId||t._id));
+  const taxCents = taxHold ? (Number(taxHold.amountCents)||0) : 0;
   const car = [c.year,c.make,c.model].filter(Boolean).join(' ') || 'este carro';
-  if(!confirm('🚫 CANCELAR la venta de '+car+' de '+c.name+'.\n\nEl cliente ya pagó '+formatMoney(collectedCents/100)+'.\n\n• Se hace una DEVOLUCIÓN de ese dinero en Finanzas (baja el ingreso de HOY).\n• La venta original NO se borra — queda en el registro.\n• Se limpia el contrato; el cliente SE QUEDA para su carro nuevo.\n\nAl capturar el carro nuevo, el ingreso vuelve a entrar y el neto de HOY queda en $0.\n\n¿Confirmar?')) return;
+  if(!confirm('🚫 CANCELAR la venta de '+car+' de '+c.name+'.\n\n'
+    +'El cliente ya pagó '+formatMoney(collectedCents/100)+' de ingreso'
+    +(taxCents>0?' + '+formatMoney(taxCents/100)+' de impuestos/DMV':'')+'.\n\n'
+    +'• Se hace una DEVOLUCIÓN del ingreso en Finanzas (baja el ingreso de HOY).\n'
+    +(taxCents>0?'• Los impuestos/DMV salen de la bolsa "por cotejar" (el carro no se traspasó al DMV).\n':'')
+    +'• La venta original queda archivada en el registro (no se borra).\n'
+    +'• Se limpia el contrato; el cliente SE QUEDA para su carro nuevo.\n\n'
+    +'Al capturar el carro nuevo, el ingreso y los impuestos vuelven a entrar y el neto de HOY queda en $0.\n\n¿Confirmar?')) return;
   const who=(auth.currentUser&&auth.currentUser.email)||''; const nowISO=new Date().toISOString(); const dateStr=today();
   try{
+    // 1) DEVOLUCIÓN del ingreso cobrado (baja el efectivo de HOY, corte actual).
     if(collectedCents>0){
       const rid='refund_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
       await setDoc(doc(db,'transactions',rid), {
@@ -3458,13 +3469,38 @@ window.cancelSale = async function(){
         createdAt:nowISO, createdBy:who, source:'admin-cancel-sale'
       });
     }
+    // 2) CONGELAR los renglones de id-FIJO (enganche/contado/DMV) a un id único.
+    //    Estos usan id fijo por cliente (downpay_<id>, cashsale_<id>, dmvhold_<id>); si no los
+    //    congelamos, al capturar el carro NUEVO se SOBRE-ESCRIBEN y se pierde el registro (y la
+    //    devolución quedaría sin su ingreso original). Congelar = copiar a id único + borrar el fijo.
+    const freeze = async (fixedId) => {
+      try{ const s=await getDoc(doc(db,'transactions',fixedId)); if(!s.exists()) return null;
+        const data=s.data(); const frozenId=fixedId+'_cxl_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+        await setDoc(doc(db,'transactions',frozenId), { ...data, entryId:frozenId, cancelledSale:true, cancelledAt:nowISO, origEntryId:fixedId });
+        await deleteDoc(doc(db,'transactions',fixedId));
+        return frozenId;
+      }catch(e){ console.log('freeze '+fixedId, e); return null; }
+    };
+    await freeze('downpay_'+id);
+    await freeze('cashsale_'+id);
+    const frozenDmv = await freeze('dmvhold_'+id);
+    // 3) Los impuestos/DMV de la venta cancelada SALEN de "por cotejar" (no hubo traspaso al DMV;
+    //    ese dinero es crédito al carro nuevo, que generará su propia bolsa de impuestos al capturarlo).
+    if(frozenDmv){
+      const vid='void_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      await setDoc(doc(db,'transactions',vid), { entryId:vid, type:'void', voidOf:frozenDmv, refType:'dmv_holding', refDept:'dealer', amountCents:taxCents, clientId:id, clientName:c.name||'', note:'Venta cancelada — impuestos/DMV no traspasados (crédito al carro nuevo)', createdAt:nowISO, createdBy:who, source:'admin-cancel-sale' });
+    }
+    // 4) Limpiar el contrato; el cliente se queda para el carro nuevo.
     await updateDoc(doc(db,'clients',id), {
       payments:[], settled:false, saleCancelled:true, cancelledAt:nowISO, cancelledBy:who, cancelledPaidCents:collectedCents,
       make:'', model:'', year:'', color:'', vin:'', weekly:0, numPay:0, total:0, down:0,
-      totalOfPayments:0, financeCharge:0, amountFinanced:0, freq:'', schedule:[], vehicleInventoryNum:''
+      totalOfPayments:0, financeCharge:0, amountFinanced:0, freq:'', schedule:[], vehicleInventoryNum:'',
+      salesTax:0, dmvFees:0
     });
     const pm=document.getElementById('pay-modal'); if(pm) pm.classList.remove('active');
-    alert('✅ Venta cancelada. Devolución de '+formatMoney(collectedCents/100)+' registrada (baja el ingreso de hoy). La venta original quedó en el registro.\n\nAhora edita al cliente (✏️), ponle el CARRO NUEVO y captura ese dinero como enganche → el ingreso vuelve a entrar y el neto de hoy queda en $0.');
+    alert('✅ Venta cancelada.\n\n• Devolución de '+formatMoney(collectedCents/100)+' registrada (baja el ingreso de hoy).'
+      +(taxCents>0?'\n• '+formatMoney(taxCents/100)+' de impuestos/DMV salieron de "por cotejar".':'')
+      +'\n• La venta original quedó archivada en el registro.\n\nAhora edita al cliente (✏️), ponle el CARRO NUEVO con su enganche e impuestos → todo vuelve a entrar y el neto de hoy queda en $0.');
   }catch(e){ alert('Error: '+((e&&e.message)||e)); }
 };
 window.deletePayment=async function(clientId, idx){
