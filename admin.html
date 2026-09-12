@@ -633,6 +633,7 @@
     <button type="button" onclick="closeModal('pay-modal');openApptModal(payingId)" style="width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:8px;">📅 Agendar cita de servicio</button>
     <button type="button" onclick="settleToday()" style="width:100%;background:rgba(76,175,80,0.15);border:1px solid #4caf50;color:#4caf50;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💰 Liquidar HOY (tú pones el monto / con descuento)</button>
     <button type="button" onclick="fixOrphanPayments()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px;font-size:12px;cursor:pointer;margin-top:8px;">🧹 Revisar pagos vs Finanzas (anular borrados)</button>
+    <button type="button" onclick="cancelSale()" style="width:100%;background:rgba(255,59,59,0.12);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">🚫 Cancelar venta (cliente cambia de carro)</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('pay-modal')">Cancelar</button>
       <button class="btn-save" onclick="confirmPayment()">CONFIRMAR</button>
@@ -3431,6 +3432,39 @@ window.fixOrphanPayments = async function(){
       await setDoc(doc(db,'transactions',vid),{ entryId:vid, type:'void', voidOf:t.entryId, refType:'payment', refDept:t.dept||'dealer', amountCents:Number(t.amountCents)||0, clientId:id, clientName:c.name||'', note:'Pago borrado — anulado (reconciliación)', createdAt:new Date().toISOString(), createdBy:who, source:'admin' });
     }
     alert('✅ Anulé '+orphans.length+' pago(s) en Finanzas ('+formatMoney(total/100)+'). Ya cuadra.');
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
+// 🚫 CANCELAR VENTA (cliente cambia de carro): hace una DEVOLUCIÓN del dinero pagado en el corte de HOY
+// (baja el ingreso de hoy, sin borrar la venta original ni tocar el corte que ya se repartió), limpia el
+// contrato y CONSERVA al cliente. Al capturar el carro nuevo, el ingreso vuelve a entrar → neto de hoy = $0.
+window.cancelSale = async function(){
+  const id = payingId; const c = clients.find(x=>x.id===id); if(!c){ alert('Cliente no encontrado'); return; }
+  let qs; try{ qs = await getDocs(query(collection(db,'transactions'), where('clientId','==',id))); }
+  catch(e){ alert('No se pudo leer Finanzas: '+((e&&e.message)||e)); return; }
+  const voided = new Set(qs.docs.map(d=>d.data()).filter(t=>t.type==='void').map(v=>v.voidOf));
+  const collectedCents = qs.docs.map(d=>d.data())
+    .filter(t=>(t.type==='payment'||t.type==='down'||t.type==='cash_sale') && !voided.has(t.entryId||t.id))
+    .reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+  const car = [c.year,c.make,c.model].filter(Boolean).join(' ') || 'este carro';
+  if(!confirm('🚫 CANCELAR la venta de '+car+' de '+c.name+'.\n\nEl cliente ya pagó '+formatMoney(collectedCents/100)+'.\n\n• Se hace una DEVOLUCIÓN de ese dinero en Finanzas (baja el ingreso de HOY).\n• La venta original NO se borra — queda en el registro.\n• Se limpia el contrato; el cliente SE QUEDA para su carro nuevo.\n\nAl capturar el carro nuevo, el ingreso vuelve a entrar y el neto de HOY queda en $0.\n\n¿Confirmar?')) return;
+  const who=(auth.currentUser&&auth.currentUser.email)||''; const nowISO=new Date().toISOString(); const dateStr=today();
+  try{
+    if(collectedCents>0){
+      const rid='refund_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+      await setDoc(doc(db,'transactions',rid), {
+        entryId:rid, type:'expense', dept:'dealer', category:'Devolución de venta',
+        clientId:id, clientName:c.name||'', amountCents:collectedCents, method:'cash', date:dateStr,
+        note:'Devolución venta '+car+' · '+c.name+' cambió de carro (crédito al carro nuevo)',
+        createdAt:nowISO, createdBy:who, source:'admin-cancel-sale'
+      });
+    }
+    await updateDoc(doc(db,'clients',id), {
+      payments:[], settled:false, saleCancelled:true, cancelledAt:nowISO, cancelledBy:who, cancelledPaidCents:collectedCents,
+      make:'', model:'', year:'', color:'', vin:'', weekly:0, numPay:0, total:0, down:0,
+      totalOfPayments:0, financeCharge:0, amountFinanced:0, freq:'', schedule:[], vehicleInventoryNum:''
+    });
+    const pm=document.getElementById('pay-modal'); if(pm) pm.classList.remove('active');
+    alert('✅ Venta cancelada. Devolución de '+formatMoney(collectedCents/100)+' registrada (baja el ingreso de hoy). La venta original quedó en el registro.\n\nAhora edita al cliente (✏️), ponle el CARRO NUEVO y captura ese dinero como enganche → el ingreso vuelve a entrar y el neto de hoy queda en $0.');
   }catch(e){ alert('Error: '+((e&&e.message)||e)); }
 };
 window.deletePayment=async function(clientId, idx){
