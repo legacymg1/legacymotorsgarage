@@ -400,6 +400,7 @@
       <button class="btn btn-ghost" onclick="closeMovEdit()">Cancelar</button>
       <button class="btn btn-primary" id="me-save" onclick="saveMovEdit()">Guardar</button>
     </div>
+    <button class="btn btn-ghost" id="me-devolver" onclick="devolverVenta()" style="width:100%;margin-top:8px;color:#f0c040;border-color:rgba(240,192,64,0.5);display:none;">↩️ Devolver venta (deja registro)</button>
     <button class="btn btn-ghost" id="me-delete" onclick="deleteMov()" style="width:100%;margin-top:8px;color:#ff6b6b;border-color:rgba(255,107,107,0.5);display:none;">🗑 Eliminar movimiento</button>
     <div id="me-readonly" style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;display:none;">Solo lectura: este movimiento es de la bolsa de tu socio.</div>
   </div>
@@ -1054,7 +1055,7 @@ window.renderDevolList = function(){
   const q=((document.getElementById('devol-search')||{}).value||'').trim().toLowerCase();
   const revMap=_reversedMap();
   const remOf=t=>(Number(t.amountCents)||0)-(revMap[t.entryId||t.id]||0);
-  let list=txns.filter(t=>t.type==='expense' && remOf(t)>0 && canEditTx(t.id));   // muestra mientras quede saldo por devolver
+  let list=txns.filter(t=>t.type==='expense' && !t.saleRefundOf && remOf(t)>0 && canEditTx(t.id));   // muestra mientras quede saldo por devolver (excluye devoluciones de VENTA)
   if(q){ const w=q.split(/\s+/); list=list.filter(t=>{ const hay=((t.note||'')+' '+(t.category||'')+' '+(t.vendor||'')+' '+(t.carLabel||'')+' '+((DEPT_LABEL[t.dept]||''))).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); }); }
   list.sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||''));
   if(!list.length){ box.innerHTML='<div style="color:var(--faint);text-align:center;padding:24px;">No hay gastos para devolver.</div>'; return; }
@@ -1967,6 +1968,10 @@ window.openMovEdit=function(id){
   document.getElementById('me-save').style.display = canEdit?'':'none';
   document.getElementById('me-readonly').style.display = canEdit?'none':'block';
   document.getElementById('me-delete').style.display = isOwnerUser()?'':'none';   // borrar = solo dueño (regla Firestore)
+  // ↩️ Devolver venta: SOLO para INGRESOS (ventas) de tu bolsa. Deja el ingreso original y registra
+  //    la devolución con fecha de HOY (cae en el corte actual aunque la venta sea de un corte pasado).
+  const devBtn=document.getElementById('me-devolver');
+  if(devBtn){ devBtn.style.display = (inc && canEdit && (Number(tx.amountCents)||0)>0) ? '' : 'none'; }
   document.getElementById('movedit-overlay').classList.add('open');
 };
 window.closeMovEdit=function(){ document.getElementById('movedit-overlay').classList.remove('open'); _movId=null; _movTx=null; };
@@ -1979,6 +1984,48 @@ window.deleteMov=async function(){
   try{ await deleteDoc(doc(db,'transactions',_movId)); closeMovEdit(); }
   catch(e){ alert('Error al eliminar: '+e.message); }
   if(btn){ btn.disabled=false; btn.textContent='🗑 Eliminar movimiento'; }
+};
+// ↩️ DEVOLVER UNA VENTA (ingreso): deja el ingreso ORIGINAL intacto y agrega un renglón de
+//    DEVOLUCIÓN (gasto) con fecha de HOY. Así:
+//      • Queda constancia de la venta Y de la devolución (el libro es permanente).
+//      • Si la venta fue de un corte YA cerrado/repartido, la devolución baja el efectivo de HOY
+//        sin tocar ese corte viejo (por eso son dos cortes distintos y ambos quedan bien).
+//      • El reporte "🔧 Por carro" resta esta devolución al carro del yonke ligado.
+//    Soporta devolución PARCIAL (varias piezas de una misma venta).
+window.devolverVenta=async function(){
+  if(!_movId||!_movTx) return;
+  const tx=_movTx;
+  if(tx.type!=='income'){ alert('Solo se pueden devolver ventas (ingresos).'); return; }
+  if(!canEditTx(_movId)){ alert('Solo puedes devolver ventas de tu bolsa.'); return; }
+  const full=Number(tx.amountCents)||0;
+  const already=liveTxns().filter(t=>t.type==='expense' && t.saleRefundOf===(tx.entryId||_movId)).reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+  const remaining=full-already;
+  if(remaining<=0){ alert('Esta venta ya fue devuelta por completo ('+centsToUSD(full)+').'); return; }
+  const desc=(tx.note||tx.category||'Venta')+(tx.clientName?(' · '+tx.clientName):'');
+  const ans=prompt('¿Cuánto vas a DEVOLVER de "'+desc+'"?\n\nSaldo disponible: '+centsToUSD(remaining)+(already>0?(' (de '+centsToUSD(full)+', ya devuelto '+centsToUSD(already)+')'):'')+'\n\n• Deja el monto completo para devolver TODO.\n• Pon MENOS para devolver solo una parte (ej. una pieza) — el resto se queda.', (remaining/100).toFixed(2));
+  if(ans===null) return;
+  const cents=Math.round(Number(ans)*100);
+  if(!cents||cents<=0){ alert('Pon un monto válido.'); return; }
+  if(cents>remaining){ alert('No puedes devolver más que el saldo ('+centsToUSD(remaining)+').'); return; }
+  const isPartial = cents<remaining || already>0;
+  const who=(auth.currentUser&&auth.currentUser.email)||''; const date=new Date().toISOString().slice(0,10);
+  const dept=tx.dept||'parts'; const cajaTxt=(DEPT_LABEL[dept]||dept);
+  if(!confirm('↩️ Devolver '+centsToUSD(cents)+(isPartial?' (parcial)':'')+' de "'+desc+'".\n\n• El ingreso original NO se toca — queda en el registro.\n• Se registra la devolución con fecha de HOY (baja el efectivo de '+cajaTxt+' en este corte).'+(tx.dismantleCarId?'\n• Baja lo que dejó ese carro del yonke.':'')+'\n\n¿Confirmar?')) return;
+  const rid='salerefund_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  try{
+    await setDoc(doc(db,'transactions',rid), {
+      entryId:rid, type:'expense', dept, category:'Devolución de venta',
+      amountCents:cents, method:(tx.method||'cash'), date,
+      saleRefundOf:(tx.entryId||_movId), partial:isPartial,
+      clientId:(tx.clientId||''), clientName:(tx.clientName||''),
+      dismantleCarId:(tx.dismantleCarId||''), dismantleCarLabel:(tx.dismantleCarLabel||''),
+      private:(tx.private===true),
+      note:(isPartial?'Devolución parcial de venta: ':'Devolución de venta: ')+desc,
+      createdAt:new Date().toISOString(), createdBy:who, source:'finanzas'
+    });
+    closeMovEdit();
+    alert('✅ Devolución registrada ('+centsToUSD(cents)+(isPartial?' · parcial':'')+').\n\nEl ingreso original quedó en el registro y esta devolución baja el efectivo de HOY.'+((remaining-cents)>0?(' Saldo restante por devolver de esta venta: '+centsToUSD(remaining-cents)+'.'):''));
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
 };
 window.meReceiptPreview=function(){
   const f=document.getElementById('me-receipt').files[0]; const box=document.getElementById('me-receipt-preview');
@@ -2367,19 +2414,24 @@ function renderDcarReport(){
   const box=document.getElementById('dcar-body'); if(!box) return;
   const m=c=>'$'+(Number(c||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const byCar={};
-  liveTxns().forEach(t=>{ const id=t.dismantleCarId; if(!id||!INCOME_TYPES.includes(t.type)) return;
-    if(!byCar[id]) byCar[id]={id, label:t.dismantleCarLabel||'', rev:0, n:0};
-    byCar[id].rev += Number(t.amountCents)||0; byCar[id].n++; });
+  liveTxns().forEach(t=>{ const id=t.dismantleCarId; if(!id) return;
+    if(INCOME_TYPES.includes(t.type)){
+      if(!byCar[id]) byCar[id]={id, label:t.dismantleCarLabel||'', rev:0, ref:0, n:0};
+      byCar[id].rev += Number(t.amountCents)||0; byCar[id].n++;
+    } else if(t.type==='expense' && t.saleRefundOf){   // ↩️ devolución de venta ligada a este carro
+      if(!byCar[id]) byCar[id]={id, label:t.dismantleCarLabel||'', rev:0, ref:0, n:0};
+      byCar[id].ref += Number(t.amountCents)||0;
+    } });
   Object.values(byCar).forEach(x=>{ const c=dismantleCars.find(d=>d.id===x.id); x.cost=c?(Number(c.costCents)||0):0; if(!x.label && c) x.label=dcarLabel(c); });
   const rows=Object.values(byCar).sort((a,b)=>b.rev-a.rev);
   if(!rows.length){ box.innerHTML='<div style="color:var(--faint);font-size:14px;padding:16px 4px;line-height:1.5;">Aún no hay ventas de partes ligadas a un carro del yonke.<br>Al registrar un ＋Ingreso de <b>Partes</b>, elige el <b>🔧 carro del yonke</b> y aquí verás cuánto va dejando cada uno.</div>'; return; }
-  let totRev=0,totCost=0;
-  const html=rows.map(x=>{ totRev+=x.rev; totCost+=(x.cost||0); const net=x.rev-(x.cost||0);
+  let totRev=0,totCost=0,totRef=0;
+  const html=rows.map(x=>{ const ref=x.ref||0; const netRev=x.rev-ref; totRev+=x.rev; totRef+=ref; totCost+=(x.cost||0); const net=netRev-(x.cost||0);
     return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="font-weight:800;">${esc(x.label||'Carro')}</div><div style="font-weight:800;color:${net>=0?'var(--green)':'var(--red)'};">${m(net)}</div></div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Ventas de partes: <b style="color:var(--green);">${m(x.rev)}</b> (${x.n}) · Costo del carro: <b>${x.cost?m(x.cost):'—'}</b></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px;">Ventas de partes: <b style="color:var(--green);">${m(x.rev)}</b> (${x.n})${ref>0?(' · ↩️ Devoluciones: <b style="color:var(--red);">−'+m(ref)+'</b>'):''} · Costo del carro: <b>${x.cost?m(x.cost):'—'}</b></div>
     </div>`; }).join('');
-  const totNet=totRev-totCost;
+  const totNet=totRev-totRef-totCost;
   box.innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5;">Ventas de partes <b>registradas en Finanzas</b> por carro del yonke, menos lo que costó el carro. (Lo vendido por eBay se lleva aparte; esto es sobre todo para tus ventas <b>fuera de eBay</b>.)</div>`+html+
     `<div style="border-top:2px solid var(--border);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;font-weight:800;"><span>TOTAL neto</span><span style="color:${totNet>=0?'var(--green)':'var(--red)'};">${m(totNet)}</span></div>`;
 }
@@ -2479,9 +2531,11 @@ function renderPrivadas(){
     totalCli+=paid;
     return {name:c.name||'(sin nombre)', car:`${c.year||''} ${c.make||''} ${c.model||''}`.trim(), paid};
   }).sort((a,b)=>b.paid-a.paid);
-  // Partes: ingresos marcados private
-  const partSales=live.filter(t=>t.private===true).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  const totalParts=partSales.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
+  // Partes: ingresos marcados private (las VENTAS). Las devoluciones (gasto saleRefundOf) restan.
+  const partSales=live.filter(t=>t.private===true && INCOME.includes(t.type)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const partRefunds=live.filter(t=>t.private===true && t.type==='expense' && t.saleRefundOf);
+  const totalParts=partSales.reduce((s,t)=>s+(Number(t.amountCents)||0),0)
+                 - partRefunds.reduce((s,t)=>s+(Number(t.amountCents)||0),0);
   const empty=(txt)=>`<div style="font-size:13px;color:var(--faint);padding:6px 0;">${txt}</div>`;
   const cardCSS='background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;';
   const totalRow=(label,val)=>`<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:8px;padding-top:8px;font-weight:700;"><span>${label}</span><span>${centsToUSD(val)}</span></div>`;
@@ -2497,6 +2551,7 @@ function renderPrivadas(){
     <div style="${cardCSS}">
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;">🔧 Partes <span style="font-size:11px;color:var(--faint);font-weight:500;">· ventas privadas</span></div>
       ${partSales.length?partSales.map(rowPart).join(''):empty('Aún no hay ventas privadas de Partes.')}
+      ${partRefunds.map(t=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:14px;"><span style="color:#ff6b6b;">↩️ ${(t.note||'Devolución de venta')}<span style="color:var(--faint);font-size:12px;">${t.date?' · '+fmtDate(t.date):''}</span></span><span style="color:#ff6b6b;white-space:nowrap;">−${centsToUSD(t.amountCents)}</span></div>`).join('')}
       ${totalRow('Total privadas Partes', totalParts)}
     </div>`;
 }
