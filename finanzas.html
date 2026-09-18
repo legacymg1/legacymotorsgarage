@@ -166,7 +166,7 @@
     <button class="btn-add" onclick="openExp()" style="flex:1;font-size:16px;padding:14px;font-weight:700;">＋ Gasto</button>
   </div>
   <div id="mov-search-wrap" style="position:relative;margin:0 0 8px;">
-    <input id="mov-search" oninput="movSearch()" placeholder="🔎 Buscar un gasto o ingreso (fecha, carro, concepto)…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 40px 11px 12px;color:var(--text);font-size:14px;">
+    <input id="mov-search" oninput="movSearch()" placeholder="🔎 Buscar: monto, fecha, nombre, carro, concepto…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 40px 11px 12px;color:var(--text);font-size:14px;">
     <span id="mov-search-x" onclick="clearMovSearch()" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--border);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;user-select:none;">✕</span>
   </div>
   <div id="mov-results" style="display:none;margin:0 0 20px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;max-height:60vh;overflow-y:auto;"></div>
@@ -1147,21 +1147,59 @@ function renderExpenses(){
   }
   renderMovResults();   // mantén el desplegable del buscador al día si hay una búsqueda activa
 }
+// 🗓️ Reconoce una FECHA escrita de varias formas dentro de la búsqueda y devuelve un filtro por ese
+//    día / mes / año. Soporta: 2026-09-15, 9/15/2026, 15/9/26, 15/9, «15 sep», «sep 15», «15 de
+//    septiembre», «septiembre», «2026», «hoy», «ayer». Ambiguo (9/15 vs 15/9): acepta las dos lecturas.
+const _MONTHS={ene:1,enero:1,jan:1,january:1,feb:2,febrero:2,february:2,mar:3,marzo:3,march:3,abr:4,abril:4,apr:4,april:4,may:5,mayo:5,jun:6,junio:6,june:6,jul:7,julio:7,july:7,ago:8,agosto:8,aug:8,august:8,sep:9,sept:9,septiembre:9,september:9,oct:10,octubre:10,october:10,nov:11,noviembre:11,november:11,dic:12,diciembre:12,dec:12,december:12};
+function _isoYMD(iso){ const p=String(iso||'').split('-'); return [ +p[0], +p[1], +p[2] ]; }
+function _ambigPred(a,b,y){   // a/b sin saber si es mes/día o día/mes → junta las lecturas válidas
+  const cands=[];
+  if(a>=1&&a<=12&&b>=1&&b<=31) cands.push([a,b]);   // mes/día (US)
+  if(b>=1&&b<=12&&a>=1&&a<=31) cands.push([b,a]);   // día/mes (MX)
+  return iso=>{ const [Y,M,D]=_isoYMD(iso); if(y&&Y!==y) return false; return cands.some(c=>c[0]===M&&c[1]===D); };
+}
+function parseDateQuery(q){
+  q=' '+q.toLowerCase().trim()+' '; let m;
+  if(/\b(hoy|today)\b/.test(q)){ const t=new Date(); const y=t.getFullYear(),mo=t.getMonth()+1,d=t.getDate(); return {matchedText:(q.match(/\b(hoy|today)\b/)[0]), test:iso=>{const[Y,M,D]=_isoYMD(iso);return Y===y&&M===mo&&D===d;}}; }
+  if(/\b(ayer|yesterday)\b/.test(q)){ const t=new Date(Date.now()-86400000); const y=t.getFullYear(),mo=t.getMonth()+1,d=t.getDate(); return {matchedText:(q.match(/\b(ayer|yesterday)\b/)[0]), test:iso=>{const[Y,M,D]=_isoYMD(iso);return Y===y&&M===mo&&D===d;}}; }
+  m=q.match(/(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);   // ISO año-mes-día
+  if(m){ const y=+m[1],mo=+m[2],d=+m[3]; return {matchedText:m[0], test:iso=>{const[Y,M,D]=_isoYMD(iso);return Y===y&&M===mo&&D===d;}}; }
+  m=q.match(/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/);  // A/B/año (ambiguo)
+  if(m){ let y=+m[3]; if(y<100) y+=2000; return {matchedText:m[0], test:_ambigPred(+m[1],+m[2],y)}; }
+  m=q.match(/(\d{1,2})\s*(?:de\s+)?([a-záéíóúñ]{3,})/);  // día + mes en palabra
+  if(m && _MONTHS[m[2]]!==undefined){ const mo=_MONTHS[m[2]],d=+m[1]; return {matchedText:m[0], test:iso=>{const[,M,D]=_isoYMD(iso);return M===mo&&D===d;}}; }
+  m=q.match(/([a-záéíóúñ]{3,})\.?\s+(\d{1,2})\b/);       // mes en palabra + día
+  if(m && _MONTHS[m[1]]!==undefined){ const mo=_MONTHS[m[1]],d=+m[2]; return {matchedText:m[0], test:iso=>{const[,M,D]=_isoYMD(iso);return M===mo&&D===d;}}; }
+  m=q.match(/\b(\d{1,2})[-\/.](\d{1,2})\b/);             // A/B sin año (ambiguo)
+  if(m){ return {matchedText:m[0], test:_ambigPred(+m[1],+m[2],null)}; }
+  m=q.match(/\b(20\d{2})\b/);                            // solo año
+  if(m){ const y=+m[1]; return {matchedText:m[1], test:iso=>_isoYMD(iso)[0]===y}; }
+  for(const w of q.trim().split(/\s+/)){ if(_MONTHS[w]!==undefined){ const mo=_MONTHS[w]; return {matchedText:w, test:iso=>_isoYMD(iso)[1]===mo}; } }   // solo mes
+  return null;
+}
+function _fmtDateLong(d){ if(!d) return ''; try{ return new Date(d+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return ''; } }
 // Desplegable de resultados JUSTO debajo de la barra de buscar (arriba), para cachar el movimiento sin bajar hasta la lista.
 function renderMovResults(){
   const box=document.getElementById('mov-results'); if(!box) return;
   const q=(document.getElementById('mov-search')?document.getElementById('mov-search').value:'').trim().toLowerCase();
   const _x=document.getElementById('mov-search-x'); if(_x) _x.style.display=q?'':'none';
   if(!q){ box.style.display='none'; box.innerHTML=''; return; }
-  const words=q.split(/\s+/);
+  // 1) ¿la búsqueda trae una FECHA? → filtra por ese día/mes/año y quita ese texto de las palabras.
+  const dp=parseDateQuery(q);
+  const rest=(dp?q.replace(dp.matchedText,' '):q).replace(/\s+/g,' ').trim();
+  const words=rest.split(/\s+/).map(w=>w.replace(/[$,]/g,'')).filter(w=>w && w!=='de' && w!=='del');
   const res=_movAll().filter(e=>{
-    const hay=[e.note,e.category,e.vendor,e.source_name,e.carLabel,e.date,fmtDate(e.date),(DEPT_LABEL[e.dept]||'')].join(' ').toLowerCase();
+    if(dp && !(e.date && dp.test(e.date))) return false;
+    if(!words.length) return true;
+    const dollars=(Number(e.amountCents)||0)/100;
+    const amtForms=[String(Math.round(dollars)), dollars.toFixed(2), dollars.toLocaleString('en-US'), dollars.toLocaleString('en-US',{minimumFractionDigits:2})];
+    const hay=[e.note,e.category,e.vendor,e.source_name,e.clientName,e.carLabel,e.dismantleCarLabel,e.accountConcept,e.date,fmtDate(e.date),_fmtDateLong(e.date),(DEPT_LABEL[e.dept]||''),...amtForms].join(' ').toLowerCase();
     return words.every(w=>hay.indexOf(w)>=0);
   }).slice(0,400);
   box.style.display='';
   box.innerHTML = res.length
     ? `<div style="font-size:11px;color:var(--faint);padding:2px 6px 6px;">${res.length} resultado${res.length===1?'':'s'} · toca uno para verlo/editarlo</div>`+res.map(movRowHtml).join('')
-    : `<div class="empty" style="padding:18px;"><div class="empty-ic">🔎</div><div class="empty-title">Sin resultados</div><div class="empty-sub">Prueba con otra fecha o palabra (ej. «abril», «Altima», «placas»).</div></div>`;
+    : `<div class="empty" style="padding:18px;"><div class="empty-ic">🔎</div><div class="empty-title">Sin resultados</div><div class="empty-sub">Prueba con un monto (150), una fecha (15/9, «sep 15», «hoy»), un nombre o un carro.</div></div>`;
 }
 
 // ---------- HELPERS ----------
