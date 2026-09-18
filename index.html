@@ -14683,9 +14683,27 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
 </div>
 
 <!-- CAR DETAIL MODAL -->
+<style>
+@media print {
+  body > *:not(#car-detail-modal){ display:none !important; }
+  #car-detail-modal{ position:absolute !important; inset:0 !important; background:#fff !important; padding:0 !important; overflow:visible !important; display:block !important; }
+  #car-detail-modal > div{ max-width:100% !important; background:#fff !important; border-radius:0 !important; box-shadow:none !important; }
+  #cdm-media{ background:#fff !important; }
+  #cdm-slides{ display:block !important; overflow:visible !important; }
+  #cdm-slides img{ display:none !important; }
+  #cdm-slides img:first-child{ display:block !important; width:100% !important; height:auto !important; max-height:380px !important; object-fit:contain !important; background:#fff !important; }
+  #cdm-media img{ height:auto !important; max-height:380px !important; object-fit:contain !important; background:#fff !important; }
+  #cdm-media div[style*="Swipe"], #cdm-media div:has(> #cdm-slides) + div{ display:none !important; }
+  #cdm-invnum{ color:#8a6d00 !important; }
+  #cdm-title,#cdm-price,#cdm-weekly,#cdm-desc{ color:#000 !important; }
+  #cdm-details span{ background:#f2f2f2 !important; color:#000 !important; border:1px solid #ccc !important; }
+  #cdm-cost{ display:none !important; }
+  .cdm-noprint{ display:none !important; }
+}
+</style>
 <div id="car-detail-modal" onclick="if(event.target===this)closeCarDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9000;overflow-y:auto;padding:20px;">
   <div style="max-width:700px;margin:0 auto;background:#12161f;border-radius:16px;overflow:hidden;position:relative;">
-    <button onclick="closeCarDetail()" aria-label="Cerrar / Close" title="Cerrar / Close" style="position:fixed;top:16px;right:16px;background:rgba(0,0,0,0.7);border:1.5px solid rgba(255,255,255,0.45);color:#fff;border-radius:50%;width:46px;height:46px;font-size:22px;line-height:1;cursor:pointer;z-index:9999;backdrop-filter:blur(4px);">✕</button>
+    <button class="cdm-noprint" onclick="closeCarDetail()" aria-label="Cerrar / Close" title="Cerrar / Close" style="position:fixed;top:16px;right:16px;background:rgba(0,0,0,0.7);border:1.5px solid rgba(255,255,255,0.45);color:#fff;border-radius:50%;width:46px;height:46px;font-size:22px;line-height:1;cursor:pointer;z-index:9999;backdrop-filter:blur(4px);">✕</button>
     <!-- Media slider -->
     <div id="cdm-media" style="background:#000;min-height:240px;"></div>
     <!-- Info -->
@@ -14697,9 +14715,10 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
       <div id="cdm-details" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;"></div>
       <div id="cdm-desc" style="font-size:14px;color:#ccc;line-height:1.6;margin-bottom:20px;"></div>
       <div id="cdm-cost" style="display:none;"></div>
-      <button onclick="window.location.href='tel:5595405145'" style="width:100%;background:linear-gradient(135deg,#f0c040,#c8960c);color:#000;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:1px;">📞 CALL NOW · LLÁMANOS</button>
+      <button class="cdm-noprint" onclick="window.location.href='tel:5595405145'" style="width:100%;background:linear-gradient(135deg,#f0c040,#c8960c);color:#000;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:1px;">📞 CALL NOW · LLÁMANOS</button>
       <p style="text-align:center;font-size:12px;color:#666;margin-top:8px;">(559) 540-5145 · legacymotorsgarage.com</p>
-      <button onclick="closeCarDetail()" style="width:100%;margin-top:12px;background:transparent;color:#ccc;border:1px solid rgba(255,255,255,0.25);border-radius:10px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:1px;">← Volver al Inventario / Close</button>
+      <button class="cdm-noprint" onclick="printCarAd()" style="width:100%;margin-top:12px;background:#1f6feb;color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:1px;">🖨️ Imprimir anuncio (para el jacket)</button>
+      <button class="cdm-noprint" onclick="closeCarDetail()" style="width:100%;margin-top:12px;background:transparent;color:#ccc;border:1px solid rgba(255,255,255,0.25);border-radius:10px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:1px;">← Volver al Inventario / Close</button>
     </div>
   </div>
 </div>
@@ -15003,7 +15022,17 @@ window.openCarDetail = function(carId){
   document.getElementById('cdm-title').textContent=c.year+' '+c.make+' '+c.model;
   document.getElementById('cdm-price').textContent='$'+Number(c.price||0).toLocaleString();
   document.getElementById('cdm-weekly').textContent=c.weekly?'$'+c.weekly+' / week · semana':'';
-  document.getElementById('cdm-details').innerHTML=(c.miles?'<span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">🛣 '+c.miles+'</span>':'')+(c.vin?'<span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">VIN: '+c.vin+'</span>':'')+'<span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">✅ 30-Day Warranty</span><span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">💰 Financing Available</span>';
+  var _chip=function(t){ return '<span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">'+t+'</span>'; };
+  var _sp=c.spec||{};
+  // Datos decodificados del VIN (NHTSA) para el anuncio / jacket del carro
+  var _specChips=[['🏷️',_sp.trim],['🚗',_sp.bodyClass],['⚙️',_sp.transmission],['🛞',_sp.drive],['🔧',_sp.engine],['🚪',(_sp.doors?_sp.doors+' doors · puertas':'')],['⛽',_sp.fuel]]
+    .filter(function(x){return x[1];}).map(function(x){return _chip(x[0]+' '+x[1]);}).join('');
+  document.getElementById('cdm-details').innerHTML=
+      (c.miles?_chip('🛣 '+c.miles+(String(c.miles).match(/mi|mil|km/i)?'':' mi')):'')
+    + (c.vin?_chip('VIN: '+c.vin):'')
+    + _specChips
+    + _chip('✅ 30-Day Warranty')
+    + _chip('💰 Financing Available');
   document.getElementById('cdm-desc').textContent=c.desc||'';
   var costBox=document.getElementById('cdm-cost');
   if(costBox){ if(isStaffUser){ costBox.innerHTML=carCostHTML(c); costBox.style.display='block'; } else { costBox.innerHTML=''; costBox.style.display='none'; } }
@@ -15011,6 +15040,9 @@ window.openCarDetail = function(carId){
   document.body.style.overflow='hidden';
 };
 
+// 🖨️ Imprimir el anuncio del carro (para el jacket que pide el DMV). El @media print deja solo
+//    la tarjeta del anuncio en blanco, con la foto principal y los datos (incluye VIN decodificado).
+window.printCarAd = function(){ try{ window.print(); }catch(e){ alert('No se pudo abrir la impresión — usa el menú del navegador → Imprimir.'); } };
 window.closeCarDetail = function(){
   document.getElementById('car-detail-modal').style.display='none';
   document.body.style.overflow='';
