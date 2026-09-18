@@ -15044,6 +15044,16 @@ window.openCarDetail = function(carId){
 // 🖨️ Imprimir el anuncio del carro (para el jacket que pide el DMV). El @media print deja solo
 //    la tarjeta del anuncio en blanco, con la foto principal y los datos (incluye VIN decodificado).
 window.printCarAd = function(){ try{ window.print(); }catch(e){ alert('No se pudo abrir la impresión — usa el menú del navegador → Imprimir.'); } };
+// A prueba de caché/CSS: esconde el video (y lo pausa) durante CUALQUIER impresión y lo restaura al terminar.
+(function(){
+  var _vidPrev=null;
+  function hideVid(){ var v=document.getElementById('cdm-video'); if(v){ _vidPrev=v.style.display; v.style.display='none'; try{ v.pause(); }catch(_e){} } }
+  function showVid(){ var v=document.getElementById('cdm-video'); if(v){ v.style.display=(_vidPrev||''); } }
+  try{ window.addEventListener('beforeprint', hideVid); window.addEventListener('afterprint', showVid);
+    var mm=window.matchMedia && window.matchMedia('print');
+    if(mm && mm.addListener){ mm.addListener(function(e){ e.matches?hideVid():showVid(); }); }
+  }catch(_e){}
+})();
 window.closeCarDetail = function(){
   document.getElementById('car-detail-modal').style.display='none';
   document.body.style.overflow='';
