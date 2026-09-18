@@ -15044,14 +15044,27 @@ window.openCarDetail = function(carId){
 // 🖨️ Imprimir el anuncio del carro (para el jacket que pide el DMV). El @media print deja solo
 //    la tarjeta del anuncio en blanco, con la foto principal y los datos (incluye VIN decodificado).
 window.printCarAd = function(){ try{ window.print(); }catch(e){ alert('No se pudo abrir la impresión — usa el menú del navegador → Imprimir.'); } };
-// A prueba de caché/CSS: esconde el video (y lo pausa) durante CUALQUIER impresión y lo restaura al terminar.
+// A prueba de caché/CSS: durante CUALQUIER impresión esconde el video (y lo pausa) y deja SOLO la
+//    primera foto (1 hoja para el jacket). Todo se restaura al terminar. Guard _on = evita doble-ejecución
+//    (beforeprint + matchMedia pueden disparar los dos).
 (function(){
-  var _vidPrev=null;
-  function hideVid(){ var v=document.getElementById('cdm-video'); if(v){ _vidPrev=v.style.display; v.style.display='none'; try{ v.pause(); }catch(_e){} } }
-  function showVid(){ var v=document.getElementById('cdm-video'); if(v){ v.style.display=(_vidPrev||''); } }
-  try{ window.addEventListener('beforeprint', hideVid); window.addEventListener('afterprint', showVid);
+  var _on=false, _vidPrev=null, _hidden=[];
+  function printOn(){
+    if(_on) return; _on=true; _hidden=[];
+    var v=document.getElementById('cdm-video'); if(v){ _vidPrev=v.style.display; v.style.display='none'; try{ v.pause(); }catch(_e){} }
+    var sl=document.getElementById('cdm-slides');
+    if(sl){ var imgs=sl.querySelectorAll('img');
+      for(var i=1;i<imgs.length;i++){ _hidden.push([imgs[i], imgs[i].style.display]); imgs[i].style.display='none'; }
+      var cap=sl.nextElementSibling; if(cap){ _hidden.push([cap, cap.style.display]); cap.style.display='none'; } }
+  }
+  function printOff(){
+    if(!_on) return; _on=false;
+    var v=document.getElementById('cdm-video'); if(v){ v.style.display=(_vidPrev||''); }
+    _hidden.forEach(function(p){ p[0].style.display=p[1]; }); _hidden=[];
+  }
+  try{ window.addEventListener('beforeprint', printOn); window.addEventListener('afterprint', printOff);
     var mm=window.matchMedia && window.matchMedia('print');
-    if(mm && mm.addListener){ mm.addListener(function(e){ e.matches?hideVid():showVid(); }); }
+    if(mm && mm.addListener){ mm.addListener(function(e){ e.matches?printOn():printOff(); }); }
   }catch(_e){}
 })();
 window.closeCarDetail = function(){
