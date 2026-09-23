@@ -14654,6 +14654,12 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <div id="car-prep-only" style="display:none;">
       <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">🔧 <b>Preparación (interno).</b> Registra lo que nos costó el carro. Puedes agregar una foto ya. El video, la descripción y el precio de venta se piden después, al editarlo para exhibición.</div>
       <input class="cf-input" id="car-cost" placeholder="Costo de compra / lo que pagamos ($)" type="number">
+      <label style="display:block;font-size:12px;color:#ffb74d;margin:2px 2px 4px;">¿Quién pagó la compra?</label>
+      <select class="cf-input" id="car-cost-payer" style="margin-top:0;">
+        <option value="dealer">🚗 Dealer (100%)</option>
+        <option value="parts">🔧 Yarda / Partes (100%)</option>
+        <option value="split">½🚗 ½🔧 Mitad y mitad (50/50 Dealer + Yarda)</option>
+      </select>
     </div>
     <div id="car-exhib-only">
       <input class="cf-input" id="car-price" placeholder="Price / Precio ($)" type="number">
@@ -15116,6 +15122,7 @@ window.openCarModal = function(carId){
   const _ms=document.getElementById('car-manage-section'); if(_ms) _ms.style.display = carId ? 'block' : 'none';   // mover/devolver solo al editar
   if(carId){ const _tp=document.getElementById('car-toparts-btn'), _rt=document.getElementById('car-return-btn'); if(_tp) _tp.dataset.cid=carId; if(_rt) _rt.dataset.cid=carId; }
   const _cc=document.getElementById('car-cost'); if(_cc) _cc.value='';
+  const _cp=document.getElementById('car-cost-payer'); if(_cp) _cp.value='dealer';
   if(!carId) title.textContent='Agregar (Preparación) / Add (Prep)';
   _carSpec = carId ? ((cars.find(x=>x.id===carId)||{}).spec||null) : null;
   renderCarSpec(_carSpec);
@@ -15292,21 +15299,45 @@ window.saveCar = async function(){
     };
     
     await setDoc(doc(db,'inventory',id), data);
-    // Costo de compra (solo al AGREGAR, si se registró): queda como gasto en el libro (bolsa Dealer)
+    // Costo de compra (solo al AGREGAR, si se registró): queda como gasto en el libro.
+    // ¿Quién pagó? → Dealer (100%), Partes/Yarda (100%), o 50/50 (dos gastos, mitad y mitad).
+    // El costo TOTAL del carro no cambia (el reporte suma las dos mitades); cada bolsa refleja lo que puso.
     const _cost = parseFloat((document.getElementById('car-cost')||{}).value) || 0;
     if(!editingCarId && _cost > 0){
       try{
-        const exId = 'exp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-        await setDoc(doc(db,'transactions',exId), {
-          entryId:exId, type:'expense', dept:'dealer', category:'Compra del vehículo',
-          amountCents: Math.round(_cost*100),
-          method:'', date:new Date().toISOString().slice(0,10), vendor:'',
-          carId:id, carLabel:((data.year||'')+' '+make+' '+model).trim()+' · #'+data.inventoryNum,
-          receiptURL:'', note:'Costo de adquisición (registrado al agregar el carro)',
-          createdAt:new Date().toISOString(),
-          createdBy:(auth.currentUser&&auth.currentUser.email)||'',
-          source:'inventory'
-        });
+        const _payer = ((document.getElementById('car-cost-payer')||{}).value) || 'dealer';
+        const _totC = Math.round(_cost*100);
+        const _who = (auth.currentUser&&auth.currentUser.email)||'';
+        const _carLabel = ((data.year||'')+' '+make+' '+model).trim()+' · #'+data.inventoryNum;
+        const _date = new Date().toISOString().slice(0,10);
+        const _grp = 'buy_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+        // Lista de partes a registrar: [dept, centavos]
+        let _legs;
+        if(_payer==='split'){
+          const _h1 = Math.round(_totC/2); const _h2 = _totC - _h1;   // centavos exactos, sin perder ni sobrar
+          _legs = [['dealer', _h1], ['parts', _h2]];
+        } else if(_payer==='parts'){
+          _legs = [['parts', _totC]];
+        } else {
+          _legs = [['dealer', _totC]];
+        }
+        for(let _i=0; _i<_legs.length; _i++){
+          const [_dept, _amt] = _legs[_i];
+          if(_amt<=0) continue;
+          const exId = 'exp_'+Date.now()+'_'+_i+'_'+Math.random().toString(36).slice(2,7);
+          const _split = _legs.length>1;
+          await setDoc(doc(db,'transactions',exId), {
+            entryId:exId, type:'expense', dept:_dept, category:'Compra del vehículo',
+            amountCents: _amt,
+            method:'', date:_date, vendor:'',
+            carId:id, carLabel:_carLabel,
+            purchaseGroupId:_grp, purchaseSplit:_split, purchasePayer:_payer,
+            receiptURL:'', note:'Costo de adquisición (registrado al agregar el carro)'+(_split?' · 50/50 ('+(_dept==='dealer'?'Dealer':'Yarda')+')':''),
+            createdAt:new Date().toISOString(),
+            createdBy:_who,
+            source:'inventory'
+          });
+        }
       }catch(exErr){ console.warn('No se pudo registrar el costo de compra:', exErr); }
     }
     closeCarModal();
