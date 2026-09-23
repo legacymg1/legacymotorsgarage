@@ -14646,6 +14646,7 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <input class="cf-input" id="car-year" placeholder="Year / Año" type="number">
     <input class="cf-input" id="car-make" placeholder="Make / Marca (Toyota)" style="text-transform:capitalize">
     <input class="cf-input" id="car-model" placeholder="Model / Modelo (Camry)" style="text-transform:capitalize">
+    <input class="cf-input" id="car-trim" placeholder="Versión / Trim (LT, XLE, Sport)…">
     <input class="cf-input" id="car-miles" placeholder="Mileage / Millas">
     <input class="cf-input" id="car-vin" placeholder="VIN Number" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter'){event.preventDefault();decodeCarVin();}">
     <button type="button" onclick="decodeCarVin()" style="width:100%;background:rgba(240,192,64,0.14);color:#f0c040;border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">🔎 Decodificar VIN (auto-rellenar)</button>
@@ -14953,7 +14954,7 @@ window.renderCars = function(){
       +'<div style="position:relative;width:42%;flex-shrink:0;min-height:175px;background:#1a1f2e;">'+thumb+videoIcon+photoCount+invBadge+certifiedSeal+prepBadge+noPubBadge+'</div>'
       +'<div style="flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;">'
       +'<div style="font-size:22px;font-weight:800;color:#f0c040;letter-spacing:0.5px;margin-bottom:1px;">'+c.year+' '+c.make+'</div>'
-      +'<div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:8px;line-height:1.15;">'+c.model+'</div>'
+      +'<div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:8px;line-height:1.15;">'+c.model+((c.trim||((c.spec&&c.spec.trim)||''))?' <span style="font-size:13px;font-weight:600;color:#cbb06a;">'+(c.trim||c.spec.trim)+'</span>':'')+'</div>'
       +'<div style="font-size:14px;font-weight:700;color:#f0c040;margin-bottom:4px;">$'+Number(c.price||0).toLocaleString()+'</div>'
       +(c.weekly?'<div style="font-size:11px;color:#aaa;margin-bottom:8px;">$'+c.weekly+' / semana</div>':'')
       +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">'
@@ -15026,13 +15027,14 @@ window.openCarDetail = function(carId){
   var _cdmv=document.getElementById('cdm-video');
   if(_cdmv){ _cdmv.play().catch(function(){ _cdmv.muted=true; _cdmv.play().catch(function(){}); }); }
   document.getElementById('cdm-invnum').textContent=c.inventoryNum?'Inventory #'+c.inventoryNum:'';
-  document.getElementById('cdm-title').textContent=c.year+' '+c.make+' '+c.model;
+  var _trim=(c.trim||((c.spec&&c.spec.trim)||''));   // versión / trim (campo guardado o del VIN)
+  document.getElementById('cdm-title').textContent=(c.year+' '+c.make+' '+c.model+(_trim?' '+_trim:'')).trim();
   document.getElementById('cdm-price').textContent='$'+Number(c.price||0).toLocaleString();
   document.getElementById('cdm-weekly').textContent=c.weekly?'$'+c.weekly+' / week · semana':'';
   var _chip=function(t){ return '<span style="background:rgba(255,255,255,0.08);padding:4px 10px;border-radius:20px;font-size:12px;color:#ccc;">'+t+'</span>'; };
   var _sp=c.spec||{};
-  // Datos decodificados del VIN (NHTSA) para el anuncio / jacket del carro
-  var _specChips=[['🏷️',_sp.trim],['🚗',_sp.bodyClass],['⚙️',_sp.transmission],['🛞',_sp.drive],['🔧',_sp.engine],['🚪',(_sp.doors?_sp.doors+' doors · puertas':'')],['⛽',_sp.fuel]]
+  // Datos decodificados del VIN (NHTSA) para el anuncio / jacket del carro. El trim ya va en el TÍTULO.
+  var _specChips=[['🚗',_sp.bodyClass],['⚙️',_sp.transmission],['🛞',_sp.drive],['🔧',_sp.engine],['🚪',(_sp.doors?_sp.doors+' doors · puertas':'')],['⛽',_sp.fuel]]
     .filter(function(x){return x[1];}).map(function(x){return _chip(x[0]+' '+x[1]);}).join('');
   document.getElementById('cdm-details').innerHTML=
       (c.miles?_chip('🛣 '+c.miles+(String(c.miles).match(/mi|mil|km/i)?'':' mi')):'')
@@ -15091,6 +15093,7 @@ window.openCarModal = function(carId){
     document.getElementById('car-year').value=c.year||'';
     document.getElementById('car-make').value=c.make||'';
     document.getElementById('car-model').value=c.model||'';
+    document.getElementById('car-trim').value=c.trim||((c.spec&&c.spec.trim)||'');
     document.getElementById('car-price').value=c.price||'';
     document.getElementById('car-weekly').value=c.weekly||'';
     document.getElementById('car-miles').value=c.miles||'';
@@ -15104,6 +15107,7 @@ window.openCarModal = function(carId){
     document.getElementById('car-year').value='';
     document.getElementById('car-make').value='';
     document.getElementById('car-model').value='';
+    document.getElementById('car-trim').value='';
     document.getElementById('car-price').value='';
     document.getElementById('car-weekly').value='';
     document.getElementById('car-miles').value='';
@@ -15163,6 +15167,7 @@ window.decodeCarVin = async function(){
     if(year) document.getElementById('car-year').value=year;
     if(make) document.getElementById('car-make').value=tc(make);
     if(model) document.getElementById('car-model').value=tc(model);
+    if(_carSpec.trim){ const _te=document.getElementById('car-trim'); if(_te) _te.value=_carSpec.trim; }   // versión / trim del VIN
     renderCarSpec(_carSpec);
     if(msg) msg.textContent = (year||make||model) ? '✓ Datos rellenados — revisa y corrige si hace falta.' : 'No se encontró info de ese VIN; captura a mano.';
   }catch(e){ if(msg) msg.textContent='No se pudo decodificar (sin internet o VIN inválido). Captura a mano.'; }
@@ -15283,6 +15288,7 @@ window.saveCar = async function(){
     const data = {
       year: document.getElementById('car-year').value,
       make, model,
+      trim: (document.getElementById('car-trim')?document.getElementById('car-trim').value.trim():'') || existing.trim || '',
       price: document.getElementById('car-price').value,
       weekly: document.getElementById('car-weekly').value,
       miles: document.getElementById('car-miles').value,
