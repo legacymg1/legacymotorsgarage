@@ -14722,7 +14722,8 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
       <div id="cdm-price" style="font-size:22px;color:#f0c040;font-weight:700;margin-bottom:4px;"></div>
       <div id="cdm-weekly" style="font-size:14px;color:#aaa;margin-bottom:12px;"></div>
       <div id="cdm-details" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;"></div>
-      <div id="cdm-desc" style="font-size:14px;color:#ccc;line-height:1.6;margin-bottom:20px;"></div>
+      <div id="cdm-desc" style="font-size:14px;color:#ccc;line-height:1.6;margin-bottom:16px;"></div>
+      <div id="cdm-spec" style="margin-bottom:16px;"></div>
       <div id="cdm-cost" style="display:none;"></div>
       <button class="cdm-noprint" onclick="window.location.href='tel:5595405145'" style="width:100%;background:linear-gradient(135deg,#f0c040,#c8960c);color:#000;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:1px;">📞 CALL NOW · LLÁMANOS</button>
       <p style="text-align:center;font-size:12px;color:#666;margin-top:8px;">(559) 540-5145 · legacymotorsgarage.com</p>
@@ -15045,6 +15046,16 @@ window.openCarDetail = function(carId){
     + _chip('✅ 30-Day Warranty')
     + _chip('💰 Financing Available');
   document.getElementById('cdm-desc').textContent=c.desc||'';
+  // 📋 Ficha técnica del VIN: TODOS los datos decodificados (NHTSA), desplegable. La ven staff y clientes.
+  var _specBox=document.getElementById('cdm-spec');
+  if(_specBox){
+    var _all=(c.spec&&c.spec.all)||[];
+    if(_all.length){
+      var _rows=_all.map(function(x){ return '<div style="display:flex;justify-content:space-between;gap:14px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12.5px;"><span style="color:#9aa;">'+x.label+'</span><span style="color:#eee;text-align:right;font-weight:600;">'+x.value+'</span></div>'; }).join('');
+      _specBox.innerHTML='<button type="button" class="cdm-noprint" onclick="toggleSpec()" id="cdm-spec-btn" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.16);color:#f0c040;border-radius:8px;padding:11px 12px;font-size:13px;font-weight:700;cursor:pointer;text-align:left;">▸ Ficha técnica del VIN ('+_all.length+' datos)</button>'
+        +'<div id="cdm-spec-list" style="display:none;margin-top:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:4px 12px;">'+_rows+'</div>';
+    } else { _specBox.innerHTML=''; }
+  }
   var costBox=document.getElementById('cdm-cost');
   if(costBox){ if(isStaffUser){ costBox.innerHTML=carCostHTML(c); costBox.style.display='block'; } else { costBox.innerHTML=''; costBox.style.display='none'; } }
   document.getElementById('car-detail-modal').style.display='block';
@@ -15077,6 +15088,11 @@ window.printCarAd = function(){ try{ window.print(); }catch(e){ alert('No se pud
     if(mm && mm.addListener){ mm.addListener(function(e){ e.matches?printOn():printOff(); }); }
   }catch(_e){}
 })();
+window.toggleSpec = function(){
+  var l=document.getElementById('cdm-spec-list'), b=document.getElementById('cdm-spec-btn');
+  if(!l) return; var show=l.style.display==='none'; l.style.display=show?'':'none';
+  if(b) b.textContent=(show?'▾':'▸')+b.textContent.slice(1);
+};
 window.closeCarDetail = function(){
   document.getElementById('car-detail-modal').style.display='none';
   document.body.style.overflow='';
@@ -15163,8 +15179,12 @@ window.decodeCarVin = async function(){
     const EXCLUDE=new Set(['Error Code','Error Text','Additional Error Text','Suggested VIN','Vehicle Descriptor','Note','Possible Values','Destination Market','NCSA Body Type','NCSA Make','NCSA Model','NCSA Note','Base Price ($)']);
     const bad=v=>{ v=(v||'').trim(); return !v || v==='0' || /^not applicable$/i.test(v) || /^0\.0*$/.test(v); };
     const all=results.filter(x=>!EXCLUDE.has(x.Variable) && !bad(x.Value)).map(x=>({label:x.Variable, value:x.Value.trim()}));
+    // Trim: NHTSA a veces devuelve códigos raros o vacío. Toma el primero "razonable"
+    // (letras, no puro número/código) de varias variables; si no, deja vacío (el usuario lo escribe).
+    const _trimCand=[g('Trim'),g('Trim2'),g('Series'),g('Series2')].map(s=>(s||'').trim())
+      .find(s=>s && /[a-z]/i.test(s) && s.length<=25) || '';
     _carSpec={ vin, source:'nhtsa', decodedAt:new Date().toISOString(),
-      trim:g('Trim')||g('Series'), series:g('Series'), bodyClass:g('Body Class'), doors:g('Doors'),
+      trim:_trimCand, series:g('Series'), bodyClass:g('Body Class'), doors:g('Doors'),
       drive:g('Drive Type'), transmission:g('Transmission Style'),
       displacementL:displ, cylinders:cyl, fuel:fuel,
       plant:g('Plant Country'), vehicleType:g('Vehicle Type'), manufacturer:g('Manufacturer Name'), engine:engine.trim(), all };
