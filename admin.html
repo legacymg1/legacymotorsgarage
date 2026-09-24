@@ -536,6 +536,17 @@
       <div class="form-group"><label class="form-label">Monto de Pago ($)</label><input class="form-input" id="f-weekly" placeholder="150" type="number" oninput="calcFinancing('weekly')"><div class="form-hint" id="f-weekly-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Ingresa el monto según la frecuencia seleccionada</div></div>
       <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="calcFinancing('numpay')"><div class="form-hint" id="f-hint" style="cursor:pointer;text-decoration:underline;" onclick="calcHint()">Toca para calcular fechas</div></div>
     </div>
+    <div style="background:var(--navy2);border-radius:10px;padding:12px;margin-bottom:8px;display:none;" id="cash-summary">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:8px;">💵 Resumen — Venta de Contado</div>
+      <div style="font-size:13px;">
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Precio del vehículo</span><b id="cs-price">$0.00</b></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Doc / Preparación</span><b>$70.00</b></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Certificación de Smog</span><b>$58.25</b></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Impuesto de venta</span><b id="cs-tax">$0.00</b></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">DMV</span><b id="cs-dmv">$0.00</b></div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--gold3);margin-top:5px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">TOTAL a pagar</span><strong id="cs-total" style="color:var(--gold);font-size:16px;">$0.00</strong></div>
+      </div>
+    </div>
     <div style="background:var(--navy2);border-radius:10px;padding:12px;margin-bottom:8px;" id="financing-summary">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:8px;">💰 Resumen Financiero</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
@@ -1198,6 +1209,9 @@ window.calcFinancing = function(changedField) {
   const docFee = 70;
   const smog = 58.25;   // Certificación de smog — se FINANCIA (entra al monto financiado)
   const freq = document.getElementById('f-freq')?.value || 'weekly';
+
+  // Contado: no hay financiamiento — solo refresca el resumen de contado ($70 + smog + total).
+  if(freq === 'cash'){ if(typeof window.updateCashSummary==='function') window.updateCashSummary(); return; }
 
   // Taxes/DMV paid upfront, NOT financed. Doc fee + smog SÍ se financian.
   const paidToday = down + tax + dmv;
@@ -3605,8 +3619,20 @@ window.toggleCashSale = function() {
   const cash = freq === 'cash';
   const payFields = document.getElementById('pay-fields-section');
   if(payFields) payFields.style.display = cash ? 'none' : '';
-  const finSum = document.getElementById('financing-summary');   // el resumen de financiamiento no aplica a contado
+  // Contado: se oculta el resumen DE FINANCIAMIENTO y se muestra el resumen DE CONTADO ($70+smog+total).
+  const finSum = document.getElementById('financing-summary');
   if(finSum) finSum.style.display = cash ? 'none' : '';
+  const cashSum = document.getElementById('cash-summary');
+  if(cashSum) cashSum.style.display = cash ? 'block' : 'none';
+  if(cash) updateCashSummary();
+};
+window.updateCashSummary = function(){
+  const num = id => parseFloat((document.getElementById(id)||{}).value) || 0;
+  const price = num('f-total'), tax = num('f-tax'), dmv = num('f-dmv');
+  const total = price + 70 + 58.25 + tax + dmv;
+  const fmt = n => '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=fmt(v); };
+  set('cs-price',price); set('cs-tax',tax); set('cs-dmv',dmv); set('cs-total',total);
 };
 
 window.generateContractFromForm = function() {
