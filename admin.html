@@ -523,6 +523,19 @@
       <div class="form-group"><label class="form-label">Sales Tax ($)</label><input class="form-input" id="f-tax" placeholder="0" type="number" oninput="calcFinancing('tax')"></div>
       <div class="form-group"><label class="form-label">DMV Fees ($)</label><input class="form-input" id="f-dmv" placeholder="0" type="number" oninput="calcFinancing('dmv')"></div>
     </div>
+    <div class="form-group">
+      <label class="form-label">Tipo de Venta</label>
+      <select class="form-input" id="f-freq" onchange="toggleCashSale();calcFinancing('freq')" oninput="calcFinancing('freq')">
+        <option value="weekly">A Plazos — Semanal (cada 7 días)</option>
+        <option value="biweekly">A Plazos — Quincenal (cada 14 días)</option>
+        <option value="monthly">A Plazos — Mensual (mismo día cada mes)</option>
+        <option value="cash">💵 VENTA EN UNA SOLA EXHIBICIÓN (Contado)</option>
+      </select>
+    </div>
+    <div class="form-row" id="pay-fields-section">
+      <div class="form-group"><label class="form-label">Monto de Pago ($)</label><input class="form-input" id="f-weekly" placeholder="150" type="number" oninput="calcFinancing('weekly')"><div class="form-hint" id="f-weekly-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Ingresa el monto según la frecuencia seleccionada</div></div>
+      <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="calcFinancing('numpay')"><div class="form-hint" id="f-hint" style="cursor:pointer;text-decoration:underline;" onclick="calcHint()">Toca para calcular fechas</div></div>
+    </div>
     <div style="background:var(--navy2);border-radius:10px;padding:12px;margin-bottom:8px;" id="financing-summary">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:8px;">💰 Resumen Financiero</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
@@ -566,22 +579,6 @@
         </div>
       </div>
       <div id="ccoa-details" style="font-size:11px;color:var(--muted);display:none;margin-top:4px;"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group" style="display:none"><!--spacer--></div
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Monto de Pago ($)</label><input class="form-input" id="f-weekly" placeholder="150" type="number" oninput="calcFinancing('weekly')"><div class="form-hint" id="f-weekly-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Ingresa el monto según la frecuencia seleccionada</div></div>
-      <div class="form-group"><label class="form-label">Número de Pagos</label><input class="form-input" id="f-numpay" placeholder="Ej: 52" type="number" oninput="calcFinancing('numpay')"><div class="form-hint" id="f-hint" style="cursor:pointer;text-decoration:underline;" onclick="calcHint()">Toca para calcular fechas</div></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Tipo de Venta</label>
-      <select class="form-input" id="f-freq" onchange="toggleCashSale();calcFinancing('freq')" oninput="calcFinancing('freq')">
-        <option value="weekly">A Plazos — Semanal (cada 7 días)</option>
-        <option value="biweekly">A Plazos — Quincenal (cada 14 días)</option>
-        <option value="monthly">A Plazos — Mensual (mismo día cada mes)</option>
-        <option value="cash">💵 VENTA EN UNA SOLA EXHIBICIÓN (Contado)</option>
-      </select>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha de Contrato</label><input class="form-input" id="f-contractdate" type="date" onchange="autoFillService()"></div>
@@ -1199,11 +1196,12 @@ window.calcFinancing = function(changedField) {
   const tax = parseFloat(document.getElementById('f-tax')?.value) || 0;
   const dmv = parseFloat(document.getElementById('f-dmv')?.value) || 0;
   const docFee = 70;
+  const smog = 58.25;   // Certificación de smog — se FINANCIA (entra al monto financiado)
   const freq = document.getElementById('f-freq')?.value || 'weekly';
 
-  // Taxes/DMV paid upfront, NOT financed
+  // Taxes/DMV paid upfront, NOT financed. Doc fee + smog SÍ se financian.
   const paidToday = down + tax + dmv;
-  const baseFinanced = Math.max(0, price + docFee - down);
+  const baseFinanced = Math.max(0, price + docFee + smog - down);
 
   // Finance charge = 20% of base financed (per 6 months) * periods
   // We need numPay or weekly to calculate
@@ -1837,11 +1835,11 @@ window.cotDup=function(i){ const o=cotOpts[i]; if(!o) return; cotOpts.splice(i+1
 window.cotRemove=function(i){ cotOpts.splice(i,1); renderCotOptions(); };
 window.cotSet=function(i,field,val){ if(!cotOpts[i]) return; cotOpts[i][field]=(field==='car'||field==='vin'||field==='freq'||field==='miles')?val:(Number(val)||0); cotUpdateResult(i); cotSaveDraft(); };
 function cotCalc(o){
-  const docFee=70;
+  const docFee=70, smog=58.25;
   const price=Number(o.price)||0, down=Number(o.down)||0, tax=Number(o.tax)||0, dmv=Number(o.dmv)||0;
   const numpay=Math.max(1, parseInt(o.numpay)||1);
   const freq=o.freq||'weekly'; const cash=freq==='cash';
-  const amountFinanced=Math.max(0, price+docFee-down);
+  const amountFinanced=Math.max(0, price+docFee+smog-down);
   const daysPerPay = freq==='monthly'?30.44:freq==='biweekly'?14:7;
   const months=(numpay*daysPerPay)/30.44;
   const financeCharge = cash?0:Math.round(amountFinanced*0.20*(months/6)*100)/100;
@@ -2315,6 +2313,7 @@ window.openEditModal=function(id){
   const idPrev=document.getElementById('f-id-preview');
   if(idPrev&&c.idPhotoURL) idPrev.innerHTML='<a href="'+c.idPhotoURL+'" target="_blank" style="font-size:12px;color:var(--green);">📷 Ver foto de ID</a>';
   else if(idPrev) idPrev.innerHTML='';
+  if(typeof toggleCashSale==='function') toggleCashSale();   // oculta #pagos/monto si es contado
   calcFinancing('load');
   document.getElementById('add-modal').classList.add('active');
 };
@@ -2346,7 +2345,7 @@ window.saveClient=async function(){
   const _price  = Number(document.getElementById('f-total').value)||0;
   const _down   = Number(document.getElementById('f-down').value)||0;
   const _weekly = Number(document.getElementById('f-weekly').value)||0;
-  const _amountFinanced  = Math.max(0, _price + 70 - _down);
+  const _amountFinanced  = Math.max(0, _price + 70 + 58.25 - _down);   // +$70 doc +$58.25 smog (ambos financiados)
 
   const freq=document.getElementById('f-freq')?document.getElementById('f-freq').value:'weekly';
   const lang=document.getElementById('f-lang')?document.getElementById('f-lang').value:'es';
@@ -2471,6 +2470,7 @@ window.saveClient=async function(){
         const _carLabel = [data.year, data.make, data.model].filter(Boolean).join(' ');
         const _carPriceC = Math.round(Number(data.total) * 100);
         const _docFeeC   = 7000; // $70 doc fee = ingreso de Legacy
+        const _smogC     = 5825; // $58.25 smog (en contado se cobra hoy; en pagos se financia y entra por los abonos)
         const _taxC = Math.round(Number(data.salesTax || 0) * 100);
         const _dmvC = Math.round(Number(data.dmvFees  || 0) * 100);
         // createdAt: Finanzas usa este sello para decidir en qué CORTE cae el movimiento (inCut).
@@ -2501,7 +2501,7 @@ window.saveClient=async function(){
           await setDoc(doc(db,'transactions','cashsale_'+id), {
             entryId:'cashsale_'+id, type:'cash_sale', dept:'dealer',
             clientId:id, clientName:name, category:'Venta de contado', saleType:'contado',
-            amountCents:_carPriceC + _docFeeC, carPriceCents:_carPriceC, docFeeCents:_docFeeC,
+            amountCents:_carPriceC + _docFeeC + _smogC, carPriceCents:_carPriceC, docFeeCents:_docFeeC, smogCents:_smogC,
             vin:data.vin||'', carLabel:_carLabel, invNum:data.vehicleInventoryNum||'',
             method:'cash', date:_saleDate, note:'Venta de contado · '+_carLabel,
             createdAt:_saleCreatedAt, createdBy:_who, source:'admin'
@@ -3601,9 +3601,12 @@ window.deletePayment=async function(clientId, idx){
 
 // Toggle cash-sale UI
 window.toggleCashSale = function() {
-  const freq = document.getElementById('f-freq').value;
+  const freq = (document.getElementById('f-freq')||{}).value;
+  const cash = freq === 'cash';
   const payFields = document.getElementById('pay-fields-section');
-  if(payFields) payFields.style.display = freq === 'cash' ? 'none' : '';
+  if(payFields) payFields.style.display = cash ? 'none' : '';
+  const finSum = document.getElementById('financing-summary');   // el resumen de financiamiento no aplica a contado
+  if(finSum) finSum.style.display = cash ? 'none' : '';
 };
 
 window.generateContractFromForm = function() {

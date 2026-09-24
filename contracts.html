@@ -163,6 +163,7 @@
     <div class="payment-box">
       <div class="payment-row"><span>Cash Price of Vehicle / Vehicle Price</span><span>${{VEHICLE_PRICE}}</span></div>
       <div class="payment-row"><span>Document Preparation Fee / Document Preparation Fee</span><span>$70.00</span></div>
+      <div class="payment-row"><span>Smog Certification Fee / Certificación de Smog</span><span>${{SMOG_FEE}}</span></div>
       <div class="payment-row"><span>Sales Tax / Sales Tax ({{TAX_RATE}}%)</span><span>${{SALES_TAX}}</span></div>
       <div class="payment-row"><span>DMV Registration Fees / DMV Registration Fees</span><span>${{DMV_FEES}}</span></div>
       <div class="payment-row"><span>Contract Cancellation Option (if selected)</span><span>${{CANCELLATION_FEE}}</span></div>
@@ -468,8 +469,9 @@
   const ccoaFee   = parseFloat(p.get('ccoaFee') || 0);
   const ccoaYes   = p.get('ccoa') === 'yes';
   const docFee    = 70;
-  const baseFinanced   = Math.max(0, price + docFee - down);
-  const totalCashPrice = price + docFee + tax + dmv + (ccoaYes ? ccoaFee : 0);
+  const smog      = 58.25;   // Certificación de smog — se FINANCIA (entra al monto financiado)
+  const baseFinanced   = Math.max(0, price + docFee + smog - down);
+  const totalCashPrice = price + docFee + smog + tax + dmv + (ccoaYes ? ccoaFee : 0);
   const daysPerPay = freq==='monthly'?30.44:freq==='biweekly'?14:7;
   const months    = numPay > 0 ? (numPay * daysPerPay) / 30.44 : 6;
   const periods   = months / 6;
@@ -522,6 +524,7 @@
     .replace(/\{\{VEH_MILES\}\}/g, p.get('miles')||'')
     .replace(/\{\{VEH_COLOR\}\}/g, p.get('color')||'')
     .replace(/\{\{VEH_PLATE\}\}/g, '')
+    .replace(/\{\{SMOG_FEE\}\}/g, fmt(smog))
     .replace(/\{\{VEHICLE_PRICE\}\}/g, fmt(price))
     .replace(/\{\{DOWN_PAYMENT\}\}/g, fmt(down))
     .replace(/\{\{AMOUNT_FINANCED\}\}/g, fmt(baseFinanced))

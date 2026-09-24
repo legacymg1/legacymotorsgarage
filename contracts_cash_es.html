@@ -123,6 +123,7 @@
   <div class="payment-box">
     <div class="payment-row"><span>Precio de Contado del Vehículo</span><span>${{VEHICLE_PRICE}}</span></div>
     <div class="payment-row"><span>Tarifa de Preparación de Documentos</span><span>$70.00</span></div>
+    <div class="payment-row"><span>Certificación de Smog</span><span>${{SMOG_FEE}}</span></div>
     <div class="payment-row"><span>Impuesto sobre la Venta ({{TAX_RATE}}%)</span><span>${{SALES_TAX}}</span></div>
     <div class="payment-row"><span>Cargos de Registro / Título del DMV</span><span>${{DMV_FEES}}</span></div>
     <div class="payment-row"><span>Opción de Cancelación de Contrato (si se selecciona)</span><span>${{CANCELLATION_FEE}}</span></div>
@@ -278,11 +279,12 @@
   const tax     = parseFloat(p.get('tax')   || 0);
   const dmv     = parseFloat(p.get('dmv')   || 0);
   const docFee  = 70;
+  const smog    = 58.25;   // Certificación de smog (en contado se suma al total)
   const ccoaYes = p.get('ccoa') === 'yes';
   const ccoaFee    = price <= 4999 ? 75 : price <= 9999 ? 150 : 250;
   const restockFee = price <= 4999 ? 175 : price <= 9999 ? 350 : 500;
   const netRestock = restockFee - ccoaFee;
-  const totalPrice = price + docFee + tax + dmv + (ccoaYes ? ccoaFee : 0);
+  const totalPrice = price + docFee + smog + tax + dmv + (ccoaYes ? ccoaFee : 0);
   const fmt = n => Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const contractNum = p.get('contractNum') || ('LMG-CASH-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5));
   const contDate = p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00') : new Date();
@@ -311,6 +313,7 @@
     .replace(/{{VEH_MILES}}/g, p.get('miles')||'')
     .replace(/{{VEH_COLOR}}/g, p.get('color')||'')
     .replace(/{{VEH_PLATE}}/g, p.get('plate')||'')
+    .replace(/{{SMOG_FEE}}/g, fmt(smog))
     .replace(/{{VEHICLE_PRICE}}/g, fmt(price))
     .replace(/{{TAX_RATE}}/g, price>0?(tax/price*100).toFixed(2):'0')
     .replace(/{{SALES_TAX}}/g, fmt(tax))
