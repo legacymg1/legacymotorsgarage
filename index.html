@@ -14653,6 +14653,7 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <button type="button" onclick="decodeCarVin()" style="width:100%;background:rgba(240,192,64,0.14);color:#f0c040;border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">🔎 Decodificar VIN (auto-rellenar)</button>
     <div id="car-vin-msg" style="font-size:12px;color:#aaa;margin:-2px 0 6px;"></div>
     <div id="car-vin-spec" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;"></div>
+    <div id="car-spec-full" style="margin-bottom:8px;"></div>
     <div id="car-prep-only" style="display:none;">
       <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">🔧 <b>Preparación (interno).</b> Registra lo que nos costó el carro. Puedes agregar una foto ya. El video, la descripción y el precio de venta se piden después, al editarlo para exhibición.</div>
       <input class="cf-input" id="car-cost" placeholder="Costo de compra / lo que pagamos ($)" type="number">
@@ -15158,11 +15159,32 @@ window.closeCarModal = function(){document.getElementById('car-modal').style.dis
 // ===== VIN → auto-relleno (NHTSA gratis; deja lista la ficha para el historial de Bumper en Fase 2) =====
 function renderCarSpec(s){
   const box=document.getElementById('car-vin-spec'); if(!box) return;
-  if(!s){ box.innerHTML=''; return; }
+  if(!s){ box.innerHTML=''; renderCarSpecFull(null); return; }
   const chips=[['🏷️',s.trim],['🚗',s.bodyClass],['⚙️',s.transmission],['🛞',s.drive],['🔧',s.engine]].filter(x=>x[1]);
   box.innerHTML=chips.map(c=>'<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:20px;padding:3px 9px;font-size:11px;color:#ccc;">'+c[0]+' '+c[1]+'</span>').join('')
-    + ((s.all&&s.all.length)?('<span style="font-size:11px;color:#666;align-self:center;">· '+s.all.length+' datos guardados</span>'):'');
+    + ((s.all&&s.all.length)?('<span style="font-size:11px;color:#666;align-self:center;">· '+s.all.length+' datos</span>'):'');
+  renderCarSpecFull(s);
 }
+// Lista COMPLETA de datos del VIN, minimizada, con inputs para CORREGIR cualquiera antes de guardar.
+function renderCarSpecFull(s){
+  const box=document.getElementById('car-spec-full'); if(!box) return;
+  if(!s || !(s.all && s.all.length)){ box.innerHTML=''; return; }
+  const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const rows=s.all.map((x,i)=>'<div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05);"><span style="flex:0 0 44%;font-size:11px;color:#9aa;line-height:1.2;">'+esc(x.label)+'</span><input value="'+esc(x.value)+'" oninput="updateSpecField('+i+',this.value)" style="flex:1;min-width:0;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#eee;font-size:12px;"></div>').join('');
+  box.innerHTML='<button type="button" onclick="toggleSpecEdit()" id="car-spec-toggle" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.16);color:#f0c040;border-radius:8px;padding:9px 11px;font-size:12px;font-weight:700;cursor:pointer;text-align:left;">▸ Ver / corregir todos los datos del VIN ('+s.all.length+')</button>'
+    +'<div id="car-spec-list" style="display:none;margin-top:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:4px 10px;max-height:300px;overflow-y:auto;">'+rows+'</div>';
+}
+window.toggleSpecEdit=function(){ const l=document.getElementById('car-spec-list'), b=document.getElementById('car-spec-toggle'); if(!l) return; const show=l.style.display==='none'; l.style.display=show?'':'none'; if(b) b.textContent=(show?'▾':'▸')+b.textContent.slice(1); };
+window.updateSpecField=function(i,v){
+  if(!(_carSpec && _carSpec.all && _carSpec.all[i])) return;
+  _carSpec.all[i].value=v;
+  // Si el dato corregido es uno de los principales, actualiza también el campo derivado + chips.
+  const map={'Body Class':'bodyClass','Transmission Style':'transmission','Drive Type':'drive','Doors':'doors','Trim':'trim','Series':'trim'};
+  const key=map[_carSpec.all[i].label]; if(key) _carSpec[key]=v;
+  const box=document.getElementById('car-vin-spec');   // re-pinta SOLO los chips de arriba (no la lista, para no perder el foco)
+  if(box){ const chips=[['🏷️',_carSpec.trim],['🚗',_carSpec.bodyClass],['⚙️',_carSpec.transmission],['🛞',_carSpec.drive],['🔧',_carSpec.engine]].filter(x=>x[1]);
+    box.innerHTML=chips.map(c=>'<span style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);border-radius:20px;padding:3px 9px;font-size:11px;color:#ccc;">'+c[0]+' '+c[1]+'</span>').join('')+'<span style="font-size:11px;color:#666;align-self:center;">· '+_carSpec.all.length+' datos</span>'; }
+};
 window.decodeCarVin = async function(){
   const vinEl=document.getElementById('car-vin'); const vin=(vinEl?vinEl.value:'').trim().toUpperCase();
   const msg=document.getElementById('car-vin-msg');
