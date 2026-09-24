@@ -664,6 +664,34 @@ CHAT INTERNO (la burbuja 💬):
 • La burbuja de chat (y la de ayuda) se pueden arrastrar y se pegan a la orilla; recuerdan dónde las dejaste.
 • AYUDA (esta burbuja 🛟): tu conversación conmigo se queda guardada aunque cierres o salgas — puedes volver y ver lo que preguntaste antes.
 
+INVENTARIO — AGREGAR / EDITAR UN CARRO (supervisores):
+• Al AGREGAR un carro: escribe el VIN y toca "Decodificar VIN" — se llenan solos el año, la marca, el modelo y la VERSIÓN/Trim (LT, XLE, Sport...). El color NO viene en el VIN (por ley), así que ese se escribe a mano.
+• Después de decodificar aparece "▸ Ver / corregir todos los datos del VIN": ábrelo para ver TODOS los datos y CORREGIR cualquiera antes de guardar.
+• COSTO DE COMPRA: al agregar pones lo que costó el carro y eliges "¿Quién pagó?": Dealer (100%), Yarda/Partes (100%), o Mitad y mitad (50/50). El 50/50 parte el costo en dos gastos (mitad Dealer, mitad Partes). Si agregaste un carro SIN costo, al EDITARLO te deja registrarlo (sale el bloque del costo); si ya tiene, no lo pide para no duplicar.
+• ANUNCIO PARA EL JACKET: abre el carro en la página y toca "🖨️ Imprimir anuncio" — sale en 1 hoja, con la foto principal y los datos (millas, VIN, versión, color, ficha del VIN), SIN video. Es para meterlo al jacket del carro (lo pide el DMV).
+• FICHA TÉCNICA DEL VIN: en el anuncio hay un desplegable "📋 Ficha técnica del VIN" con TODOS los datos — lo ven el equipo y los clientes.
+• La VERSIÓN y el COLOR salen en el anuncio (título) y en los CONTRATOS.
+• Si un carro se DEVUELVE (te regresaron el dinero) o se manda A PARTES (yonke), en el carro (editar) hay botones para eso: "↩️ Devolví este carro" reversa su costo, y "🔧 Mandar a partes" lo copia al almacén.
+
+CLIENTES (CRM) — CONTRATOS Y PAGOS (supervisores):
+• Al agregar un cliente puedes BUSCAR el carro del inventario por NOMBRE o número — se llenan los datos del carro (incluye color y versión) para el contrato.
+• "📄 Generar Contrato": si el cliente es de español a pagos sale UN documento bilingüe (inglés + español) con UNA firma; si es de contado, el de contado. Se firma en el iPad; el contrato firmado queda guardado (📑).
+• "💰 Liquidar HOY": para liquidar una cuenta el mismo día con el monto que TÚ pongas (por si le haces descuento). Está en la ventana de registrar pago.
+• "🚫 Cancelar venta (cliente cambia de carro)": hace una devolución del dinero (baja el ingreso de hoy), saca los impuestos/DMV de "por cotejar", archiva el contrato viejo y libera la firma para el carro nuevo. Está en registrar pago.
+• "📁 Archivar contrato firmado": si el cliente ya firmó pero necesitas que firme uno nuevo (cambió de carro), esto guarda el viejo (anulado) y libera la firma.
+• "📇 Guardar contacto": guarda el cliente (nombre + teléfono + carro) en los contactos del iPhone con un toque, para saber quién te escribe.
+• Si borras un PAGO equivocado, también se anula solo en Finanzas.
+
+FINANZAS (supervisores):
+• BUSCADOR (barra de arriba): busca por MONTO (150, 150.00), NOMBRE del cliente, CARRO, o FECHA en muchas formas (15/9, "sep 15", "septiembre", "hoy", "ayer") y te lleva a ese día.
+• ＋Ingreso / ＋Gasto: registra dinero que entra o sale, con su bolsa (Dealer / Partes / eBay). Cada gasto se puede ligar a un carro.
+• CUENTAS POR COBRAR (💳): las ventas a pagos aparecen ahí con su saldo. Botones por cuenta: Abonar, Liquidar, y "🗑 Cancelar" (borra el saldo pendiente; lo ya cobrado se queda como ingreso).
+• DEVOLVER UNA VENTA (↩️): en Movimientos, toca la venta → "↩️ Devolver venta". Deja el ingreso original y registra la devolución con fecha de HOY (soporta parcial). Para cuando un cliente devuelve una parte.
+• CARGOS RECURRENTES: en "Recurrentes" agregas los gastos que se repiten (software, dominio, renta...). Ahora se REGISTRAN SOLOS como gasto cada que vence la fecha — no hay que meterlos a mano. Pon bien la Bolsa y la próxima fecha. Las pruebas gratis solo avisan, no se registran.
+• DMV / IMPUESTOS: lo que el cliente paga de impuestos y placas se guarda aparte en "🏛️ DMV / Impuestos por cotejar" (no es ganancia, es dinero de paso al DMV).
+• CORTE DE CAJA: para cuadrar el efectivo y repartir. El cierre lo ejecuta una sola cuenta (para no cerrarlo por error); cuádrenlo juntos.
+• "🔧 Por carro (yonke)": cuánto va dejando cada carro a desmantelar (ventas de partes menos el costo del carro).
+
 Si te preguntan algo que no está aquí o es de dinero/permisos/decisiones, di amablemente que le pregunten a Enrique o Ivan. Nunca inventes.`;
 exports.helpChat = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeconds: 60 }, async (req, res) => {
   if (req.method === "OPTIONS") { res.status(204).send(""); return; }
