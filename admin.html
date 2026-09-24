@@ -507,6 +507,7 @@
     <div class="form-row">
       <div class="form-group"><label class="form-label">Marca</label><input class="form-input" id="f-make" placeholder="Toyota"></div>
       <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="f-model" placeholder="Camry"></div>
+      <div class="form-group"><label class="form-label">Versión / Trim</label><input class="form-input" id="f-trim" placeholder="LT, XLE, Sport"></div>
       <div class="form-group"><label class="form-label">Color</label><input class="form-input" id="f-color" placeholder="Plata / Blanco"></div>
     </div>
     <div class="form-row">
@@ -1183,6 +1184,7 @@ window.pickInvCar=function(id){
   const set=(f,v)=>{ const el=document.getElementById(f); if(el) el.value=(v==null?'':v); };
   set('f-inventory-num', c.inventoryNum||''); set('f-year', c.year); set('f-make', c.make); set('f-model', c.model);
   set('f-vin', c.vin); set('f-total', c.price); set('f-miles', c.miles);
+  set('f-color', c.color||''); set('f-trim', c.trim||((c.spec&&c.spec.trim)||''));   // color + versión del inventario → al contrato
   const st=document.getElementById('inv-lookup-status'); if(st) st.textContent='✅ '+[c.year,c.make,c.model].filter(Boolean).join(' ');
   const search=document.getElementById('f-car-search'); if(search) search.value='#'+(c.inventoryNum||'')+' · '+[c.year,c.make,c.model].filter(Boolean).join(' ');
   const box=document.getElementById('f-car-results'); if(box){ box.style.display='none'; box.innerHTML=''; }
@@ -2264,6 +2266,7 @@ window.openEditModal=function(id){
   document.getElementById('f-phone').value=c.phone||''; formatPhone(document.getElementById('f-phone'));
   document.getElementById('f-make').value=c.make||'';
   if(document.getElementById('f-color')) document.getElementById('f-color').value=c.color||'';
+  if(document.getElementById('f-trim')) document.getElementById('f-trim').value=c.trim||'';
   document.getElementById('f-model').value=c.model||'';
   document.getElementById('f-year').value=c.year||'';
   document.getElementById('f-total').value=c.total||'';
@@ -2400,6 +2403,7 @@ window.saveClient=async function(){
     zip:document.getElementById('f-zip')?.value.trim() || existing.zip || '',
     make:titleCase(document.getElementById('f-make').value.trim()),
     color:titleCase(document.getElementById('f-color')?.value.trim() || existing.color || ''),
+    trim:(document.getElementById('f-trim')?.value.trim() || existing.trim || ''),
     model:titleCase(document.getElementById('f-model').value.trim()),
     year:document.getElementById('f-year').value,
     vin:(document.getElementById('f-vin')?.value.trim() || existing.vin || '').toUpperCase(),
@@ -3584,6 +3588,8 @@ window.generateContractFromForm = function() {
     year: document.getElementById('f-year')?.value || '',
     make: document.getElementById('f-make')?.value.trim() || '',
     model: document.getElementById('f-model')?.value.trim() || '',
+    trim: document.getElementById('f-trim')?.value.trim() || '',
+    color: document.getElementById('f-color')?.value.trim() || '',
     vin: document.getElementById('f-vin')?.value.trim() || '',
     miles: document.getElementById('f-miles')?.value.trim() || '',
     price: document.getElementById('f-total')?.value || '',
