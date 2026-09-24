@@ -134,7 +134,7 @@
   .form-group { margin-bottom: 16px; }
   .form-label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
   .form-input { width: 100%; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: var(--font-body); font-size: 14px; outline: none; transition: border-color 0.2s; }
-  #f-name,#f-make,#f-model,#f-color,#f-city{text-transform:capitalize;} #f-vin{text-transform:uppercase;}
+  #f-name,#f-make,#f-model,#f-trim,#f-color,#f-city{text-transform:capitalize;} #f-vin{text-transform:uppercase;}
   .form-input:focus { border-color: var(--gold); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .form-hint { font-size: 11px; color: var(--gold); margin-top: 4px; min-height: 16px; }
@@ -2403,7 +2403,7 @@ window.saveClient=async function(){
     zip:document.getElementById('f-zip')?.value.trim() || existing.zip || '',
     make:titleCase(document.getElementById('f-make').value.trim()),
     color:titleCase(document.getElementById('f-color')?.value.trim() || existing.color || ''),
-    trim:(document.getElementById('f-trim')?.value.trim() || existing.trim || ''),
+    trim:((document.getElementById('f-trim')?.value.trim() || existing.trim || '').replace(/\b\w/g,c=>c.toUpperCase())),
     model:titleCase(document.getElementById('f-model').value.trim()),
     year:document.getElementById('f-year').value,
     vin:(document.getElementById('f-vin')?.value.trim() || existing.vin || '').toUpperCase(),

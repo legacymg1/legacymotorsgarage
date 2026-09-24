@@ -14646,7 +14646,7 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <input class="cf-input" id="car-year" placeholder="Year / Año" type="number">
     <input class="cf-input" id="car-make" placeholder="Make / Marca (Toyota)" style="text-transform:capitalize">
     <input class="cf-input" id="car-model" placeholder="Model / Modelo (Camry)" style="text-transform:capitalize">
-    <input class="cf-input" id="car-trim" placeholder="Versión / Trim (LT, XLE, Sport)…">
+    <input class="cf-input" id="car-trim" placeholder="Versión / Trim (LT, XLE, Sport)…" style="text-transform:capitalize">
     <input class="cf-input" id="car-color" placeholder="Color (el VIN no lo trae — escríbelo)" style="text-transform:capitalize">
     <input class="cf-input" id="car-miles" placeholder="Mileage / Millas">
     <input class="cf-input" id="car-vin" placeholder="VIN Number" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter'){event.preventDefault();decodeCarVin();}">
@@ -15334,8 +15334,8 @@ window.saveCar = async function(){
     const data = {
       year: document.getElementById('car-year').value,
       make, model,
-      trim: (document.getElementById('car-trim')?document.getElementById('car-trim').value.trim():'') || existing.trim || '',
-      color: (document.getElementById('car-color')?document.getElementById('car-color').value.trim():'') || existing.color || '',
+      trim: (((document.getElementById('car-trim')?document.getElementById('car-trim').value.trim():'') || existing.trim || '').replace(/\b\w/g,function(c){return c.toUpperCase();})),
+      color: (((document.getElementById('car-color')?document.getElementById('car-color').value.trim():'') || existing.color || '').replace(/\b\w/g,function(c){return c.toUpperCase();})),
       price: document.getElementById('car-price').value,
       weekly: document.getElementById('car-weekly').value,
       miles: document.getElementById('car-miles').value,
