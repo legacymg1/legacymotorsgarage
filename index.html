@@ -14656,6 +14656,9 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <div id="car-spec-full" style="margin-bottom:8px;"></div>
     <div id="car-prep-only" style="display:none;">
       <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">🔧 <b>Preparación (interno).</b> Registra lo que nos costó el carro. Puedes agregar una foto ya. El video, la descripción y el precio de venta se piden después, al editarlo para exhibición.</div>
+    </div>
+    <div id="car-cost-block" style="display:none;">
+      <div id="car-cost-editnote" style="display:none;background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">💰 Este carro <b>aún no tiene costo de compra</b>. Puedes registrarlo aquí.</div>
       <input class="cf-input" id="car-cost" placeholder="Costo de compra / lo que pagamos ($)" type="number">
       <label style="display:block;font-size:12px;color:#ffb74d;margin:2px 2px 4px;">¿Quién pagó la compra?</label>
       <select class="cf-input" id="car-cost-payer" style="margin-top:0;">
@@ -15147,6 +15150,11 @@ window.openCarModal = function(carId){
   if(carId){ const _tp=document.getElementById('car-toparts-btn'), _rt=document.getElementById('car-return-btn'); if(_tp) _tp.dataset.cid=carId; if(_rt) _rt.dataset.cid=carId; }
   const _cc=document.getElementById('car-cost'); if(_cc) _cc.value='';
   const _cp=document.getElementById('car-cost-payer'); if(_cp) _cp.value='dealer';
+  // 💰 Costo de compra: al AGREGAR siempre; al EDITAR solo si el carro TODAVÍA no tiene costo registrado
+  //    (para poder ponérselo a los carros que se agregaron sin costo, sin duplicar los que sí lo tienen).
+  const _hasPurchase = carId && (carExpenses[carId]||[]).some(function(e){ return e.category==='Compra del vehículo'; });
+  const _cblk=document.getElementById('car-cost-block'); if(_cblk) _cblk.style.display = (!carId || !_hasPurchase) ? 'block' : 'none';
+  const _cnote=document.getElementById('car-cost-editnote'); if(_cnote) _cnote.style.display = (carId && !_hasPurchase) ? 'block' : 'none';
   const _ccol=document.getElementById('car-color'); if(_ccol && !carId) _ccol.value='';
   if(!carId) title.textContent='Agregar (Preparación) / Add (Prep)';
   _carSpec = carId ? ((cars.find(x=>x.id===carId)||{}).spec||null) : null;
@@ -15352,11 +15360,13 @@ window.saveCar = async function(){
     };
     
     await setDoc(doc(db,'inventory',id), data);
-    // Costo de compra (solo al AGREGAR, si se registró): queda como gasto en el libro.
+    // Costo de compra: al AGREGAR, o al EDITAR un carro que TODAVÍA no tiene costo registrado
+    // (así se les puede poner a los carros que se agregaron sin costo, sin duplicar).
     // ¿Quién pagó? → Dealer (100%), Partes/Yarda (100%), o 50/50 (dos gastos, mitad y mitad).
     // El costo TOTAL del carro no cambia (el reporte suma las dos mitades); cada bolsa refleja lo que puso.
     const _cost = parseFloat((document.getElementById('car-cost')||{}).value) || 0;
-    if(!editingCarId && _cost > 0){
+    const _yaTieneCosto = editingCarId && (carExpenses[editingCarId]||[]).some(function(e){ return e.category==='Compra del vehículo'; });
+    if(_cost > 0 && !_yaTieneCosto){
       try{
         const _payer = ((document.getElementById('car-cost-payer')||{}).value) || 'dealer';
         const _totC = Math.round(_cost*100);
