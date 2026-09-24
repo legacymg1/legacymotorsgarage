@@ -2151,6 +2151,7 @@ window.renderAll = function() {
           <button type="button" class="btn btn-pay" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">💵 Pago</button>
           <button type="button" class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)">💬 SMS</button>
           <button type="button" class="btn" style="flex:0;padding:9px 10px;" onclick="event.stopPropagation();openApptModal('${c.id}')" title="Agendar cita">📅</button>
+          ${c.phone?'<button type="button" class="btn" style="flex:0;padding:9px 10px;" data-cid="'+c.id+'" onclick="event.stopPropagation();saveContact(this.dataset.cid)" title="Guardar en mis contactos (iPhone)">📇</button>':''}
           ${(!c.insurance||c.insuranceExp<today())?'<button class="btn" data-cid="'+c.id+'" onclick="event.stopPropagation();openInsuranceSMS(this.dataset.cid)" style="flex:0;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>':''}
           <button type="button" class="btn btn-edit" style="flex:0;padding:9px 10px;" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">✏️</button>
           <button class="btn" style="flex:0;padding:9px 10px;background:var(--gold3);color:var(--navy3);" onclick="event.stopPropagation();generateContract('${c.id}')" title="Generar Contrato">📄</button>
@@ -3536,6 +3537,40 @@ window.releaseContract = async function(){
     alert('✅ Contrato viejo archivado (anulado, queda en el registro).\n\nAhora genera el contrato del cliente y fírmalo — abrirá fresco, sin candado. El viejo lo puedes ver siempre en el historial de versiones.');
     const pm=document.getElementById('pay-modal'); if(pm) pm.classList.remove('active');
   }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
+// 📇 Guardar el cliente en los contactos del iPhone: genera un vCard (.vcf) y lo comparte/abre
+//    para agregarlo con un toque. Así, cuando te escriban, ya sabes quién es.
+window.saveContact = async function(id){
+  const c = clients.find(x=>x.id===id); if(!c){ alert('Cliente no encontrado'); return; }
+  const name=(c.name||'Cliente').trim();
+  const phone=(c.phone||'').trim();
+  if(!phone){ alert('Este cliente no tiene teléfono guardado.'); return; }
+  const car=[c.year,c.make,c.model].filter(Boolean).join(' ');
+  const esc=s=>String(s||'').replace(/([\\;,])/g,'\\$1').replace(/\n/g,'\\n');
+  const noteParts=[car, c.vin?('VIN '+c.vin):'', c.contractNumber?('Contrato '+c.contractNumber):''].filter(Boolean).join(' · ');
+  const vcf=['BEGIN:VCARD','VERSION:3.0',
+    'N:'+esc(name)+';;;','FN:'+esc(name),
+    'TEL;TYPE=CELL:'+phone,
+    'ORG:Cliente Legacy Motors',
+    noteParts?('NOTE:'+esc(noteParts)):'',
+    'END:VCARD'].filter(Boolean).join('\r\n');
+  const fname=(name.replace(/[^\w]+/g,'_')||'contacto')+'.vcf';
+  // iPhone: compartir el archivo → aparece "Agregar a Contactos" (requiere el gesto del toque, aquí sí lo hay)
+  try{
+    const file=new File([vcf],fname,{type:'text/vcard'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:name});
+      return;
+    }
+  }catch(e){ if(e && e.name==='AbortError') return; /* si falla, cae al respaldo */ }
+  // Respaldo (computadora / navegadores sin compartir archivos): descarga/abre el vCard
+  try{
+    const blob=new Blob([vcf],{type:'text/vcard'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=fname; a.style.display='none';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ a.remove(); URL.revokeObjectURL(url); }, 5000);
+  }catch(e){ alert('No se pudo generar el contacto: '+((e&&e.message)||e)); }
 };
 window.deletePayment=async function(clientId, idx){
   if(!confirm('¿Eliminar este pago? También se anula en Finanzas.')) return;
