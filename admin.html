@@ -680,6 +680,19 @@
   </div>
 </div>
 
+<!-- 👀 PREVIEW del sales sheet antes de enviar a Lendmark -->
+<div class="modal-overlay" id="lendmark-preview-modal">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-title">👀 Vista previa — se enviará a Lendmark</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Revisa que todo esté bien. Al enviar, se manda a <b>branch257@lendmarkfinancial.com</b> desde tu Zoho (con copia a ti).</div>
+    <div id="lendmark-preview-body" style="max-height:60vh;overflow-y:auto;background:#fff;border-radius:8px;"></div>
+    <div class="modal-actions" style="margin-top:10px;">
+      <button class="btn-cancel" onclick="closeModal('lendmark-preview-modal')">Cancelar</button>
+      <button class="btn-save" id="lendmark-preview-send" onclick="lendmarkPreviewSend()" style="background:#c8960c;color:#0b0e14;">📮 Enviar a Lendmark</button>
+    </div>
+  </div>
+</div>
+
 <!-- 📑 LENDMARK SALES SHEETS (historial) -->
 <div class="modal-overlay" id="lendmark-list-modal">
   <div class="modal" style="max-width:640px;">
@@ -1996,9 +2009,9 @@ function _lmMoney(n){ return '$'+Number(n||0).toLocaleString('en-US',{minimumFra
 function _sheetHTML(s, sigUrl){
   const money=_lmMoney; const photos=(s.photos||[]).slice(0,6);
   const photoHtml = photos.length
-    ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:12px 0;">'+photos.map(p=>'<img src="'+p+'" style="width:31%;height:140px;object-fit:cover;border:1px solid #999;">').join('')+'</div>'
+    ? '<div style="font-weight:800;border-bottom:1px solid #000;margin:14px 0 8px;">VEHICLE PHOTOS / FOTOS DEL VEHÍCULO</div><div style="display:flex;flex-wrap:wrap;gap:10px;margin:4px 0;">'+photos.map(p=>'<img src="'+p+'" style="width:48%;height:220px;object-fit:cover;border:1px solid #999;">').join('')+'</div>'
     : '<div style="font-size:12px;color:#555;margin:10px 0;">(Sin fotos ligadas por VIN — adjuntar por separado)</div>';
-  return '<div style="max-width:640px;margin:0 auto;padding:24px 28px;font-size:13px;">'
+  return '<div style="max-width:680px;margin:0 auto;padding:24px 28px;font-size:13.5px;">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:12px;">'
       +'<div><div style="font-size:20px;font-weight:800;">LEGACY MOTORS GARAGE LLC</div><div style="font-size:11px;">21122 Ave 152, Porterville, CA 93257 · (559) 540-5145 · Dealer Lic. 83177</div></div>'
       +'<div style="text-align:right;font-size:11px;">Date: <b>'+(s.today||'')+'</b>'+(s.invNum?'<br>Stock #: <b>'+s.invNum+'</b>':'')+'</div>'
@@ -2012,8 +2025,9 @@ function _sheetHTML(s, sigUrl){
       +(s.color?'<tr><td style="padding:3px 0;">Color</td><td style="padding:3px 0;text-align:right;">'+s.color+'</td></tr>':'')
     +'</table>'
     +photoHtml
-    +(s.smogPhoto?'<div style="font-weight:800;border-bottom:1px solid #000;margin:12px 0 4px;">SMOG CERTIFICATE / CERTIFICADO DE SMOG</div><div style="text-align:center;margin:8px 0;"><img src="'+s.smogPhoto+'" style="max-width:88%;max-height:340px;border:1px solid #999;"></div>':'')
-    +'<div style="font-weight:800;border-bottom:1px solid #000;margin:10px 0 4px;">PRICE BREAKDOWN / DESGLOSE</div>'
+    +'<div style="page-break-before:always;break-before:page;height:0;"></div>'
+    +(s.smogPhoto?'<div style="font-weight:800;border-bottom:1px solid #000;margin:2px 0 6px;">SMOG CERTIFICATE / CERTIFICADO DE SMOG</div><div style="text-align:center;margin:8px 0;"><img src="'+s.smogPhoto+'" style="max-width:96%;max-height:430px;border:1px solid #999;"></div>':'')
+    +'<div style="font-weight:800;border-bottom:1px solid #000;margin:14px 0 6px;">PRICE BREAKDOWN / DESGLOSE</div>'
     +'<table style="width:100%;font-size:13px;border-collapse:collapse;">'
       +'<tr><td style="padding:3px 0;">Vehicle Cash Price</td><td style="padding:3px 0;text-align:right;">'+money(s.price)+'</td></tr>'
       +'<tr><td style="padding:3px 0;">Document Preparation Fee</td><td style="padding:3px 0;text-align:right;">'+money(s.docFee)+'</td></tr>'
@@ -2092,14 +2106,27 @@ window.lendmarkSheet = async function(i, mode){
     const rid='lm_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     await setDoc(doc(db,'lendmark_sheets',rid), {...s, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||''});
   }catch(e){ console.log('save lendmark sheet', e); }
-  if(mode==='email'){ _sendLendmarkEmail(s); return; }
+  if(mode==='email'){ _previewLendmark(s, sigUrl); return; }
   const box=document.getElementById('print-receipt'); if(!box) return;
   box.innerHTML=_sheetHTML(s, sigUrl);
   _outputSheet('print', box, vin, carTitle);
 };
+// 👀 Muestra el PREVIEW (lo que se enviará) y guarda los datos pendientes para el botón Enviar.
+let _pendingEmailS=null;
+function _previewLendmark(s, sigUrl){
+  const body=document.getElementById('lendmark-preview-body'); if(body) body.innerHTML=_sheetHTML(s, sigUrl);
+  _pendingEmailS=s;
+  const m=document.getElementById('lendmark-preview-modal'); if(m) m.classList.add('active');
+}
+window.lendmarkPreviewSend=async function(){
+  const s=_pendingEmailS; if(!s){ alert('Genera la hoja primero.'); return; }
+  const b=document.getElementById('lendmark-preview-send'); if(b){ b.disabled=true; b.textContent='📮 Enviando…'; }
+  await _doSendLendmark(s);
+  if(b){ b.disabled=false; b.textContent='📮 Enviar a Lendmark'; }
+  closeModal('lendmark-preview-modal');
+};
 // 📮 Envía el sales sheet DIRECTO por el servidor (Zoho SMTP) — arma el correo en el backend con fotos+firma.
-async function _sendLendmarkEmail(s){
-  if(!confirm('📮 Enviar el sales sheet DIRECTO a Lendmark (branch257@lendmarkfinancial.com) desde tu Zoho, con copia a ti.\n\nSe manda solo. ¿Confirmar?')) return;
+async function _doSendLendmark(s){
   try{
     const r=await httpsCallable(functions,'sendLendmarkEmail')({ data:s });
     const d=(r&&r.data)||{};
@@ -2112,7 +2139,7 @@ window.openSavedSheet = async function(id, mode){
   const sigUrl = await _loadSellerSig();
   let s; try{ const snap=await getDoc(doc(db,'lendmark_sheets',id)); if(!snap.exists()){ alert('Hoja no encontrada.'); return; } s=snap.data(); }
   catch(e){ alert('No se pudo cargar: '+((e&&e.message)||e)); return; }
-  if(mode==='email'){ _sendLendmarkEmail(s); return; }
+  if(mode==='email'){ _previewLendmark(s, sigUrl); return; }
   const box=document.getElementById('print-receipt'); if(!box) return;
   box.innerHTML=_sheetHTML(s, sigUrl);
   _outputSheet('print', box, s.vin, s.carTitle);
