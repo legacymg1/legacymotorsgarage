@@ -17,6 +17,7 @@ const EBAY_AUTH_TOKEN = defineSecret("EBAY_AUTH_TOKEN");
 const EBAY_OAUTH_REFRESH = defineSecret("EBAY_OAUTH_REFRESH");
 const PLAID_CLIENT_ID = defineSecret("PLAID_CLIENT_ID");
 const PLAID_SECRET = defineSecret("PLAID_SECRET");
+const ZOHO_MAIL_PASS = defineSecret("ZOHO_MAIL_PASS");
 
 // Prueba: confirma que el backend está vivo.
 exports.ping = onCall((request) => ({
@@ -589,7 +590,7 @@ exports.cfgSet = onCall({ timeoutSeconds: 30 }, async (request) => {
   const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
   const docId = String((request.data && request.data.docId) || "").trim();
   const data = (request.data && request.data.data) || {};
-  const RULES = { sellerSignature: "owner", stickerBatch: "staff", binBatch: "staff" };
+  const RULES = { sellerSignature: "owner", stickerBatch: "staff", binBatch: "staff", timeclock: "owner" };
   const level = RULES[docId];
   if (!level) throw new HttpsError("permission-denied", "Documento de config no permitido.");
   if (level === "owner" && email !== "ev@legacymotorsgarage.com") throw new HttpsError("permission-denied", "Solo el dueño.");
@@ -597,6 +598,172 @@ exports.cfgSet = onCall({ timeoutSeconds: 30 }, async (request) => {
   await admin.firestore().collection("config").doc(docId).set(data, { merge: true });
   return { ok: true };
 });
+// ===== 🕐 RELOJ DE EMPLEADOS (check-in/out con GPS validado en el servidor) =====
+const OWNER_EMAILS = ["ev@legacymotorsgarage.com", "ivan.garcia@legacymotorsgarage.com"];
+function _haversineM(aLat, aLng, bLat, bLng) {
+  const R = 6371000, toR = (x) => x * Math.PI / 180;
+  const dLat = toR(bLat - aLat), dLng = toR(bLng - aLng);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toR(aLat)) * Math.cos(toR(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+function _laMondayKey(now) {
+  now = now || new Date();
+  const dstr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now); // YYYY-MM-DD
+  const wd = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "short" }).format(now);
+  const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const offset = ((map[wd] || 0) + 6) % 7; // días desde el lunes
+  const d = new Date(dstr + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() - offset);
+  return d.toISOString().slice(0, 10);
+}
+async function _tcConfig() {
+  try { const s = await admin.firestore().collection("config").doc("timeclock").get(); return s.exists ? s.data() : {}; }
+  catch (e) { return {}; }
+}
+// Verifica el GPS contra las ubicaciones configuradas (dealer/yonke). Devuelve {ok, location, distM}.
+function _checkGeofence(cfg, lat, lng) {
+  const radius = Number(cfg.radiusM) || 150;
+  const spots = [["dealer", cfg.dealer], ["yonke", cfg.yonke]].filter((x) => x[1] && x[1].lat != null);
+  if (!spots.length) return { ok: true, location: "(sin ubicación)", distM: null }; // aún no configurada → no bloquea
+  if (lat == null || lng == null) return { ok: false, location: null, distM: null, noGps: true };
+  let best = null;
+  for (const [name, s] of spots) {
+    const d = _haversineM(lat, lng, Number(s.lat), Number(s.lng));
+    if (best === null || d < best.distM) best = { location: name, distM: d };
+  }
+  return { ok: best.distM <= radius, location: best.location, distM: Math.round(best.distM) };
+}
+function _emailKey(email) { return String(email || "").replace(/[/#?]/g, "_"); }
+// Entrada / salida. request.data = { action:'in'|'out', lat, lng }
+// Turno ABIERTO en timeclock_open/<email> (1 por empleado) → sin índices compuestos.
+// Turnos CERRADOS en timeclock/<autoId> con weekKey (índice de un solo campo, automático).
+exports.clockPunch = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  const name = (request.auth.token && request.auth.token.name) || email.split("@")[0];
+  const action = String((request.data && request.data.action) || "").trim();
+  const lat = request.data && request.data.lat != null ? Number(request.data.lat) : null;
+  const lng = request.data && request.data.lng != null ? Number(request.data.lng) : null;
+  if (action !== "in" && action !== "out") throw new HttpsError("invalid-argument", "Acción inválida.");
+  const db = admin.firestore();
+  const cfg = await _tcConfig();
+  const geo = _checkGeofence(cfg, lat, lng);
+  if (geo.noGps) throw new HttpsError("failed-precondition", "No pudimos leer tu ubicación (GPS). Activa la ubicación e inténtalo de nuevo.");
+  const openRef = db.collection("timeclock_open").doc(_emailKey(email));
+  const openSnap = await openRef.get();
+  const nowIso = new Date().toISOString();
+  if (action === "in") {
+    if (openSnap.exists) throw new HttpsError("failed-precondition", "Ya tienes una ENTRADA abierta. Haz Salida primero.");
+    if (!geo.ok) throw new HttpsError("failed-precondition", "No estás en el Dealer ni en el Yonke (estás a " + geo.distM + " m). Acércate para registrar tu entrada.");
+    await openRef.set({ email, name, location: geo.location, inAt: nowIso, inLat: lat, inLng: lng, weekKey: _laMondayKey(new Date()) });
+    return { ok: true, action: "in", location: geo.location, at: nowIso };
+  } else {
+    if (!openSnap.exists) throw new HttpsError("failed-precondition", "No tienes una entrada abierta. Haz Entrada primero.");
+    const d = openSnap.data();
+    const hours = Math.max(0, (new Date(nowIso) - new Date(d.inAt)) / 3600000);
+    await db.collection("timeclock").add({
+      email, name, location: d.location || geo.location, outLocation: geo.location,
+      inAt: d.inAt, outAt: nowIso, inLat: d.inLat, inLng: d.inLng, outLat: lat, outLng: lng,
+      hours: Math.round(hours * 100) / 100, weekKey: d.weekKey || _laMondayKey(new Date()), createdAt: nowIso,
+    });
+    await openRef.delete();
+    return { ok: true, action: "out", hours: Math.round(hours * 100) / 100, at: nowIso };
+  }
+});
+// Estado + horas de la semana del empleado que llama. Para su tarjeta en warehouse.
+exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  const db = admin.firestore();
+  const wk = _laMondayKey(new Date());
+  const openSnap = await db.collection("timeclock_open").doc(_emailKey(email)).get();
+  const open = openSnap.exists ? { inAt: openSnap.data().inAt, location: openSnap.data().location } : null;
+  const snap = await db.collection("timeclock").where("weekKey", "==", wk).get();
+  let hours = 0;
+  snap.forEach((d) => { const x = d.data(); if ((x.email || "").toLowerCase() === email) hours += Number(x.hours) || 0; });
+  if (open) hours += Math.max(0, (Date.now() - new Date(open.inAt)) / 3600000);
+  return { ok: true, weekKey: wk, hours: Math.round(hours * 100) / 100, open };
+});
+// Panel del dueño (Finanzas): horas + pago de la semana por empleado.
+exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  if (!OWNER_EMAILS.includes(email)) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  const cfg = await _tcConfig();
+  const rates = cfg.rates || {};
+  const wk = (request.data && request.data.weekKey) || _laMondayKey(new Date());
+  const byEmp = {};
+  const snap = await db.collection("timeclock").where("weekKey", "==", wk).get();
+  snap.forEach((d) => {
+    const x = d.data(); const e = (x.email || "?").toLowerCase();
+    if (!byEmp[e]) byEmp[e] = { email: e, name: x.name || e.split("@")[0], hours: 0, open: false, shifts: 0 };
+    byEmp[e].hours += Number(x.hours) || 0; byEmp[e].shifts += 1;
+  });
+  // turnos abiertos (todos los empleados con entrada sin salida)
+  const openSnap = await db.collection("timeclock_open").get();
+  openSnap.forEach((d) => {
+    const x = d.data(); if ((x.weekKey || "") !== wk) return;
+    const e = (x.email || "?").toLowerCase();
+    if (!byEmp[e]) byEmp[e] = { email: e, name: x.name || e.split("@")[0], hours: 0, open: false, shifts: 0 };
+    byEmp[e].open = true; byEmp[e].hours += Math.max(0, (Date.now() - new Date(x.inAt)) / 3600000);
+  });
+  const list = Object.values(byEmp).map((r) => {
+    const rate = Number(rates[r.email]) || 0;
+    const hrs = Math.round(r.hours * 100) / 100;
+    return { email: r.email, name: r.name, hours: hrs, open: r.open, shifts: r.shifts, rate, pay: Math.round(hrs * rate * 100) / 100 };
+  }).sort((a, b) => b.hours - a.hours);
+  const totalPay = list.reduce((s, r) => s + r.pay, 0);
+  return { ok: true, weekKey: wk, rates, config: { dealer: cfg.dealer || null, yonke: cfg.yonke || null, radiusM: Number(cfg.radiusM) || 150 }, list, totalPay: Math.round(totalPay * 100) / 100 };
+});
+
+// 📮 Enviar el sales sheet a Lendmark directo por el SMTP de Zoho (from ev@, cc a ev@).
+exports.sendLendmarkEmail = onCall({ secrets: [ZOHO_MAIL_PASS], timeoutSeconds: 60, memory: "512MiB" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  if (!OWNER_EMAILS.includes(email)) throw new HttpsError("permission-denied", "Solo dueños.");
+  const d = request.data || {};
+  const pdfBase64 = String(d.pdfBase64 || "");
+  if (!pdfBase64) throw new HttpsError("invalid-argument", "Falta el PDF.");
+  const filename = String(d.filename || "Lendmark_SalesSheet.pdf").replace(/[^\w.\-]/g, "_");
+  const vehicle = String(d.vehicle || "").slice(0, 120);
+  const vin = String(d.vin || "").slice(0, 20);
+  const to = String(d.to || "branch257@lendmarkfinancial.com");
+  const FROM = "ev@legacymotorsgarage.com";
+  const subject = "Vehicle Sales Sheet for Funding" + (vehicle ? (" — " + vehicle) : "") + (vin ? (" (VIN " + vin + ")") : "");
+  const textBody =
+    "Dear Lendmark Financial Services Team,\n\n" +
+    "Please find attached the vehicle sales sheet for the following deal, for your review and funding:\n\n" +
+    (vehicle ? ("Vehicle: " + vehicle + "\n") : "") +
+    (vin ? ("VIN: " + vin + "\n") : "") +
+    "\nThe attached PDF includes the vehicle details, photographs, smog certificate, and the complete price breakdown (vehicle price, documentation fee, smog certification, sales tax, and DMV/registration fees), along with the down payment and the amount to finance.\n\n" +
+    "Please let us know if you need any additional documentation to process this transaction. We appreciate your partnership.\n\n" +
+    "Best regards,\n\n" +
+    "Enrique Villagómez\nLegacy Motors Garage LLC\n21122 Ave 152, Porterville, CA 93257\nPhone: (559) 540-5145\nDealer License No. 83177";
+  const htmlBody =
+    "<p>Dear Lendmark Financial Services Team,</p>" +
+    "<p>Please find attached the vehicle sales sheet for the following deal, for your review and funding:</p>" +
+    "<p>" + (vehicle ? ("<b>Vehicle:</b> " + vehicle + "<br>") : "") + (vin ? ("<b>VIN:</b> " + vin) : "") + "</p>" +
+    "<p>The attached PDF includes the vehicle details, photographs, smog certificate, and the complete price breakdown (vehicle price, documentation fee, smog certification, sales tax, and DMV/registration fees), along with the down payment and the amount to finance.</p>" +
+    "<p>Please let us know if you need any additional documentation to process this transaction. We appreciate your partnership.</p>" +
+    "<p>Best regards,<br><br><b>Enrique Villagómez</b><br>Legacy Motors Garage LLC<br>21122 Ave 152, Porterville, CA 93257<br>Phone: (559) 540-5145<br>Dealer License No. 83177</p>";
+  try {
+    const nodemailer = require("nodemailer");
+    const transporter = nodemailer.createTransport({
+      host: "smtp.zoho.com", port: 465, secure: true,
+      auth: { user: FROM, pass: ZOHO_MAIL_PASS.value() },
+    });
+    await transporter.sendMail({
+      from: '"Legacy Motors Garage LLC" <' + FROM + ">",
+      to, cc: FROM, subject, text: textBody, html: htmlBody,
+      attachments: [{ filename, content: Buffer.from(pdfBase64, "base64"), contentType: "application/pdf" }],
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+});
+
 exports.botConvos = onCall({ timeoutSeconds: 30 }, async (request) => {
   salesOwnerOnly(request);
   const db = admin.firestore();
