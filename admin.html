@@ -1912,10 +1912,74 @@ function renderCotOptions(){
         </div>
       </div>
       <div id="cot-res-${i}" style="margin-top:6px;"></div>
+      <button type="button" onclick="lendmarkSheet(${i})" style="width:100%;margin-top:8px;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">📄 Sales sheet (Lendmark)</button>
     </div>`).join('');
   cotOpts.forEach((o,i)=>cotUpdateResult(i));
   cotSaveDraft();
 }
+// 📄 Sales sheet para Lendmark Financial Services (desde una opción del cotizador).
+//    Arma la hoja con el desglose (precio + doc $70 + smog $58.25 + tax + DMV) y jala las fotos
+//    del inventario cruzando por VIN. Monto a financiar = total − enganche (lo que Lendmark paga).
+window.lendmarkSheet = async function(i){
+  const o = cotOpts[i]; if(!o){ alert('Opción no encontrada.'); return; }
+  const price=Number(o.price)||0, down=Number(o.down)||0, tax=Number(o.tax)||0, dmv=Number(o.dmv)||0;
+  const docFee=70, smog=58.25;
+  const total=price+docFee+smog+tax+dmv;
+  const financed=Math.max(0, total-down);
+  try{ await loadInvCache(); }catch(e){}
+  const vin=(o.vin||'').trim().toUpperCase();
+  const inv = vin ? (_invCache||[]).find(c=>(c.vin||'').trim().toUpperCase()===vin) : null;
+  const photos=(inv&&inv.photos&&inv.photos.length)?inv.photos.slice(0,6):((inv&&inv.img)?[inv.img]:[]);
+  const smogPhoto=(inv&&inv.smogPhotoURL)||'';
+  const year=o.year||(inv&&inv.year)||'', make=o.make||(inv&&inv.make)||'', model=o.model||(inv&&inv.model)||'';
+  const trim=(inv&&inv.trim)||'', miles=o.miles||(inv&&inv.miles)||'', color=o.color||(inv&&inv.color)||'', invNum=(inv&&inv.inventoryNum)||'';
+  const carTitle=[year,make,model,trim].filter(Boolean).join(' ')||(o.car||'');
+  const cust=(document.getElementById('cot-customer')?document.getElementById('cot-customer').value.trim():'')||'';
+  const money=n=>'$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const today=new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
+  const box=document.getElementById('print-receipt'); if(!box) return;
+  const photoHtml = photos.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;">'+photos.map(p=>'<img src="'+p+'" style="width:31%;height:110px;object-fit:cover;border:1px solid #999;">').join('')+'</div>'
+    : '<div style="font-size:11px;color:#555;margin:8px 0;">(Sin fotos ligadas por VIN — adjuntar por separado)</div>';
+  box.innerHTML =
+    '<div style="max-width:640px;margin:0 auto;padding:24px 28px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:12px;">'
+      +'<div><div style="font-size:20px;font-weight:800;">LEGACY MOTORS GARAGE LLC</div><div style="font-size:11px;">21122 Ave 152, Porterville, CA 93257 · (559) 540-5145 · Dealer Lic. 83177</div></div>'
+      +'<div style="text-align:right;font-size:11px;">Date: <b>'+today+'</b>'+(invNum?'<br>Stock #: <b>'+invNum+'</b>':'')+'</div>'
+    +'</div>'
+    +'<div style="text-align:center;font-size:15px;font-weight:800;letter-spacing:1px;margin-bottom:4px;">VEHICLE SALES SHEET — LENDMARK FINANCIAL SERVICES</div>'
+    +(cust?'<div style="text-align:center;font-size:12px;margin-bottom:8px;">Buyer / Comprador: <b>'+cust+'</b></div>':'')
+    +'<table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:6px;">'
+      +'<tr><td style="padding:3px 0;width:50%;">Vehicle</td><td style="padding:3px 0;text-align:right;font-weight:700;">'+carTitle+'</td></tr>'
+      +'<tr><td style="padding:3px 0;">VIN</td><td style="padding:3px 0;text-align:right;font-weight:700;">'+(vin||'—')+'</td></tr>'
+      +'<tr><td style="padding:3px 0;">Odometer / Miles</td><td style="padding:3px 0;text-align:right;">'+(miles?(miles+' mi'):'—')+'</td></tr>'
+      +(color?'<tr><td style="padding:3px 0;">Color</td><td style="padding:3px 0;text-align:right;">'+color+'</td></tr>':'')
+    +'</table>'
+    +photoHtml
+    +(smogPhoto?'<div style="font-weight:800;border-bottom:1px solid #000;margin:8px 0 4px;">SMOG CERTIFICATE / CERTIFICADO DE SMOG</div><div style="text-align:center;margin:6px 0;"><img src="'+smogPhoto+'" style="max-width:100%;max-height:320px;border:1px solid #999;"></div>':'')
+    +'<div style="font-weight:800;border-bottom:1px solid #000;margin:10px 0 4px;">PRICE BREAKDOWN / DESGLOSE</div>'
+    +'<table style="width:100%;font-size:13px;border-collapse:collapse;">'
+      +'<tr><td style="padding:3px 0;">Vehicle Cash Price</td><td style="padding:3px 0;text-align:right;">'+money(price)+'</td></tr>'
+      +'<tr><td style="padding:3px 0;">Document Preparation Fee</td><td style="padding:3px 0;text-align:right;">'+money(docFee)+'</td></tr>'
+      +'<tr><td style="padding:3px 0;">Smog Certification Fee</td><td style="padding:3px 0;text-align:right;">'+money(smog)+'</td></tr>'
+      +'<tr><td style="padding:3px 0;">Sales Tax</td><td style="padding:3px 0;text-align:right;">'+money(tax)+'</td></tr>'
+      +'<tr><td style="padding:3px 0;">DMV / Registration Fees</td><td style="padding:3px 0;text-align:right;">'+money(dmv)+'</td></tr>'
+      +'<tr><td style="border-top:1px solid #000;padding:5px 0;font-weight:800;">TOTAL PRICE</td><td style="border-top:1px solid #000;padding:5px 0;text-align:right;font-weight:800;">'+money(total)+'</td></tr>'
+      +'<tr><td style="padding:3px 0;">Less: Down Payment</td><td style="padding:3px 0;text-align:right;">('+money(down)+')</td></tr>'
+      +'<tr><td style="border-top:2px solid #000;padding:6px 0;font-weight:800;font-size:15px;">AMOUNT TO FINANCE</td><td style="border-top:2px solid #000;padding:6px 0;text-align:right;font-weight:800;font-size:15px;">'+money(financed)+'</td></tr>'
+    +'</table>'
+    +'<div style="margin-top:26px;display:flex;justify-content:space-between;gap:20px;">'
+      +'<div style="flex:1;border-top:1px solid #000;padding-top:4px;text-align:center;font-size:11px;">Dealer / Legacy Motors Garage LLC</div>'
+      +'<div style="flex:1;border-top:1px solid #000;padding-top:4px;text-align:center;font-size:11px;">Date</div>'
+    +'</div>'
+    +'</div>';
+  const imgs=box.querySelectorAll('img'); let pending=imgs.length;
+  const go=()=>{ try{ window.print(); }catch(e){ alert('No se pudo abrir la impresión.'); } };
+  if(!pending){ go(); return; }
+  let done=false; const fire=()=>{ if(done) return; done=true; go(); };
+  imgs.forEach(im=>{ if(im.complete){ if(--pending<=0) fire(); } else { im.onload=im.onerror=()=>{ if(--pending<=0) fire(); }; } });
+  setTimeout(fire, 3500);
+};
 window.printCotizacion=function(){
   if(!cotOpts.length){ alert('Agrega al menos una opción.'); return; }
   const cust=document.getElementById('cot-customer').value.trim();

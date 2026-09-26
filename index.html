@@ -14680,6 +14680,9 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">📍 Foto del GPS (para identificar el carro)</label>
     <input type="file" class="cf-input" id="car-gps-photo" accept="image/*" style="padding:8px;cursor:pointer;">
     <div id="car-gps-preview" style="margin-top:6px;"></div>
+    <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">🧪 Foto del Smog (interna, para Lendmark — no sale en la página)</label>
+    <input type="file" class="cf-input" id="car-smog-photo" accept="image/*" style="padding:8px;cursor:pointer;">
+    <div id="car-smog-preview" style="margin-top:6px;"></div>
     <div id="car-upload-progress" style="display:none;margin-top:8px;font-size:13px;color:#ccc;text-align:center;">Subiendo archivos...</div>
     <div id="car-manage-section" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#f0c040;margin-bottom:8px;">🔧 Mover / devolver este carro</div>
@@ -15143,6 +15146,8 @@ window.openCarModal = function(carId){
   document.getElementById('car-gps-photo').value='';
   const _gpsC = editingCarId ? cars.find(x=>x.id===editingCarId) : null;
   document.getElementById('car-gps-preview').innerHTML = (_gpsC && _gpsC.gpsPhotoURL) ? '<a href="'+_gpsC.gpsPhotoURL+'" target="_blank" style="color:#f0c040;font-size:12px;">📍 Ver foto GPS actual</a>' : '';
+  const _smE=document.getElementById('car-smog-photo'); if(_smE) _smE.value='';
+  const _smP=document.getElementById('car-smog-preview'); if(_smP) _smP.innerHTML = (_gpsC && _gpsC.smogPhotoURL) ? '<a href="'+_gpsC.smogPhotoURL+'" target="_blank" style="color:#f0c040;font-size:12px;">🧪 Ver foto del smog actual</a>' : '';
   // Nuevo = etapa PREP (solo costo); Editar = etapa EXHIBICIÓN (formulario completo)
   document.getElementById('car-prep-only').style.display = carId ? 'none' : 'block';
   document.getElementById('car-exhib-only').style.display = carId ? 'block' : 'none';
@@ -15339,6 +15344,16 @@ window.saveCar = async function(){
       await uploadBytes(gr, gconv);
       gpsPhotoURL = await getDownloadURL(gr);
     }
+    // 🧪 Foto del Smog (interna — para el sales sheet de Lendmark; no se muestra al público)
+    let smogPhotoURL = existing.smogPhotoURL || '';
+    const smogFile = document.getElementById('car-smog-photo') ? document.getElementById('car-smog-photo').files[0] : null;
+    if(smogFile){
+      progress.style.display='block'; progress.textContent='Subiendo foto del smog...';
+      const sconv = await toJpeg(smogFile);
+      const sr = ref(storage, `inventory/${id}/smog_${Date.now()}_${sconv.name}`);
+      await uploadBytes(sr, sconv);
+      smogPhotoURL = await getDownloadURL(sr);
+    }
     const data = {
       year: document.getElementById('car-year').value,
       make, model,
@@ -15353,6 +15368,7 @@ window.saveCar = async function(){
       inventoryNum: existing.inventoryNum || generateInvNum(),
       status: existing.status || 'prep',
       gpsPhotoURL,
+      smogPhotoURL,
       vin: (document.getElementById('car-vin')?document.getElementById('car-vin').value.trim():'').toUpperCase(),
       spec: (_carSpec && _carSpec.vin === (document.getElementById('car-vin')?document.getElementById('car-vin').value.trim().toUpperCase():'')) ? _carSpec : (existing.spec||null),
       createdAt: existing.createdAt || Date.now(),
