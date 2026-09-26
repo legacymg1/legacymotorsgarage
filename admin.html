@@ -661,6 +661,7 @@
       <button class="btn-cancel" onclick="closeModal('wa-modal')">Cancelar</button>
       <button class="btn-save" onclick="sendWhatsApp()" style="background:linear-gradient(135deg,#2196F3,#1565C0)">ENVIAR SMS</button>
     </div>
+    <button type="button" id="wa-print-btn" onclick="printReceipt()" style="display:none;width:100%;margin-top:8px;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ Imprimir recibo (físico)</button>
   </div>
 </div>
 
@@ -1043,7 +1044,7 @@ window.settleToday = async function(id){
     // 🎊 Mismo mensaje de FELICIDADES que un pago que liquida (getPaidOffMsg → modal de SMS).
     if(confirm('🎊 '+cc.name+' LIQUIDADO con '+formatMoney(amount)+(discount>0?(' (descuento '+formatMoney(discount)+')'):'')+'. Saldo en $0. El pago ya está en Finanzas.\n\n¿Enviar mensaje de FELICIDADES al cliente?')){
       const msg = getPaidOffMsg(cc);
-      if(msg){ waPhone=(cc.phone||'').replace(/\D/g,''); const wp=document.getElementById('wa-preview'), wt=document.getElementById('wa-text'); if(wp) wp.textContent=msg; if(wt) wt.value=msg; document.getElementById('wa-modal').classList.add('active'); }
+      if(msg){ waPhone=(cc.phone||'').replace(/\D/g,''); const wp=document.getElementById('wa-preview'), wt=document.getElementById('wa-text'); if(wp) wp.textContent=msg; if(wt) wt.value=msg; const _pb=document.getElementById('wa-print-btn'); if(_pb) _pb.style.display='none'; document.getElementById('wa-modal').classList.add('active'); }
       else alert('No se pudo generar el mensaje. Usa "Reenviar recibo del último pago" si hace falta.');
     }
   }catch(e){ alert('Error: '+((e&&e.message)||e)); }
@@ -2640,6 +2641,41 @@ window.openPayModal=function(id){
 
 let _savingPayment = false;
 
+let _lastReceipt = null;   // 🖨️ datos del último pago para imprimir recibo físico
+// 🖨️ Imprime un recibo físico del último pago (window.print — funciona en el iPad instalado).
+window.printReceipt = function(){
+  const r=_lastReceipt;
+  if(!r){ alert('No hay un pago para imprimir. Registra el pago primero.'); return; }
+  const money = n => (n==null?'—':'$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  const fdate = d => { try{ if(!d) return new Date().toLocaleDateString('es-MX'); const dt=(d instanceof Date)?d:new Date(String(d).length<=10?(d+'T12:00:00'):d); return dt.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'}); }catch(e){ return String(d||''); } };
+  const methodLbl = ({cash:'Efectivo',zelle:'Zelle',card:'Tarjeta',transfer:'Transferencia',check:'Cheque'})[r.method] || (r.method||'');
+  const box=document.getElementById('print-receipt'); if(!box) return;
+  box.innerHTML =
+    '<div style="max-width:520px;margin:0 auto;padding:26px 30px;">'
+    +'<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;">'
+      +'<div style="font-size:22px;font-weight:800;letter-spacing:1px;">LEGACY MOTORS GARAGE LLC</div>'
+      +'<div style="font-size:12px;">21122 Ave 152, Porterville, CA 93257 · (559) 540-5145</div>'
+      +'<div style="font-size:12px;">Dealer License No. 83177 · legacymotorsgarage.com</div>'
+    +'</div>'
+    +'<div style="text-align:center;font-size:16px;font-weight:800;letter-spacing:2px;margin-bottom:14px;">RECIBO DE PAGO / PAYMENT RECEIPT</div>'
+    +'<table style="width:100%;font-size:14px;border-collapse:collapse;">'
+      +'<tr><td style="padding:5px 0;">Fecha / Date</td><td style="padding:5px 0;text-align:right;font-weight:700;">'+fdate(r.date)+'</td></tr>'
+      +'<tr><td style="padding:5px 0;">Cliente / Customer</td><td style="padding:5px 0;text-align:right;font-weight:700;">'+(r.name||'')+'</td></tr>'
+      +(r.car?'<tr><td style="padding:5px 0;">Vehículo / Vehicle</td><td style="padding:5px 0;text-align:right;">'+r.car+'</td></tr>':'')
+      +(r.contract?'<tr><td style="padding:5px 0;">Contrato / Contract</td><td style="padding:5px 0;text-align:right;">'+r.contract+'</td></tr>':'')
+      +'<tr><td style="padding:5px 0;">Método / Method</td><td style="padding:5px 0;text-align:right;">'+methodLbl+'</td></tr>'
+      +'<tr><td style="border-top:2px solid #000;padding:10px 0 5px;font-size:16px;font-weight:800;">PAGADO / PAID</td><td style="border-top:2px solid #000;padding:10px 0 5px;text-align:right;font-size:20px;font-weight:800;">'+money(r.amount)+'</td></tr>'
+      +(!r.paidOff && r.balance!=null ? '<tr><td style="padding:5px 0;">Saldo restante / Balance</td><td style="padding:5px 0;text-align:right;font-weight:700;">'+money(r.balance)+'</td></tr>':'')
+      +(r.paidOff ? '<tr><td colspan="2" style="padding:8px 0;text-align:center;font-weight:800;">✅ AUTO PAGADO POR COMPLETO / PAID IN FULL</td></tr>' : (r.nextPay?'<tr><td style="padding:5px 0;">Próximo pago / Next payment</td><td style="padding:5px 0;text-align:right;font-weight:700;">'+fdate(r.nextPay)+'</td></tr>':''))
+    +'</table>'
+    +'<div style="margin-top:26px;display:flex;justify-content:space-between;gap:20px;">'
+      +'<div style="flex:1;border-top:1px solid #000;padding-top:4px;text-align:center;font-size:11px;">Firma del cliente / Customer</div>'
+      +'<div style="flex:1;border-top:1px solid #000;padding-top:4px;text-align:center;font-size:11px;">Legacy Motors Garage LLC</div>'
+    +'</div>'
+    +'<div style="text-align:center;font-size:11px;margin-top:16px;">¡Gracias por su pago! · Thank you for your payment!</div>'
+    +'</div>';
+  try{ window.print(); }catch(e){ alert('No se pudo abrir la impresión — usa el menú del navegador → Imprimir.'); }
+};
 window.confirmPayment = async function(){
   if(_savingPayment) return;                                  // doble clic: se ignora
   const amount = Number(document.getElementById('pay-amount').value);
@@ -2703,11 +2739,23 @@ window.confirmPayment = async function(){
   }
   _savingPayment = false;
 
+  // 🖨️ Guarda los datos de ESTE pago para poder imprimir un recibo físico.
+  try{
+    _lastReceipt = {
+      name: c.name||'', car: [c.year,c.make,c.model].filter(Boolean).join(' '), contract: c.contractNumber||'',
+      amount: amount, method: method, date: date,
+      balance: (typeof calcBalance==='function') ? calcBalance(updated) : null,
+      nextPay: (typeof getNextPayDate==='function') ? getNextPayDate(updated) : null,
+      paidOff: isPaidOff(updated)
+    };
+  }catch(e){ _lastReceipt=null; }
+
   const enviar = (msg) => {
     if(!msg){ alert('No se pudo generar el mensaje. Puedes reenviarlo con "📩 Reenviar recibo del último pago".'); return; }
     waPhone = (c.phone||'').replace(/\D/g,'');
     document.getElementById('wa-preview').textContent = msg;
     document.getElementById('wa-text').value = msg;
+    const pb=document.getElementById('wa-print-btn'); if(pb) pb.style.display = _lastReceipt ? '' : 'none';
     document.getElementById('wa-modal').classList.add('active');
   };
 
@@ -2822,9 +2870,11 @@ window.resendLastReceipt = function(){
   const last = pays[pays.length-1];
   const msg = isPaidOff(c) ? getPaidOffMsg(c) : getThanksMsg(c, getNextPayDate(c), last && last.amount);
   if(!msg){ alert('No se pudo generar el mensaje.'); return; }
+  try{ _lastReceipt = { name:c.name||'', car:[c.year,c.make,c.model].filter(Boolean).join(' '), contract:c.contractNumber||'', amount:(last&&last.amount)||0, method:(last&&last.method)||'', date:(last&&last.date)||'', balance:calcBalance(c), nextPay:getNextPayDate(c), paidOff:isPaidOff(c) }; }catch(e){ _lastReceipt=null; }
   waPhone = (c.phone||'').replace(/\D/g,'');
   document.getElementById('wa-preview').textContent = msg;
   document.getElementById('wa-text').value = msg;
+  const pb=document.getElementById('wa-print-btn'); if(pb) pb.style.display = _lastReceipt ? '' : 'none';
   closeModal('pay-modal');
   document.getElementById('wa-modal').classList.add('active');
 };
@@ -2910,6 +2960,7 @@ window.openWhatsApp=function(id,status){
   document.getElementById('wa-preview').textContent=msg;
   document.getElementById('wa-text').value=msg;
   waPhone=c.phone.replace(/\D/g,'');
+  const _pb=document.getElementById('wa-print-btn'); if(_pb) _pb.style.display='none';
   document.getElementById('wa-modal').classList.add('active');
 };
 
@@ -4142,5 +4193,14 @@ document.addEventListener('pointerup', delegatedClientAction, false);
 <script type="module" src="chat-widget.js"></script>
 <script type="module" src="help-bot.js"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="warehouse.html">
+<!-- 🖨️ Recibo imprimible (solo visible al imprimir) -->
+<div id="print-receipt" style="display:none;"></div>
+<style>
+@media print {
+  body > *:not(#print-receipt){ display:none !important; }
+  #print-receipt{ display:block !important; position:absolute !important; inset:0 !important; background:#fff !important; color:#000 !important; padding:0 !important; font-family:'Times New Roman',serif; }
+  #print-receipt *{ color:#000 !important; }
+}
+</style>
 </body>
 </html>
