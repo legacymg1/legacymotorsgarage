@@ -17,7 +17,19 @@ const EBAY_AUTH_TOKEN = defineSecret("EBAY_AUTH_TOKEN");
 const EBAY_OAUTH_REFRESH = defineSecret("EBAY_OAUTH_REFRESH");
 const PLAID_CLIENT_ID = defineSecret("PLAID_CLIENT_ID");
 const PLAID_SECRET = defineSecret("PLAID_SECRET");
-const ZOHO_MAIL_PASS = defineSecret("ZOHO_MAIL_PASS");
+// Zoho SMTP pass: se lee en TIEMPO DE EJECUCIÓN desde Secret Manager (no en el deploy),
+// para que el despliegue no falle si el secreto aún no tiene permisos/valor.
+let _zohoPassCache = null;
+async function _getZohoPass() {
+  if (_zohoPassCache) return _zohoPassCache;
+  try {
+    const { SecretManagerServiceClient } = require("@google-cloud/secret-manager");
+    const client = new SecretManagerServiceClient();
+    const [v] = await client.accessSecretVersion({ name: "projects/legacy-motors-garage/secrets/ZOHO_MAIL_PASS/versions/latest" });
+    _zohoPassCache = v.payload.data.toString("utf8").trim();
+    return _zohoPassCache;
+  } catch (e) { return null; }
+}
 
 // Prueba: confirma que el backend está vivo.
 exports.ping = onCall((request) => ({
@@ -718,7 +730,7 @@ exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
 });
 
 // 📮 Enviar el sales sheet a Lendmark directo por el SMTP de Zoho (from ev@, cc a ev@).
-exports.sendLendmarkEmail = onCall({ secrets: [ZOHO_MAIL_PASS], timeoutSeconds: 60, memory: "512MiB" }, async (request) => {
+exports.sendLendmarkEmail = onCall({ timeoutSeconds: 60, memory: "512MiB" }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
   if (!OWNER_EMAILS.includes(email)) throw new HttpsError("permission-denied", "Solo dueños.");
@@ -767,10 +779,12 @@ exports.sendLendmarkEmail = onCall({ secrets: [ZOHO_MAIL_PASS], timeoutSeconds: 
     "<p>Best regards,<br><br><b>Enrique Villagómez</b><br>Legacy Motors Garage LLC<br>21122 Ave 152, Porterville, CA 93257<br>Phone: (559) 540-5145<br>Dealer License No. 83177</p>" +
     sheetHtml + "</div>";
   try {
+    const pass = await _getZohoPass();
+    if (!pass) return { ok: false, error: "Falta configurar la contraseña de Zoho. Verifica que el secreto ZOHO_MAIL_PASS exista en el proyecto legacy-motors-garage y que la función tenga permiso para leerlo." };
     const nodemailer = require("nodemailer");
     const transporter = nodemailer.createTransport({
       host: "smtp.zoho.com", port: 465, secure: true,
-      auth: { user: FROM, pass: ZOHO_MAIL_PASS.value() },
+      auth: { user: FROM, pass },
     });
     await transporter.sendMail({ from: '"Legacy Motors Garage LLC" <' + FROM + ">", to, cc: FROM, subject, text: textBody, html: htmlBody });
     return { ok: true };
