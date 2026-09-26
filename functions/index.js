@@ -22,13 +22,18 @@ const PLAID_SECRET = defineSecret("PLAID_SECRET");
 let _zohoPassCache = null;
 async function _getZohoPass() {
   if (_zohoPassCache) return _zohoPassCache;
-  try {
-    const { SecretManagerServiceClient } = require("@google-cloud/secret-manager");
-    const client = new SecretManagerServiceClient();
-    const [v] = await client.accessSecretVersion({ name: "projects/legacy-motors-garage/secrets/ZOHO_MAIL_PASS/versions/latest" });
-    _zohoPassCache = v.payload.data.toString("utf8").trim();
-    return _zohoPassCache;
-  } catch (e) { return null; }
+  const { SecretManagerServiceClient } = require("@google-cloud/secret-manager");
+  const client = new SecretManagerServiceClient();
+  // Prueba varios nombres por si se creó en minúsculas u otra variante (los nombres son case-sensitive).
+  const names = ["ZOHO_MAIL_PASS", "zoho_mail_pass", "Zoho_Mail_Pass", "ZOHO_PASS", "zoho_pass"];
+  for (const n of names) {
+    try {
+      const [v] = await client.accessSecretVersion({ name: "projects/legacy-motors-garage/secrets/" + n + "/versions/latest" });
+      _zohoPassCache = v.payload.data.toString("utf8").trim();
+      if (_zohoPassCache) return _zohoPassCache;
+    } catch (e) { /* prueba el siguiente */ }
+  }
+  return null;
 }
 
 // Prueba: confirma que el backend está vivo.
