@@ -722,42 +722,57 @@ exports.sendLendmarkEmail = onCall({ secrets: [ZOHO_MAIL_PASS], timeoutSeconds: 
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
   if (!OWNER_EMAILS.includes(email)) throw new HttpsError("permission-denied", "Solo dueños.");
-  const d = request.data || {};
-  const pdfBase64 = String(d.pdfBase64 || "");
-  if (!pdfBase64) throw new HttpsError("invalid-argument", "Falta el PDF.");
-  const filename = String(d.filename || "Lendmark_SalesSheet.pdf").replace(/[^\w.\-]/g, "_");
-  const vehicle = String(d.vehicle || "").slice(0, 120);
-  const vin = String(d.vin || "").slice(0, 20);
-  const to = String(d.to || "branch257@lendmarkfinancial.com");
+  const s = (request.data && request.data.data) || {};
+  const to = String((request.data && request.data.to) || "branch257@lendmarkfinancial.com");
   const FROM = "ev@legacymotorsgarage.com";
+  const vehicle = String(s.carTitle || "").slice(0, 120);
+  const vin = String(s.vin || "").slice(0, 20);
+  const money = (n) => "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let sigUrl = "";
+  try { const sg = await admin.firestore().collection("config").doc("sellerSignature").get(); sigUrl = (sg.exists && sg.data().dataUrl) || ""; } catch (e) {}
   const subject = "Vehicle Sales Sheet for Funding" + (vehicle ? (" — " + vehicle) : "") + (vin ? (" (VIN " + vin + ")") : "");
+  const photos = Array.isArray(s.photos) ? s.photos.slice(0, 4) : [];
+  const photoHtml = photos.length ? ('<div style="margin:8px 0;">' + photos.map((p) => '<img src="' + p + '" style="width:23%;max-height:120px;object-fit:cover;border:1px solid #999;margin:2px;">').join("") + "</div>") : "";
+  const smogHtml = s.smogPhoto ? ('<p style="font-weight:bold;border-bottom:1px solid #000;margin:8px 0 3px;">SMOG CERTIFICATE</p><img src="' + s.smogPhoto + '" style="max-width:55%;max-height:220px;border:1px solid #999;">') : "";
+  const row = (a, b, bold) => '<tr><td style="padding:3px 0;' + (bold ? "font-weight:bold;border-top:1px solid #000;" : "") + '">' + a + '</td><td style="padding:3px 0;text-align:right;' + (bold ? "font-weight:bold;border-top:1px solid #000;" : "") + '">' + b + "</td></tr>";
+  const totalRows = s.cash
+    ? row("TOTAL (CASH / CONTADO)", money(s.total), true)
+    : (row("TOTAL PRICE", money(s.total), true) + row("Less: Down Payment", "(" + money(s.down) + ")") + row("AMOUNT TO FINANCE", money(s.financed), true));
+  const sheetHtml =
+    '<div style="border-top:2px solid #000;margin-top:14px;padding-top:8px;">' +
+    '<div style="font-weight:bold;font-size:15px;">VEHICLE SALES SHEET</div>' +
+    '<table style="width:100%;font-size:13px;border-collapse:collapse;margin:6px 0;">' +
+      row("Vehicle", vehicle) + row("VIN", vin || "—") + row("Odometer / Miles", s.miles ? (s.miles + " mi") : "—") + (s.color ? row("Color", s.color) : "") +
+    "</table>" + photoHtml + smogHtml +
+    '<p style="font-weight:bold;border-bottom:1px solid #000;margin:10px 0 3px;">PRICE BREAKDOWN</p>' +
+    '<table style="width:100%;font-size:13px;border-collapse:collapse;">' +
+      row("Vehicle Cash Price", money(s.price)) + row("Document Preparation Fee", money(s.docFee || 70)) + row("Smog Certification Fee", money(s.smog || 58.25)) +
+      row("Sales Tax", money(s.tax)) + row("DMV / Registration Fees", money(s.dmv)) + totalRows +
+    "</table>" +
+    '<div style="margin-top:18px;">' + (sigUrl ? ('<img src="' + sigUrl + '" style="height:44px;">') : "") + '<div style="border-top:1px solid #000;width:220px;padding-top:3px;font-size:11px;">Dealer / Legacy Motors Garage LLC · ' + (s.today || "") + "</div></div>" +
+    "</div>";
   const textBody =
     "Dear Lendmark Financial Services Team,\n\n" +
-    "Please find attached the vehicle sales sheet for the following deal, for your review and funding:\n\n" +
-    (vehicle ? ("Vehicle: " + vehicle + "\n") : "") +
-    (vin ? ("VIN: " + vin + "\n") : "") +
-    "\nThe attached PDF includes the vehicle details, photographs, smog certificate, and the complete price breakdown (vehicle price, documentation fee, smog certification, sales tax, and DMV/registration fees), along with the down payment and the amount to finance.\n\n" +
-    "Please let us know if you need any additional documentation to process this transaction. We appreciate your partnership.\n\n" +
-    "Best regards,\n\n" +
-    "Enrique Villagómez\nLegacy Motors Garage LLC\n21122 Ave 152, Porterville, CA 93257\nPhone: (559) 540-5145\nDealer License No. 83177";
+    "Please find below the vehicle sales sheet for the following deal, for your review and funding:\n\n" +
+    (vehicle ? ("Vehicle: " + vehicle + "\n") : "") + (vin ? ("VIN: " + vin + "\n") : "") +
+    "\nThe sheet includes the vehicle details, photographs, smog certificate, and the complete price breakdown (vehicle price, documentation fee, smog certification, sales tax, and DMV/registration fees)" +
+    (s.cash ? "." : ", along with the down payment and the amount to finance.") +
+    "\n\nPlease let us know if you need any additional documentation to process this transaction. We appreciate your partnership.\n\n" +
+    "Best regards,\n\nEnrique Villagómez\nLegacy Motors Garage LLC\n21122 Ave 152, Porterville, CA 93257\nPhone: (559) 540-5145\nDealer License No. 83177";
   const htmlBody =
+    '<div style="font-family:Arial,Helvetica,sans-serif;color:#111;max-width:680px;">' +
     "<p>Dear Lendmark Financial Services Team,</p>" +
-    "<p>Please find attached the vehicle sales sheet for the following deal, for your review and funding:</p>" +
-    "<p>" + (vehicle ? ("<b>Vehicle:</b> " + vehicle + "<br>") : "") + (vin ? ("<b>VIN:</b> " + vin) : "") + "</p>" +
-    "<p>The attached PDF includes the vehicle details, photographs, smog certificate, and the complete price breakdown (vehicle price, documentation fee, smog certification, sales tax, and DMV/registration fees), along with the down payment and the amount to finance.</p>" +
+    "<p>Please find below the vehicle sales sheet for the following deal, for your review and funding.</p>" +
     "<p>Please let us know if you need any additional documentation to process this transaction. We appreciate your partnership.</p>" +
-    "<p>Best regards,<br><br><b>Enrique Villagómez</b><br>Legacy Motors Garage LLC<br>21122 Ave 152, Porterville, CA 93257<br>Phone: (559) 540-5145<br>Dealer License No. 83177</p>";
+    "<p>Best regards,<br><br><b>Enrique Villagómez</b><br>Legacy Motors Garage LLC<br>21122 Ave 152, Porterville, CA 93257<br>Phone: (559) 540-5145<br>Dealer License No. 83177</p>" +
+    sheetHtml + "</div>";
   try {
     const nodemailer = require("nodemailer");
     const transporter = nodemailer.createTransport({
       host: "smtp.zoho.com", port: 465, secure: true,
       auth: { user: FROM, pass: ZOHO_MAIL_PASS.value() },
     });
-    await transporter.sendMail({
-      from: '"Legacy Motors Garage LLC" <' + FROM + ">",
-      to, cc: FROM, subject, text: textBody, html: htmlBody,
-      attachments: [{ filename, content: Buffer.from(pdfBase64, "base64"), contentType: "application/pdf" }],
-    });
+    await transporter.sendMail({ from: '"Legacy Motors Garage LLC" <' + FROM + ">", to, cc: FROM, subject, text: textBody, html: htmlBody });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };

@@ -1994,11 +1994,11 @@ async function _ensurePdfLibs(){
 function _lmMoney(n){ return '$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 // Arma el HTML de la hoja de Lendmark a partir de un objeto de datos (reusado por cotizador y por el historial).
 function _sheetHTML(s, sigUrl){
-  const money=_lmMoney; const photos=s.photos||[];
+  const money=_lmMoney; const photos=(s.photos||[]).slice(0,6);
   const photoHtml = photos.length
-    ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;">'+photos.map(p=>'<img src="'+p+'" style="width:31%;height:110px;object-fit:cover;border:1px solid #999;">').join('')+'</div>'
-    : '<div style="font-size:11px;color:#555;margin:8px 0;">(Sin fotos ligadas por VIN — adjuntar por separado)</div>';
-  return '<div style="max-width:640px;margin:0 auto;padding:24px 28px;">'
+    ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:12px 0;">'+photos.map(p=>'<img src="'+p+'" style="width:31%;height:140px;object-fit:cover;border:1px solid #999;">').join('')+'</div>'
+    : '<div style="font-size:12px;color:#555;margin:10px 0;">(Sin fotos ligadas por VIN — adjuntar por separado)</div>';
+  return '<div style="max-width:640px;margin:0 auto;padding:24px 28px;font-size:13px;">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:12px;">'
       +'<div><div style="font-size:20px;font-weight:800;">LEGACY MOTORS GARAGE LLC</div><div style="font-size:11px;">21122 Ave 152, Porterville, CA 93257 · (559) 540-5145 · Dealer Lic. 83177</div></div>'
       +'<div style="text-align:right;font-size:11px;">Date: <b>'+(s.today||'')+'</b>'+(s.invNum?'<br>Stock #: <b>'+s.invNum+'</b>':'')+'</div>'
@@ -2012,7 +2012,7 @@ function _sheetHTML(s, sigUrl){
       +(s.color?'<tr><td style="padding:3px 0;">Color</td><td style="padding:3px 0;text-align:right;">'+s.color+'</td></tr>':'')
     +'</table>'
     +photoHtml
-    +(s.smogPhoto?'<div style="font-weight:800;border-bottom:1px solid #000;margin:8px 0 4px;">SMOG CERTIFICATE / CERTIFICADO DE SMOG</div><div style="text-align:center;margin:6px 0;"><img src="'+s.smogPhoto+'" style="max-width:100%;max-height:320px;border:1px solid #999;"></div>':'')
+    +(s.smogPhoto?'<div style="font-weight:800;border-bottom:1px solid #000;margin:12px 0 4px;">SMOG CERTIFICATE / CERTIFICADO DE SMOG</div><div style="text-align:center;margin:8px 0;"><img src="'+s.smogPhoto+'" style="max-width:88%;max-height:340px;border:1px solid #999;"></div>':'')
     +'<div style="font-weight:800;border-bottom:1px solid #000;margin:10px 0 4px;">PRICE BREAKDOWN / DESGLOSE</div>'
     +'<table style="width:100%;font-size:13px;border-collapse:collapse;">'
       +'<tr><td style="padding:3px 0;">Vehicle Cash Price</td><td style="padding:3px 0;text-align:right;">'+money(s.price)+'</td></tr>'
@@ -2020,13 +2020,15 @@ function _sheetHTML(s, sigUrl){
       +'<tr><td style="padding:3px 0;">Smog Certification Fee</td><td style="padding:3px 0;text-align:right;">'+money(s.smog)+'</td></tr>'
       +'<tr><td style="padding:3px 0;">Sales Tax</td><td style="padding:3px 0;text-align:right;">'+money(s.tax)+'</td></tr>'
       +'<tr><td style="padding:3px 0;">DMV / Registration Fees</td><td style="padding:3px 0;text-align:right;">'+money(s.dmv)+'</td></tr>'
-      +'<tr><td style="border-top:1px solid #000;padding:5px 0;font-weight:800;">TOTAL PRICE</td><td style="border-top:1px solid #000;padding:5px 0;text-align:right;font-weight:800;">'+money(s.total)+'</td></tr>'
-      +'<tr><td style="padding:3px 0;">Less: Down Payment</td><td style="padding:3px 0;text-align:right;">('+money(s.down)+')</td></tr>'
-      +'<tr><td style="border-top:2px solid #000;padding:6px 0;font-weight:800;font-size:15px;">AMOUNT TO FINANCE</td><td style="border-top:2px solid #000;padding:6px 0;text-align:right;font-weight:800;font-size:15px;">'+money(s.financed)+'</td></tr>'
+      +(s.cash
+        ? '<tr><td style="border-top:2px solid #000;padding:6px 0;font-weight:800;font-size:15px;">TOTAL (CASH / CONTADO)</td><td style="border-top:2px solid #000;padding:6px 0;text-align:right;font-weight:800;font-size:15px;">'+money(s.total)+'</td></tr>'
+        : '<tr><td style="border-top:1px solid #000;padding:5px 0;font-weight:800;">TOTAL PRICE</td><td style="border-top:1px solid #000;padding:5px 0;text-align:right;font-weight:800;">'+money(s.total)+'</td></tr>'
+          +'<tr><td style="padding:3px 0;">Less: Down Payment</td><td style="padding:3px 0;text-align:right;">('+money(s.down)+')</td></tr>'
+          +'<tr><td style="border-top:2px solid #000;padding:6px 0;font-weight:800;font-size:15px;">AMOUNT TO FINANCE</td><td style="border-top:2px solid #000;padding:6px 0;text-align:right;font-weight:800;font-size:15px;">'+money(s.financed)+'</td></tr>')
     +'</table>'
-    +'<div style="margin-top:30px;display:flex;justify-content:space-between;gap:20px;align-items:flex-end;">'
-      +'<div style="flex:1;text-align:center;">'+(sigUrl?'<img src="'+sigUrl+'" style="height:46px;display:block;margin:0 auto -2px;">':'<div style="height:44px;"></div>')+'<div style="border-top:1px solid #000;padding-top:4px;font-size:11px;">Dealer / Legacy Motors Garage LLC</div></div>'
-      +'<div style="flex:1;text-align:center;"><div style="height:44px;line-height:44px;font-size:12px;">'+(s.today||'')+'</div><div style="border-top:1px solid #000;padding-top:4px;font-size:11px;">Date</div></div>'
+    +'<div style="margin-top:28px;display:flex;justify-content:space-between;gap:20px;align-items:flex-end;">'
+      +'<div style="flex:1;text-align:center;">'+(sigUrl?'<img src="'+sigUrl+'" style="height:48px;display:block;margin:0 auto -2px;">':'<div style="height:46px;"></div>')+'<div style="border-top:1px solid #000;padding-top:4px;font-size:11px;">Dealer / Legacy Motors Garage LLC</div></div>'
+      +'<div style="flex:1;text-align:center;"><div style="height:46px;line-height:46px;font-size:12px;">'+(s.today||'')+'</div><div style="border-top:1px solid #000;padding-top:4px;font-size:11px;">Date</div></div>'
     +'</div>'
     +'</div>';
 }
@@ -2083,24 +2085,37 @@ window.lendmarkSheet = async function(i, mode){
   const carTitle=[year,make,model,trim].filter(Boolean).join(' ')||(o.car||'');
   const cust=(document.getElementById('cot-customer')?document.getElementById('cot-customer').value.trim():'')||'';
   const today=new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
-  const s={ carTitle, vin, miles, color, invNum, photos, smogPhoto, cust, price, docFee, smog, tax, dmv, total, down, financed, today };
-  const box=document.getElementById('print-receipt'); if(!box) return;
-  box.innerHTML=_sheetHTML(s, sigUrl);
+  const cash=(o.freq==='cash');
+  const s={ carTitle, vin, miles, color, invNum, photos, smogPhoto, cust, price, docFee, smog, tax, dmv, total, down, financed, today, cash };
   // 💾 Guarda el registro para el botón "Lendmark Sales Sheets".
   try{
     const rid='lm_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     await setDoc(doc(db,'lendmark_sheets',rid), {...s, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||''});
   }catch(e){ console.log('save lendmark sheet', e); }
-  _outputSheet(mode, box, vin, carTitle);
+  if(mode==='email'){ _sendLendmarkEmail(s); return; }
+  const box=document.getElementById('print-receipt'); if(!box) return;
+  box.innerHTML=_sheetHTML(s, sigUrl);
+  _outputSheet('print', box, vin, carTitle);
 };
+// 📮 Envía el sales sheet DIRECTO por el servidor (Zoho SMTP) — arma el correo en el backend con fotos+firma.
+async function _sendLendmarkEmail(s){
+  if(!confirm('📮 Enviar el sales sheet DIRECTO a Lendmark (branch257@lendmarkfinancial.com) desde tu Zoho, con copia a ti.\n\nSe manda solo. ¿Confirmar?')) return;
+  try{
+    const r=await httpsCallable(functions,'sendLendmarkEmail')({ data:s });
+    const d=(r&&r.data)||{};
+    if(d.ok){ alert('✅ Enviado a Lendmark (con copia a tu Zoho).'); }
+    else alert('No se pudo enviar: '+((d&&d.error)||'error'));
+  }catch(e){ alert('No se pudo enviar: '+((e&&e.message)||e)+'\n\nSi el backend aún se está desplegando, espera unos minutos y reintenta.'); }
+}
 // Re-abrir (imprimir/enviar) una hoja guardada del historial.
 window.openSavedSheet = async function(id, mode){
   const sigUrl = await _loadSellerSig();
   let s; try{ const snap=await getDoc(doc(db,'lendmark_sheets',id)); if(!snap.exists()){ alert('Hoja no encontrada.'); return; } s=snap.data(); }
   catch(e){ alert('No se pudo cargar: '+((e&&e.message)||e)); return; }
+  if(mode==='email'){ _sendLendmarkEmail(s); return; }
   const box=document.getElementById('print-receipt'); if(!box) return;
   box.innerHTML=_sheetHTML(s, sigUrl);
-  _outputSheet(mode||'print', box, s.vin, s.carTitle);
+  _outputSheet('print', box, s.vin, s.carTitle);
 };
 // 📑 Historial de Lendmark Sales Sheets
 window.openLendmarkList = async function(){
