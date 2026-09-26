@@ -1872,7 +1872,7 @@ window.cotCarKey=function(e){
 window.cotAddBlank=function(){ cotOpts.push({id:++cotSeq, car:'', vin:'', miles:'', price:0, down:0, tax:0, dmv:0, numpay:52, freq:'weekly'}); renderCotOptions(); };
 window.cotDup=function(i){ const o=cotOpts[i]; if(!o) return; cotOpts.splice(i+1,0,{...o,id:++cotSeq}); renderCotOptions(); };
 window.cotRemove=function(i){ cotOpts.splice(i,1); renderCotOptions(); };
-window.cotSet=function(i,field,val){ if(!cotOpts[i]) return; cotOpts[i][field]=(field==='car'||field==='vin'||field==='freq'||field==='miles')?val:(Number(val)||0); cotUpdateResult(i); cotSaveDraft(); };
+window.cotSet=function(i,field,val){ if(!cotOpts[i]) return; cotOpts[i][field]=(field==='car'||field==='vin'||field==='freq'||field==='miles')?val:(Number(val)||0); if(field==='freq'){ renderCotOptions(); } else { cotUpdateResult(i); } cotSaveDraft(); };
 function cotCalc(o){
   const docFee=70, smog=58.25;
   const price=Number(o.price)||0, down=Number(o.down)||0, tax=Number(o.tax)||0, dmv=Number(o.dmv)||0;
@@ -1886,21 +1886,28 @@ function cotCalc(o){
   const payEven = cash?0:Math.round((totalPayments/numpay)*100)/100;
   const lastPay = cash?0:Math.round((totalPayments-payEven*(numpay-1))*100)/100;
   const payToday = down+tax+dmv;
-  return {docFee,price,down,tax,dmv,numpay,freq,cash,amountFinanced,financeCharge,totalPayments,payEven,lastPay,payToday};
+  return {docFee,smog,price,down,tax,dmv,numpay,freq,cash,amountFinanced,financeCharge,totalPayments,payEven,lastPay,payToday};
 }
 function cotResultHTML(r){
+  const rowM='display:flex;justify-content:space-between;';
+  const feeRows = `<div style="${rowM}"><span style="color:var(--muted);">Doc / Preparación</span><b>${formatMoney(r.docFee||70)}</b></div>
+    <div style="${rowM}"><span style="color:var(--muted);">Certificación de Smog</span><b>${formatMoney(r.smog||58.25)}</b></div>`;
   if(r.cash){
+    const totalCash=r.price+(r.docFee||70)+(r.smog||58.25)+r.tax+r.dmv;
     return `<div style="background:var(--navy2);border-radius:10px;padding:12px;font-size:13px;">
-      <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Precio de contado</span><b>${formatMoney(r.price)}</b></div>
-      <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Impuestos + DMV</span><b>${formatMoney(r.tax+r.dmv)}</b></div>
-      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">Total de contado</span><b style="color:var(--gold);">${formatMoney(r.price+r.tax+r.dmv)}</b></div></div>`;
+      <div style="${rowM}"><span style="color:var(--muted);">Precio del vehículo</span><b>${formatMoney(r.price)}</b></div>
+      ${feeRows}
+      <div style="${rowM}"><span style="color:var(--muted);">Impuestos + DMV</span><b>${formatMoney(r.tax+r.dmv)}</b></div>
+      <div style="${rowM}border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">Total de contado</span><b style="color:var(--gold);">${formatMoney(totalCash)}</b></div></div>`;
   }
   return `<div style="background:var(--navy2);border-radius:10px;padding:12px;font-size:13px;">
-    <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Paga hoy (enganche+imp.+DMV)</span><b style="color:var(--green);">${formatMoney(r.payToday)}</b></div>
-    <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Monto financiado</span><b>${formatMoney(r.amountFinanced)}</b></div>
-    <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Cargo por financiamiento</span><b>${formatMoney(r.financeCharge)}</b></div>
-    <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Total a financiar</span><b>${formatMoney(r.totalPayments)}</b></div>
-    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">${r.numpay} pagos de</span><b style="color:var(--gold);font-size:17px;">${formatMoney(r.payEven)}</b></div>
+    <div style="${rowM}"><span style="color:var(--muted);">Precio del vehículo</span><b>${formatMoney(r.price)}</b></div>
+    ${feeRows}
+    <div style="${rowM}"><span style="color:var(--muted);">Paga hoy (enganche+imp.+DMV)</span><b style="color:var(--green);">${formatMoney(r.payToday)}</b></div>
+    <div style="${rowM}"><span style="color:var(--muted);">Monto financiado (incluye doc+smog)</span><b>${formatMoney(r.amountFinanced)}</b></div>
+    <div style="${rowM}"><span style="color:var(--muted);">Cargo por financiamiento</span><b>${formatMoney(r.financeCharge)}</b></div>
+    <div style="${rowM}"><span style="color:var(--muted);">Total a financiar</span><b>${formatMoney(r.totalPayments)}</b></div>
+    <div style="${rowM}border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">${r.numpay} pagos de</span><b style="color:var(--gold);font-size:17px;">${formatMoney(r.payEven)}</b></div>
     ${Math.abs(r.lastPay-r.payEven)>0.01?`<div style="font-size:11px;color:var(--muted);text-align:right;">(último pago ${formatMoney(r.lastPay)})</div>`:''}</div>`;
 }
 function cotUpdateResult(i){ const el=document.getElementById('cot-res-'+i); if(el && cotOpts[i]) el.innerHTML=cotResultHTML(cotCalc(cotOpts[i])); }
@@ -1918,15 +1925,15 @@ function renderCotOptions(){
       <div class="form-group"><label class="form-label">Carro</label><input class="form-input" value="${(o.car||'').replace(/"/g,'&quot;')}" oninput="cotSet(${i},'car',this.value)" placeholder="2019 Toyota Camry"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <div class="form-group" style="flex:1;min-width:120px;"><label class="form-label">Precio $</label><input class="form-input" type="number" value="${o.price||''}" oninput="cotSet(${i},'price',this.value)"></div>
-        <div class="form-group" style="flex:1;min-width:120px;"><label class="form-label">Enganche $</label><input class="form-input" type="number" value="${o.down||''}" oninput="cotSet(${i},'down',this.value)"></div>
+        ${o.freq!=='cash' ? `<div class="form-group" style="flex:1;min-width:120px;"><label class="form-label">Enganche $</label><input class="form-input" type="number" value="${o.down||''}" oninput="cotSet(${i},'down',this.value)"></div>` : ''}
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <div class="form-group" style="flex:1;min-width:110px;"><label class="form-label">Impuestos $</label><input class="form-input" type="number" value="${o.tax||''}" oninput="cotSet(${i},'tax',this.value)"></div>
         <div class="form-group" style="flex:1;min-width:110px;"><label class="form-label">DMV $</label><input class="form-input" type="number" value="${o.dmv||''}" oninput="cotSet(${i},'dmv',this.value)"></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <div class="form-group" style="flex:1;min-width:110px;"><label class="form-label"># Pagos</label><input class="form-input" type="number" value="${o.numpay||''}" oninput="cotSet(${i},'numpay',this.value)"></div>
-        <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">Frecuencia</label>
+        ${o.freq!=='cash' ? `<div class="form-group" style="flex:1;min-width:110px;"><label class="form-label"># Pagos</label><input class="form-input" type="number" value="${o.numpay||''}" oninput="cotSet(${i},'numpay',this.value)"></div>` : ''}
+        <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">Tipo de venta</label>
           <select class="form-input" onchange="cotSet(${i},'freq',this.value)">
             <option value="weekly"${o.freq==='weekly'?' selected':''}>Semanal</option>
             <option value="biweekly"${o.freq==='biweekly'?' selected':''}>Quincenal</option>
