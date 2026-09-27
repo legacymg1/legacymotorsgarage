@@ -2480,15 +2480,18 @@ window.renderAll = function() {
       });
     });
     const totalBalance2 = clients.reduce((s,c)=>s+calcBalance(c),0);
-    const totalMonthly2 = clients.reduce((s,c)=>{
-      const freq=c.freq||'weekly'; const w=Number(c.weekly||0);
-      return s+(freq==='monthly'?w:freq==='biweekly'?w*26/12:w*52/12);
-    },0);
+    // 💵 Cobrado ESTE MES = suma real de los pagos registrados con fecha de este mes.
+    const nowY2=now2.getFullYear(), nowM2=now2.getMonth();
+    let cobradoMes2=0, nPagosMes2=0;
+    clients.forEach(c=>{ (c.payments||[]).forEach(p=>{
+      const dt=p&&p.date?new Date(String(p.date).slice(0,10)+'T12:00:00'):null;
+      if(dt && dt.getFullYear()===nowY2 && dt.getMonth()===nowM2){ cobradoMes2+=Number(p.amount||0); nPagosMes2++; }
+    }); });
     const totalWeekly2 = clients.reduce((s,c)=>s+Number(c.weekly||0),0);
     const activeClients2 = clients.filter(c=>calcBalance(c)>0).length;
     finHTML = `<div class="fin-summary">
       <div class="fs-item"><div class="fs-label">Restante Este Mes</div><div class="fs-value" style="color:var(--green);">${formatMoney(restanteMes2)}</div><div class="fs-sub">${pagosRestantes2} pagos pendientes</div></div>
-      <div class="fs-item"><div class="fs-label">Ingresos / Mes</div><div class="fs-value">${formatMoney(Math.round(totalMonthly2))}</div><div class="fs-sub">Estimado mensual</div></div>
+      <div class="fs-item"><div class="fs-label">Cobrado Este Mes</div><div class="fs-value" style="color:var(--gold);">${formatMoney(cobradoMes2)}</div><div class="fs-sub">${nPagosMes2} pagos recibidos</div></div>
       <div class="fs-item"><div class="fs-label">Total Por Cobrar</div><div class="fs-value">${formatMoney(totalBalance2)}</div><div class="fs-sub">${activeClients2} clientes activos</div></div>
       <div class="fs-item"><div class="fs-label">Pago Promedio</div><div class="fs-value">${formatMoney(Math.round(totalWeekly2/Math.max(clients.length,1)))}</div><div class="fs-sub">Por cliente</div></div>
       <div class="fs-item"><div class="fs-label">Cartera Total</div><div class="fs-value">${clients.length}</div><div class="fs-sub">Clientes totales</div></div>
