@@ -2480,18 +2480,26 @@ window.renderAll = function() {
       });
     });
     const totalBalance2 = clients.reduce((s,c)=>s+calcBalance(c),0);
-    // 💵 Cobrado ESTE MES = suma real de los pagos registrados con fecha de este mes.
     const nowY2=now2.getFullYear(), nowM2=now2.getMonth();
+    // 💵 Cobrado ESTE MES = suma real de los pagos registrados con fecha de este mes.
     let cobradoMes2=0, nPagosMes2=0;
     clients.forEach(c=>{ (c.payments||[]).forEach(p=>{
       const dt=p&&p.date?new Date(String(p.date).slice(0,10)+'T12:00:00'):null;
       if(dt && dt.getFullYear()===nowY2 && dt.getMonth()===nowM2){ cobradoMes2+=Number(p.amount||0); nPagosMes2++; }
     }); });
+    // 📅 Parcialidades del MES = TODOS los pagos programados que caen en este mes (pagados + pendientes),
+    //    sin enganches. Si vendes hoy, el schedule del nuevo cliente ya suma sus pagos de este mes.
+    const startOfMonthStr2 = nowY2+'-'+String(nowM2+1).padStart(2,'0')+'-01';
+    let parcialidadesMes2=0, nParcMes2=0;
+    clients.forEach(c=>{ const w=Number(c.weekly||0); if(w<=0) return;
+      (c.schedule||[]).forEach(d=>{ if(d>=startOfMonthStr2 && d<=endOfMonthStr2){ parcialidadesMes2+=w; nParcMes2++; } });
+    });
     const totalWeekly2 = clients.reduce((s,c)=>s+Number(c.weekly||0),0);
     const activeClients2 = clients.filter(c=>calcBalance(c)>0).length;
     finHTML = `<div class="fin-summary">
-      <div class="fs-item"><div class="fs-label">Restante Este Mes</div><div class="fs-value" style="color:var(--green);">${formatMoney(restanteMes2)}</div><div class="fs-sub">${pagosRestantes2} pagos pendientes</div></div>
-      <div class="fs-item"><div class="fs-label">Cobrado Este Mes</div><div class="fs-value" style="color:var(--gold);">${formatMoney(cobradoMes2)}</div><div class="fs-sub">${nPagosMes2} pagos recibidos</div></div>
+      <div class="fs-item"><div class="fs-label">Parcialidades del Mes</div><div class="fs-value" style="color:var(--gold);">${formatMoney(parcialidadesMes2)}</div><div class="fs-sub">${nParcMes2} pagos programados (pagados + pendientes)</div></div>
+      <div class="fs-item"><div class="fs-label">Cobrado Este Mes</div><div class="fs-value" style="color:var(--green);">${formatMoney(cobradoMes2)}</div><div class="fs-sub">${nPagosMes2} pagos recibidos</div></div>
+      <div class="fs-item"><div class="fs-label">Restante Este Mes</div><div class="fs-value">${formatMoney(restanteMes2)}</div><div class="fs-sub">${pagosRestantes2} pagos pendientes</div></div>
       <div class="fs-item"><div class="fs-label">Total Por Cobrar</div><div class="fs-value">${formatMoney(totalBalance2)}</div><div class="fs-sub">${activeClients2} clientes activos</div></div>
       <div class="fs-item"><div class="fs-label">Pago Promedio</div><div class="fs-value">${formatMoney(Math.round(totalWeekly2/Math.max(clients.length,1)))}</div><div class="fs-sub">Por cliente</div></div>
       <div class="fs-item"><div class="fs-label">Cartera Total</div><div class="fs-value">${clients.length}</div><div class="fs-sub">Clientes totales</div></div>
