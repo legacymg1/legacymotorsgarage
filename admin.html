@@ -674,9 +674,19 @@
 <div class="modal-overlay" id="addon-modal">
   <div class="modal">
     <div class="modal-title">➕ Cargo / deuda adicional</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Deuda NUEVA (reparación, enganche, etc.) con su propio contrato. El carro sigue como colateral. El cliente paga el mismo monto: primero termina el carro, luego este cargo. Interés igual que el carro, contando desde que arranca.</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Deuda NUEVA (reparación, enganche, etc.) con su <b>propio contrato</b> y su <b>propio plan de pagos</b>. El carro sigue como colateral. Tú eliges cuántos pagos y de cuánto — para bajarle el pago, dale MÁS semanas o meses. Interés igual que el carro (20% / 6 meses) sobre el plazo que elijas.</div>
     <div class="form-group"><label class="form-label">¿De qué es? (concepto)</label><input class="form-input" id="addon-concept" placeholder="Ej. Cambio de aceite / Enganche moto / Transmisión"></div>
     <div class="form-group"><label class="form-label">Monto de la deuda ($)</label><input class="form-input" id="addon-amount" type="number" inputmode="decimal" placeholder="200" oninput="addonPreview()"></div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1;"><label class="form-label">Frecuencia</label>
+        <select class="form-input" id="addon-freq" onchange="addonPreview()">
+          <option value="weekly">Semanal</option>
+          <option value="biweekly">Quincenal</option>
+          <option value="monthly">Mensual</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1;"><label class="form-label"># de pagos</label><input class="form-input" id="addon-numpay" type="number" inputmode="numeric" min="1" placeholder="8" oninput="addonPreview()"></div>
+    </div>
     <div id="addon-preview" style="background:var(--navy2);border-radius:10px;padding:12px;font-size:13px;margin-bottom:12px;display:none;"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('addon-modal')">Cancelar</button>
@@ -1043,29 +1053,28 @@ function isPaidOff(c) {
 }
 
 // ===== 💳 CARGOS ADICIONALES (reparaciones / enganche a deuda) — deuda SEPARADA, mismo carro colateral =====
-// Cada cargo es su propia deuda con su contrato; el cliente paga el MISMO monto: primero termina el
-// carro, luego siguen los pagos al cargo. El interés del cargo se calcula sobre SU plazo (empieza cuando
-// arranca a pagarse, después del carro) — misma tasa que el carro.
+// Cada cargo es su propia deuda con su PROPIO contrato y su PROPIO plan de pagos (frecuencia + # de pagos
+// que TÚ eliges), independiente del carro. Para bajarle el pago, se le dan más semanas/meses. El interés
+// es la misma tasa que el carro (20% / 6 meses) calculado sobre el plazo elegido del cargo.
 function clientAddons(c){ return Array.isArray(c.addons)?c.addons:[]; }
 function addonPaid(a){ return (a.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0); }
 function addonBalance(a){ if(!a||a.settled===true) return 0; return Math.max(0, ((Number(a.totalCents)||0)/100) - addonPaid(a)); }
 function addonsBalance(c){ return clientAddons(c).reduce((s,a)=>s+addonBalance(a),0); }
 function activeAddons(c){ return clientAddons(c).filter(a=>addonBalance(a)>0.005); }
 function totalClientDebt(c){ return calcBalance(c) + addonsBalance(c); }
-// Financiamiento del cargo al MISMO ritmo y tasa que el carro (add-on 20% / 6 meses).
-function calcAddonFinance(principal, weekly, freq){
-  principal=Number(principal)||0; weekly=Number(weekly)||0; freq=freq||'weekly';
-  if(principal<=0) return { principal:0, financeCharge:0, total:0, numPay:0 };
-  if(weekly<=0) return { principal, financeCharge:0, total:principal, numPay:1 };
+// Financiamiento del cargo por PLAZO ELEGIDO (número de pagos que TÚ pones), misma tasa que el carro
+// (20% / 6 meses) sobre ese plazo. Más pagos = más plazo = interés un poco mayor pero pago más BAJO.
+// Devuelve el monto del pago (payment) y el último pago (ajusta centavos para cuadrar el total).
+function calcAddonFinance(principal, numPay, freq){
+  principal=Number(principal)||0; numPay=Math.max(1, parseInt(numPay)||1); freq=freq||'weekly';
+  if(principal<=0) return { principal:0, financeCharge:0, total:0, numPay:0, payment:0, lastPayment:0 };
   const daysPerPay = freq==='monthly'?30.44:freq==='biweekly'?14:7;
-  let numPay=Math.max(1, Math.ceil(principal/weekly)), total=principal, fc=0;
-  for(let it=0; it<8; it++){
-    const months=(numPay*daysPerPay)/30.44;
-    fc=Math.round(principal*0.20*(months/6)*100)/100;
-    total=Math.round((principal+fc)*100)/100;
-    numPay=Math.max(1, Math.ceil(total/Math.max(weekly,0.01)));
-  }
-  return { principal, financeCharge:fc, total, numPay };
+  const months=(numPay*daysPerPay)/30.44;
+  const fc=Math.round(principal*0.20*(months/6)*100)/100;
+  const total=Math.round((principal+fc)*100)/100;
+  const payment=Math.round((total/numPay)*100)/100;
+  const lastPayment=Math.round((total-(payment*(numPay-1)))*100)/100;   // el último cuadra los centavos
+  return { principal, financeCharge:fc, total, numPay, payment, lastPayment };
 }
 
 let _addonClientId=null;
@@ -1074,6 +1083,9 @@ window.openAddonModal=function(){
   _addonClientId=c.id;
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
   set('addon-concept',''); set('addon-amount','');
+  // Arranca con la misma frecuencia del carro; el # de pagos lo pones tú (se sugiere al escribir el monto).
+  set('addon-freq', c.freq && c.freq!=='cash' ? c.freq : 'weekly');
+  set('addon-numpay','');
   const pv=document.getElementById('addon-preview'); if(pv){ pv.style.display='none'; pv.innerHTML=''; }
   document.getElementById('addon-modal').classList.add('active');
 };
@@ -1082,27 +1094,39 @@ window.addonPreview=function(){
   const amt=Number(document.getElementById('addon-amount').value)||0;
   const box=document.getElementById('addon-preview'); if(!box) return;
   if(amt<=0){ box.style.display='none'; return; }
-  const w=Number(c.weekly)||0, freq=c.freq||'weekly';
-  const r=calcAddonFinance(amt,w,freq);
+  const freq=document.getElementById('addon-freq').value||'weekly';
+  const npEl=document.getElementById('addon-numpay');
+  // Sugerencia: si aún no pones # de pagos, arranca con el mismo pago del carro (y de ahí lo bajas dándole más plazo).
+  let numPay=parseInt(npEl.value)||0;
+  if(numPay<=0){
+    const w=Number(c.weekly)||0;
+    numPay = w>0 ? Math.max(1, Math.ceil(amt/w)) : 1;
+    npEl.value=numPay;                 // lo dejamos escrito para que lo puedas ajustar
+  }
+  const r=calcAddonFinance(amt,numPay,freq);
   const freqLbl=freq==='monthly'?'mensuales':freq==='biweekly'?'quincenales':'semanales';
+  const sameLast = Math.abs(r.lastPayment-r.payment)<0.005;
   box.style.display='block';
-  box.innerHTML=`<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Monto</span><b>${formatMoney(r.principal)}</b></div>
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Monto de la deuda</span><b>${formatMoney(r.principal)}</b></div>
     <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Cargo por financiamiento (20% / 6m)</span><b>${formatMoney(r.financeCharge)}</b></div>
     <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">Total del cargo</span><b style="color:var(--gold);">${formatMoney(r.total)}</b></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:4px;">${r.numPay} pagos ${freqLbl} de ${formatMoney(w)} · empieza al terminar el carro</div>`;
+    <div style="display:flex;justify-content:space-between;background:rgba(31,111,235,0.12);border-radius:8px;padding:8px 10px;margin-top:8px;"><span style="font-weight:700;">Pago ${freqLbl.slice(0,-2)+'l'}</span><b style="font-size:16px;color:#4aa3ff;">${formatMoney(r.payment)}</b></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px;">${r.numPay} pagos ${freqLbl} de ${formatMoney(r.payment)}${sameLast?'':(' (último '+formatMoney(r.lastPayment)+')')} · deuda aparte del carro</div>`;
 };
 window.saveAddon=async function(){
   const c=clients.find(x=>x.id===_addonClientId); if(!c){ alert('Cliente no encontrado'); return; }
   const concept=(document.getElementById('addon-concept').value||'').trim();
   const amt=Number(document.getElementById('addon-amount').value)||0;
+  const freq=document.getElementById('addon-freq').value||'weekly';
+  const numPay=parseInt(document.getElementById('addon-numpay').value)||0;
   if(!concept){ alert('Escribe de qué es el cargo.'); return; }
   if(amt<=0){ alert('Pon el monto de la deuda.'); return; }
-  const w=Number(c.weekly)||0, freq=c.freq||'weekly';
-  if(w<=0){ alert('Este cliente no tiene un pago semanal definido (¿es de contado o servicio?). El cargo necesita un monto de pago.'); return; }
-  const r=calcAddonFinance(amt,w,freq);
+  if(numPay<=0){ alert('Pon el número de pagos (semanas o meses) del cargo.'); return; }
+  const r=calcAddonFinance(amt,numPay,freq);   // plazo y pago que TÚ elegiste
   const id='ad_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
   const contractNumber='LMG-ADD-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5);
-  const addon={ id, concept, principalCents:Math.round(r.principal*100), financeChargeCents:Math.round(r.financeCharge*100), totalCents:Math.round(r.total*100), numPay:r.numPay, weekly:w, freq, payments:[], settled:false, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', contractNumber, signedContract:null };
+  // weekly = el PAGO propio de este cargo (no el del carro). lastPayment cuadra los centavos.
+  const addon={ id, concept, principalCents:Math.round(r.principal*100), financeChargeCents:Math.round(r.financeCharge*100), totalCents:Math.round(r.total*100), numPay:r.numPay, weekly:r.payment, lastPayment:r.lastPayment, freq, payments:[], settled:false, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', contractNumber, signedContract:null };
   const btn=document.getElementById('addon-save'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
   try{
     await updateDoc(doc(db,'clients',c.id), { addons: arrayUnion(addon) });
@@ -1122,7 +1146,7 @@ window.openAddonContract=function(c, addon){
     idType:c.idType||'', idNumber:c.idNumber||'', idState:c.idState||'CA', idExpiry:c.idExpiry||'',
     year:c.year||'', make:c.make||'', model:c.model||'', trim:c.trim||'', color:c.color||'', vin:c.vin||'', miles:c.miles||'',
     concept:addon.concept||'', principal:(addon.principalCents/100).toFixed(2), financeCharge:(addon.financeChargeCents/100).toFixed(2),
-    total:(addon.totalCents/100).toFixed(2), numPay:addon.numPay||0, weekly:Number(c.weekly||0).toFixed(2), freq:c.freq||'weekly',
+    total:(addon.totalCents/100).toFixed(2), numPay:addon.numPay||0, weekly:Number(addon.weekly||0).toFixed(2), lastPayment:Number(addon.lastPayment||addon.weekly||0).toFixed(2), freq:addon.freq||'weekly',
     lang:c.lang||'es', contractDate:today()
   });
   _showContractLinks('contracts_addon.html?'+params.toString()+'&_cb='+Date.now(), '');

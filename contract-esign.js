@@ -146,8 +146,24 @@ window.signAndSave = async function(){
     var app=A2.getApps().length?A2.getApps()[0]:A2.initializeApp(__FBCFG);
     var db=FS.getFirestore(app), st=ST.getStorage(app);
     var cnum=q.get('contractNum')||('LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5));
+    var addonId=q.get('addonId');
     var snap=await FS.getDoc(FS.doc(db,'clients',clientId));
     var existing=snap.exists()?snap.data():{};
+    // ➕ CARGO ADICIONAL: la firma se guarda EN el cargo (c.addons[]), sin tocar el contrato del carro.
+    if(addonId){
+      var _nowA=new Date().toISOString();
+      var _addons=Array.isArray(existing.addons)?existing.addons.slice():[];
+      var _pathA='contracts/'+clientId+'/addon-'+addonId+'-'+cnum+'.html';
+      var _srefA=ST.ref(st,_pathA);
+      await ST.uploadString(_srefA, snapshotHTML, 'raw', {contentType:'text/html; charset=utf-8'});
+      var _urlA=await ST.getDownloadURL(_srefA);
+      var _entryA={url:_urlA,contractNumber:cnum,signedAt:_nowA,method:'esign',status:'active',hash:hashHex,signedBy:((__user&&__user.email)||'')};
+      _addons=_addons.map(function(a){ if(a && a.id===addonId){ a.signedContract=_entryA; } return a; });
+      await FS.setDoc(FS.doc(db,'clients',clientId),{addons:_addons},{merge:true});
+      alert('Contrato del cargo firmado y guardado. Numero: '+cnum+'.');
+      var _u2A=new URL(window.location.href); _u2A.searchParams.set('_cb', String(Date.now())); window.location.href=_u2A.toString();
+      return;
+    }
     var versions=Array.isArray(existing.signedContractVersions)?existing.signedContractVersions.slice():[];
     var reason=null; try{ reason=sessionStorage.getItem('correctionReason'); }catch(e){}
     var newVer=versions.length+1;

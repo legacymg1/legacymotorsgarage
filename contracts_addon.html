@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Additional Charge Agreement — Legacy Motors Garage LLC</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Times New Roman', serif; font-size: 10pt; color: #000; background: #fff; }
+  .page { width: 8.5in; min-height: 11in; margin: 0 auto; padding: 0.5in; }
+  h1 { font-size: 13pt; text-align: center; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; }
+  h2 { font-size: 11pt; text-align: center; margin-bottom: 2px; }
+  .subtitle { font-size: 8pt; text-align: center; margin-bottom: 12px; color: #333; }
+  .header-box { border: 2px solid #000; padding: 8px 12px; margin-bottom: 10px; }
+  .dealer-info { display: flex; justify-content: space-between; font-size: 9pt; flex-wrap: wrap; gap:4px; }
+  .section { margin-bottom: 10px; }
+  .section-title { font-size: 10pt; font-weight: bold; text-transform: uppercase; background: #000; color: #fff; padding: 3px 8px; margin-bottom: 6px; letter-spacing: 1px; }
+  .field-row { display: flex; gap: 10px; margin-bottom: 5px; flex-wrap: wrap; }
+  .field label { font-size: 8pt; display: block; color: #555; margin-bottom: 1px; }
+  .field-line { border-bottom: 1px solid #000; min-height: 18px; padding: 2px 4px; font-size: 9.5pt; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .four-col { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+  .payment-box { border: 2px solid #000; padding: 8px; }
+  .payment-row { display: flex; justify-content: space-between; border-bottom: 1px solid #ccc; padding: 3px 0; font-size: 9.5pt; }
+  .payment-row.total { font-weight: bold; font-size: 11pt; border-bottom: none; border-top: 2px solid #000; padding-top: 5px; margin-top: 2px; }
+  .payment-row.highlight { background: #f5f5f5; }
+  .pay-plan { background:#eef4ff; border:2px solid #000; padding:8px; margin-top:6px; }
+  .clause { margin-bottom: 8px; font-size: 9pt; line-height: 1.45; text-align: justify; }
+  .clause-title { font-weight: bold; font-size: 9pt; }
+  .sign-box { border: 1px solid #000; padding: 8px; margin-bottom: 8px; }
+  .sign-row { display: flex; gap: 20px; margin-top: 6px; }
+  .sign-line { flex: 1; border-bottom: 1px solid #000; padding-top: 20px; text-align: center; font-size: 8pt; color: #555; }
+  .initial-slot { border: 1px solid #000; min-width: 75px; height: 34px; display: inline-block; vertical-align: middle; }
+  .warning-box { border: 2px solid #000; padding: 8px; margin: 8px 0; background: #fff8f0; }
+  .page-break { page-break-after: always; }
+  .footer-note { font-size: 7.5pt; color: #555; text-align: center; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 6px; }
+  @media print {
+    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .no-print, .action-bar { display: none !important; }
+    .page { margin: 0; padding: 0.4in; page-break-before: always; break-before: page; min-height: auto; }
+    .page:first-of-type { page-break-before: avoid; break-before: avoid; }
+    @page { margin: 0.4in; size: letter; }
+  }
+  .action-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1a2035; padding: 10px 20px; display: flex; gap: 10px; justify-content: center; z-index: 999; }
+  .action-bar button { padding: 10px 24px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: bold; }
+  .btn-print { background: #c9a84c; color: #000; }
+  .btn-close { background: #333; color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="action-bar no-print">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Print</button>
+  <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
+</div>
+
+<!-- ==================== PAGE 1 — ENGLISH ==================== -->
+<div class="page">
+
+<div class="header-box">
+  <h1>Legacy Motors Garage LLC</h1>
+  <h2>Additional Charge &amp; Security Agreement</h2>
+  <p class="subtitle">Separate debt secured by the same vehicle · Dealer License No. 83177 · Seller's Permit No. 235986016</p>
+  <div class="dealer-info">
+    <span>21122 Ave 152, Porterville, CA 93257</span>
+    <span>📞 (559) 540-5145</span>
+    <span>ev@legacymotorsgarage.com</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="four-col">
+    <div class="field"><label>Agreement No.</label><div class="field-line">{{CONTRACT_NUMBER}}</div></div>
+    <div class="field"><label>Date</label><div class="field-line">{{CONTRACT_DATE}}</div></div>
+    <div class="field"><label>Charge / Concept</label><div class="field-line">{{CONCEPT}}</div></div>
+  </div>
+</div>
+
+<!-- BUYER -->
+<div class="section">
+  <div class="section-title">1. Buyer (Debtor)</div>
+  <div class="three-col">
+    <div class="field"><label>Full Legal Name</label><div class="field-line">{{BUYER_NAME}}</div></div>
+    <div class="field"><label>Phone</label><div class="field-line">{{BUYER_PHONE}}</div></div>
+    <div class="field"><label>Date of Birth</label><div class="field-line">{{BUYER_DOB}}</div></div>
+  </div>
+  <div class="three-col" style="margin-top:5px;">
+    <div class="field"><label>Address</label><div class="field-line">{{BUYER_ADDRESS}}</div></div>
+    <div class="field"><label>City, State, ZIP</label><div class="field-line">{{BUYER_CITY_STATE_ZIP}}</div></div>
+    <div class="field"><label>ID / DL No.</label><div class="field-line">{{BUYER_ID_NUMBER}}</div></div>
+  </div>
+</div>
+
+<!-- COLLATERAL VEHICLE -->
+<div class="section">
+  <div class="section-title">2. Collateral Vehicle (same vehicle — unchanged)</div>
+  <div class="four-col">
+    <div class="field"><label>Year</label><div class="field-line">{{VEH_YEAR}}</div></div>
+    <div class="field"><label>Make</label><div class="field-line">{{VEH_MAKE}}</div></div>
+    <div class="field"><label>Model</label><div class="field-line">{{VEH_MODEL}}</div></div>
+    <div class="field"><label>Color</label><div class="field-line">{{VEH_COLOR}}</div></div>
+  </div>
+  <div class="four-col" style="margin-top:5px;">
+    <div class="field"><label>VIN Number</label><div class="field-line">{{VEH_VIN}}</div></div>
+    <div class="field"><label>Odometer</label><div class="field-line">{{VEH_MILES}}</div></div>
+    <div class="field"><label>License Plate</label><div class="field-line">{{VEH_PLATE}}</div></div>
+    <div class="field"><label>&nbsp;</label><div class="field-line">&nbsp;</div></div>
+  </div>
+</div>
+
+<!-- CHARGE BREAKDOWN -->
+<div class="section">
+  <div class="section-title">3. Amount of this Additional Charge</div>
+  <div class="payment-box">
+    <div class="payment-row"><span>Principal amount of charge ({{CONCEPT}})</span><span>${{PRINCIPAL}}</span></div>
+    <div class="payment-row"><span>Finance charge (same rate as vehicle: 20% per 6 months, over this term)</span><span>${{FINANCE_CHARGE}}</span></div>
+    <div class="payment-row total highlight"><span>TOTAL OF THIS ADDITIONAL DEBT</span><span>${{TOTAL}}</span></div>
+  </div>
+  <div class="pay-plan">
+    <div class="payment-row" style="border:none;font-weight:bold;font-size:11pt;"><span>Payment plan for this charge</span><span></span></div>
+    <div class="payment-row"><span>Number of payments</span><span>{{NUMPAY}} {{FREQ_WORD}}</span></div>
+    <div class="payment-row"><span>Payment amount ({{FREQ_ADJ}})</span><span>${{PAYMENT}}</span></div>
+    <div class="payment-row"><span>Final payment</span><span>${{LAST_PAYMENT}}</span></div>
+    <div class="payment-row"><span>First payment due</span><span>{{FIRST_PAY_DATE}}</span></div>
+  </div>
+  <div style="margin-top:8px;display:flex;align-items:center;justify-content:flex-end;gap:10px;font-size:8.5pt;color:#333;">
+    <span><strong>Buyer's Initials</strong> — I reviewed and agree to this charge and payment plan:</span>
+    <span class="initial-slot"></span>
+  </div>
+</div>
+
+<!-- TERMS -->
+<div class="section">
+  <div class="section-title">4. Terms</div>
+  <div class="clause"><span class="clause-title">A. Separate Debt — Original Contract Unchanged:</span> This is a NEW and SEPARATE debt for the charge described above. It does <strong>not</strong> modify, replace, or increase the balance of the Buyer's original vehicle purchase/finance contract. The original contract remains in full force with its own separate balance and payment schedule.</div>
+  <div class="clause"><span class="clause-title">B. Same Vehicle as Collateral:</span> As security for this additional debt, Buyer grants Seller a security interest in the same vehicle described in Section 2, in addition to any existing security interest under the original contract. Buyer shall not sell, transfer, or further encumber the vehicle until both this debt and the original contract are paid in full.</div>
+  <div class="clause"><span class="clause-title">C. Finance Charge:</span> The finance charge shown above is calculated at the same rate applied to the vehicle (20% per each 6-month period) applied over the term of this charge ({{NUMPAY}} {{FREQ_WORD}}). Buyer may prepay this debt in full at any time; the remaining unearned finance charge, if any, will be handled in accordance with California law.</div>
+  <div class="clause"><span class="clause-title">D. Payments:</span> Buyer shall pay {{NUMPAY}} {{FREQ_WORD}} payments of ${{PAYMENT}} each (final payment ${{LAST_PAYMENT}}), beginning {{FIRST_PAY_DATE}}, until the Total of this Additional Debt (${{TOTAL}}) is paid in full. Payments on this charge are tracked separately from the vehicle payments.</div>
+  <div class="clause"><span class="clause-title">E. Default:</span> If Buyer fails to make a payment when due on this debt, or defaults under the original contract, Seller may exercise all remedies available under California law and the security interest granted herein, including repossession of the collateral vehicle, subject to Buyer's rights to notice and reinstatement under California law.</div>
+  <div class="clause"><span class="clause-title">F. Governing Law &amp; Entire Agreement:</span> This Agreement is governed by the laws of the State of California. It is the entire agreement between the parties as to this additional charge. Any modification must be in writing and signed by both parties. If any provision is unenforceable, the remaining provisions remain in effect.</div>
+</div>
+
+<!-- SIGNATURES (EN) -->
+<div class="section">
+  <div class="section-title">5. Signatures</div>
+  <div class="warning-box">
+    <strong>⚠️ NOTICE TO BUYER:</strong> Do not sign this agreement before you read it or if it contains any blank spaces. You are entitled to a completely filled-in copy of this agreement.
+  </div>
+  <div class="sign-box">
+    <p style="font-size:9pt;margin-bottom:8px;">By signing below, Buyer acknowledges: (1) reading and understanding this entire Agreement; (2) that this is a separate debt that does not change the original contract; (3) that the same vehicle secures this debt; (4) receiving a completed copy.</p>
+    <div class="sign-row">
+      <div class="sign-line">Buyer Signature<br>{{BUYER_NAME}}</div>
+      <div class="sign-line">Date</div>
+    </div>
+    <div class="sign-row" style="margin-top:16px;">
+      <div class="sign-line">Seller Signature<br>Enrique Ivan Villagomez Linares<br>Legacy Motors Garage LLC — Authorized Representative</div>
+      <div class="sign-line">Date</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">
+  Legacy Motors Garage LLC · Dealer License No. 83177 · Seller's Permit No. 235986016 · 21122 Ave 152, Porterville, CA 93257 · (559) 540-5145
+</div>
+
+</div><!-- end page 1 (EN) -->
+
+<!-- ==================== PAGE 2 — ESPAÑOL ==================== -->
+<div class="page page-break">
+
+<div class="header-box">
+  <h1>Legacy Motors Garage LLC</h1>
+  <h2>Acuerdo de Cargo Adicional y Garantía</h2>
+  <p class="subtitle">Deuda separada garantizada por el mismo vehículo · Licencia de Dealer No. 83177</p>
+  <div class="dealer-info">
+    <span>21122 Ave 152, Porterville, CA 93257</span>
+    <span>📞 (559) 540-5145</span>
+    <span>ev@legacymotorsgarage.com</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="four-col">
+    <div class="field"><label>Acuerdo No.</label><div class="field-line">{{CONTRACT_NUMBER}}</div></div>
+    <div class="field"><label>Fecha</label><div class="field-line">{{CONTRACT_DATE}}</div></div>
+    <div class="field"><label>Concepto del cargo</label><div class="field-line">{{CONCEPT}}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">1. Comprador (Deudor)</div>
+  <div class="three-col">
+    <div class="field"><label>Nombre legal completo</label><div class="field-line">{{BUYER_NAME}}</div></div>
+    <div class="field"><label>Teléfono</label><div class="field-line">{{BUYER_PHONE}}</div></div>
+    <div class="field"><label>Fecha de nacimiento</label><div class="field-line">{{BUYER_DOB}}</div></div>
+  </div>
+  <div class="three-col" style="margin-top:5px;">
+    <div class="field"><label>Dirección</label><div class="field-line">{{BUYER_ADDRESS}}</div></div>
+    <div class="field"><label>Ciudad, Estado, ZIP</label><div class="field-line">{{BUYER_CITY_STATE_ZIP}}</div></div>
+    <div class="field"><label>ID / Licencia No.</label><div class="field-line">{{BUYER_ID_NUMBER}}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">2. Vehículo en Garantía (el mismo — sin cambios)</div>
+  <div class="four-col">
+    <div class="field"><label>Año</label><div class="field-line">{{VEH_YEAR}}</div></div>
+    <div class="field"><label>Marca</label><div class="field-line">{{VEH_MAKE}}</div></div>
+    <div class="field"><label>Modelo</label><div class="field-line">{{VEH_MODEL}}</div></div>
+    <div class="field"><label>Color</label><div class="field-line">{{VEH_COLOR}}</div></div>
+  </div>
+  <div class="four-col" style="margin-top:5px;">
+    <div class="field"><label>Número VIN</label><div class="field-line">{{VEH_VIN}}</div></div>
+    <div class="field"><label>Odómetro</label><div class="field-line">{{VEH_MILES}}</div></div>
+    <div class="field"><label>Placa</label><div class="field-line">{{VEH_PLATE}}</div></div>
+    <div class="field"><label>&nbsp;</label><div class="field-line">&nbsp;</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">3. Monto de este Cargo Adicional</div>
+  <div class="payment-box">
+    <div class="payment-row"><span>Monto principal del cargo ({{CONCEPT}})</span><span>${{PRINCIPAL}}</span></div>
+    <div class="payment-row"><span>Cargo por financiamiento (misma tasa que el auto: 20% por 6 meses, sobre este plazo)</span><span>${{FINANCE_CHARGE}}</span></div>
+    <div class="payment-row total highlight"><span>TOTAL DE ESTA DEUDA ADICIONAL</span><span>${{TOTAL}}</span></div>
+  </div>
+  <div class="pay-plan">
+    <div class="payment-row" style="border:none;font-weight:bold;font-size:11pt;"><span>Plan de pagos de este cargo</span><span></span></div>
+    <div class="payment-row"><span>Número de pagos</span><span>{{NUMPAY}} {{FREQ_WORD_ES}}</span></div>
+    <div class="payment-row"><span>Monto del pago ({{FREQ_ADJ_ES}})</span><span>${{PAYMENT}}</span></div>
+    <div class="payment-row"><span>Último pago</span><span>${{LAST_PAYMENT}}</span></div>
+    <div class="payment-row"><span>Primer pago</span><span>{{FIRST_PAY_DATE}}</span></div>
+  </div>
+  <div style="margin-top:8px;display:flex;align-items:center;justify-content:flex-end;gap:10px;font-size:8.5pt;color:#333;">
+    <span><strong>Iniciales del Comprador</strong> — Revisé y acepto este cargo y su plan de pagos:</span>
+    <span class="initial-slot"></span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">4. Términos</div>
+  <div class="clause"><span class="clause-title">A. Deuda separada — el contrato original no cambia:</span> Esta es una deuda NUEVA y SEPARADA por el cargo descrito arriba. NO modifica, reemplaza ni aumenta el saldo del contrato original de compra/financiamiento del vehículo. El contrato original sigue vigente con su propio saldo y su propio calendario de pagos.</div>
+  <div class="clause"><span class="clause-title">B. Mismo vehículo como garantía:</span> Como garantía de esta deuda adicional, el Comprador otorga al Vendedor un interés de garantía sobre el mismo vehículo descrito en la Sección 2, además de cualquier garantía existente bajo el contrato original. El Comprador no venderá, transferirá ni gravará el vehículo hasta pagar por completo esta deuda y el contrato original.</div>
+  <div class="clause"><span class="clause-title">C. Cargo por financiamiento:</span> El cargo por financiamiento mostrado se calcula a la misma tasa aplicada al vehículo (20% por cada periodo de 6 meses) sobre el plazo de este cargo ({{NUMPAY}} {{FREQ_WORD_ES}}). El Comprador puede pagar por adelantado en cualquier momento; el cargo por financiamiento no devengado, si lo hubiera, se manejará conforme a la ley de California.</div>
+  <div class="clause"><span class="clause-title">D. Pagos:</span> El Comprador pagará {{NUMPAY}} pagos {{FREQ_WORD_ES}} de ${{PAYMENT}} cada uno (último pago ${{LAST_PAYMENT}}), comenzando el {{FIRST_PAY_DATE}}, hasta pagar por completo el Total de esta Deuda Adicional (${{TOTAL}}). Los pagos de este cargo se registran por separado de los pagos del vehículo.</div>
+  <div class="clause"><span class="clause-title">E. Incumplimiento:</span> Si el Comprador no paga a tiempo esta deuda, o incumple el contrato original, el Vendedor podrá ejercer todos los remedios disponibles bajo la ley de California y la garantía otorgada aquí, incluida la recuperación (repossession) del vehículo, sujeto a los derechos del Comprador a notificación y reinstalación conforme a la ley de California.</div>
+  <div class="clause"><span class="clause-title">F. Ley aplicable y acuerdo completo:</span> Este Acuerdo se rige por las leyes del Estado de California. Es el acuerdo completo entre las partes respecto a este cargo adicional. Cualquier modificación debe ser por escrito y firmada por ambas partes. Si alguna cláusula es inválida, las demás siguen vigentes.</div>
+</div>
+
+<div class="section">
+  <div class="section-title">5. Firmas</div>
+  <div class="warning-box">
+    <strong>⚠️ AVISO AL COMPRADOR:</strong> No firme este acuerdo antes de leerlo o si contiene espacios en blanco. Tiene derecho a una copia totalmente llena de este acuerdo.
+  </div>
+  <div class="sign-box">
+    <p style="font-size:9pt;margin-bottom:8px;">Al firmar abajo, el Comprador reconoce: (1) haber leído y entendido este Acuerdo completo; (2) que es una deuda separada que no cambia el contrato original; (3) que el mismo vehículo garantiza esta deuda; (4) haber recibido una copia completa.</p>
+    <div class="sign-row">
+      <div class="sign-line">Firma del Comprador<br>{{BUYER_NAME}}</div>
+      <div class="sign-line">Fecha</div>
+    </div>
+    <div class="sign-row" style="margin-top:16px;">
+      <div class="sign-line">Firma del Vendedor<br>Enrique Ivan Villagomez Linares<br>Legacy Motors Garage LLC — Representante Autorizado</div>
+      <div class="sign-line">Fecha</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">
+  Legacy Motors Garage LLC · Licencia de Dealer No. 83177 · 21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>
+  El contrato en inglés es el legalmente vinculante; esta traducción al español se provee conforme al Código Civil de California §1632.
+</div>
+
+</div><!-- end page 2 (ES) -->
+
+<script>
+(function(){
+  const p = new URLSearchParams(window.location.search);
+  const num = n => Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const freq = p.get('freq') || 'weekly';
+  const numPay = parseInt(p.get('numPay')) || 0;
+  const freqWord = { weekly:'weekly', biweekly:'bi-weekly', monthly:'monthly' }[freq] || 'weekly';
+  const freqAdj  = { weekly:'weekly', biweekly:'bi-weekly', monthly:'monthly' }[freq] || 'weekly';
+  const freqWordEs = { weekly:'semanales', biweekly:'quincenales', monthly:'mensuales' }[freq] || 'semanales';
+  const freqAdjEs  = { weekly:'semanal', biweekly:'quincenal', monthly:'mensual' }[freq] || 'semanal';
+  // Primer pago = un periodo después de la fecha del contrato (editable antes de firmar)
+  const cd = p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00') : new Date();
+  const first = new Date(cd);
+  if(freq==='monthly') first.setMonth(first.getMonth()+1);
+  else first.setDate(first.getDate() + (freq==='biweekly'?14:7));
+  const contDateStr = cd.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
+  const firstStr = first.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
+
+  document.body.innerHTML = document.body.innerHTML
+    .replace(/{{CONTRACT_NUMBER}}/g, p.get('contractNum')||'')
+    .replace(/{{CONTRACT_DATE}}/g, contDateStr)
+    .replace(/{{CONCEPT}}/g, p.get('concept')||'')
+    .replace(/{{BUYER_NAME}}/g, p.get('name')||'')
+    .replace(/{{BUYER_PHONE}}/g, p.get('phone')||'')
+    .replace(/{{BUYER_DOB}}/g, p.get('dob') ? new Date(p.get('dob')+'T12:00:00').toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '')
+    .replace(/{{BUYER_ADDRESS}}/g, p.get('address')||'')
+    .replace(/{{BUYER_CITY_STATE_ZIP}}/g, [p.get('city'),p.get('state'),p.get('zip')].filter(Boolean).join(', '))
+    .replace(/{{BUYER_ID_NUMBER}}/g, p.get('idNumber')||'')
+    .replace(/{{VEH_YEAR}}/g, p.get('year')||'')
+    .replace(/{{VEH_MAKE}}/g, p.get('make')||'')
+    .replace(/{{VEH_MODEL}}/g, (p.get('model')||'')+(p.get('trim')?' '+p.get('trim'):''))
+    .replace(/{{VEH_COLOR}}/g, p.get('color')||'')
+    .replace(/{{VEH_VIN}}/g, p.get('vin')||'')
+    .replace(/{{VEH_MILES}}/g, p.get('miles')||'')
+    .replace(/{{VEH_PLATE}}/g, p.get('plate')||'')
+    .replace(/{{PRINCIPAL}}/g, num(p.get('principal')))
+    .replace(/{{FINANCE_CHARGE}}/g, num(p.get('financeCharge')))
+    .replace(/{{TOTAL}}/g, num(p.get('total')))
+    .replace(/{{PAYMENT}}/g, num(p.get('weekly')))
+    .replace(/{{LAST_PAYMENT}}/g, num(p.get('lastPayment')||p.get('weekly')))
+    .replace(/{{NUMPAY}}/g, numPay || '')
+    .replace(/{{FREQ_WORD_ES}}/g, freqWordEs)
+    .replace(/{{FREQ_ADJ_ES}}/g, freqAdjEs)
+    .replace(/{{FREQ_WORD}}/g, freqWord)
+    .replace(/{{FREQ_ADJ}}/g, freqAdj)
+    .replace(/{{FIRST_PAY_DATE}}/g, firstStr);
+
+  // Campos editables antes de firmar
+  document.querySelectorAll('.field-line').forEach(el=>{ el.contentEditable='true'; el.style.outline='none'; el.style.borderBottom='1px solid #999'; el.style.cursor='text'; });
+  document.querySelectorAll('.payment-row span:last-child').forEach(el=>{ el.contentEditable='true'; el.style.cursor='text'; el.style.outline='none'; el.style.minWidth='60px'; el.style.display='inline-block'; });
+})();
+</script>
+<script type="module" src="contract-esign.js?v=3"></script>
+</body>
+</html>
