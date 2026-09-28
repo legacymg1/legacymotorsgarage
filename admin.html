@@ -2726,8 +2726,16 @@ window.openEditModal=function(id){
   document.getElementById('add-modal').classList.add('active');
 };
 
+// Evita que un paso lento de RED (subir foto del ID, decodificar HEIC, buscar inventario)
+// deje el guardado "colgado" para siempre. Si tarda más de la cuenta, rechaza y seguimos.
+function _withTimeout(promise, ms, label){
+  return Promise.race([
+    promise,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout '+(label||'')+' ('+ms+'ms)')), ms))
+  ]);
+}
 window.saveClient=async function(){
-  console.log("saveClient v3.3 running");
+  console.log("saveClient v3.4 running");
   const name=titleCase(document.getElementById('f-name').value.trim());
   if(!name){alert('Nombre requerido');return;}
   const _phD=(document.getElementById('f-phone').value||'').replace(/[^0-9]/g,'');
@@ -2774,21 +2782,21 @@ window.saveClient=async function(){
     try {
       const st = getStorage();
       let _idUp = idPhotoFile;
-      try { _idUp = await blobToJpeg(idPhotoFile); } catch(e){ console.warn('ID no convertida, se sube tal cual', e); }
+      try { _idUp = await _withTimeout(blobToJpeg(idPhotoFile), 20000, 'convertir ID'); } catch(e){ console.warn('ID no convertida, se sube tal cual', e); _idUp = idPhotoFile; }
       const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_id.jpg');
-      await uploadBytes(idRef, _idUp, {contentType: (_idUp.type||'image/jpeg')});
-      idPhotoURL = await getDownloadURL(idRef);
-    } catch(storErr){ console.log('ID photo skipped:', storErr); }
+      await _withTimeout(uploadBytes(idRef, _idUp, {contentType: (_idUp.type||'image/jpeg')}), 30000, 'subir ID');
+      idPhotoURL = await _withTimeout(getDownloadURL(idRef), 15000, 'URL ID');
+    } catch(storErr){ console.log('ID photo skipped (se guarda el cliente sin actualizar la foto):', storErr); }
   }
 
   // Inventory sold update
   const invNum = document.getElementById('f-inventory-num')?.value.trim();
   if(invNum){
     try {
-      const invSnap = await getDocs(collection(db,'inventory'));
+      const invSnap = await _withTimeout(getDocs(collection(db,'inventory')), 15000, 'buscar inventario');
       const match = invSnap.docs.find(d => invNumEq(d.data().inventoryNum, invNum));
       if(match){
-        await setDoc(doc(db,'inventory',match.id),{...match.data(),status:'sold'});
+        await _withTimeout(setDoc(doc(db,'inventory',match.id),{...match.data(),status:'sold'}), 15000, 'marcar vendido');
       }
     } catch(invErr){ console.log('Inventory update skipped:', invErr); }
   }
