@@ -507,7 +507,7 @@
     .replace(/\{\{VEH_VIN\}\}/g, p.get('vin')||'')
     .replace(/\{\{VEH_MILES\}\}/g, p.get('miles')||'')
     .replace(/\{\{VEH_COLOR\}\}/g, p.get('color')||'')
-    .replace(/\{\{VEH_PLATE\}\}/g, '')
+    .replace(/\{\{VEH_PLATE\}\}/g, p.get('plate')||'')
     .replace(/\{\{SMOG_FEE\}\}/g, fmt(smog))
     .replace(/\{\{VEHICLE_PRICE\}\}/g, fmt(price))
     .replace(/\{\{DOWN_PAYMENT\}\}/g, fmt(down))

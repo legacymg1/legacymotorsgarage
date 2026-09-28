@@ -134,7 +134,7 @@
   .form-group { margin-bottom: 16px; }
   .form-label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
   .form-input { width: 100%; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: var(--font-body); font-size: 14px; outline: none; transition: border-color 0.2s; }
-  #f-name,#f-make,#f-model,#f-trim,#f-color,#f-city{text-transform:capitalize;} #f-vin{text-transform:uppercase;}
+  #f-name,#f-make,#f-model,#f-trim,#f-color,#f-city{text-transform:capitalize;} #f-vin,#f-plate{text-transform:uppercase;}
   .form-input:focus { border-color: var(--gold); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .form-hint { font-size: 11px; color: var(--gold); margin-top: 4px; min-height: 16px; }
@@ -514,6 +514,9 @@
     <div class="form-row">
       <div class="form-group"><label class="form-label">VIN</label><input class="form-input" id="f-vin" placeholder="Número VIN del carro" oninput="this.value=this.value.toUpperCase()"></div>
       <div class="form-group"><label class="form-label">Millas</label><input class="form-input" id="f-miles" placeholder="85000" type="number"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Número de placas</label><input class="form-input" id="f-plate" placeholder="Placa (ej. 8ABC123)" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
     <div id="finance-only">
     <div class="form-row">
@@ -1123,6 +1126,11 @@ window.openAddonContract=function(c, addon){
     lang:c.lang||'es', contractDate:today()
   });
   _showContractLinks('contracts_addon.html?'+params.toString()+'&_cb='+Date.now(), '');
+};
+window.signAddonContract=function(clientId, addonId){
+  const c=clients.find(x=>x.id===clientId); if(!c){ alert('Cliente no encontrado'); return; }
+  const a=(c.addons||[]).find(x=>x.id===addonId); if(!a){ alert('Cargo no encontrado'); return; }
+  openAddonContract(c, a);
 };
 
 // Declara un contrato liquidado. Queda con fecha y con quien lo hizo.
@@ -2429,7 +2437,7 @@ window.renderAll = function() {
         <div class="cli-phone">${c.phone}</div>
         <div class="cli-next" style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</div>
         <div style="font-size:13px;color:var(--cream2);font-weight:500;">${formatMoney(c.weekly)}</div>
-        <div class="cli-balance">${formatMoney(balance)}</div>
+        <div class="cli-balance">${formatMoney(totalClientDebt(c))}${addonsBalance(c)>0.005?`<div style="font-size:10px;color:#1f6feb;font-weight:600;">carro ${formatMoney(balance)} + cargos ${formatMoney(addonsBalance(c))}</div>`:''}</div>
         <div class="cli-actions">
           <button type="button" class="cli-btn" style="background:var(--green);color:#000;" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">💵</button>
           <button type="button" class="cli-btn" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)">💬</button>
@@ -2522,7 +2530,12 @@ window.renderAll = function() {
           <div class="payment-row"><span class="pay-label">${c.freq==='monthly'?'Pago mensual':c.freq==='biweekly'?'Pago quincenal':'Pago semanal'}</span><span class="pay-value">${formatMoney(c.weekly)}</span></div>
           <div class="payment-row"><span class="pay-label">Próximo pago</span><span class="pay-value" style="color:${payColor}">${status==='paidoff'?'Auto pagado':formatDate(nextPay)+dayLabel}</span></div>
           <div class="payment-row"><span class="pay-label">Pagos</span><span class="pay-value">${paidCount} de ${totalPay}</span></div>
-          <div class="payment-row"><span class="pay-label">Saldo</span><span class="pay-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
+          <div class="payment-row"><span class="pay-label">Saldo ${clientAddons(c).length?'del carro':''}</span><span class="pay-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
+          ${clientAddons(c).length ? `<div style="margin:8px 0;padding:9px 11px;background:rgba(31,111,235,0.08);border:1px solid rgba(31,111,235,0.35);border-radius:8px;font-size:12px;">
+            <div style="font-weight:700;color:#1f6feb;margin-bottom:5px;">💳 Deudas adicionales</div>
+            ${clientAddons(c).map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 0;"><span>${a.concept||'Cargo'}${a.settled?' <span style="color:var(--green);">✅</span>':''}</span><span style="display:flex;gap:6px;align-items:center;"><b>${formatMoney(addonBalance(a))}</b>${(a.signedContract&&a.signedContract.url)?`<button onclick="event.stopPropagation();window.open('${a.signedContract.url}','_blank')" title="Ver contrato del cargo" style="background:rgba(0,200,83,0.15);color:var(--green);border:1px solid var(--green);border-radius:5px;padding:1px 6px;font-size:10px;cursor:pointer;">📑</button>`:`<button onclick="event.stopPropagation();signAddonContract('${c.id}','${a.id}')" title="Firmar contrato del cargo" style="background:rgba(240,192,64,0.15);color:var(--gold);border:1px solid var(--gold3);border-radius:5px;padding:1px 6px;font-size:10px;cursor:pointer;">✍️ firmar</button>`}</span></div>`).join('')}
+            <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.15);margin-top:5px;padding-top:5px;font-weight:800;"><span>Deuda total a Legacy</span><span style="color:var(--gold);">${formatMoney(totalClientDebt(c))}</span></div>
+          </div>` : ''}
           <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
           <div class="progress-label"><span>${formatMoney(calcPaid(c))} pagado</span><span>${progress}%</span></div>
           ${schedHTML}
@@ -2638,7 +2651,7 @@ window.smsPlain=function(id){ const c=clients.find(x=>x.id===id); if(!c) return;
 window.openAddModal=function(){
   editingId=null;
   document.getElementById('modal-title').textContent='NUEVO CLIENTE';
-  ['name','phone','make','model','color','year','total','down','weekly','notes','dob','contractdate','lastservice','vin','miles','address','city','zip','id-number'].forEach(f=>{const el=document.getElementById('f-'+f);if(el)el.value='';});
+  ['name','phone','make','model','color','year','total','down','weekly','notes','dob','contractdate','lastservice','vin','miles','plate','address','city','zip','id-number'].forEach(f=>{const el=document.getElementById('f-'+f);if(el)el.value='';});
   const _c=document.getElementById('f-sms-consent'); if(_c) _c.checked=false;
   const _pv2=document.getElementById('f-private'); if(_pv2) _pv2.checked=false;
   document.getElementById('f-startdate').value=today();
@@ -2660,6 +2673,7 @@ window.openEditModal=function(id){
   document.getElementById('f-make').value=c.make||'';
   if(document.getElementById('f-color')) document.getElementById('f-color').value=c.color||'';
   if(document.getElementById('f-trim')) document.getElementById('f-trim').value=c.trim||'';
+  if(document.getElementById('f-plate')) document.getElementById('f-plate').value=c.plate||'';
   document.getElementById('f-model').value=c.model||'';
   document.getElementById('f-year').value=c.year||'';
   document.getElementById('f-total').value=c.total||'';
@@ -2803,6 +2817,7 @@ window.saveClient=async function(){
     model:titleCase(document.getElementById('f-model').value.trim()),
     year:document.getElementById('f-year').value,
     vin:(document.getElementById('f-vin')?.value.trim() || existing.vin || '').toUpperCase(),
+    plate:(document.getElementById('f-plate')?.value.trim() || existing.plate || '').toUpperCase(),
     miles:document.getElementById('f-miles')?.value.trim() || existing.miles || '',
     total:Number(document.getElementById('f-total').value)||0,
     down:Number(document.getElementById('f-down').value)||0,
@@ -2851,6 +2866,10 @@ window.saveClient=async function(){
     // merge:true -> ya no borra insuranceCompany, insurancePhotoURL, lastLogin, settled...
     await setDoc(doc(db,'clients',id), data, { merge: true });
     console.log('Saved successfully!');
+    // El cliente ya existe en la base: dejarlo como "editando" para que el botón 📄 Contrato
+    // pueda ligar la firma (contract-esign.js exige clientId). Antes quedaba en null tras crear
+    // un cliente NUEVO y el contrato se abría sin cliente ligado → "No hay cliente ligado".
+    editingId = id;
 
     // 💵 VENTA → Finanzas. Antes una venta de CONTADO no pasaba nada (carro liquidado pero
     // Finanzas en cero). Ahora, al guardar CUALQUIER venta de carro (contado o pagos):
@@ -4083,9 +4102,15 @@ window.updateCashSummary = function(){
   set('cs-price',price); set('cs-tax',tax); set('cs-dmv',dmv); set('cs-total',total);
 };
 
-window.generateContractFromForm = function() {
+window.generateContractFromForm = async function() {
   const name = document.getElementById('f-name').value.trim();
   if(!name){ alert('Por favor ingresa el nombre del cliente primero'); return; }
+  // El contrato SOLO se puede firmar/guardar si el cliente ya existe en la base (contract-esign.js
+  // exige clientId). Si es un cliente NUEVO todavía sin guardar, lo guardamos primero para ligar la firma.
+  if(!editingId){
+    await saveClient();          // saveClient deja editingId = id del cliente recién creado
+    if(!editingId) return;       // el guardado falló o se canceló → no abrimos el contrato
+  }
   const freq = document.getElementById('f-freq')?.value || 'weekly';
   // Get client lang for Spanish civil code compliance
   const clientLang = document.getElementById('f-lang')?.value || 'es';
@@ -4103,6 +4128,7 @@ window.generateContractFromForm = function() {
     trim: document.getElementById('f-trim')?.value.trim() || '',
     color: document.getElementById('f-color')?.value.trim() || '',
     vin: document.getElementById('f-vin')?.value.trim() || '',
+    plate: document.getElementById('f-plate')?.value.trim() || '',
     miles: document.getElementById('f-miles')?.value.trim() || '',
     price: document.getElementById('f-total')?.value || '',
     down: document.getElementById('f-down')?.value || '',
@@ -4312,7 +4338,10 @@ window.generateContract = function(clientId) {
     year: c.year || '',
     make: c.make || '',
     model: c.model || '',
+    trim: c.trim || '',
+    color: c.color || '',
     vin: c.vin || '',
+    plate: c.plate || '',
     miles: c.miles || '',
     price: c.total || '',
     down: c.down || '',
