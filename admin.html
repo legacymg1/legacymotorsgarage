@@ -644,6 +644,7 @@
     <button type="button" onclick="settleToday()" style="width:100%;background:rgba(76,175,80,0.15);border:1px solid #4caf50;color:#4caf50;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💰 Liquidar HOY (tú pones el monto / con descuento)</button>
     <button type="button" onclick="fixOrphanPayments()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px;font-size:12px;cursor:pointer;margin-top:8px;">🧹 Revisar pagos vs Finanzas (anular borrados)</button>
     <button type="button" onclick="cancelSale()" style="width:100%;background:rgba(255,59,59,0.12);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">🚫 Cancelar venta (cliente cambia de carro)</button>
+    <button type="button" onclick="openAddonModal()" style="width:100%;background:rgba(31,111,235,0.12);border:1px solid #1f6feb;color:#1f6feb;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">➕ Agregar cargo / deuda (reparación, enganche…)</button>
     <button type="button" onclick="releaseContract()" style="width:100%;background:transparent;border:1px solid #b45309;color:#f0c040;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">📁 Archivar contrato firmado (para firmar el nuevo)</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('pay-modal')">Cancelar</button>
@@ -663,6 +664,21 @@
       <button class="btn-save" onclick="sendWhatsApp()" style="background:linear-gradient(135deg,#2196F3,#1565C0)">ENVIAR SMS</button>
     </div>
     <button type="button" id="wa-print-btn" onclick="printReceipt()" style="display:none;width:100%;margin-top:8px;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ Imprimir recibo (físico)</button>
+  </div>
+</div>
+
+<!-- ➕ AGREGAR CARGO / DEUDA ADICIONAL -->
+<div class="modal-overlay" id="addon-modal">
+  <div class="modal">
+    <div class="modal-title">➕ Cargo / deuda adicional</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Deuda NUEVA (reparación, enganche, etc.) con su propio contrato. El carro sigue como colateral. El cliente paga el mismo monto: primero termina el carro, luego este cargo. Interés igual que el carro, contando desde que arranca.</div>
+    <div class="form-group"><label class="form-label">¿De qué es? (concepto)</label><input class="form-input" id="addon-concept" placeholder="Ej. Cambio de aceite / Enganche moto / Transmisión"></div>
+    <div class="form-group"><label class="form-label">Monto de la deuda ($)</label><input class="form-input" id="addon-amount" type="number" inputmode="decimal" placeholder="200" oninput="addonPreview()"></div>
+    <div id="addon-preview" style="background:var(--navy2);border-radius:10px;padding:12px;font-size:13px;margin-bottom:12px;display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('addon-modal')">Cancelar</button>
+      <button class="btn-save" id="addon-save" onclick="saveAddon()">Guardar y firmar contrato</button>
+    </div>
   </div>
 </div>
 
@@ -1022,6 +1038,92 @@ function isPaidOff(c) {
   if(!Number(c.totalOfPayments) && (c.schedule||[]).length > 0 && getPaidCount(c) >= (c.schedule||[]).length && calcBalance(c) <= 0.005) return true;   // completó los pagos POR CONTEO **y** ya no debe saldo
   return calcBalance(c) <= 0.005;                  // un abono parcial ya NO cierra una mensualidad
 }
+
+// ===== 💳 CARGOS ADICIONALES (reparaciones / enganche a deuda) — deuda SEPARADA, mismo carro colateral =====
+// Cada cargo es su propia deuda con su contrato; el cliente paga el MISMO monto: primero termina el
+// carro, luego siguen los pagos al cargo. El interés del cargo se calcula sobre SU plazo (empieza cuando
+// arranca a pagarse, después del carro) — misma tasa que el carro.
+function clientAddons(c){ return Array.isArray(c.addons)?c.addons:[]; }
+function addonPaid(a){ return (a.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0); }
+function addonBalance(a){ if(!a||a.settled===true) return 0; return Math.max(0, ((Number(a.totalCents)||0)/100) - addonPaid(a)); }
+function addonsBalance(c){ return clientAddons(c).reduce((s,a)=>s+addonBalance(a),0); }
+function activeAddons(c){ return clientAddons(c).filter(a=>addonBalance(a)>0.005); }
+function totalClientDebt(c){ return calcBalance(c) + addonsBalance(c); }
+// Financiamiento del cargo al MISMO ritmo y tasa que el carro (add-on 20% / 6 meses).
+function calcAddonFinance(principal, weekly, freq){
+  principal=Number(principal)||0; weekly=Number(weekly)||0; freq=freq||'weekly';
+  if(principal<=0) return { principal:0, financeCharge:0, total:0, numPay:0 };
+  if(weekly<=0) return { principal, financeCharge:0, total:principal, numPay:1 };
+  const daysPerPay = freq==='monthly'?30.44:freq==='biweekly'?14:7;
+  let numPay=Math.max(1, Math.ceil(principal/weekly)), total=principal, fc=0;
+  for(let it=0; it<8; it++){
+    const months=(numPay*daysPerPay)/30.44;
+    fc=Math.round(principal*0.20*(months/6)*100)/100;
+    total=Math.round((principal+fc)*100)/100;
+    numPay=Math.max(1, Math.ceil(total/Math.max(weekly,0.01)));
+  }
+  return { principal, financeCharge:fc, total, numPay };
+}
+
+let _addonClientId=null;
+window.openAddonModal=function(){
+  const c=clients.find(x=>x.id===payingId); if(!c){ alert('Abre un cliente primero.'); return; }
+  _addonClientId=c.id;
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
+  set('addon-concept',''); set('addon-amount','');
+  const pv=document.getElementById('addon-preview'); if(pv){ pv.style.display='none'; pv.innerHTML=''; }
+  document.getElementById('addon-modal').classList.add('active');
+};
+window.addonPreview=function(){
+  const c=clients.find(x=>x.id===_addonClientId); if(!c) return;
+  const amt=Number(document.getElementById('addon-amount').value)||0;
+  const box=document.getElementById('addon-preview'); if(!box) return;
+  if(amt<=0){ box.style.display='none'; return; }
+  const w=Number(c.weekly)||0, freq=c.freq||'weekly';
+  const r=calcAddonFinance(amt,w,freq);
+  const freqLbl=freq==='monthly'?'mensuales':freq==='biweekly'?'quincenales':'semanales';
+  box.style.display='block';
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Monto</span><b>${formatMoney(r.principal)}</b></div>
+    <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Cargo por financiamiento (20% / 6m)</span><b>${formatMoney(r.financeCharge)}</b></div>
+    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">Total del cargo</span><b style="color:var(--gold);">${formatMoney(r.total)}</b></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">${r.numPay} pagos ${freqLbl} de ${formatMoney(w)} · empieza al terminar el carro</div>`;
+};
+window.saveAddon=async function(){
+  const c=clients.find(x=>x.id===_addonClientId); if(!c){ alert('Cliente no encontrado'); return; }
+  const concept=(document.getElementById('addon-concept').value||'').trim();
+  const amt=Number(document.getElementById('addon-amount').value)||0;
+  if(!concept){ alert('Escribe de qué es el cargo.'); return; }
+  if(amt<=0){ alert('Pon el monto de la deuda.'); return; }
+  const w=Number(c.weekly)||0, freq=c.freq||'weekly';
+  if(w<=0){ alert('Este cliente no tiene un pago semanal definido (¿es de contado o servicio?). El cargo necesita un monto de pago.'); return; }
+  const r=calcAddonFinance(amt,w,freq);
+  const id='ad_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  const contractNumber='LMG-ADD-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5);
+  const addon={ id, concept, principalCents:Math.round(r.principal*100), financeChargeCents:Math.round(r.financeCharge*100), totalCents:Math.round(r.total*100), numPay:r.numPay, weekly:w, freq, payments:[], settled:false, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', contractNumber, signedContract:null };
+  const btn=document.getElementById('addon-save'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  try{
+    await updateDoc(doc(db,'clients',c.id), { addons: arrayUnion(addon) });
+    c.addons=[...(c.addons||[]), addon];
+    closeModal('addon-modal');
+    renderAll();
+    if(confirm('✅ Cargo agregado ('+formatMoney(r.total)+').\n\n¿Generar el contrato del cargo para que el cliente lo firme en la tableta?')) openAddonContract(c, addon);
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+  if(btn){ btn.disabled=false; btn.textContent='Guardar y firmar contrato'; }
+};
+window.openAddonContract=function(c, addon){
+  const g=id=>{ const el=document.getElementById(id); return el?(el.value||''):''; };
+  const params=new URLSearchParams({
+    clientId:c.id, addonId:addon.id, contractNum:addon.contractNumber,
+    name:c.name||'', phone:c.phone||'', dob:c.dob||'', address:c.address||'',
+    city:c.city||'', state:c.state||'', zip:c.zip||'',
+    idType:c.idType||'', idNumber:c.idNumber||'', idState:c.idState||'CA', idExpiry:c.idExpiry||'',
+    year:c.year||'', make:c.make||'', model:c.model||'', trim:c.trim||'', color:c.color||'', vin:c.vin||'', miles:c.miles||'',
+    concept:addon.concept||'', principal:(addon.principalCents/100).toFixed(2), financeCharge:(addon.financeChargeCents/100).toFixed(2),
+    total:(addon.totalCents/100).toFixed(2), numPay:addon.numPay||0, weekly:Number(c.weekly||0).toFixed(2), freq:c.freq||'weekly',
+    lang:c.lang||'es', contractDate:today()
+  });
+  _showContractLinks('contracts_addon.html?'+params.toString()+'&_cb='+Date.now(), '');
+};
 
 // Declara un contrato liquidado. Queda con fecha y con quien lo hizo.
 window.markSettled = async function(id) {
@@ -2622,7 +2724,9 @@ window.saveClient=async function(){
   const isService = kind === 'service';
   const startDate=document.getElementById('f-startdate').value;
   const numPay=parseInt(document.getElementById('f-numpay').value)||0;
-  if(!isService){
+  const _freqNow = document.getElementById('f-freq')?document.getElementById('f-freq').value:'weekly';
+  const _isCashLike = (_freqNow==='cash' || _freqNow==='lendmark');   // contado / lendmark = 1 sola exhibición, sin plan de pagos
+  if(!isService && !_isCashLike){
     if(!startDate){alert('Fecha del primer pago requerida');return;}
     if(!numPay){alert('Número de pagos requerido');return;}
   }
@@ -2980,33 +3084,49 @@ window.confirmPayment = async function(){
       if(!snap.exists()) throw new Error('El cliente ya no existe');
       const fresh    = { id: c.id, ...snap.data() };          // datos frescos, no la copia en memoria
       const payments = [...(fresh.payments || [])];
-      if(payments.some(p => p.entryId === entryId)) return fresh;   // ya estaba registrado
+      if(payments.some(p => p.entryId === entryId)) return fresh;   // ya estaba registrado (idempotente)
       const nowISO   = new Date().toISOString();
       const whoEmail = (auth.currentUser && auth.currentUser.email) || '';
-      const entry = { entryId, amount, date, method, schedDate: getNextPayDate(fresh), createdAt: nowISO, createdBy: whoEmail };
-      payments.push(entry);
-
-      // ETAPA 1 — doble escritura: el libro contable inmutable, en paralelo al sistema viejo.
-      // El id del renglon = entryId -> misma peticion nunca crea dos renglones (idempotente).
-      // set (no update) porque el doc no existe aun; queda atado a la MISMA transaccion atomica.
-      tx.set(doc(db, 'transactions', entryId), {
-        entryId,
-        type: 'payment',
-        dept: 'dealer',
-        clientId: fresh.id,
-        clientName: fresh.name || '',
-        amountCents: Math.round(amount * 100),      // dinero en centavos, entero
-        method,
-        date,                                       // fecha del pago (la que capturas)
-        schedDate: entry.schedDate,
-        createdAt: nowISO,                          // sello real de cuando se registro
-        createdBy: whoEmail,                        // corte por socio se basa en esto
-        note: '',
-        source: 'admin'
-      });
-
-      tx.update(ref, { payments });                 // sistema viejo, intacto
-      return { ...fresh, payments };
+      // 💳 ASIGNACIÓN del pago. Sin cargos adicionales activos → comportamiento ORIGINAL (todo al carro,
+      //    una sola fila). Con cargos → primero el CARRO hasta cubrirlo, el sobrante a los cargos en orden.
+      const addons = (Array.isArray(fresh.addons)?fresh.addons:[]).map(a=>({...a, payments:[...(a.payments||[])]}));
+      const activeAdd = addons.filter(a=>addonBalance(a)>0.005);
+      const writes = [];   // renglones para Finanzas
+      if(activeAdd.length === 0){
+        // === ORIGINAL: todo al carro ===
+        payments.push({ entryId, amount, date, method, schedDate:getNextPayDate(fresh), createdAt:nowISO, createdBy:whoEmail });
+        writes.push({ id:entryId, cents:Math.round(amount*100), note:'', addonId:'' });
+      } else {
+        let remaining = amount;
+        const primBal = calcBalance(fresh);
+        if(primBal > 0.005){
+          const toPrim = Math.round(Math.min(remaining, primBal)*100)/100;
+          payments.push({ entryId, amount:toPrim, date, method, schedDate:getNextPayDate(fresh), createdAt:nowISO, createdBy:whoEmail });
+          writes.push({ id:entryId, cents:Math.round(toPrim*100), note:'', addonId:'' });
+          remaining = Math.round((remaining-toPrim)*100)/100;
+        }
+        for(const a of addons){
+          if(remaining <= 0.005) break;
+          const aBal = addonBalance(a); if(aBal <= 0.005) continue;
+          const toA = Math.round(Math.min(remaining, aBal)*100)/100;
+          const eid = entryId+'_'+a.id;
+          a.payments.push({ entryId:eid, amount:toA, date, method, createdAt:nowISO, createdBy:whoEmail });
+          if(addonBalance(a) <= 0.005) a.settled = true;
+          writes.push({ id:eid, cents:Math.round(toA*100), note:'Cargo adicional: '+(a.concept||''), addonId:a.id });
+          remaining = Math.round((remaining-toA)*100)/100;
+        }
+        if(remaining > 0.005){   // sobrepago: se queda como pago extra del carro (no se pierde)
+          const eid = entryId+'_x';
+          payments.push({ entryId:eid, amount:remaining, date, method, schedDate:'', createdAt:nowISO, createdBy:whoEmail, note:'sobrepago' });
+          writes.push({ id:eid, cents:Math.round(remaining*100), note:'sobrepago', addonId:'' });
+        }
+      }
+      // Doble escritura: un renglón 'payment' en Finanzas por cada porción (idempotente por id).
+      for(const wl of writes){
+        tx.set(doc(db,'transactions',wl.id), { entryId:wl.id, type:'payment', dept:'dealer', clientId:fresh.id, clientName:fresh.name||'', amountCents:wl.cents, method, date, schedDate:'', addonId:wl.addonId||'', createdAt:nowISO, createdBy:whoEmail, note:wl.note||'', source:'admin' });
+      }
+      tx.update(ref, { payments, addons });
+      return { ...fresh, payments, addons };
     });
     closeModal('pay-modal');
   } catch(e) {
