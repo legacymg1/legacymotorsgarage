@@ -1890,21 +1890,33 @@ function cotCalc(o){
   const docFee=70, smog=58.25;
   const price=Number(o.price)||0, down=Number(o.down)||0, tax=Number(o.tax)||0, dmv=Number(o.dmv)||0;
   const numpay=Math.max(1, parseInt(o.numpay)||1);
-  const freq=o.freq||'weekly'; const cash=freq==='cash';
+  const freq=o.freq||'weekly'; const cash=freq==='cash'; const lendmark=freq==='lendmark';
+  const totalAll=price+docFee+smog+tax+dmv;            // precio + doc + smog + impuestos + DMV
+  const lendmarkFunds=Math.max(0, totalAll-down);       // lo que Lendmark paga = total − enganche
   const amountFinanced=Math.max(0, price+docFee+smog-down);
   const daysPerPay = freq==='monthly'?30.44:freq==='biweekly'?14:7;
   const months=(numpay*daysPerPay)/30.44;
-  const financeCharge = cash?0:Math.round(amountFinanced*0.20*(months/6)*100)/100;
-  const totalPayments = cash?0:Math.round((amountFinanced+financeCharge)*100)/100;
-  const payEven = cash?0:Math.round((totalPayments/numpay)*100)/100;
-  const lastPay = cash?0:Math.round((totalPayments-payEven*(numpay-1))*100)/100;
+  const noFin = cash||lendmark;
+  const financeCharge = noFin?0:Math.round(amountFinanced*0.20*(months/6)*100)/100;
+  const totalPayments = noFin?0:Math.round((amountFinanced+financeCharge)*100)/100;
+  const payEven = noFin?0:Math.round((totalPayments/numpay)*100)/100;
+  const lastPay = noFin?0:Math.round((totalPayments-payEven*(numpay-1))*100)/100;
   const payToday = down+tax+dmv;
-  return {docFee,smog,price,down,tax,dmv,numpay,freq,cash,amountFinanced,financeCharge,totalPayments,payEven,lastPay,payToday};
+  return {docFee,smog,price,down,tax,dmv,numpay,freq,cash,lendmark,totalAll,lendmarkFunds,amountFinanced,financeCharge,totalPayments,payEven,lastPay,payToday};
 }
 function cotResultHTML(r){
   const rowM='display:flex;justify-content:space-between;';
   const feeRows = `<div style="${rowM}"><span style="color:var(--muted);">Doc / Preparación</span><b>${formatMoney(r.docFee||70)}</b></div>
     <div style="${rowM}"><span style="color:var(--muted);">Certificación de Smog</span><b>${formatMoney(r.smog||58.25)}</b></div>`;
+  if(r.lendmark){
+    return `<div style="background:var(--navy2);border-radius:10px;padding:12px;font-size:13px;">
+      <div style="${rowM}"><span style="color:var(--muted);">Precio del vehículo</span><b>${formatMoney(r.price)}</b></div>
+      ${feeRows}
+      <div style="${rowM}"><span style="color:var(--muted);">Impuestos + DMV</span><b>${formatMoney(r.tax+r.dmv)}</b></div>
+      <div style="${rowM}border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><span style="font-weight:700;">Total</span><b>${formatMoney(r.totalAll)}</b></div>
+      <div style="${rowM}"><span style="color:var(--green);">− Enganche (lo paga el cliente a nosotros)</span><b style="color:var(--green);">−${formatMoney(r.down)}</b></div>
+      <div style="${rowM}border-top:2px solid var(--gold3);margin-top:6px;padding-top:6px;"><span style="color:var(--gold);font-weight:700;">Cheque de Lendmark</span><b style="color:var(--gold);font-size:17px;">${formatMoney(r.lendmarkFunds)}</b></div></div>`;
+  }
   if(r.cash){
     const totalCash=r.price+(r.docFee||70)+(r.smog||58.25)+r.tax+r.dmv;
     return `<div style="background:var(--navy2);border-radius:10px;padding:12px;font-size:13px;">
@@ -1945,13 +1957,14 @@ function renderCotOptions(){
         <div class="form-group" style="flex:1;min-width:110px;"><label class="form-label">DMV $</label><input class="form-input" type="number" value="${o.dmv||''}" oninput="cotSet(${i},'dmv',this.value)"></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        ${o.freq!=='cash' ? `<div class="form-group" style="flex:1;min-width:110px;"><label class="form-label"># Pagos</label><input class="form-input" type="number" value="${o.numpay||''}" oninput="cotSet(${i},'numpay',this.value)"></div>` : ''}
+        ${(o.freq!=='cash'&&o.freq!=='lendmark') ? `<div class="form-group" style="flex:1;min-width:110px;"><label class="form-label"># Pagos</label><input class="form-input" type="number" value="${o.numpay||''}" oninput="cotSet(${i},'numpay',this.value)"></div>` : ''}
         <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">Tipo de venta</label>
           <select class="form-input" onchange="cotSet(${i},'freq',this.value)">
             <option value="weekly"${o.freq==='weekly'?' selected':''}>Semanal</option>
             <option value="biweekly"${o.freq==='biweekly'?' selected':''}>Quincenal</option>
             <option value="monthly"${o.freq==='monthly'?' selected':''}>Mensual</option>
             <option value="cash"${o.freq==='cash'?' selected':''}>Contado</option>
+            <option value="lendmark"${o.freq==='lendmark'?' selected':''}>Lendmark (contado + enganche)</option>
           </select>
         </div>
       </div>
@@ -2037,8 +2050,8 @@ function _sheetHTML(s, sigUrl){
       +(s.cash
         ? '<tr><td style="border-top:2px solid #000;padding:6px 0;font-weight:800;font-size:15px;">TOTAL (CASH / CONTADO)</td><td style="border-top:2px solid #000;padding:6px 0;text-align:right;font-weight:800;font-size:15px;">'+money(s.total)+'</td></tr>'
         : '<tr><td style="border-top:1px solid #000;padding:5px 0;font-weight:800;">TOTAL PRICE</td><td style="border-top:1px solid #000;padding:5px 0;text-align:right;font-weight:800;">'+money(s.total)+'</td></tr>'
-          +'<tr><td style="padding:3px 0;">Less: Down Payment</td><td style="padding:3px 0;text-align:right;">('+money(s.down)+')</td></tr>'
-          +'<tr><td style="border-top:2px solid #000;padding:6px 0;font-weight:800;font-size:15px;">AMOUNT TO FINANCE</td><td style="border-top:2px solid #000;padding:6px 0;text-align:right;font-weight:800;font-size:15px;">'+money(s.financed)+'</td></tr>')
+          +'<tr><td style="padding:3px 0;">Less: Down Payment'+(s.lendmark?' (paid to dealer)':'')+'</td><td style="padding:3px 0;text-align:right;">('+money(s.down)+')</td></tr>'
+          +'<tr><td style="border-top:2px solid #000;padding:6px 0;font-weight:800;font-size:15px;">'+(s.lendmark?'AMOUNT FINANCED BY LENDMARK (CHECK)':'AMOUNT TO FINANCE')+'</td><td style="border-top:2px solid #000;padding:6px 0;text-align:right;font-weight:800;font-size:15px;">'+money(s.financed)+'</td></tr>')
     +'</table>'
     +'<div style="margin-top:28px;display:flex;justify-content:space-between;gap:20px;align-items:flex-end;">'
       +'<div style="flex:1;text-align:center;">'+(sigUrl?'<img src="'+sigUrl+'" style="height:48px;display:block;margin:0 auto -2px;">':'<div style="height:46px;"></div>')+'<div style="border-top:1px solid #000;padding-top:4px;font-size:11px;">Dealer / Legacy Motors Garage LLC</div></div>'
@@ -2099,8 +2112,8 @@ window.lendmarkSheet = async function(i, mode){
   const carTitle=[year,make,model,trim].filter(Boolean).join(' ')||(o.car||'');
   const cust=(document.getElementById('cot-customer')?document.getElementById('cot-customer').value.trim():'')||'';
   const today=new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
-  const cash=(o.freq==='cash');
-  const s={ carTitle, vin, miles, color, invNum, photos, smogPhoto, cust, price, docFee, smog, tax, dmv, total, down, financed, today, cash };
+  const cash=(o.freq==='cash'); const lendmark=(o.freq==='lendmark');
+  const s={ carTitle, vin, miles, color, invNum, photos, smogPhoto, cust, price, docFee, smog, tax, dmv, total, down, financed, today, cash, lendmark };
   // 💾 Guarda el registro para el botón "Lendmark Sales Sheets".
   try{
     const rid='lm_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
