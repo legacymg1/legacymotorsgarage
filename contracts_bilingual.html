@@ -874,8 +874,12 @@
   const aprStr = apr.toFixed(2);
   const fmt = n => Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const payDisplay = (numPay > 1 && Math.abs(finalPay - payAmt) > 0.01) ? (fmt(payAmt)+' × '+(numPay-1)+' + '+fmt(finalPay)+' (último / last)') : fmt(payAmt);
-  let restockFee = 0, netRestock = 0;
-  if(ccoaYes){ restockFee = price<=4999?175:price<=9999?350:500; netRestock = restockFee - ccoaFee; }
+  // CCOA: se calcula SIEMPRE (aunque el cliente lo rechace) para que la sección muestre la ley/tarifas
+  // completas. Solo el renglón "Opción de Cancelación" del desglose de precio queda en N/A si no se aceptó.
+  const ccoaFeeTier = price<=4999?75:price<=9999?150:250;
+  const restockFee  = price<=4999?175:price<=9999?350:500;
+  const netRestock  = restockFee - ccoaFeeTier;
+  const shownCcoaFee = ccoaYes ? (ccoaFee||ccoaFeeTier) : ccoaFeeTier;
   const freqLabel = freq==='monthly'?'Monthly / Mensual':freq==='biweekly'?'Bi-Weekly / Quincenal':'Weekly / Semanal';
   const contDate = p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00') : new Date();
   let bizDays=0; const expDate=new Date(contDate);
@@ -921,18 +925,17 @@
     .replace(/\{\{FINANCE_CHARGE\}\}/g, fmt(financeCharge))
     .replace(/\{\{APR\}\}/g, aprStr)
     .replace(/\{\{TOTAL_OF_PAYMENTS\}\}/g, fmt(totalOfPayments))
-    .replace(/\{\{CCOA_FEE\}\}/g, ccoaYes?fmt(ccoaFee):'N/A')
-    .replace(/\{\{RESTOCK_FEE\}\}/g, ccoaYes?fmt(restockFee):'N/A')
-    .replace(/\{\{NET_RESTOCK\}\}/g, ccoaYes?fmt(netRestock):'N/A')
+    .replace(/\{\{CCOA_FEE\}\}/g, fmt(shownCcoaFee))
+    .replace(/\{\{RESTOCK_FEE\}\}/g, fmt(restockFee))
+    .replace(/\{\{NET_RESTOCK\}\}/g, fmt(netRestock))
     .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, ccoaYes?expDate.toLocaleDateString('en-US'):'N/A');
 
-  // Mark CCOA checkbox
-  const acceptChk = document.getElementById('ccoa-accept-check');
-  const declineChk = document.getElementById('ccoa-decline-check');
-  if(acceptChk&&declineChk){
-    const chk = ccoaYes ? acceptChk : declineChk;
-    chk.innerHTML = '<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
-  }
+  // Marca la casilla del CCOA (misma elección) en INGLÉS y ESPAÑOL. idx 0 = ACEPTO/ACCEPT, 1 = RECHAZO/DECLINE.
+  ['ccoa','ccoa_es'].forEach(function(g){
+    const gb=document.querySelectorAll('.opt-box[data-optgroup="'+g+'"]');
+    const idx=ccoaYes?0:1;
+    if(gb[idx]){ const mc=gb[idx].querySelector('.checkbox'); if(mc){ mc.innerHTML='<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>'; mc.style.background='#000'; } }
+  });
 
   // Make fields editable
   document.querySelectorAll('.field-line').forEach(el=>{
@@ -946,15 +949,24 @@
     el.contentEditable='true'; el.style.cursor='text'; el.style.outline='none';
     el.style.minWidth='60px'; el.style.display='inline-block';
   });
+  // Grupos ligados EN↔ES: el GPS y el CCOA son UNA sola decisión mostrada en dos idiomas.
+  // Al tocar una opción (en cualquier idioma) se marca la MISMA opción en ambos idiomas, así la
+  // firma no se bloquea sin importar en qué idioma haya tocado el cliente.
+  const _pair={gps:'gps_es', gps_es:'gps', ccoa:'ccoa_es', ccoa_es:'ccoa'};
+  const _mark=(cb,on)=>{ if(!cb) return; cb.innerHTML= on?'<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>':''; cb.style.background= on?'#000':''; };
   document.querySelectorAll('.opt-box').forEach(box=>{
     box.style.cursor='pointer';
     box.onclick=function(){
       var grp=this.getAttribute('data-optgroup')||'';
-      var sel=grp?'.opt-box[data-optgroup="'+grp+'"] .checkbox':'.opt-box .checkbox';
-      document.querySelectorAll(sel).forEach(c=>{c.innerHTML='';c.style.background='';});
-      var mine=this.querySelector('.checkbox');
-      mine.innerHTML='<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
-      mine.style.background='#000';
+      if(!grp){ _mark(this.querySelector('.checkbox'), true); return; }   // casilla suelta (garantía): solo se marca
+      var groupBoxes=Array.prototype.slice.call(document.querySelectorAll('.opt-box[data-optgroup="'+grp+'"]'));
+      var idx=groupBoxes.indexOf(this);
+      var groups=[grp]; if(_pair[grp]) groups.push(_pair[grp]);
+      groups.forEach(function(g){
+        var gb=document.querySelectorAll('.opt-box[data-optgroup="'+g+'"]');
+        gb.forEach(function(b){ _mark(b.querySelector('.checkbox'), false); });
+        if(gb[idx]) _mark(gb[idx].querySelector('.checkbox'), true);
+      });
     };
   });
 
@@ -1023,8 +1035,8 @@ window.signAndSave = async function(){
   if(!es || !es.hasInk()){ alert('Falta la firma del comprador.'); return; }
   var __slots=document.querySelectorAll('.initial-slot');
   if(__slots.length && (!es.hasInitials || !es.hasInitials())){ alert('Faltan las iniciales del comprador (recuadro de iniciales).'); return; }
-  var __gps=document.querySelectorAll('.opt-box[data-optgroup="gps"]');
-  if(__gps.length){ var __g=false; __gps.forEach(function(b){ var c=b.querySelector('.checkbox'); if(c && c.textContent.indexOf('\u2713')>=0) __g=true; }); if(!__g){ alert('Selecciona una opcion del GPS (I CONSENT o I DECLINE) antes de firmar.'); return; } }
+  var __gps=document.querySelectorAll('.opt-box[data-optgroup="gps"], .opt-box[data-optgroup="gps_es"]');
+  if(__gps.length){ var __g=false; __gps.forEach(function(b){ var c=b.querySelector('.checkbox'); if(c && c.textContent.indexOf('\u2713')>=0) __g=true; }); if(!__g){ alert('Selecciona una opcion del GPS (CONSIENTO / I CONSENT  o  RECHAZO / I DECLINE) antes de firmar.'); return; } }
   if(!confirm('Firmar y guardar el contrato? Se guarda una copia oficial firmada en el expediente del cliente.')) return;
   // asegurar sesion iniciada (misma cuenta del admin) antes de guardar
   var __user=null;
