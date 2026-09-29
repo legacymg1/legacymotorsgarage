@@ -4192,8 +4192,10 @@ window.generateContractFromForm = async function() {
     // Cliente español a PAGOS: UN solo documento bilingüe (todo inglés + todo español) con UNA firma.
     _showContractLinks('contracts_bilingual.html' + qs, '');
   } else if(clientLang === 'es'){
-    // Contado en español: por ahora dos documentos (el bilingüe de contado va enseguida).
-    _showContractLinks('contracts_cash.html' + qs, 'contracts_cash_es.html' + qs);
+    // Contado en español: UN solo documento bilingüe (todo inglés + todo español) con UNA firma.
+    // Antes abría 2 documentos y al firmar el 2º tapaba al 1º (solo se veía el español). Ahora ambos
+    // idiomas quedan en un mismo archivo firmado → para el DMV se ven los dos.
+    _showContractLinks('contracts_cash_bilingual.html' + qs, '');
   } else {
     // Cliente en inglés: un solo contrato en inglés.
     _showContractLinks((freq === 'cash' ? 'contracts_cash.html' : 'contracts.html') + qs, '');
