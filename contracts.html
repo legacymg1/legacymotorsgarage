@@ -90,6 +90,11 @@
   </div>
 </div>
 
+<!-- 3-DAY RIGHT TO CANCEL — MANDATORY FIRST-PAGE NOTICE (CA CARS Act / SB 766, Civil Code §1784.43) -->
+<div class="warning-box" style="background:#fffbe6;">
+  <strong>⚠️ 3-DAY RIGHT TO CANCEL:</strong> CALIFORNIA DOES NOT HAVE A COOLING-OFF PERIOD FOR NEW VEHICLES. You have up to 3 days to return the vehicle to the dealer and cancel this contract and obtain a refund. Please review the disclosure, which the dealer is required by law to provide, for the details about this right and how to exercise it.
+</div>
+
 <!-- BUYER INFO -->
 <div class="section">
   <div class="section-title">1. Buyer Information</div>
@@ -166,7 +171,6 @@
       <div class="payment-row"><span>Smog Certification Fee / Certificación de Smog</span><span>${{SMOG_FEE}}</span></div>
       <div class="payment-row"><span>Sales Tax / Sales Tax ({{TAX_RATE}}%)</span><span>${{SALES_TAX}}</span></div>
       <div class="payment-row"><span>DMV Registration Fees / DMV Registration Fees</span><span>${{DMV_FEES}}</span></div>
-      <div class="payment-row"><span>Contract Cancellation Option (if selected)</span><span>${{CANCELLATION_FEE}}</span></div>
       <div class="payment-row"><span>Other: _______________________</span><span>$_________</span></div>
       <div class="payment-row highlight"><span>Total Price / Total Price</span><span>${{TOTAL_CASH_PRICE}}</span></div>
       <div class="payment-row"><span>Less: Down Payment / Less: Down Payment</span><span>(${{DOWN_PAYMENT}})</span></div>
@@ -232,24 +236,11 @@
   </div>
 </div>
 
-<!-- CONTRACT CANCELLATION OPTION -->
+<!-- 3-DAY RIGHT TO CANCEL (CA CARS ACT) — replaces the former optional Contract Cancellation Option -->
 <div class="section">
-  <div class="section-title">8. Contract Cancellation Option</div>
+  <div class="section-title">8. 3-Day Right to Cancel (California CARS Act)</div>
   <div class="clause">
-    Pursuant to California Vehicle Code §11709.2, Buyer is hereby notified of the availability of a <strong>Contract Cancellation Option Agreement</strong> (CCOA). This is an <strong>OPTIONAL</strong> add-on agreement. The fees are as follows:
-  </div>
-  <div style="border:1px solid #000;padding:8px;margin:6px 0;font-size:9pt;">
-    <strong>Vehicle Price $0 – $4,999:</strong> Option Fee: $75.00 | Restocking Fee: $175.00 | Total if returned: $175.00 (minus $75 already paid) = <strong>$100.00 net</strong><br>
-    <strong>Vehicle Price $5,000 – $9,999:</strong> Option Fee: $150.00 | Restocking Fee: $350.00 | Total if returned: $350.00 (minus $150 already paid) = <strong>$200.00 net</strong><br>
-    <strong>Vehicle Price $10,000 – $39,999:</strong> Option Fee: $250.00 | Restocking Fee: $500.00 | Total if returned: $500.00 (minus $250 already paid) = <strong>$250.00 net</strong>
-  </div>
-  <div class="opt-box" id="ccoa-accept-box" data-optgroup="ccoa">
-    <div class="checkbox" id="ccoa-accept-check" style="background:#000;"></div>
-    <span><strong>I ACCEPT</strong> the Contract Cancellation Option Agreement for ${{CCOA_FEE}}. Initials: <span class="initial-box"></span></span>
-  </div>
-  <div class="opt-box" id="ccoa-decline-box" data-optgroup="ccoa">
-    <div class="checkbox" id="ccoa-decline-check" style="background:#000;"></div>
-    <span><strong>I DECLINE</strong> the Contract Cancellation Option Agreement. I understand I am NOT entitled to cancel this contract after signing. Initials: <span class="initial-box"></span></span>
+    If the purchase price of this used vehicle is <strong>$50,000 or less</strong>, you have a <strong>3-calendar-day right to cancel</strong> this sale and return the vehicle for a refund, for any reason, beginning the day after you sign — subject to the conditions, restocking fee, and mileage fee set out in the separate <strong>"3-Day Right to Cancel Used Car Purchase or Lease"</strong> disclosure provided with this contract (see the following page). Pursuant to the California CARS Act (SB 766, Civil Code §1784.43), this right replaces the former optional Contract Cancellation Option.
   </div>
 </div>
 
@@ -391,13 +382,13 @@
 
 </div><!-- end page 2 -->
 
-<!-- ==================== PAGE 3: CONTRACT CANCELLATION OPTION ==================== -->
+<!-- ==================== PAGE 3: 3-DAY RIGHT TO CANCEL DISCLOSURE (CA CARS ACT) ==================== -->
 <div class="page page-break" style="margin-top:0.5in;">
 
 <div class="header-box">
   <h1>Legacy Motors Garage LLC</h1>
-  <h2>Contract Cancellation Option Agreement (CCOA)</h2>
-  <p class="subtitle">Acuerdo de Opción de Cancelación de Contrato · California Vehicle Code §11709.2 · Dealer License No. 83177</p>
+  <h2>3-Day Right to Cancel Used Car Purchase or Lease</h2>
+  <p class="subtitle">Derecho a Cancelar en 3 Días · California CARS Act · SB 766 · Civil Code §1784.43 · Dealer License No. 83177</p>
 </div>
 
 <div class="section">
@@ -405,61 +396,40 @@
     <div class="field"><label>Contract No.</label><div class="field-line">{{CONTRACT_NUMBER}}</div></div>
     <div class="field"><label>Date</label><div class="field-line">{{CONTRACT_DATE}}</div></div>
     <div class="field"><label>Buyer</label><div class="field-line">{{BUYER_NAME}}</div></div>
-    <div class="field"><label>Option Fee</label><div class="field-line">${{CCOA_FEE}}</div></div>
+    <div class="field"><label>Vehicle Price / Precio</label><div class="field-line">${{VEHICLE_PRICE}}</div></div>
   </div>
 </div>
 
 <div class="section">
-  <div class="section-title">Terms of Contract Cancellation Option / Términos de la Opción de Cancelación</div>
+  <div class="section-title">Your 3-Day Right to Cancel / Su Derecho a Cancelar en 3 Días</div>
   <div class="clause">
-    Pursuant to California Vehicle Code §11709.2, Legacy Motors Garage LLC offers Buyer the option to cancel the Retail Installment Sale Contract within <strong>two (2) business days</strong> of the contract date, subject to the following terms and conditions. <strong>THIS IS AN OPTIONAL AGREEMENT.</strong> Buyer is not required to purchase this option. / De conformidad con el Código de Vehículos de California §11709.2, Legacy Motors Garage LLC ofrece al Comprador la opción de cancelar el Contrato dentro de dos (2) días hábiles.
+    For a used vehicle with a purchase price of <strong>$50,000 or less</strong>, you have the right to cancel this sale and return the vehicle for a refund within <strong>3 calendar days</strong>, for any reason, beginning the calendar day after you sign this contract. This right applies only if ALL of the conditions below are met. / Para un vehículo usado con precio de <strong>$50,000 o menos</strong>, usted tiene derecho a cancelar esta venta y devolver el vehículo para un reembolso dentro de <strong>3 días calendario</strong>, por cualquier razón, empezando el día después de firmar — solo si se cumplen TODAS las condiciones de abajo.
   </div>
-  <div class="clause">
-    <span class="clause-title">Option Fees by Vehicle Price / Tarifas por Precio del Vehículo (California Vehicle Code §11709.2 · §11713.21):</span> These are the maximum fees allowed by law for ALL price ranges — shown whether or not Buyer purchases this option, so Buyer knows the option and its cost for any vehicle. / Estas son las tarifas máximas permitidas por la ley para TODOS los rangos de precio — se muestran acepte o no el Comprador esta opción, para que el Comprador conozca la opción y su costo para cualquier vehículo.
-    <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:8.5pt;">
-      <tr style="background:#000;color:#fff;"><td style="padding:3px 6px;border:1px solid #000;">Vehicle Cash Price / Precio de Contado</td><td style="padding:3px 6px;border:1px solid #000;">Option Fee / Tarifa de Opción</td><td style="padding:3px 6px;border:1px solid #000;">Restocking Fee / Tarifa de Reposición</td><td style="padding:3px 6px;border:1px solid #000;">Net if returned / Neto si se devuelve</td></tr>
-      <tr><td style="padding:3px 6px;border:1px solid #999;">$0 – $4,999</td><td style="padding:3px 6px;border:1px solid #999;">$75.00</td><td style="padding:3px 6px;border:1px solid #999;">$175.00</td><td style="padding:3px 6px;border:1px solid #999;">$100.00</td></tr>
-      <tr><td style="padding:3px 6px;border:1px solid #999;">$5,000 – $9,999</td><td style="padding:3px 6px;border:1px solid #999;">$150.00</td><td style="padding:3px 6px;border:1px solid #999;">$350.00</td><td style="padding:3px 6px;border:1px solid #999;">$200.00</td></tr>
-      <tr><td style="padding:3px 6px;border:1px solid #999;">$10,000 – $29,999</td><td style="padding:3px 6px;border:1px solid #999;">$250.00</td><td style="padding:3px 6px;border:1px solid #999;">$500.00</td><td style="padding:3px 6px;border:1px solid #999;">$250.00</td></tr>
-      <tr><td style="padding:3px 6px;border:1px solid #999;">$30,000 – $39,999</td><td style="padding:3px 6px;border:1px solid #999;">1% of price / 1% del precio</td><td style="padding:3px 6px;border:1px solid #999;">$600.00</td><td style="padding:3px 6px;border:1px solid #999;">$600.00 − Option Fee</td></tr>
-    </table>
-    <div style="margin-top:4px;">This vehicle's price falls in the tier with an Option Fee of <strong>${{CCOA_FEE}}</strong> and a Restocking Fee of <strong>${{RESTOCK_FEE}}</strong> (net <strong>${{NET_RESTOCK}}</strong> if returned). / El precio de este vehículo corresponde a la tarifa de opción de <strong>${{CCOA_FEE}}</strong> y reposición de <strong>${{RESTOCK_FEE}}</strong> (neto <strong>${{NET_RESTOCK}}</strong> si se devuelve).</div>
-  </div>
-  <div class="clause">
-    <span class="clause-title">1. Option Fee Paid:</span> ${{CCOA_FEE}} (non-refundable if Buyer does not cancel within the 2-day period).
-  </div>
-  <div class="clause">
-    <span class="clause-title">2. Restocking Fee upon Cancellation:</span> ${{RESTOCK_FEE}}. The Option Fee already paid will be applied toward the Restocking Fee. Net amount owed upon return: ${{NET_RESTOCK}}.
-  </div>
-  <div class="clause">
-    <span class="clause-title">3. Vehicle Return Conditions:</span> To exercise this option, Buyer must: (a) return the vehicle to Legacy Motors Garage LLC at 21122 Ave 152, Porterville, CA 93257 within 2 business days of the contract date, during business hours; (b) return the vehicle in the same or better condition as delivered, with no more than 250 additional miles driven; (c) return all keys, documentation, and accessories; (d) provide written notice of cancellation.
-  </div>
-  <div class="clause">
-    <span class="clause-title">4. Refund Upon Return:</span> Upon valid exercise of this option and return of the vehicle in acceptable condition, Seller will refund Buyer's down payment within 10 business days, less the Net Restocking Fee stated above.
-  </div>
-  <div class="clause">
-    <span class="clause-title">5. Limitations:</span> This option CANNOT be exercised if: (a) the vehicle has been in an accident; (b) the vehicle has sustained damage; (c) the vehicle has been driven more than 250 miles since delivery; (d) the vehicle has been altered or modified; (e) Buyer has received or attempted to receive insurance proceeds.
-  </div>
-  <div class="clause">
-    <span class="clause-title">6. Expiration:</span> This option expires at the close of business on {{CCOA_EXPIRY_DATE}} (2 business days from contract date). If not exercised by that time, this option is void and the Retail Installment Sale Contract remains in full force.
-  </div>
+  <div class="clause"><span class="clause-title">1. Deadline / Fecha límite:</span> You must return the vehicle and give written notice of cancellation no later than the close of business on <strong>{{CANCEL_DEADLINE}}</strong> (the 3rd calendar day after you sign). / Debe devolver el vehículo y dar aviso por escrito a más tardar al cierre del <strong>{{CANCEL_DEADLINE}}</strong> (el 3er día calendario después de firmar).</div>
+  <div class="clause"><span class="clause-title">2. Mileage limit / Límite de millas:</span> You lose this right if the vehicle is driven <strong>more than 400 miles</strong> after you sign. The odometer at signing reads <strong>{{VEH_MILES}}</strong> miles. / Pierde este derecho si el vehículo se maneja <strong>más de 400 millas</strong> después de firmar. El odómetro al firmar marca <strong>{{VEH_MILES}}</strong> millas.</div>
+  <div class="clause"><span class="clause-title">3. Condition / Condición:</span> The vehicle must be returned in the same condition as delivered, with no new damage, and with all keys, documents, and accessories. / El vehículo debe devolverse en la misma condición, sin daños nuevos, con todas las llaves, documentos y accesorios.</div>
+  <div class="clause"><span class="clause-title">4. Restocking fee / Tarifa de reposición:</span> If you cancel, the dealer may keep a restocking fee of <strong>1.5% of the purchase price</strong> (minimum $200, maximum $600). For this vehicle the restocking fee is <strong>${{RESTOCK_FEE}}</strong>. / Si cancela, el dealer puede retener <strong>1.5% del precio</strong> (mínimo $200, máximo $600). Para este vehículo es <strong>${{RESTOCK_FEE}}</strong>.</div>
+  <div class="clause"><span class="clause-title">5. Mileage fee / Cargo por millas:</span> If you drove the vehicle <strong>more than 250 miles</strong>, the dealer may also charge <strong>$1 per mile over 250</strong>, up to <strong>$150</strong>. / Si manejó <strong>más de 250 millas</strong>, el dealer también puede cobrar <strong>$1 por milla sobre 250</strong>, hasta <strong>$150</strong>.</div>
+  <div class="clause"><span class="clause-title">6. Your refund / Su reembolso:</span> Upon valid cancellation and return, the dealer will refund the full amount you paid — including sales tax, registration fees, and any deposit or trade-in — minus only the restocking fee and any mileage fee above, within the time required by law. / Al cancelar válidamente y devolver, el dealer reembolsará todo lo que pagó — incluyendo impuestos, registro y cualquier enganche o trade-in — menos la tarifa de reposición y el cargo por millas, en el tiempo que exige la ley.</div>
+  <div class="clause"><span class="clause-title">7. How to cancel / Cómo cancelar:</span> Return the vehicle to Legacy Motors Garage LLC, 21122 Ave 152, Porterville, CA 93257, during business hours, and deliver written notice that you are canceling. / Devuelva el vehículo en Legacy Motors Garage LLC, 21122 Ave 152, Porterville, CA 93257, en horario laboral, y entregue aviso por escrito de que cancela.</div>
 </div>
 
-<div class="sign-box" style="margin-top:20px;">
-  <p style="font-size:9pt;margin-bottom:8px;"><strong>By signing below, Buyer acknowledges:</strong> (1) This is an OPTIONAL agreement; (2) The option fee is non-refundable unless the cancellation option is validly exercised; (3) Buyer has read and understood all terms above; (4) Buyer received a copy of this agreement. / Al firmar, el Comprador reconoce que este es un acuerdo OPCIONAL y que ha leído y entendido todos los términos.</p>
+<div class="sign-box" style="margin-top:14px;">
+  <p style="font-size:9pt;margin-bottom:8px;">I received and read this "3-Day Right to Cancel Used Car Purchase or Lease" disclosure and understand my right to cancel and the conditions, restocking fee, and mileage fee that apply. / Recibí y leí esta divulgación del "Derecho a Cancelar en 3 Días" y entiendo mi derecho a cancelar y las condiciones, la tarifa de reposición y el cargo por millas que aplican.</p>
+  <div style="margin-bottom:10px;font-size:9pt;">Buyer's Initials / Iniciales del Comprador: <span class="initial-slot" style="border:1px solid #000;min-width:75px;height:34px;display:inline-block;vertical-align:middle;"></span></div>
   <div class="sign-row">
-    <div class="sign-line">Buyer Signature<br>{{BUYER_NAME}}</div>
-    <div class="sign-line">Date</div>
+    <div class="sign-line">Buyer Signature / Firma del Comprador<br>{{BUYER_NAME}}</div>
+    <div class="sign-line">Date / Fecha</div>
   </div>
   <div class="sign-row" style="margin-top:16px;">
     <div class="sign-line">Seller Representative<br>Enrique Ivan Villagomez Linares · Legacy Motors Garage LLC</div>
-    <div class="sign-line">Date</div>
+    <div class="sign-line">Date / Fecha</div>
   </div>
 </div>
 
 <div class="footer-note">
   Legacy Motors Garage LLC · Dealer License No. 83177 · 21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>
-  This Contract Cancellation Option Agreement is issued pursuant to California Vehicle Code §11709.2. Buyer is entitled to a copy of this agreement at time of signing.
+  This disclosure is provided pursuant to the California CARS Act (SB 766), Civil Code §1784.43. Buyer is entitled to a copy at the time of signing.
 </div>
 
 </div><!-- end page 3 -->
@@ -477,12 +447,10 @@
   const numPay    = parseInt(  p.get('numPay')  || 0);
   const weekly    = parseFloat(p.get('weekly')  || 0);
   const freq      = p.get('freq') || 'weekly';
-  const ccoaFee   = parseFloat(p.get('ccoaFee') || 0);
-  const ccoaYes   = p.get('ccoa') === 'yes';
   const docFee    = 70;
   const smog      = 58.25;   // Certificación de smog — se FINANCIA (entra al monto financiado)
   const baseFinanced   = Math.max(0, price + docFee + smog - down);
-  const totalCashPrice = price + docFee + smog + tax + dmv + (ccoaYes ? ccoaFee : 0);
+  const totalCashPrice = price + docFee + smog + tax + dmv;   // CARS Act: ya no hay cargo de CCOA por adelantado
   const daysPerPay = freq==='monthly'?30.44:freq==='biweekly'?14:7;
   const months    = numPay > 0 ? (numPay * daysPerPay) / 30.44 : 6;
   const periods   = months / 6;
@@ -505,15 +473,13 @@
   const aprStr = apr.toFixed(2);
   const fmt = n => Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const payDisplay = (numPay > 1 && Math.abs(finalPay - payAmt) > 0.01) ? (fmt(payAmt)+' × '+(numPay-1)+' + '+fmt(finalPay)+' (último / last)') : fmt(payAmt);
-  // Tarifas del COA por rango de precio (§11713.21) — SIEMPRE se muestran, acepte o no el cliente.
-  const ccoaFeeTier = price<=4999?75:price<=9999?150:250;
-  const restockFee  = price<=4999?175:price<=9999?350:500;
-  const netRestock  = restockFee - ccoaFeeTier;
-  const shownCcoaFee = ccoaYes ? (ccoaFee||ccoaFeeTier) : ccoaFeeTier;
+  // CARS Act (§1784.43): restocking = 1.5% del precio, min $200, max $600. Solo si el cliente cancela.
+  const restockFee = price>0 ? Math.min(600, Math.max(200, Math.round(price*0.015*100)/100)) : 0;
   const freqLabel = freq==='monthly'?'Monthly / Mensual':freq==='biweekly'?'Bi-Weekly / Quincenal':'Weekly / Semanal';
   const contDate = p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00') : new Date();
-  let bizDays=0; const expDate=new Date(contDate);
-  while(bizDays<2){expDate.setDate(expDate.getDate()+1);if(expDate.getDay()!==0&&expDate.getDay()!==6)bizDays++;}
+  // Fecha límite = 3 días calendario DESPUÉS de firmar.
+  const cancelDeadline = new Date(contDate); cancelDeadline.setDate(cancelDeadline.getDate()+3);
+  const cancelDeadlineStr = cancelDeadline.toLocaleDateString('en-US',{weekday:'long',month:'2-digit',day:'2-digit',year:'numeric'});
   const contractNum = p.get('contractNum') || ('LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5));
   const todayStr = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}); // MM/DD/YYYY
 
@@ -550,23 +516,12 @@
     .replace(/\{\{TAX_RATE\}\}/g, tax>0?(tax/price*100).toFixed(2):'0')
     .replace(/\{\{SALES_TAX\}\}/g, fmt(tax))
     .replace(/\{\{DMV_FEES\}\}/g, dmv>0?fmt(dmv):'____')
-    .replace(/\{\{CANCELLATION_FEE\}\}/g, ccoaYes?fmt(ccoaFee):'N/A')
     .replace(/\{\{TOTAL_CASH_PRICE\}\}/g, fmt(totalCashPrice))
     .replace(/\{\{FINANCE_CHARGE\}\}/g, fmt(financeCharge))
     .replace(/\{\{APR\}\}/g, aprStr)
     .replace(/\{\{TOTAL_OF_PAYMENTS\}\}/g, fmt(totalOfPayments))
-    .replace(/\{\{CCOA_FEE\}\}/g, fmt(shownCcoaFee))
     .replace(/\{\{RESTOCK_FEE\}\}/g, fmt(restockFee))
-    .replace(/\{\{NET_RESTOCK\}\}/g, fmt(netRestock))
-    .replace(/\{\{CCOA_EXPIRY_DATE\}\}/g, expDate.toLocaleDateString('en-US'));
-
-  // Mark CCOA checkbox
-  const acceptChk = document.getElementById('ccoa-accept-check');
-  const declineChk = document.getElementById('ccoa-decline-check');
-  if(acceptChk&&declineChk){
-    const chk = ccoaYes ? acceptChk : declineChk;
-    chk.innerHTML = '<span style="color:#fff;font-size:10px;line-height:14px;display:block;text-align:center;">✓</span>';
-  }
+    .replace(/\{\{CANCEL_DEADLINE\}\}/g, cancelDeadlineStr);
 
   // Make fields editable
   document.querySelectorAll('.field-line').forEach(el=>{

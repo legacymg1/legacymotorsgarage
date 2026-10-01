@@ -576,25 +576,8 @@
         </div>
       </div>
     </div>
-    <!-- CCOA Option -->
-    <div style="background:var(--navy2);border-radius:10px;padding:12px;margin-bottom:8px;">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);margin-bottom:8px;">📋 Contract Cancellation Option (CCOA)</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Requerido por CA Vehicle Code §11709.2 — Opcional para el cliente</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">¿El cliente acepta el CCOA?</label>
-          <select class="form-input" id="f-ccoa" onchange="calcCCOA()">
-            <option value="no">No acepta</option>
-            <option value="yes">Sí acepta</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Tarifa CCOA (auto-calculada)</label>
-          <input class="form-input" id="f-ccoa-fee" placeholder="$0" readonly style="background:var(--navy3);color:var(--gold);font-weight:700;">
-        </div>
-      </div>
-      <div id="ccoa-details" style="font-size:11px;color:var(--muted);display:none;margin-top:4px;"></div>
-    </div>
+    <!-- CCOA eliminado (CARS Act SB 766, §1784.43, oct-2026): ya no es una opción pagada;
+         ahora es el derecho automático de 3 días que viene desglosado en los contratos. -->
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha de Contrato</label><input class="form-input" id="f-contractdate" type="date" onchange="autoFillService()"></div>
       <div class="form-group"><label class="form-label">Último Servicio</label><input class="form-input" id="f-lastservice" type="date" onchange="autoFillService()"><div class="form-hint" style="font-size:11px;color:var(--muted);margin-top:4px;">Se llena solo con la fecha del contrato. Cámbiala cuando el carro regrese al taller.</div></div>
