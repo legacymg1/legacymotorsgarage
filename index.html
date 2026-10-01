@@ -14673,6 +14673,25 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
       <textarea class="cf-input" id="car-desc" rows="2" placeholder="Description / Descripción" style="resize:vertical;"></textarea>
       <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">🎥 Video</label>
       <input type="file" class="cf-input" id="car-video" accept="video/*" style="padding:8px;cursor:pointer;">
+
+      <!-- ✨ POST BILINGÜE PARA FACEBOOK / MARKETPLACE (bot) -->
+      <div style="border:1px solid rgba(240,192,64,.3);border-radius:10px;padding:12px;margin-top:12px;background:rgba(240,192,64,.05);">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#f0c040;margin-bottom:4px;">✨ Post para Facebook / Marketplace</div>
+        <div style="font-size:11px;color:#999;margin-bottom:10px;line-height:1.4;">Marca lo que trae el carro y el bot escribe el post bilingüe (inglés + español juntos), listo para copiar. Usa los datos del VIN.</div>
+        <label style="font-size:11px;color:#aaa;display:block;margin-bottom:5px;">Características / Features:</label>
+        <div id="car-feat-grid" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
+        <input class="cf-input" id="car-feat-extra" placeholder="Algo extra (ej. 2 juegos de llaves, rines nuevos, techo…)">
+        <div style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+          <label style="font-size:12px;color:#aaa;">Sugerir enganche:</label>
+          <input class="cf-input" id="car-fb-down" type="number" value="50" style="width:70px;margin:0;padding:8px;"><span style="color:#aaa;font-size:13px;">%</span>
+        </div>
+        <button type="button" id="car-genpost-btn" onclick="generateCarPost()" style="width:100%;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;">✨ Generar post con el bot</button>
+        <textarea class="cf-input" id="car-fbpost" rows="11" placeholder="Aquí aparecerá el post bilingüe listo para copiar…" style="resize:vertical;margin-top:8px;font-size:13px;line-height:1.45;" oninput="updateFbCount()"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+          <span id="car-fbpost-count" style="font-size:11px;color:#888;">0 / 5000</span>
+          <button type="button" onclick="copyCarPost(this)" style="background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:7px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">📋 Copiar</button>
+        </div>
+      </div>
     </div>
     <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">📸 Fotos / Photos <span style="color:#666;">(de tu galería o cámara)</span></label>
     <input type="file" class="cf-input" id="car-photos" accept="image/*" multiple style="padding:8px;cursor:pointer;">
@@ -15165,9 +15184,96 @@ window.openCarModal = function(carId){
   _carSpec = carId ? ((cars.find(x=>x.id===carId)||{}).spec||null) : null;
   renderCarSpec(_carSpec);
   const _vm=document.getElementById('car-vin-msg'); if(_vm) _vm.textContent='';
+  // ✨ Post FB / características (cargar al editar, limpiar al agregar)
+  const _fbC = carId ? (cars.find(x=>x.id===carId)||{}) : {};
+  renderCarFeatures(_fbC.features||[]);
+  const _fp=document.getElementById('car-fbpost'); if(_fp) _fp.value=_fbC.fbPost||'';
+  const _fe=document.getElementById('car-feat-extra'); if(_fe) _fe.value=_fbC.fbExtra||'';
+  const _fd=document.getElementById('car-fb-down'); if(_fd) _fd.value=_fbC.fbDownPct||50;
+  updateFbCount();
   modal.style.display='flex';
 }
 window.closeCarModal = function(){document.getElementById('car-modal').style.display='none';}
+
+// ===== ✨ POST BILINGÜE PARA FACEBOOK / MARKETPLACE (bot) =====
+const CAR_FEATURES = [
+  {en:"Clean Title", es:"Título Limpio"},
+  {en:"Low Miles", es:"Pocas Millas"},
+  {en:"Full Service Just Completed", es:"Servicio Completo Recién Hecho"},
+  {en:"Apple CarPlay / Android Auto", es:"Apple CarPlay / Android Auto"},
+  {en:"Touchscreen", es:"Pantalla Táctil"},
+  {en:"Backup Camera", es:"Cámara de Reversa"},
+  {en:"Parking Sensors", es:"Sensores de Proximidad"},
+  {en:"Remote Start", es:"Encendido Remoto"},
+  {en:"Bluetooth", es:"Bluetooth"},
+  {en:"Ice Cold A/C", es:"A/C Bien Frío"},
+  {en:"Great on Gas", es:"Excelente en Gasolina"},
+  {en:"Leather Seats", es:"Asientos de Piel"},
+  {en:"Sunroof", es:"Quemacocos / Techo"},
+  {en:"Third Row Seating", es:"Tercera Fila"},
+  {en:"Alloy Wheels", es:"Rines de Aluminio"},
+  {en:"New Tires", es:"Llantas Nuevas"},
+  {en:"Tow Package", es:"Paquete de Arrastre"},
+  {en:"AWD / 4WD", es:"4x4 / AWD"},
+  {en:"Two Sets of Keys", es:"Dos Juegos de Llaves"},
+  {en:"Runs & Drives Excellent", es:"Maneja Excelente"},
+];
+function renderCarFeatures(selected){
+  const grid=document.getElementById('car-feat-grid'); if(!grid) return;
+  const sel = new Set((selected||[]).map(x=> (x&&x.en)||x ));
+  grid.innerHTML = CAR_FEATURES.map((f,i)=>{
+    const on = sel.has(f.en);
+    return '<button type="button" class="car-feat-chip" data-i="'+i+'" data-on="'+(on?'1':'0')+'" onclick="toggleCarFeat(this)" '+
+      'style="border:1px solid '+(on?'#f0c040':'rgba(255,255,255,.18)')+';background:'+(on?'rgba(240,192,64,.18)':'rgba(255,255,255,.04)')+';color:'+(on?'#f0c040':'#ccc')+';border-radius:999px;padding:6px 11px;font-size:12px;cursor:pointer;">'+(on?'✓ ':'')+f.es+'</button>';
+  }).join('');
+}
+window.toggleCarFeat=function(btn){
+  const on = btn.dataset.on==='1' ? '0':'1';
+  btn.dataset.on=on;
+  const f=CAR_FEATURES[parseInt(btn.dataset.i,10)]||{};
+  btn.style.border='1px solid '+(on==='1'?'#f0c040':'rgba(255,255,255,.18)');
+  btn.style.background=(on==='1'?'rgba(240,192,64,.18)':'rgba(255,255,255,.04)');
+  btn.style.color=(on==='1'?'#f0c040':'#ccc');
+  btn.textContent=(on==='1'?'✓ ':'')+(f.es||'');
+};
+function getSelectedCarFeatures(){
+  const out=[];
+  document.querySelectorAll('#car-feat-grid .car-feat-chip').forEach(b=>{ if(b.dataset.on==='1'){ const f=CAR_FEATURES[parseInt(b.dataset.i,10)]; if(f) out.push({en:f.en,es:f.es}); } });
+  return out;
+}
+window.updateFbCount=function(){ const t=document.getElementById('car-fbpost'), c=document.getElementById('car-fbpost-count'); if(t&&c){ const n=t.value.length; c.textContent=n+' / 5000'; c.style.color = n>5000?'#ff5a5a':(n>0?'#8ad98a':'#888'); } };
+window.copyCarPost=function(btn){
+  const t=document.getElementById('car-fbpost'); if(!t||!t.value.trim()){ alert('Primero genera el post.'); return; }
+  const ok=()=>{ if(btn){ const o=btn.textContent; btn.textContent='✅ Copiado'; setTimeout(()=>{ try{btn.textContent=o;}catch(e){} },1500); } };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t.value).then(ok).catch(()=>{ try{t.select();document.execCommand('copy');ok();}catch(e){} }); }
+  else { try{ t.select(); document.execCommand('copy'); ok(); }catch(e){} }
+};
+window.generateCarPost=async function(){
+  const btn=document.getElementById('car-genpost-btn');
+  const car={
+    year:document.getElementById('car-year').value, make:document.getElementById('car-make').value,
+    model:document.getElementById('car-model').value, trim:document.getElementById('car-trim').value,
+    color:document.getElementById('car-color').value, miles:document.getElementById('car-miles').value,
+    price:document.getElementById('car-price').value, spec:_carSpec||null
+  };
+  if(!car.year||!car.make||!car.model){ alert('Pon al menos año, marca y modelo del carro.'); return; }
+  if(!auth.currentUser){ alert('Inicia sesión primero.'); return; }
+  const features=getSelectedCarFeatures();
+  const extra=(document.getElementById('car-feat-extra').value||'').trim();
+  const downPct=parseInt(document.getElementById('car-fb-down').value,10)||50;
+  const _o=btn.textContent; btn.disabled=true; btn.textContent='✨ Generando…';
+  try{
+    const idToken=await auth.currentUser.getIdToken();
+    const r=await fetch('https://us-central1-legacy-motors-garage.cloudfunctions.net/generateCarPost',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ idToken, car, features, extra, downPct })
+    });
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok || !j.post){ throw new Error(j.error || ('HTTP '+r.status)); }
+    const t=document.getElementById('car-fbpost'); t.value=j.post; updateFbCount();
+  }catch(e){ alert('No se pudo generar el post: '+((e&&e.message)||e)); }
+  btn.disabled=false; btn.textContent=_o;
+};
 
 // ===== VIN → auto-relleno (NHTSA gratis; deja lista la ficha para el historial de Bumper en Fase 2) =====
 function renderCarSpec(s){
@@ -15371,6 +15477,10 @@ window.saveCar = async function(){
       smogPhotoURL,
       vin: (document.getElementById('car-vin')?document.getElementById('car-vin').value.trim():'').toUpperCase(),
       spec: (_carSpec && _carSpec.vin === (document.getElementById('car-vin')?document.getElementById('car-vin').value.trim().toUpperCase():'')) ? _carSpec : (existing.spec||null),
+      features: (typeof getSelectedCarFeatures==='function' ? getSelectedCarFeatures() : (existing.features||[])),
+      fbPost: (document.getElementById('car-fbpost')?document.getElementById('car-fbpost').value.trim():'') || existing.fbPost || '',
+      fbExtra: (document.getElementById('car-feat-extra')?document.getElementById('car-feat-extra').value.trim():'') || '',
+      fbDownPct: parseInt((document.getElementById('car-fb-down')||{}).value,10) || existing.fbDownPct || 50,
       createdAt: existing.createdAt || Date.now(),
       updatedAt: Date.now()
     };

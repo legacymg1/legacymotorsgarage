@@ -226,6 +226,70 @@ exports.translateText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 20 },
   } catch (e) { return { es: text, en: text }; }
 });
 
+// ✨ GENERA EL POST BILINGÜE para Facebook Marketplace de un carro del inventario.
+// onRequest + CORS (index.html no tiene el SDK de Functions). Protegido con el ID token del usuario.
+// Reglas anti-baneo de Marketplace: NADA de "financing/credit/approval/warranty included/buy here pay here".
+exports.generateCarPost = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, timeoutSeconds: 45 }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
+  try {
+    const body = req.body || {};
+    // Seguridad: solo personal con sesión iniciada (verifica el ID token de Firebase que manda el frontend).
+    const idToken = String(body.idToken || "");
+    if (!idToken) { res.status(401).json({ error: "auth" }); return; }
+    try { await admin.auth().verifyIdToken(idToken); }
+    catch (e) { res.status(401).json({ error: "auth" }); return; }
+
+    const car = body.car || {};
+    const feats = Array.isArray(body.features) ? body.features.slice(0, 40) : [];
+    const extra = String(body.extra || "").slice(0, 400);
+    let downPct = parseInt(body.downPct, 10); if (!(downPct > 0 && downPct <= 100)) downPct = 50;
+
+    // Datos REALES del VIN decode (solo hechos verdaderos; el bot no inventa).
+    const spec = car.spec && typeof car.spec === "object" ? car.spec : null;
+    const specFacts = spec ? Object.keys(spec)
+      .filter((k) => ["bodyClass","body","doors","driveType","drive","engineCylinders","cylinders","displacementL","fuelType","transmissionStyle","transmission","series","trim"].includes(k))
+      .map((k) => k + ": " + spec[k]).filter((s) => s && !/: (null|undefined|)$/.test(s)).slice(0, 12) : [];
+
+    const payload = {
+      year: car.year || "", make: car.make || "", model: car.model || "", trim: car.trim || "",
+      color: car.color || "", miles: car.miles || "", price: car.price || "",
+      vinSpec: specFacts,
+      features: feats,      // [{en, es}, ...]
+      extra: extra,         // texto libre del vendedor (ej. "2 juegos de llaves, rines nuevos")
+      downPct: downPct,
+    };
+
+    const system = "You write ONE Facebook Marketplace post for a used-car dealership (Legacy Motors Garage LLC, 21122 Ave 152, Porterville, CA 93257, phone (559) 540-5145).\n\n" +
+      "OUTPUT FORMAT — strict:\n" +
+      "- BILINGUAL on the SAME line: English first, then ' | ', then Spanish. EVERY content line must be bilingual so the buyer never scrolls to find their language.\n" +
+      "- Line 1: a 🔥 headline with the {year} {make} {model} {trim} + the single strongest hook (e.g. Clean Title, Low Miles) + 'Ready to Drive!' — bilingual, wrapped in 🔥 ... 🔥 feel. The first ~180 characters are the mobile preview, so pack the hook here.\n" +
+      "- Then ✅ feature lines, ONE per feature, bilingual. Use ONLY the features given in 'features' and anything in 'extra'. NEVER invent a feature. If a VIN spec fact is clearly a selling point (e.g. body style, cylinders, automatic transmission, AWD/4WD) you may add it as a ✅ line, but never state fuel-economy numbers.\n" +
+      "- Then one ✨ summary line: warm, honest, 1 short sentence each language.\n" +
+      "- Then one 💰 soft call-to-action line inviting them to ask how they can take it home with only {downPct}% down / a low weekly payment plan. Bilingual.\n" +
+      "- Then 📍 address line (the dealership address) and 📞 phone line.\n\n" +
+      "BANNED — these get the post removed/banned on Facebook Marketplace, NEVER use any of them in any language: financing, finance, we finance, credit, 'no credit', 'bad credit', 'guaranteed approval', approval, approved, APR, loan, interest, 'buy here pay here', 'warranty included', 'warranty'. For payments use ONLY soft wording: 'low weekly payment plan' / 'plan de pagos semanal bajo' and the down-payment percentage. Never promise approval or mention credit in any way.\n\n" +
+      "STYLE: clean, modern, trustworthy — like the best US used-car dealers. Punchy emoji bullets. Keep the whole post UNDER 1300 characters total. Natural Spanish (Mexican, warm). Return ONLY the post text, ready to paste — no markdown, no code fences, no notes.";
+
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({
+      model: "claude-sonnet-5",
+      max_tokens: 1100,
+      system: system,
+      messages: [{ role: "user", content: "Make the Facebook Marketplace post for this vehicle. Data (JSON):\n" + JSON.stringify(payload) }],
+    });
+    let post = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    // Red de seguridad: quita cercos de código si el modelo los puso.
+    post = post.replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
+    res.status(200).json({ post: post.slice(0, 4900) });
+  } catch (e) {
+    console.error("generateCarPost error", e);
+    res.status(500).json({ error: String((e && e.message) || e) });
+  }
+});
+
 // 🔔 NOTIFICACIONES PUSH del chat interno.
 // Debe empatar con CHAT_CHANNELS del frontend (quién es miembro de cada canal).
 const CHAT_MEMBERS = {
