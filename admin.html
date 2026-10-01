@@ -142,6 +142,11 @@
   .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
   .btn-save { flex: 1; background: linear-gradient(135deg,var(--gold3),var(--gold)); color: var(--navy3); border: none; border-radius: 10px; padding: 12px; font-family: var(--font-display); font-size: 20px; cursor: pointer; }
   .btn-cancel { background: var(--border); color: var(--text); border: none; border-radius: 10px; padding: 12px 20px; font-size: 14px; cursor: pointer; }
+  /* Secciones del formulario de Nuevo Cliente (estructura por pasos) */
+  .addc-section { border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; background: rgba(255,255,255,0.02); }
+  .addc-head { font-family: var(--font-display); font-size: 16px; color: var(--gold); margin-bottom: 12px; letter-spacing: 0.5px; }
+  .addc-saveinline { width: 100%; background: #22a06b; color: #fff; border: none; border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 6px; }
+  .addc-saveinline:disabled { opacity: 0.7; }
 
   .payment-history { max-height: 200px; overflow-y: auto; margin: 12px 0; }
   .payment-entry { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
@@ -421,81 +426,59 @@
 </div>
 
 <!-- ADD/EDIT MODAL -->
-<div class="modal-overlay" id="add-modal">
-  <div class="modal">
+<div class="modal-overlay" id="add-modal" style="cursor:pointer;" onclick="if(event.target===this)closeModal('add-modal')">
+  <div class="modal" style="max-width:920px;width:96vw;max-height:94vh;cursor:auto;" onclick="event.stopPropagation()">
     <div class="modal-title" id="modal-title">NUEVO CLIENTE</div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="f-name" placeholder="Juan García"></div>
-      <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="f-phone" placeholder="(555) 555-5555" type="tel" inputmode="tel" oninput="formatPhone(this)"></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Tipo de cliente</label>
-      <select class="form-input" id="f-kind" onchange="toggleKind()">
-        <option value="finance">🚗 Financiado (con pagos)</option>
-        <option value="service">🔧 Servicio (sin pagos — solo taller / partes)</option>
-      </select>
-    </div>
-    <div class="form-group" style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;">
-      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:14px;line-height:1.4;">
-        <input type="checkbox" id="f-private" style="width:18px;height:18px;margin-top:1px;flex:none;">
-        <span>🔒 <b>Venta privada / pre-Legacy</b><br><span style="font-size:12px;color:var(--muted);">NO cuenta en los números ni impuestos de Legacy. Se lleva aparte en Finanzas.</span></span>
-      </label>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Fecha de Nacimiento</label><input class="form-input" id="f-dob" type="date"></div>
-      <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="f-address" placeholder="123 Main St"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Ciudad / City</label><input class="form-input" id="f-city" placeholder="Porterville"></div>
-      <div class="form-group"><label class="form-label">Estado / State</label><input class="form-input" id="f-state" placeholder="CA" style="max-width:80px;"></div>
-      <div class="form-group"><label class="form-label">ZIP</label><input class="form-input" id="f-zip" placeholder="93257" style="max-width:80px;"></div>
-    </div>
-    <!-- INVENTORY & ID - moved to top -->
-    <div class="form-row">
-      <div class="form-group" style="position:relative;">
-        <label class="form-label">🚗 Buscar carro del inventario (nombre o número)</label>
-        <input class="form-input" id="f-car-search" placeholder="Ej: Tahoe, 2015 Honda, 0001…" autocomplete="off" oninput="carSearchInput(this.value)">
-        <div id="f-car-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--surface,#141924);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:44vh;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.5);"></div>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">🔑 No. Inventario del Vehículo</label>
-        <input class="form-input" id="f-inventory-num" placeholder="Ej: 0001" oninput="lookupInventory(this.value)">
-        <div id="inv-lookup-status" style="font-size:11px;color:var(--gold);margin-top:4px;"></div>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">🪪 Tipo de ID</label>
-        <select class="form-input" id="f-id-type">
-          <option value="">Seleccionar...</option>
-          <option value="Driver's License">Driver's License / Lic. de Manejo</option>
-          <option value="Passport">Passport / Pasaporte</option>
-          <option value="Matricula Consular">Matrícula Consular</option>
-          <option value="State ID">State ID</option>
-          <option value="Other">Other / Otro</option>
+    <!-- ============ 1 · IDIOMA ============ -->
+    <div class="addc-section">
+      <div class="addc-head">1 · Idioma de comunicación</div>
+      <div class="form-group" style="margin-bottom:0;">
+        <select class="form-input" id="f-lang">
+          <option value="es">🇲🇽 Español</option>
+          <option value="en">🇺🇸 English</option>
         </select>
       </div>
-      <div class="form-group"><label class="form-label">Número de ID</label><input class="form-input" id="f-id-number" placeholder="A1234567"></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Estado del ID</label><input class="form-input" id="f-id-state" placeholder="CA"></div>
-      <div class="form-group"><label class="form-label">Vencimiento del ID</label><input class="form-input" id="f-id-expiry" type="date"></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">📸 Foto del ID</label>
-      <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;">
-      <div id="f-id-preview" style="margin-top:6px;"></div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Idioma de Comunicación</label>
-      <select class="form-input" id="f-lang">
-        <option value="es">🇲🇽 Español</option>
-        <option value="en">🇺🇸 English</option>
-      </select>
-    </div>
-    <div class="form-row">
+
+    <!-- ============ 2 · DATOS DEL CLIENTE ============ -->
+    <div class="addc-section">
+      <div class="addc-head">2 · Datos del cliente</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nombre</label><input class="form-input" id="f-name" placeholder="Juan García"></div>
+        <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="f-phone" placeholder="(555) 555-5555" type="tel" inputmode="tel" oninput="formatPhone(this)"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Fecha de Nacimiento</label><input class="form-input" id="f-dob" type="date"></div>
+        <div class="form-group"><label class="form-label">Dirección</label><input class="form-input" id="f-address" placeholder="123 Main St"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Ciudad / City</label><input class="form-input" id="f-city" placeholder="Porterville"></div>
+        <div class="form-group"><label class="form-label">Estado / State</label><input class="form-input" id="f-state" placeholder="CA" style="max-width:80px;"></div>
+        <div class="form-group"><label class="form-label">ZIP</label><input class="form-input" id="f-zip" placeholder="93257" style="max-width:80px;"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">🪪 Tipo de ID</label>
+          <select class="form-input" id="f-id-type">
+            <option value="">Seleccionar...</option>
+            <option value="Driver's License">Driver's License / Lic. de Manejo</option>
+            <option value="Passport">Passport / Pasaporte</option>
+            <option value="Matricula Consular">Matrícula Consular</option>
+            <option value="State ID">State ID</option>
+            <option value="Other">Other / Otro</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Número de ID</label><input class="form-input" id="f-id-number" placeholder="A1234567"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Estado del ID</label><input class="form-input" id="f-id-state" placeholder="CA"></div>
+        <div class="form-group"><label class="form-label">Vencimiento del ID</label><input class="form-input" id="f-id-expiry" type="date"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">📸 Foto del ID</label>
+        <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;">
+        <div id="f-id-preview" style="margin-top:6px;"></div>
+      </div>
       <div class="form-group" style="background:rgba(232,182,74,0.06);border:1px solid rgba(232,182,74,0.25);border-radius:10px;padding:12px;">
         <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
           <input type="checkbox" id="f-sms-consent" style="margin-top:3px;width:18px;height:18px;flex:none;cursor:pointer;">
@@ -503,22 +486,59 @@
           <span style="color:var(--muted);font-size:12px;">El cliente autorizó <b>por escrito</b> recibir mensajes de cumpleaños, servicio y promociones. No es obligatorio para el crédito.</span></span>
         </label>
       </div>
-      <div class="form-group"><label class="form-label">Año del Carro</label><input class="form-input" id="f-year" placeholder="2019" type="number"></div>
+      <button type="button" id="save-inline-btn" class="addc-saveinline" onclick="saveClient(true)">💾 Guardar cliente y seguir</button>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">Puedes guardar aquí con los datos del cliente y seguir llenando el resto cuando quieras.</div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Marca</label><input class="form-input" id="f-make" placeholder="Toyota"></div>
-      <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="f-model" placeholder="Camry"></div>
-      <div class="form-group"><label class="form-label">Versión / Trim</label><input class="form-input" id="f-trim" placeholder="LT, XLE, Sport"></div>
-      <div class="form-group"><label class="form-label">Color</label><input class="form-input" id="f-color" placeholder="Plata / Blanco"></div>
+
+    <!-- ============ 3 · TIPO DE CLIENTE Y VEHÍCULO ============ -->
+    <div class="addc-section">
+      <div class="addc-head">3 · Tipo de cliente y vehículo</div>
+      <div class="form-group">
+        <label class="form-label">Tipo de cliente</label>
+        <select class="form-input" id="f-kind" onchange="toggleKind()">
+          <option value="finance">🚗 Financiado (con pagos)</option>
+          <option value="service">🔧 Servicio (sin pagos — solo taller / partes)</option>
+        </select>
+      </div>
+      <div class="form-group" style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:14px;line-height:1.4;">
+          <input type="checkbox" id="f-private" style="width:18px;height:18px;margin-top:1px;flex:none;">
+          <span>🔒 <b>Venta privada / pre-Legacy</b><br><span style="font-size:12px;color:var(--muted);">NO cuenta en los números ni impuestos de Legacy. Se lleva aparte en Finanzas.</span></span>
+        </label>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="position:relative;">
+          <label class="form-label">🚗 Buscar carro del inventario (nombre o número)</label>
+          <input class="form-input" id="f-car-search" placeholder="Ej: Tahoe, 2015 Honda, 0001…" autocomplete="off" oninput="carSearchInput(this.value)">
+          <div id="f-car-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--surface,#141924);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:44vh;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.5);"></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">🔑 No. Inventario del Vehículo</label>
+          <input class="form-input" id="f-inventory-num" placeholder="Ej: 0001" oninput="lookupInventory(this.value)">
+          <div id="inv-lookup-status" style="font-size:11px;color:var(--gold);margin-top:4px;"></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Año del Carro</label><input class="form-input" id="f-year" placeholder="2019" type="number"></div>
+        <div class="form-group"><label class="form-label">Marca</label><input class="form-input" id="f-make" placeholder="Toyota"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Modelo</label><input class="form-input" id="f-model" placeholder="Camry"></div>
+        <div class="form-group"><label class="form-label">Versión / Trim</label><input class="form-input" id="f-trim" placeholder="LT, XLE, Sport"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Color</label><input class="form-input" id="f-color" placeholder="Plata / Blanco"></div>
+        <div class="form-group"><label class="form-label">Número de placas</label><input class="form-input" id="f-plate" placeholder="Placa (ej. 8ABC123)" oninput="this.value=this.value.toUpperCase()"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">VIN</label><input class="form-input" id="f-vin" placeholder="Número VIN del carro" oninput="this.value=this.value.toUpperCase()"></div>
+        <div class="form-group"><label class="form-label">Millas</label><input class="form-input" id="f-miles" placeholder="85000" type="number"></div>
+      </div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">VIN</label><input class="form-input" id="f-vin" placeholder="Número VIN del carro" oninput="this.value=this.value.toUpperCase()"></div>
-      <div class="form-group"><label class="form-label">Millas</label><input class="form-input" id="f-miles" placeholder="85000" type="number"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Número de placas</label><input class="form-input" id="f-plate" placeholder="Placa (ej. 8ABC123)" oninput="this.value=this.value.toUpperCase()"></div>
-    </div>
-    <div id="finance-only">
+    <div id="finance-only" class="addc-section">
+    <div class="addc-head">4 · Venta y financiamiento</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Precio del Vehículo ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcFinancing('price')"></div>
       <div class="form-group"><label class="form-label">Down Payment ($)</label><input class="form-input" id="f-down" placeholder="1000" type="number" oninput="calcFinancing('down')"></div>
@@ -586,23 +606,27 @@
       <div class="form-group"><label class="form-label">Fecha Primer Pago</label><input class="form-input" id="f-startdate" type="date" onchange="setTimeout(calcHint,50)"></div>
     </div>
     </div><!-- /finance-only -->
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">Póliza de Seguro</label>
-        <input class="form-input" id="f-insurance" placeholder="Número de póliza">
-        <div class="form-hint" id="f-insurance-hint"></div>
+    <!-- ============ 5 · SEGURO Y NOTAS ============ -->
+    <div class="addc-section">
+      <div class="addc-head">5 · Seguro y notas</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Póliza de Seguro</label>
+          <input class="form-input" id="f-insurance" placeholder="Número de póliza">
+          <div class="form-hint" id="f-insurance-hint"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vencimiento del Seguro</label>
+          <input class="form-input" id="f-insurance-exp" type="date">
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Vencimiento del Seguro</label>
-        <input class="form-input" id="f-insurance-exp" type="date">
-      </div>
+      <div class="form-group" style="margin-bottom:0;"><label class="form-label">Notas</label><input class="form-input" id="f-notes" placeholder="Información adicional..."></div>
     </div>
-    <div class="form-group"><label class="form-label">Notas</label><input class="form-input" id="f-notes" placeholder="Información adicional..."></div>
 
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('add-modal')">Cancelar</button>
       <button class="btn-save" style="background:var(--border);color:var(--text);margin-right:8px;" id="contract-btn" onclick="generateContractFromForm()">📄 Contrato</button>
-      <button class="btn-save" id="save-btn" onclick="saveClient()">GUARDAR</button>
+      <button class="btn-save" id="save-btn" onclick="saveClient()">GUARDAR Y CERRAR</button>
     </div>
   </div>
 </div>
@@ -2741,8 +2765,9 @@ function _withTimeout(promise, ms, label){
     new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout '+(label||'')+' ('+ms+'ms)')), ms))
   ]);
 }
-window.saveClient=async function(){
-  console.log("saveClient v3.4 running");
+window.saveClient=async function(keepOpen){
+  // keepOpen=true → "Guardar y seguir" (guardado PARCIAL): no cierra el modal y NO exige el plan de pagos.
+  console.log("saveClient v3.5 running", {keepOpen:!!keepOpen});
   const name=titleCase(document.getElementById('f-name').value.trim());
   if(!name){alert('Nombre requerido');return;}
   const _phD=(document.getElementById('f-phone').value||'').replace(/[^0-9]/g,'');
@@ -2755,13 +2780,15 @@ window.saveClient=async function(){
   const numPay=parseInt(document.getElementById('f-numpay').value)||0;
   const _freqNow = document.getElementById('f-freq')?document.getElementById('f-freq').value:'weekly';
   const _isCashLike = (_freqNow==='cash' || _freqNow==='lendmark');   // contado / lendmark = 1 sola exhibición, sin plan de pagos
-  if(!isService && !_isCashLike){
+  if(!keepOpen && !isService && !_isCashLike){   // solo el guardado FINAL exige el plan de pagos
     if(!startDate){alert('Fecha del primer pago requerida');return;}
     if(!numPay){alert('Número de pagos requerido');return;}
   }
 
-  const btn=document.getElementById('save-btn');
-  btn.textContent='GUARDANDO...';btn.disabled=true;
+  const btn = keepOpen ? (document.getElementById('save-inline-btn')||document.getElementById('save-btn'))
+                       : document.getElementById('save-btn');
+  const _btnOrig = (btn && btn.textContent) || '';
+  if(btn){ btn.textContent='GUARDANDO...'; btn.disabled=true; }
 
   const id=editingId||('c_'+Date.now());
   const existing=editingId?clients.find(x=>x.id===editingId):{};
@@ -2955,9 +2982,17 @@ window.saveClient=async function(){
       }
     }catch(finErr){ console.log('Post venta a finanzas omitido:', finErr); }
 
-    closeModal('add-modal');
+    if(!keepOpen) closeModal('add-modal');   // guardado PARCIAL deja el modal abierto para seguir llenando
   }catch(e){console.error('Save error:',e);alert('Error guardando: '+e.message);}
-  btn.textContent='GUARDAR';btn.disabled=false;
+  if(btn){
+    btn.disabled=false;
+    if(keepOpen){
+      btn.textContent='✅ Guardado — sigue llenando';
+      setTimeout(function(){ try{ btn.textContent='💾 Guardar cliente y seguir'; }catch(_e){} }, 2500);
+    } else {
+      btn.textContent = _btnOrig || 'GUARDAR Y CERRAR';
+    }
+  }
 };
 
 window.openDelClient=function(){
