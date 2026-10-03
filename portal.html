@@ -552,6 +552,7 @@ onAuthStateChanged(auth, async (user)=>{
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='block';
     renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); maybeAskConsent();
+    checkSquareReturn();   // 💳 si viene de pagar con Square, registra y refresca
     try{ await updateDoc(doc(db,'clients',currentClient.id), { lastLogin: new Date().toISOString() }); }catch(e){}
   }catch(e){ showLoginError(t('errConn')); }
 });
@@ -875,6 +876,49 @@ window.bookSlot = async function(time){
     renderServicePortal(c);
   }catch(e){ document.getElementById('book-msg').innerHTML=`<div style="color:var(--red);">${(es?'No se pudo agendar: ':'Could not book: ')+e.message}</div>`; }
 };
+// ===== 💳 PAGO CON SQUARE =====
+const SQ_FN = 'https://us-central1-legacy-motors-garage.cloudfunctions.net';
+window.payNow = async function(){
+  const c = currentClient; if(!c) return;
+  const due = dueNow(c), bal = calcBalance(c);
+  const defAmt = (due>0?due:bal).toFixed(2);
+  const msg = (L==='en'
+    ? ('How much do you want to pay? (you can change it)\nBalance: '+formatMoney(bal))
+    : ('¿Cuánto quieres pagar? (lo puedes cambiar)\nSaldo: '+formatMoney(bal)));
+  const v = prompt(msg, defAmt);
+  if(v===null) return;
+  const amt = Math.round(parseFloat(String(v).replace(/[^0-9.]/g,''))*100);
+  if(!(amt>=100)){ alert(L==='en'?'Minimum $1.00':'Mínimo $1.00'); return; }
+  try{
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(SQ_FN+'/createSquareCheckout',{ method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ idToken, clientId:c.id, amountCents:amt }) });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || !j.url){ throw new Error(j.error||('HTTP '+r.status)); }
+    try{ localStorage.setItem('sqPendingOrder', j.orderId||''); }catch(e){}
+    window.location.href = j.url;   // redirige a la página SEGURA de Square
+  }catch(e){ alert((L==='en'?'Could not start payment: ':'No se pudo iniciar el pago: ')+((e&&e.message)||e)); }
+};
+// Al regresar de Square, re-verifica el pago y refresca el saldo.
+async function checkSquareReturn(){
+  try{
+    const u = new URL(window.location.href);
+    if(u.searchParams.get('sqdone')!=='1') return;
+    let orderId = u.searchParams.get('orderId') || '';
+    if(!orderId){ try{ orderId = localStorage.getItem('sqPendingOrder')||''; }catch(e){} }
+    ['sqdone','orderId','transactionId','referenceId','checkoutId'].forEach(k=>u.searchParams.delete(k));
+    window.history.replaceState({}, '', u.pathname);   // evita reconfirmar al recargar
+    try{ localStorage.removeItem('sqPendingOrder'); }catch(e){}
+    if(!orderId) return;
+    const r = await fetch(SQ_FN+'/confirmSquarePayment',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ orderId }) });
+    const j = await r.json().catch(()=>({}));
+    if(j && j.ok){
+      try{ const snap = await getDoc(doc(db,'clients',currentClient.id)); if(snap.exists()){ currentClient = { id:snap.id, ...snap.data() }; renderPortal(); } }catch(e){}
+      alert(L==='en' ? ('✅ Payment received: '+formatMoney(j.amount)+'. Thank you!') : ('✅ Pago recibido: '+formatMoney(j.amount)+'. ¡Gracias!'));
+    }
+  }catch(e){}
+}
+
 function renderPortal() {
   const c = currentClient;
   if((c.kind||'')==='service'){ return renderServicePortal(c); }
@@ -1018,6 +1062,10 @@ function renderPortal() {
         <div class="npc-amount-label">${dueNow(c)<(Number(c.weekly)||0)?(L==='en'?'last payment':'último pago'):freqLabel}</div>
       </div>
     </div>`}
+
+    <!-- 💳 PAGAR AHORA (Square) — oculto si ya pagó -->
+    ${status==='paidoff' ? '' : `
+    <button onclick="payNow()" style="width:100%;background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:16px;box-shadow:0 6px 18px rgba(67,160,71,.35);">💳 ${L==='en'?'Pay now':'Pagar ahora'}</button>`}
 
     ${serviceCardHTML(nextServ2, nextAppt, _lastAppt)}
 

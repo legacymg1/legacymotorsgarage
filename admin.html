@@ -650,6 +650,7 @@
     <div style="font-family:var(--font-display);font-size:16px;color:var(--muted);margin-top:16px;">HISTORIAL</div>
     <div class="payment-history" id="pay-history"></div>
     <button type="button" onclick="resendLastReceipt()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:10px;">📩 Reenviar recibo del último pago</button>
+    <button type="button" onclick="sendSquareCharge()" style="width:100%;background:rgba(67,160,71,0.14);border:1px solid #43a047;color:#43a047;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💳 Enviar cobro por Square (link de pago)</button>
     <button type="button" onclick="closeModal('pay-modal');openApptModal(payingId)" style="width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:8px;">📅 Agendar cita de servicio</button>
     <button type="button" onclick="settleToday()" style="width:100%;background:rgba(76,175,80,0.15);border:1px solid #4caf50;color:#4caf50;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💰 Liquidar HOY (tú pones el monto / con descuento)</button>
     <button type="button" onclick="fixOrphanPayments()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px;font-size:12px;cursor:pointer;margin-top:8px;">🧹 Revisar pagos vs Finanzas (anular borrados)</button>
@@ -3327,6 +3328,50 @@ function getOverdueMsg(c, days) {
     .replace(/{saldo}/g, formatMoney(calcBalance(c)))
     .replace(/{dias}/g, days);
 }
+
+// 💳 Enviar cobro por Square: crea un link de pago para el cliente y lo mandas por SMS / lo copias.
+window.sendSquareCharge = async function(){
+  const id = payingId; const c = clients.find(x=>x.id===id);
+  if(!c){ alert('Abre un cliente primero.'); return; }
+  const due = dueNow(c), bal = calcBalance(c);
+  const def = (due>0?due:bal).toFixed(2);
+  const v = prompt('💳 Cobro por Square a '+(c.name||'')+'\n\n¿De cuánto es el cobro? (lo puedes cambiar)\nSaldo: '+formatMoney(bal), def);
+  if(v===null) return;
+  const amt = Math.round(parseFloat(String(v).replace(/[^0-9.]/g,''))*100);
+  if(!(amt>=100)){ alert('Mínimo $1.00'); return; }
+  if(!auth.currentUser){ alert('Inicia sesión.'); return; }
+  try{
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch('https://us-central1-legacy-motors-garage.cloudfunctions.net/createSquareCheckout',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ idToken, clientId:id, amountCents:amt }) });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || !j.url){ throw new Error(j.error||('HTTP '+r.status)); }
+    const nombre = (c.name||'').split(' ')[0]||'';
+    const carro = [c.year,c.make,c.model].filter(Boolean).join(' ');
+    const msg = 'Hola '+nombre+', aquí puede pagar su '+carro+' ('+formatMoney(amt/100)+') de forma segura:\n'+j.url+'\n\n— Legacy Motors Garage LLC';
+    _showSquareLink(c, j.url, msg);
+  }catch(e){ alert('No se pudo crear el cobro: '+((e&&e.message)||e)); }
+};
+window._showSquareLink = function(c, link, msg){
+  const ph = (c.phone||'').replace(/[^0-9]/g,'');
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:18px;cursor:pointer;';
+  ov.onclick=(e)=>{ if(e.target===ov) ov.remove(); };
+  const box=document.createElement('div');
+  box.style.cssText='background:var(--surface,#141924);color:var(--text,#e7e9ee);border:1px solid var(--border,#2a3141);border-radius:16px;max-width:430px;width:100%;padding:22px;cursor:auto;';
+  box.innerHTML = '<div style="font-size:17px;font-weight:800;margin-bottom:6px;">💳 Cobro de Square listo</div>'
+    + '<div style="font-size:13px;color:var(--muted,#9aa3b4);margin-bottom:14px;">Mándaselo al cliente. Cuando pague, el abono se registra solo en su cuenta y en Finanzas.</div>'
+    + '<div style="background:var(--navy2,#0f1320);border:1px solid var(--border,#2a3141);border-radius:10px;padding:10px;font-size:12px;word-break:break-all;margin-bottom:14px;">'+link+'</div>'
+    + (ph?('<a href="sms:'+ph+'?&body='+encodeURIComponent(msg)+'" style="display:block;background:#1f6feb;color:#fff;text-decoration:none;border-radius:10px;padding:13px;font-size:15px;font-weight:800;text-align:center;margin-bottom:10px;">📩 Enviar por SMS a '+(c.phone||'')+'</a>'):'')
+    + '<button id="sqcopy" style="width:100%;background:rgba(67,160,71,.15);color:#43a047;border:1px solid #43a047;border-radius:10px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:10px;">📋 Copiar link</button>'
+    + '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="width:100%;background:transparent;color:var(--muted,#9aa3b4);border:1px solid var(--border,#2a3141);border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">Cerrar</button>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  const cp=box.querySelector('#sqcopy');
+  cp.onclick=()=>{ const done=()=>{ cp.textContent='✅ Copiado'; setTimeout(()=>{cp.textContent='📋 Copiar link';},1500); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(link).then(done).catch(()=>{ try{const t=document.createElement('textarea');t.value=link;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();done();}catch(e){} }); }
+    else { try{const t=document.createElement('textarea');t.value=link;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();done();}catch(e){} } };
+};
 
 window.resendLastReceipt = function(){
   const c = clients.find(x=>x.id===payingId);

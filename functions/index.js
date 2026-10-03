@@ -17,6 +17,7 @@ const EBAY_AUTH_TOKEN = defineSecret("EBAY_AUTH_TOKEN");
 const EBAY_OAUTH_REFRESH = defineSecret("EBAY_OAUTH_REFRESH");
 const PLAID_CLIENT_ID = defineSecret("PLAID_CLIENT_ID");
 const PLAID_SECRET = defineSecret("PLAID_SECRET");
+const SQUARE_ACCESS_TOKEN = defineSecret("SQUARE_ACCESS_TOKEN");
 // Zoho SMTP pass: se lee en TIEMPO DE EJECUCIÓN desde Secret Manager (no en el deploy),
 // para que el despliegue no falle si el secreto aún no tiene permisos/valor.
 let _zohoPassCache = null;
@@ -288,6 +289,93 @@ exports.generateCarPost = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, time
     console.error("generateCarPost error", e);
     res.status(500).json({ error: String((e && e.message) || e) });
   }
+});
+
+// ===== 💳 PAGOS CON SQUARE (portal del cliente + "enviar cobro" desde el admin) =====
+const SQUARE_LOCATION_ID = "LDTPHV3ZR18D0";       // Ubicación de Production (NO es secreto)
+const SQUARE_API = "https://connect.squareup.com"; // Production
+function _sqHeaders() {
+  return { "Authorization": "Bearer " + SQUARE_ACCESS_TOKEN.value(), "Content-Type": "application/json", "Square-Version": "2024-10-17" };
+}
+// Crea un link de pago (hosted checkout de Square) para un cliente. El cliente mete su tarjeta EN SQUARE.
+exports.createSquareCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors: true, timeoutSeconds: 30 }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
+  try {
+    const body = req.body || {};
+    const idToken = String(body.idToken || "");
+    if (!idToken) { res.status(401).json({ error: "auth" }); return; }
+    try { await admin.auth().verifyIdToken(idToken); } catch (e) { res.status(401).json({ error: "auth" }); return; }
+    const clientId = String(body.clientId || "").slice(0, 80);
+    const amountCents = Math.round(Number(body.amountCents) || 0);
+    if (!clientId) { res.status(400).json({ error: "clientId" }); return; }
+    if (!(amountCents >= 100)) { res.status(400).json({ error: "amount_min" }); return; }   // mínimo $1
+    if (amountCents > 2000000) { res.status(400).json({ error: "amount_max" }); return; }    // tope $20,000 por seguridad
+    const snap = await admin.firestore().doc("clients/" + clientId).get();
+    if (!snap.exists) { res.status(404).json({ error: "client" }); return; }
+    const c = snap.data() || {};
+    const carLabel = [c.year, c.make, c.model].filter(Boolean).join(" ") || "Vehículo";
+    const payload = {
+      idempotency_key: (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)),
+      order: {
+        location_id: SQUARE_LOCATION_ID,
+        reference_id: clientId,
+        line_items: [{ name: "Pago — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
+      },
+      checkout_options: { redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1", ask_for_shipping_address: false },
+    };
+    const r = await fetch(SQUARE_API + "/v2/online-checkout/payment-links", { method: "POST", headers: _sqHeaders(), body: JSON.stringify(payload) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { console.error("square createLink", JSON.stringify(j)); res.status(502).json({ error: (j.errors && j.errors[0] && j.errors[0].detail) || "square_error" }); return; }
+    const link = j.payment_link || {};
+    res.status(200).json({ url: link.url || link.long_url || "", orderId: link.order_id || "" });
+  } catch (e) { console.error("createSquareCheckout", e); res.status(500).json({ error: String((e && e.message) || e) }); }
+});
+// Tras el pago, Square regresa al portal con el orderId. Esto RE-VERIFICA con Square que sí se pagó
+// y lo registra en la cuenta del cliente + Finanzas (idempotente por el id del pago de Square).
+exports.confirmSquarePayment = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors: true, timeoutSeconds: 30 }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
+  try {
+    const orderId = String((req.body && req.body.orderId) || "").slice(0, 160);
+    if (!orderId) { res.status(400).json({ error: "orderId" }); return; }
+    const r = await fetch(SQUARE_API + "/v2/orders/batch-retrieve", { method: "POST", headers: _sqHeaders(), body: JSON.stringify({ order_ids: [orderId] }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { console.error("square retrieve", JSON.stringify(j)); res.status(502).json({ error: "square_error" }); return; }
+    const order = (j.orders && j.orders[0]) || null;
+    if (!order) { res.status(404).json({ error: "order" }); return; }
+    const tenders = Array.isArray(order.tenders) ? order.tenders : [];
+    const paid = order.state === "COMPLETED" || (order.net_amount_due_money && Number(order.net_amount_due_money.amount) === 0 && tenders.length);
+    if (!paid) { res.status(200).json({ ok: false, status: order.state || "PENDING" }); return; }
+    const clientId = String(order.reference_id || "");
+    if (!clientId) { res.status(200).json({ ok: false, error: "no_ref" }); return; }
+    const payId = (tenders[0] && tenders[0].id) || order.id;
+    const amountCents = Math.round(((order.total_money && order.total_money.amount) || 0));
+    const amount = Math.round(amountCents) / 100;
+    const entryId = "sq_" + payId;
+    const db = admin.firestore();
+    const nowISO = new Date().toISOString();
+    const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const cref = db.doc("clients/" + clientId);
+    let clientName = "";
+    await db.runTransaction(async (tx) => {
+      const cs = await tx.get(cref);
+      if (!cs.exists) return;
+      const c = cs.data() || {}; clientName = c.name || "";
+      const payments = Array.isArray(c.payments) ? c.payments.slice() : [];
+      if (payments.some((p) => p && p.entryId === entryId)) return;   // ya registrado (idempotente)
+      let schedDate = "";
+      try {
+        const sched = Array.isArray(c.schedule) ? c.schedule : [];
+        const paidSet = new Set(payments.map((p) => p && p.schedDate).filter(Boolean));
+        for (const d of sched) { if (!paidSet.has(d)) { schedDate = d; break; } }
+      } catch (e) {}
+      payments.push({ entryId, amount, date: dateStr, method: "square", schedDate, createdAt: nowISO, createdBy: "portal-square", source: "square" });
+      tx.update(cref, { payments });
+      tx.set(db.doc("transactions/" + entryId), { entryId, type: "payment", dept: "dealer", clientId, clientName, amountCents, method: "square", date: dateStr, schedDate: "", createdAt: nowISO, createdBy: "portal-square", note: "Pago por Square (portal)", source: "square" });
+    });
+    res.status(200).json({ ok: true, amount, clientName });
+  } catch (e) { console.error("confirmSquarePayment", e); res.status(500).json({ error: String((e && e.message) || e) }); }
 });
 
 // 🔔 NOTIFICACIONES PUSH del chat interno.
