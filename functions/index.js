@@ -321,6 +321,10 @@ exports.createSquareCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors:
         location_id: SQUARE_LOCATION_ID,
         reference_id: clientId,
         line_items: [{ name: "Pago — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
+        // 💳 Cargo por servicio 2.5% sobre el monto base (lo paga el cliente por usar el link).
+        service_charges: [{ name: "Cargo por servicio / Service fee (2.5%)", percentage: "2.5", calculation_phase: "SUBTOTAL_PHASE" }],
+        // Guardamos el monto BASE (sin el 2.5%): es lo que reduce la deuda del cliente al registrar el abono.
+        metadata: { baseCents: String(amountCents) },
       },
       checkout_options: { redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1", ask_for_shipping_address: false },
     };
@@ -344,7 +348,13 @@ async function _sqRecordOrderId(orderId) {
   const clientId = String(order.reference_id || "");
   if (!clientId) { return { ok: false, error: "no_ref" }; }
   const payId = (tenders[0] && tenders[0].id) || order.id;
-  const amountCents = Math.round(((order.total_money && order.total_money.amount) || 0));
+  // El abono que reduce la deuda = monto BASE (sin el 2.5%). Lo sacamos de metadata; si no está,
+  // usamos el total de los line items (sin el cargo por servicio); último recurso: el total.
+  let amountCents = 0;
+  try { amountCents = parseInt(order.metadata && order.metadata.baseCents, 10) || 0; } catch (e) {}
+  if (!amountCents) {
+    amountCents = Math.round(((order.net_amounts && order.net_amounts.line_item_total_money && order.net_amounts.line_item_total_money.amount)) || (order.total_money && order.total_money.amount) || 0);
+  }
   const amount = Math.round(amountCents) / 100;
   const entryId = "sq_" + payId;
   const db = admin.firestore();
@@ -366,7 +376,7 @@ async function _sqRecordOrderId(orderId) {
     } catch (e) {}
     payments.push({ entryId, amount, date: dateStr, method: "square", schedDate, createdAt: nowISO, createdBy: "square", source: "square" });
     tx.update(cref, { payments });
-    tx.set(db.doc("transactions/" + entryId), { entryId, type: "payment", dept: "dealer", clientId, clientName, amountCents, method: "square", date: dateStr, schedDate: "", createdAt: nowISO, createdBy: "square", note: "Pago por Square", source: "square" });
+    tx.set(db.doc("transactions/" + entryId), { entryId, type: "payment", dept: "dealer", clientId, clientName, amountCents, method: "square", date: dateStr, schedDate: "", createdAt: nowISO, createdBy: "square", note: "Pago por Square (el cliente pagó +2.5% de cargo por servicio aparte)", source: "square" });
   });
   return { ok: true, amount, clientName };
 }
