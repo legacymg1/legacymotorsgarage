@@ -326,7 +326,12 @@ exports.createSquareCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors:
         // Guardamos el monto BASE (sin el 2.5%): es lo que reduce la deuda del cliente al registrar el abono.
         metadata: { baseCents: String(amountCents) },
       },
-      checkout_options: { redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1", ask_for_shipping_address: false },
+      checkout_options: {
+        redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1",
+        ask_for_shipping_address: false,
+        // Métodos de pago en el link: tarjeta + Cash App Pay + Apple/Google Pay (Afterpay apagado).
+        accepted_payment_methods: { apple_pay: true, google_pay: true, cash_app_pay: true, afterpay_clearpay: false },
+      },
     };
     const r = await fetch(SQUARE_API + "/v2/online-checkout/payment-links", { method: "POST", headers: _sqHeaders(), body: JSON.stringify(payload) });
     const j = await r.json().catch(() => ({}));
