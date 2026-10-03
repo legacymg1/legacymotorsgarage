@@ -331,6 +331,46 @@ exports.createSquareCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors:
     res.status(200).json({ url: link.url || link.long_url || "", orderId: link.order_id || "" });
   } catch (e) { console.error("createSquareCheckout", e); res.status(500).json({ error: String((e && e.message) || e) }); }
 });
+// Recupera la orden de Square, verifica que esté PAGADA y registra el abono (idempotente por id del pago).
+async function _sqRecordOrderId(orderId) {
+  const r = await fetch(SQUARE_API + "/v2/orders/batch-retrieve", { method: "POST", headers: _sqHeaders(), body: JSON.stringify({ order_ids: [orderId] }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { console.error("square retrieve", JSON.stringify(j)); return { ok: false, error: "square_error" }; }
+  const order = (j.orders && j.orders[0]) || null;
+  if (!order) { return { ok: false, error: "order" }; }
+  const tenders = Array.isArray(order.tenders) ? order.tenders : [];
+  const paid = order.state === "COMPLETED" || (order.net_amount_due_money && Number(order.net_amount_due_money.amount) === 0 && tenders.length);
+  if (!paid) { return { ok: false, status: order.state || "PENDING" }; }
+  const clientId = String(order.reference_id || "");
+  if (!clientId) { return { ok: false, error: "no_ref" }; }
+  const payId = (tenders[0] && tenders[0].id) || order.id;
+  const amountCents = Math.round(((order.total_money && order.total_money.amount) || 0));
+  const amount = Math.round(amountCents) / 100;
+  const entryId = "sq_" + payId;
+  const db = admin.firestore();
+  const nowISO = new Date().toISOString();
+  const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const cref = db.doc("clients/" + clientId);
+  let clientName = "";
+  await db.runTransaction(async (tx) => {
+    const cs = await tx.get(cref);
+    if (!cs.exists) return;
+    const c = cs.data() || {}; clientName = c.name || "";
+    const payments = Array.isArray(c.payments) ? c.payments.slice() : [];
+    if (payments.some((p) => p && p.entryId === entryId)) return;   // ya registrado (idempotente)
+    let schedDate = "";
+    try {
+      const sched = Array.isArray(c.schedule) ? c.schedule : [];
+      const paidSet = new Set(payments.map((p) => p && p.schedDate).filter(Boolean));
+      for (const d of sched) { if (!paidSet.has(d)) { schedDate = d; break; } }
+    } catch (e) {}
+    payments.push({ entryId, amount, date: dateStr, method: "square", schedDate, createdAt: nowISO, createdBy: "square", source: "square" });
+    tx.update(cref, { payments });
+    tx.set(db.doc("transactions/" + entryId), { entryId, type: "payment", dept: "dealer", clientId, clientName, amountCents, method: "square", date: dateStr, schedDate: "", createdAt: nowISO, createdBy: "square", note: "Pago por Square", source: "square" });
+  });
+  return { ok: true, amount, clientName };
+}
+
 // Tras el pago, Square regresa al portal con el orderId. Esto RE-VERIFICA con Square que sí se pagó
 // y lo registra en la cuenta del cliente + Finanzas (idempotente por el id del pago de Square).
 exports.confirmSquarePayment = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors: true, timeoutSeconds: 30 }, async (req, res) => {
@@ -339,43 +379,24 @@ exports.confirmSquarePayment = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors:
   try {
     const orderId = String((req.body && req.body.orderId) || "").slice(0, 160);
     if (!orderId) { res.status(400).json({ error: "orderId" }); return; }
-    const r = await fetch(SQUARE_API + "/v2/orders/batch-retrieve", { method: "POST", headers: _sqHeaders(), body: JSON.stringify({ order_ids: [orderId] }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { console.error("square retrieve", JSON.stringify(j)); res.status(502).json({ error: "square_error" }); return; }
-    const order = (j.orders && j.orders[0]) || null;
-    if (!order) { res.status(404).json({ error: "order" }); return; }
-    const tenders = Array.isArray(order.tenders) ? order.tenders : [];
-    const paid = order.state === "COMPLETED" || (order.net_amount_due_money && Number(order.net_amount_due_money.amount) === 0 && tenders.length);
-    if (!paid) { res.status(200).json({ ok: false, status: order.state || "PENDING" }); return; }
-    const clientId = String(order.reference_id || "");
-    if (!clientId) { res.status(200).json({ ok: false, error: "no_ref" }); return; }
-    const payId = (tenders[0] && tenders[0].id) || order.id;
-    const amountCents = Math.round(((order.total_money && order.total_money.amount) || 0));
-    const amount = Math.round(amountCents) / 100;
-    const entryId = "sq_" + payId;
-    const db = admin.firestore();
-    const nowISO = new Date().toISOString();
-    const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-    const cref = db.doc("clients/" + clientId);
-    let clientName = "";
-    await db.runTransaction(async (tx) => {
-      const cs = await tx.get(cref);
-      if (!cs.exists) return;
-      const c = cs.data() || {}; clientName = c.name || "";
-      const payments = Array.isArray(c.payments) ? c.payments.slice() : [];
-      if (payments.some((p) => p && p.entryId === entryId)) return;   // ya registrado (idempotente)
-      let schedDate = "";
-      try {
-        const sched = Array.isArray(c.schedule) ? c.schedule : [];
-        const paidSet = new Set(payments.map((p) => p && p.schedDate).filter(Boolean));
-        for (const d of sched) { if (!paidSet.has(d)) { schedDate = d; break; } }
-      } catch (e) {}
-      payments.push({ entryId, amount, date: dateStr, method: "square", schedDate, createdAt: nowISO, createdBy: "portal-square", source: "square" });
-      tx.update(cref, { payments });
-      tx.set(db.doc("transactions/" + entryId), { entryId, type: "payment", dept: "dealer", clientId, clientName, amountCents, method: "square", date: dateStr, schedDate: "", createdAt: nowISO, createdBy: "portal-square", note: "Pago por Square (portal)", source: "square" });
-    });
-    res.status(200).json({ ok: true, amount, clientName });
+    const out = await _sqRecordOrderId(orderId);
+    res.status(200).json(out);
   } catch (e) { console.error("confirmSquarePayment", e); res.status(500).json({ error: String((e && e.message) || e) }); }
+});
+
+// 🔔 Webhook de Square: cuando un pago se completa, Square pega aquí y registramos el abono SOLO,
+// aunque el cliente haya pagado desde el link por SMS sin abrir el portal. Re-verificamos con Square
+// (así una llamada falsa no puede inventar un pago). Idempotente por el id del pago.
+exports.squareWebhook = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (req, res) => {
+  if (req.method !== "POST") { res.status(200).send("ok"); return; }
+  try {
+    const b = req.body || {};
+    const obj = (b.data && b.data.object) || {};
+    const pay = obj.payment || obj || {};
+    const orderId = pay.order_id || (obj.order && obj.order.id) || b.order_id || "";
+    if (orderId) { try { await _sqRecordOrderId(String(orderId)); } catch (e) { console.error("sqWebhook record", e); } }
+  } catch (e) { console.error("squareWebhook", e); }
+  res.status(200).send("ok");   // siempre 200 para que Square no reintente en loop
 });
 
 // 🔔 NOTIFICACIONES PUSH del chat interno.
