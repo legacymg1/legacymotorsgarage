@@ -92,10 +92,26 @@ const OWNER='ev@legacymotorsgarage.com';
 const REF=doc(db,'private_finance','ev');
 
 const CG={ BTC:'bitcoin', ETH:'ethereum', SOL:'solana', DOGE:'dogecoin', ADA:'cardano', XRP:'ripple', BNB:'binancecoin', LTC:'litecoin', MATIC:'matic-network', AVAX:'avalanche-2', DOT:'polkadot', LINK:'chainlink', SHIB:'shiba-inu' };
-const DEF={ crypto:[], stocks:[], cash:0, cards:[], insurance:[], expenses:[], income:[], coRevenue:[], coExpenses:[], debtExtra:0, plaidIgnore:[], cardPromo:{}, cardApr:{} };
+const DEF={ crypto:[], stocks:[], cash:0, cards:[], insurance:[], expenses:[], income:[], coRevenue:[], coExpenses:[], debtExtra:0, plaidIgnore:[], cardPromo:{}, cardApr:{}, recon2025:null };
 let D=JSON.parse(JSON.stringify(DEF)), prices={crypto:{},stocks:{},at:''}, section='resumen', unsub=null;
 let plaid={ items:[], totals:{cash:0,cardDebt:0,invest:0}, at:'' };
 let taxRep=null, taxLoading=false;
+
+// 🧾 RECONSTRUCCIÓN 2025: los DATOS viven en Firestore (D.recon2025), NO en el código (repo público).
+// Se cargan solo con el login del dueño. Para meter/actualizar: botón "Importar" (lee recon2025.json local).
+// FUENTE DE VERDAD completa = ESTADOS-CUENTA-2025/RECONSTRUCCION-2025-MAESTRO.html (local, privado).
+window.importRecon = async function(inp){
+  const f = inp.files && inp.files[0]; if(!f) return;
+  try{
+    const txt = await f.text();
+    const obj = JSON.parse(txt);
+    if(!obj || typeof obj!=='object' || !('income' in obj)) throw new Error('El archivo no parece ser recon2025.json');
+    D.recon2025 = obj;
+    await save();
+    render();
+    alert('✅ Reconstrucción 2025 importada y guardada en tu base de datos privada.');
+  }catch(e){ alert('No se pudo importar: '+e.message); }
+};
 
 const uid=()=> 'x'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
 const num=(v)=>{ const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
@@ -316,52 +332,64 @@ window.downloadTaxCsv=function(){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url; a.download='movimientos_'+taxRep.year+'.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 };
+function taxTag(t){
+  const m={ok:['✅','pos'],pend:['⏳','mut'],wash:['🔁','neg'],leg:['🔵','mut']};
+  const x=m[t]; return x?`<span class="s ${x[1]}" style="font-size:10px;">${x[0]}</span>`:'';
+}
+function taxRows(list){
+  return list.map(r=>`<div class="row"><div class="l"><b>${esc(r.src)}</b> ${taxTag(r.tag)}${r.det?`<div class="s mut">${esc(r.det)}</div>`:''}</div><div class="r"><b>${fmt0(r.amt)}</b></div></div>`).join('');
+}
 function vTax(){
-  if(taxLoading) return `<div class="card"><h2>🧾 Resumen 2025</h2><div class="empty">⏳ Trayendo tus movimientos de 2025 de los bancos… esto puede tardar un minuto. No cierres la página.</div></div>`;
-  if(!taxRep){
+  const R=D.recon2025;
+  if(!R){
     return `<div class="card">
-      <h2>🧾 Resumen del año 2025 (para impuestos)</h2>
-      <div class="s mut" style="line-height:1.5;margin-bottom:12px;">Junta tus movimientos de 2025 de las cuentas conectadas: <b>cuánto ENTRÓ</b> a tus cuentas de banco/efectivo y <b>cuánto se GASTÓ</b> en tus tarjetas. Es un <b>mapa para tu contador</b> (no decide qué es gravable).</div>
-      <button class="btn gold" style="width:100%;" onclick="loadTaxYear(2025)">📊 Generar resumen 2025</button>
-      <div class="s mut" style="margin-top:12px;line-height:1.5;">⚠️ Trae solo lo de cuentas conectadas por Plaid que dieron historial. Las que Plaid NO jaló (o para cotejar) las analizo de tus <b>estados de cuenta</b> — abajo te digo cómo.</div>
+      <h2>🧾 Reconstrucción fiscal 2025</h2>
+      <div class="s mut" style="line-height:1.55;margin-bottom:14px;">Los datos de tu reconstrucción 2025 viven en tu <b>base de datos privada</b> (solo con tu login) — por seguridad NO se guardan en la página (el repo es público). Para verlos aquí, <b>impórtalos una vez</b> desde el archivo <code>recon2025.json</code> que está en tu carpeta privada <code>ESTADOS-CUENTA-2025</code>.</div>
+      <label class="btn gold" style="width:100%;display:block;text-align:center;cursor:pointer;">📥 Importar reconstrucción (recon2025.json)
+        <input type="file" accept="application/json,.json" style="display:none;" onchange="importRecon(this)">
+      </label>
+      <div class="s mut" style="margin-top:12px;line-height:1.5;">El reporte completo para imprimir/CPA está en <code>ESTADOS-CUENTA-2025/RECONSTRUCCION-2025-MAESTRO.html</code> (local).</div>
     </div>`;
   }
-  const t=taxRep.totals||{};
-  const cov=(taxRep.items||[]).map(it=>{
-    if(it.skipped) return `<div class="row"><div class="l"><b>${esc(it.institution||'—')}</b><div class="s mut">${esc(it.skipped)}</div></div></div>`;
-    if(it.error) return `<div class="row"><div class="l"><b>${esc(it.institution||'—')}</b><div class="s neg">⚠️ ${esc(it.error)}</div></div></div>`;
-    const incompl = it.earliest && it.earliest > (taxRep.year+'-01-15');
-    return `<div class="row"><div class="l"><b>${esc(it.institution||'—')}</b><div class="s ${incompl?'neg':'mut'}">${it.count} movimientos · desde ${it.earliest||'—'}${incompl?' ⚠️ no cubre enero (falta inicio de 2025)':''}</div></div></div>`;
-  }).join('');
+  const net = R.incomeBase - R.expenseBase;
+  const carRows = R.cars.map(c=>`<div class="row"><div class="l"><b>${esc(c.cli)}</b><div class="s mut">${esc(c.car)}</div></div><div class="r"><b class="pos">${fmt0(c.paid)}</b><div class="s ${c.cost==null?'neg':'mut'}">costo: ${c.cost==null?'❓':fmt0(c.cost)}</div></div></div>`).join('');
+  const pendRows = R.pending.map(p=>`<div class="row"><div class="l">${esc(p)}</div></div>`).join('');
   return `
+  <div class="card" style="border-left:4px solid var(--gold,#d4af37);">
+    <h2>🧾 Reconstrucción fiscal 2025</h2>
+    <div class="s mut" style="line-height:1.5;">Armada desde tus <b>estados de cuenta</b> (no de Plaid — Plaid no tenía el historial 2025). Es un <b>mapa para tu contador</b>, NO una declaración. Última actualización: <b>${R.updated}</b>.</div>
+  </div>
   <div class="kpis">
-    <div class="kpi"><div class="t">💵 Entró a efectivo/banco ${taxRep.year}</div><div class="v pos">${fmt0(t.cashInNoXfer)}</div><div class="s mut">sin transferencias entre cuentas</div></div>
-    <div class="kpi"><div class="t">💳 Gasto en tarjetas ${taxRep.year}</div><div class="v neg">${fmt0(t.ccSpendNoXfer)}</div><div class="s mut">solo compras (sin pagos a la tarjeta)</div></div>
+    <div class="kpi"><div class="t">💰 Ingreso de negocio</div><div class="v pos">${fmt0(R.incomeBase)}</div><div class="s mut">lo cobrado a clientes + eBay + comisiones</div></div>
+    <div class="kpi"><div class="t">🧾 Gastos de negocio</div><div class="v neg">${fmt0(R.expenseBase)}</div><div class="s mut">SIN el costo de los carros todavía</div></div>
+    <div class="kpi"><div class="t">📍 En papel HOY</div><div class="v ${net<0?'neg':'pos'}">${fmt0(net)}</div><div class="s mut">cambia al meter el COGS de los carros</div></div>
+    <div class="kpi"><div class="t">🔁 Washes excluidos</div><div class="v">${fmt0(R.washTotal)}</div><div class="s mut">tu propio dinero (El Frenchie/Square)</div></div>
   </div>
-  <div class="card">
-    <h2>📋 Detalle de los totales</h2>
-    <div class="row"><div class="l"><b>Entradas a banco/efectivo</b><div class="s">todo lo que entró (incluye transferencias)</div></div><div class="r"><b class="pos">${fmt(t.cashIn)}</b></div></div>
-    <div class="row"><div class="l"><b>↳ sin transferencias / préstamos</b><div class="s">más cercano a "ingreso real" (tu contador decide)</div></div><div class="r"><b class="pos">${fmt(t.cashInNoXfer)}</b></div></div>
-    <div class="row"><div class="l"><b>Salidas de banco/efectivo</b></div><div class="r"><b class="neg">${fmt(t.cashOut)}</b></div></div>
-    <div class="row"><div class="l"><b>Compras con tarjeta de crédito</b></div><div class="r"><b class="neg">${fmt(t.ccSpend)}</b></div></div>
-    <div class="row"><div class="l"><b>↳ sin pagos/transferencias</b></div><div class="r"><b class="neg">${fmt(t.ccSpendNoXfer)}</b></div></div>
-    <div class="row"><div class="l"><b>Pagos hechos a tarjetas</b></div><div class="r"><b class="mut">${fmt(t.ccPay)}</b></div></div>
+  <div class="card"><h2>💰 Ingresos 2025</h2>${taxRows(R.income)}
+    <div class="row" style="border-top:2px solid currentColor;"><div class="l"><b>INGRESO base confirmado</b></div><div class="r"><b class="pos">${fmt0(R.incomeBase)}</b></div></div>
+    <div class="s mut" style="margin-top:8px;">Aparte (no negocio): Robinhood dividendos <b>$109</b> (1040). Robinhood 1099-B = $0.</div>
   </div>
-  <div class="card"><h2>🏦 Cobertura por banco (hasta qué fecha dio Plaid)</h2>${cov||'<div class="empty">Sin cuentas.</div>'}</div>
-  <div class="card">
-    <h2>📝 Para completar el año (tu contador)</h2>
-    <div class="s mut" style="line-height:1.55;">
-    • <b>Robinhood:</b> usa tu <b>1099-B</b> (las ganancias/pérdidas reales de ventas). Plaid solo tiene el saldo de hoy, no las ventas del año.<br>
-    • <b>Seguro:</b> está en la pestaña 🛡️ Seguro (prima × 12 = anual).<br>
-    • <b>Cuentas que Plaid no jaló</b> o que salgan ⚠️ incompletas arriba: las saco de tus <b>estados de cuenta</b> (ver abajo).<br>
-    • <b>Legacy:</b> ya va aparte en su Schedule C (la pérdida ~$8k) — NO lo dupliques aquí.
-    </div>
+  <div class="card"><h2>🧾 Gastos / deducciones 2025</h2>${taxRows(R.expenses)}
+    <div class="row" style="border-top:2px solid currentColor;"><div class="l"><b>GASTOS base</b></div><div class="r"><b class="neg">${fmt0(R.expenseBase)}</b></div></div>
+    <div class="s neg" style="margin-top:8px;">⏳ FALTA el gasto más grande: el <b>COSTO EN EFECTIVO de los carros (COGS)</b>.</div>
   </div>
-  <div style="display:flex;gap:8px;margin:6px 0 20px;">
-    <button class="btn gold" style="flex:2;" onclick="downloadTaxCsv()">⬇️ Descargar CSV ${taxRep.year}</button>
-    <button class="btn" style="flex:1;" onclick="window.print()">🖨️ Imprimir</button>
+  <div class="card"><h2>🔁 Washes — El Frenchie/Square (NO son ingreso)</h2>${R.washes.map(w=>`<div class="row"><div class="l"><b>${esc(w.src)}</b><div class="s mut">${esc(w.det)}</div></div><div class="r"><b>${fmt0(w.amt)}</b></div></div>`).join('')}
+    <div class="row" style="border-top:2px solid currentColor;"><div class="l"><b>Total a EXCLUIR del ingreso</b></div><div class="r"><b>${fmt0(R.washTotal)}</b></div></div>
   </div>
-  <div class="card"><div class="s mut">No soy tu contador — esto es un MAPA de tus movimientos. "Lo que entró" NO es automáticamente ingreso gravable (transferencias, préstamos y retiros no son ingreso). Tu contador decide.</div></div>`;
+  <div class="card"><h2>🚗 Carros 2025 (ventas vs costo — en construcción)</h2>
+    <div class="s mut" style="margin-bottom:6px;">"Cobrado 2025" = lo pagado en el año. Falta: qué carro y cuánto PAGASTE por cada uno.</div>${carRows}
+  </div>
+  <div class="card"><h2>⏳ Pendientes</h2>${pendRows}</div>
+  <div style="display:flex;gap:8px;margin:6px 0 10px;flex-wrap:wrap;">
+    <button class="btn gold" style="flex:2;min-width:160px;" onclick="window.open('../ESTADOS-CUENTA-2025/RECONSTRUCCION-2025-MAESTRO.html','_blank')">📄 Abrir reporte maestro completo</button>
+    <button class="btn" style="flex:1;min-width:110px;" onclick="window.print()">🖨️ Imprimir</button>
+  </div>
+  <div style="margin:0 0 20px;">
+    <label class="btn" style="width:100%;display:block;text-align:center;cursor:pointer;font-size:12px;">🔄 Actualizar desde recon2025.json
+      <input type="file" accept="application/json,.json" style="display:none;" onchange="importRecon(this)">
+    </label>
+  </div>
+  <div class="card"><div class="s mut">No soy tu contador — esto es un MAPA. "Lo que entró" NO es automáticamente ingreso gravable. Tu contador decide y firma. Etiquetas: ✅ verificado · ⏳ pendiente · 🔁 wash · 🔵 Legacy.</div></div>`;
 }
 
 function rowsHtml(list, mapFn, addLabel, addKey){
