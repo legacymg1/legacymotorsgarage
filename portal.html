@@ -919,6 +919,41 @@ async function checkSquareReturn(){
   }catch(e){}
 }
 
+// 📄 SECCIÓN "MIS CONTRATOS" — solo para clientes que YA firmaron electrónicamente.
+// Devuelve '' (nada) si el cliente no tiene ningún contrato firmado.
+function contractsSectionHTML(c){
+  const items = [];
+  const sc = c.signedContract;
+  if(sc && sc.url && (sc.status==='active' || !sc.status)){
+    items.push({label:(L==='en'?'Purchase contract':'Contrato de compra'), num:sc.contractNumber, date:sc.signedAt, url:sc.url});
+  }
+  (c.addons||[]).forEach(function(a){
+    const asc = a && a.signedContract;
+    if(asc && asc.url && (asc.status==='active' || !asc.status)){
+      items.push({label:(L==='en'?'Additional charge agreement':'Contrato de cargo adicional'), num:asc.contractNumber, date:asc.signedAt, url:asc.url});
+    }
+  });
+  if(!items.length) return '';
+  const rows = items.map(function(it){
+    let ds='';
+    try{ const d=new Date(it.date); ds=isNaN(d.getTime())?(it.date||''):d.toLocaleDateString(L==='en'?'en-US':'es-US',{year:'numeric',month:'short',day:'numeric'}); }catch(e){ ds=it.date||''; }
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-top:1px solid var(--border);">
+      <div style="min-width:0;">
+        <div style="font-weight:600;font-size:14px;color:var(--white);">${it.label}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${it.num?('#'+it.num+' · '):''}${L==='en'?'Signed':'Firmado'} ${ds}</div>
+      </div>
+      <a href="${it.url}" target="_blank" rel="noopener" style="flex:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap;">${L==='en'?'View':'Ver'}</a>
+    </div>`;
+  }).join('');
+  return `<div class="insurance-section" id="contracts-section" style="margin-top:16px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-weight:600;font-size:15px;">📄 ${L==='en'?'My contracts':'Mis contratos'}</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">${L==='en'?'Your signed documents, available anytime.':'Tus documentos firmados, disponibles cuando quieras.'}</div>
+    ${rows}
+  </div>`;
+}
+
 function renderPortal() {
   const c = currentClient;
   if((c.kind||'')==='service'){ return renderServicePortal(c); }
@@ -1091,6 +1126,9 @@ function renderPortal() {
     <!-- Seguro/ID COMPLETADOS abajo (minimizados) -->
     ${insComplete ? insSectionHTML : ''}
     ${idComplete ? idSectionHTML : ''}
+
+    <!-- 📄 MIS CONTRATOS (solo si el cliente ya firmó electrónicamente) -->
+    ${contractsSectionHTML(c)}
 
     <!-- MENSAJES DE TEXTO (discreto) -->
     <div class="insurance-section" id="sms-section" style="margin-top:16px;padding:16px 20px;">
