@@ -380,6 +380,7 @@ function vTax(){
     <div class="s mut" style="margin-bottom:6px;">"Cobrado 2025" = lo pagado en el año. Falta: qué carro y cuánto PAGASTE por cada uno.</div>${carRows}
   </div>
   <div class="card"><h2>⏳ Pendientes</h2>${pendRows}</div>
+  ${Array.isArray(R.cpaNotes)&&R.cpaNotes.length?`<div class="card" style="border-left:4px solid var(--gold,#d4af37);"><h2>📝 Notas para el contador</h2>${R.cpaNotes.map((n,i)=>`<div class="row"><div class="l"><b>${i+1}.</b> ${esc(n)}</div></div>`).join('')}</div>`:''}
   <div style="display:flex;gap:8px;margin:6px 0 10px;flex-wrap:wrap;">
     <button class="btn gold" style="flex:2;min-width:160px;" onclick="window.open('../ESTADOS-CUENTA-2025/RECONSTRUCCION-2025-MAESTRO.html','_blank')">📄 Abrir reporte maestro completo</button>
     <button class="btn" style="flex:1;min-width:110px;" onclick="window.print()">🖨️ Imprimir</button>
