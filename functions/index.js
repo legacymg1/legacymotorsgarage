@@ -204,6 +204,64 @@ exports.plaidRemove = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeout
   return { ok: true };
 });
 
+// 🧾 Jala las TRANSACCIONES de un año (ej. 2025) de las cuentas de banco/tarjeta conectadas por Plaid.
+// Devuelve agregados (cuánto ENTRÓ a efectivo, cuánto se GASTÓ en tarjetas) + la lista para hacer CSV.
+// Honesto: la cobertura depende de cada banco (devuelve la fecha más vieja que dio cada uno).
+exports.plaidTransactions = onCall({ secrets: [PLAID_CLIENT_ID, PLAID_SECRET], timeoutSeconds: 540, memory: "1GiB" }, async (request) => {
+  plaidOwnerOnly(request);
+  const year = parseInt(request.data && request.data.year, 10) || (new Date().getFullYear() - 1);
+  const start = year + "-01-01", end = year + "-12-31";
+  const client = plaidClient();
+  const snap = await admin.firestore().collection("plaid_items").get();
+  const items = [], txns = [];
+  const CAP = 25000;
+  for (const d of snap.docs) {
+    const it = d.data();
+    if (it.kind === "investments") { items.push({ itemId: it.itemId, institution: it.institution || "", owner: it.owner || "yo", skipped: "inversión (sin transacciones)" }); continue; }
+    const entry = { itemId: it.itemId, institution: it.institution || "", owner: it.owner || "yo", earliest: "", count: 0 };
+    try {
+      const accMap = {};
+      let offset = 0, total = Infinity;
+      while (offset < total) {
+        const r = await client.transactionsGet({ access_token: it.accessToken, start_date: start, end_date: end, options: { count: 500, offset } });
+        total = r.data.total_transactions || 0;
+        (r.data.accounts || []).forEach((a) => { accMap[a.account_id] = { type: a.type, name: a.name || a.official_name || "", mask: a.mask || "" }; });
+        const batch = r.data.transactions || [];
+        for (const t of batch) {
+          const acc = accMap[t.account_id] || {};
+          const cat = (t.personal_finance_category && t.personal_finance_category.primary) || (Array.isArray(t.category) ? t.category[0] : "") || "";
+          txns.push({ date: t.date, name: (t.merchant_name || t.name || "").slice(0, 80), amount: t.amount, accType: acc.type || "", acc: (acc.name || "") + (acc.mask ? (" ••" + acc.mask) : ""), inst: it.institution || "", cat, owner: it.owner || "yo", pending: !!t.pending });
+          if (!entry.earliest || t.date < entry.earliest) entry.earliest = t.date;
+          entry.count++;
+        }
+        offset += batch.length;
+        if (!batch.length) break;
+        if (txns.length > CAP) break;
+      }
+    } catch (e) { entry.error = String((e && e.response && e.response.data && e.response.data.error_message) || (e && e.message) || e); }
+    items.push(entry);
+    if (txns.length > CAP) break;
+  }
+  // Agregados. Plaid: amount>0 = sale dinero de la cuenta; amount<0 = entra dinero.
+  const isXfer = (c) => /TRANSFER|LOAN_PAYMENTS|CREDIT_CARD_PAYMENT|BANK_FEES/i.test(c || "");
+  let cashIn = 0, cashInNoXfer = 0, cashOut = 0, ccSpend = 0, ccSpendNoXfer = 0, ccPay = 0;
+  for (const t of txns) {
+    if (t.pending) continue;
+    if (t.accType === "depository") {
+      if (t.amount < 0) { cashIn += -t.amount; if (!isXfer(t.cat)) cashInNoXfer += -t.amount; }
+      else cashOut += t.amount;
+    } else if (t.accType === "credit") {
+      if (t.amount > 0) { ccSpend += t.amount; if (!isXfer(t.cat)) ccSpendNoXfer += t.amount; }
+      else ccPay += -t.amount;
+    }
+  }
+  return {
+    year, at: new Date().toISOString(), items,
+    totals: { cashIn: _r2(cashIn), cashInNoXfer: _r2(cashInNoXfer), cashOut: _r2(cashOut), ccSpend: _r2(ccSpend), ccSpendNoXfer: _r2(ccSpendNoXfer), ccPay: _r2(ccPay) },
+    txns,
+  };
+});
+
 // 🌐 Traducir un mensaje corto → { es, en }. Se llama al ENVIAR al canal GROUP para guardar ambas versiones.
 // Callable normal (sin Eventarc) → no necesita permisos especiales. Modelo Haiku (rápido y baratísimo).
 exports.translateText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 20 }, async (request) => {

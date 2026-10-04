@@ -95,6 +95,7 @@ const CG={ BTC:'bitcoin', ETH:'ethereum', SOL:'solana', DOGE:'dogecoin', ADA:'ca
 const DEF={ crypto:[], stocks:[], cash:0, cards:[], insurance:[], expenses:[], income:[], coRevenue:[], coExpenses:[], debtExtra:0, plaidIgnore:[], cardPromo:{}, cardApr:{} };
 let D=JSON.parse(JSON.stringify(DEF)), prices={crypto:{},stocks:{},at:''}, section='resumen', unsub=null;
 let plaid={ items:[], totals:{cash:0,cardDebt:0,invest:0}, at:'' };
+let taxRep=null, taxLoading=false;
 
 const uid=()=> 'x'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
 const num=(v)=>{ const n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
@@ -293,11 +294,75 @@ function calc(){
 }
 
 // ---------- NAV / RENDER ----------
-const SECTIONS=[['resumen','📊 Resumen'],['deuda','💳 Deuda'],['conectar','🔗 Conectar'],['crypto','₿ Cripto'],['stocks','📈 Acciones'],['cards','💳 Tarjetas'],['insurance','🛡️ Seguro'],['expenses','🧾 Gastos'],['income','💰 Ingresos'],['company','🏢 Empresa']];
+const SECTIONS=[['resumen','📊 Resumen'],['tax','🧾 Resumen 2025'],['deuda','💳 Deuda'],['conectar','🔗 Conectar'],['crypto','₿ Cripto'],['stocks','📈 Acciones'],['cards','💳 Tarjetas'],['insurance','🛡️ Seguro'],['expenses','🧾 Gastos'],['income','💰 Ingresos'],['company','🏢 Empresa']];
 function buildNav(){ document.getElementById('nav').innerHTML=SECTIONS.map(([k,l])=>`<button data-k="${k}" class="${k===section?'on':''}" onclick="go('${k}')">${l}</button>`).join(''); }
 window.go=(k)=>{ section=k; buildNav(); render(); window.scrollTo(0,0); };
 
-function render(){ const v=document.getElementById('view'); if(!v) return; v.innerHTML=({resumen:vResumen,deuda:vDebt,conectar:vConectar,crypto:vCrypto,stocks:vStocks,cards:vCards,insurance:vInsurance,expenses:vExpenses,income:vIncome,company:vCompany}[section]||vResumen)(); }
+function render(){ const v=document.getElementById('view'); if(!v) return; v.innerHTML=({resumen:vResumen,tax:vTax,deuda:vDebt,conectar:vConectar,crypto:vCrypto,stocks:vStocks,cards:vCards,insurance:vInsurance,expenses:vExpenses,income:vIncome,company:vCompany}[section]||vResumen)(); }
+
+// ---- 🧾 RESUMEN 2025 (impuestos) ----
+window.loadTaxYear=async function(year){
+  taxLoading=true; render();
+  try{ const r=await httpsCallable(functions,'plaidTransactions')({year}); taxRep=r.data||null; }
+  catch(e){ alert('No se pudieron traer los movimientos: '+((e&&e.message)||e)); }
+  taxLoading=false; render();
+};
+window.downloadTaxCsv=function(){
+  if(!taxRep||!taxRep.txns){ alert('Primero genera el resumen.'); return; }
+  const esc2=(s)=>{ s=String(s==null?'':s); return /[",\n]/.test(s)?('"'+s.replace(/"/g,'""')+'"'):s; };
+  const head=['Fecha','Banco','Cuenta','Tipo','Descripcion','Categoria','Monto','Dueño'];
+  const rows=taxRep.txns.map(t=>[t.date,t.inst,t.acc,(t.accType==='depository'?'Banco/Efectivo':t.accType==='credit'?'Tarjeta':t.accType),t.name,t.cat,Number(t.amount).toFixed(2),(t.owner==='ella'?'Esposa':'Yo')].map(esc2).join(','));
+  const csv=[head.join(',')].concat(rows).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='movimientos_'+taxRep.year+'.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+};
+function vTax(){
+  if(taxLoading) return `<div class="card"><h2>🧾 Resumen 2025</h2><div class="empty">⏳ Trayendo tus movimientos de 2025 de los bancos… esto puede tardar un minuto. No cierres la página.</div></div>`;
+  if(!taxRep){
+    return `<div class="card">
+      <h2>🧾 Resumen del año 2025 (para impuestos)</h2>
+      <div class="s mut" style="line-height:1.5;margin-bottom:12px;">Junta tus movimientos de 2025 de las cuentas conectadas: <b>cuánto ENTRÓ</b> a tus cuentas de banco/efectivo y <b>cuánto se GASTÓ</b> en tus tarjetas. Es un <b>mapa para tu contador</b> (no decide qué es gravable).</div>
+      <button class="btn gold" style="width:100%;" onclick="loadTaxYear(2025)">📊 Generar resumen 2025</button>
+      <div class="s mut" style="margin-top:12px;line-height:1.5;">⚠️ Trae solo lo de cuentas conectadas por Plaid que dieron historial. Las que Plaid NO jaló (o para cotejar) las analizo de tus <b>estados de cuenta</b> — abajo te digo cómo.</div>
+    </div>`;
+  }
+  const t=taxRep.totals||{};
+  const cov=(taxRep.items||[]).map(it=>{
+    if(it.skipped) return `<div class="row"><div class="l"><b>${esc(it.institution||'—')}</b><div class="s mut">${esc(it.skipped)}</div></div></div>`;
+    if(it.error) return `<div class="row"><div class="l"><b>${esc(it.institution||'—')}</b><div class="s neg">⚠️ ${esc(it.error)}</div></div></div>`;
+    const incompl = it.earliest && it.earliest > (taxRep.year+'-01-15');
+    return `<div class="row"><div class="l"><b>${esc(it.institution||'—')}</b><div class="s ${incompl?'neg':'mut'}">${it.count} movimientos · desde ${it.earliest||'—'}${incompl?' ⚠️ no cubre enero (falta inicio de 2025)':''}</div></div></div>`;
+  }).join('');
+  return `
+  <div class="kpis">
+    <div class="kpi"><div class="t">💵 Entró a efectivo/banco ${taxRep.year}</div><div class="v pos">${fmt0(t.cashInNoXfer)}</div><div class="s mut">sin transferencias entre cuentas</div></div>
+    <div class="kpi"><div class="t">💳 Gasto en tarjetas ${taxRep.year}</div><div class="v neg">${fmt0(t.ccSpendNoXfer)}</div><div class="s mut">solo compras (sin pagos a la tarjeta)</div></div>
+  </div>
+  <div class="card">
+    <h2>📋 Detalle de los totales</h2>
+    <div class="row"><div class="l"><b>Entradas a banco/efectivo</b><div class="s">todo lo que entró (incluye transferencias)</div></div><div class="r"><b class="pos">${fmt(t.cashIn)}</b></div></div>
+    <div class="row"><div class="l"><b>↳ sin transferencias / préstamos</b><div class="s">más cercano a "ingreso real" (tu contador decide)</div></div><div class="r"><b class="pos">${fmt(t.cashInNoXfer)}</b></div></div>
+    <div class="row"><div class="l"><b>Salidas de banco/efectivo</b></div><div class="r"><b class="neg">${fmt(t.cashOut)}</b></div></div>
+    <div class="row"><div class="l"><b>Compras con tarjeta de crédito</b></div><div class="r"><b class="neg">${fmt(t.ccSpend)}</b></div></div>
+    <div class="row"><div class="l"><b>↳ sin pagos/transferencias</b></div><div class="r"><b class="neg">${fmt(t.ccSpendNoXfer)}</b></div></div>
+    <div class="row"><div class="l"><b>Pagos hechos a tarjetas</b></div><div class="r"><b class="mut">${fmt(t.ccPay)}</b></div></div>
+  </div>
+  <div class="card"><h2>🏦 Cobertura por banco (hasta qué fecha dio Plaid)</h2>${cov||'<div class="empty">Sin cuentas.</div>'}</div>
+  <div class="card">
+    <h2>📝 Para completar el año (tu contador)</h2>
+    <div class="s mut" style="line-height:1.55;">
+    • <b>Robinhood:</b> usa tu <b>1099-B</b> (las ganancias/pérdidas reales de ventas). Plaid solo tiene el saldo de hoy, no las ventas del año.<br>
+    • <b>Seguro:</b> está en la pestaña 🛡️ Seguro (prima × 12 = anual).<br>
+    • <b>Cuentas que Plaid no jaló</b> o que salgan ⚠️ incompletas arriba: las saco de tus <b>estados de cuenta</b> (ver abajo).<br>
+    • <b>Legacy:</b> ya va aparte en su Schedule C (la pérdida ~$8k) — NO lo dupliques aquí.
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin:6px 0 20px;">
+    <button class="btn gold" style="flex:2;" onclick="downloadTaxCsv()">⬇️ Descargar CSV ${taxRep.year}</button>
+    <button class="btn" style="flex:1;" onclick="window.print()">🖨️ Imprimir</button>
+  </div>
+  <div class="card"><div class="s mut">No soy tu contador — esto es un MAPA de tus movimientos. "Lo que entró" NO es automáticamente ingreso gravable (transferencias, préstamos y retiros no son ingreso). Tu contador decide.</div></div>`;
+}
 
 function rowsHtml(list, mapFn, addLabel, addKey){
   const body = list.length ? list.map(mapFn).join('') : `<div class="empty">Nada todavía.</div>`;
