@@ -503,6 +503,8 @@ exports.squareRecentPayments = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutS
           cardBrand: card.card_brand || card.bin || "",
           last4: card.last_4 || "",
           cardholderName: card.cardholder_name || "",                         // nombre del tarjetahabiente (cuando viene)
+          buyerEmail: p.buyer_email_address || "",                            // correo del comprador (si lo capturó para el recibo)
+          customerId: p.customer_id || "",                                    // id del cliente de Square (si está ligado)
           entryMethod: (p.card_details && p.card_details.entry_method) || "", // KEYED, SWIPED, CONTACTLESS, EMV…
           orderId: p.order_id || "",
           note: p.note || "",
