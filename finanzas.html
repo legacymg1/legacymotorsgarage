@@ -2127,14 +2127,24 @@ window.toggleSqSearch=function(sqId){
 };
 window.renderSqSearch=function(sqId,q){
   const p=_sqPays.find(x=>x.id===sqId); const res=document.getElementById('sqsrchres-'+sqId); if(!res) return;
-  const cents=p?(p.totalCents||p.amountCents||0):0;
-  q=(q||'').trim().toLowerCase();
+  const payCents=p?(p.totalCents||p.amountCents||0):0;
+  const clean=(q||'').trim().replace(/[$,]/g,'').toLowerCase();   // acepta $ y comas
+  const numMatch=clean.match(/^\d+(\.\d{1,2})?$/);                // ¿escribió una cantidad (con o sin centavos)?
+  const searchCents = numMatch ? Math.round(parseFloat(clean)*100) : null;
   const MONEYIN={income:1,down:1,payment:1,cash_sale:1};
   let list=txns.filter(t=>MONEYIN[t.type]);
-  if(q){ const words=q.split(/\s+/); list=list.filter(t=>{ const hay=((t.note||'')+' '+(t.category||'')+' '+(t.clientName||'')+' '+(t.date||'')+' '+((t.amountCents||t.downCents||0)/100).toFixed(2)).toLowerCase(); return words.every(w=>hay.indexOf(w)>=0); }); }
-  // ordenar por cercanía de monto, luego fecha
-  list.sort((a,b)=>Math.abs((a.amountCents||a.downCents||0)-cents)-Math.abs((b.amountCents||b.downCents||0)-cents));
-  list=list.slice(0,12);
+  if(clean){
+    const words=clean.split(/\s+/);
+    list=list.filter(t=>{
+      const amtStr=((t.amountCents||t.downCents||0)/100).toFixed(2);
+      const hay=((t.note||'')+' '+(t.category||'')+' '+(t.clientName||'')+' '+(t.date||'')+' '+amtStr).toLowerCase();
+      return words.every(w=>hay.indexOf(w)>=0);
+    });
+  }
+  // ordenar por cercanía a la cantidad buscada (si escribió una); si no, a la del pago de Square
+  const target = (searchCents!=null) ? searchCents : payCents;
+  list.sort((a,b)=>Math.abs((a.amountCents||a.downCents||0)-target)-Math.abs((b.amountCents||b.downCents||0)-target));
+  list=list.slice(0,15);
   if(!list.length){ res.innerHTML='<div style="font-size:12px;color:var(--faint);padding:6px;">Sin cargos. Prueba otra búsqueda o usa "Registrar venta nueva".</div>'; return; }
   res.innerHTML=list.map(t=>'<div onclick="linkSquareToTx(\''+sqId+'\',\''+t.id+'\')" style="padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;border:1px solid var(--border);margin-bottom:6px;">'
     +'<b>'+centsToUSD(t.amountCents||t.downCents||0)+'</b> · '+(t.note||t.category||'ingreso')+(t.clientName?(' · '+t.clientName):'')+' · '+((t.date||'').slice(0,10))+'</div>').join('');
