@@ -2108,7 +2108,7 @@ function renderSquarePays(){
       +'<div style="font-size:12px;color:var(--muted);">'+sqFmtDate(p.createdAt)+' · '+(card||'Square')+ent+(p.note?(' · '+p.note):'')+'</div>'
       +brk+mLine
       +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'+primary
-        +'<button class="btn-add" style="font-size:13px;" onclick="markSquareMine(\''+p.id+'\')" title="Este cargo fue mío (El Frenchie), no una venta. Se excluye.">🚫 Mío</button>'
+        +'<button class="btn-add" style="font-size:13px;" onclick="markSquareMine(\''+p.id+'\')" title="Este pago NO es una venta de cliente (ej. prueba, cargo propio, otro) — excluir y quitarlo de la lista.">🚫 No es venta</button>'
       +'</div>'
       +'<div id="sqsrch-'+p.id+'" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:12px;color:var(--muted);">🔎 Buscar el cargo</span><span onclick="toggleSqSearch(\''+p.id+'\')" style="cursor:pointer;color:var(--gold);font-size:12.5px;font-weight:700;padding:4px 6px;">▲ minimizar</span></div>'
@@ -2169,10 +2169,10 @@ window.assignSquarePay = function(id){
 };
 window.markSquareMine = async function(id){
   const p=_sqPays.find(x=>x.id===id); if(!p) return;
-  if(!confirm('Marcar este pago de '+centsToUSD(p.totalCents||p.amountCents||0)+' como TUYO (El Frenchie, no venta)?\n\nSe excluye del CRM y no vuelve a salir aquí.')) return;
+  if(!confirm('Marcar este pago de '+centsToUSD(p.totalCents||p.amountCents||0)+' como "NO es venta" (prueba, cargo propio, otro)?\n\nSe excluye y no vuelve a salir aquí.')) return;
   const who=(auth.currentUser&&auth.currentUser.email)||'';
   try{
-    await setDoc(doc(db,'square_payments',id), { assigned:true, kind:'mio_frenchie', note:'El Frenchie / no venta', amountCents:(p.totalCents||p.amountCents||0), createdAt:p.createdAt||'', assignedAt:new Date().toISOString(), assignedBy:who });
+    await setDoc(doc(db,'square_payments',id), { assigned:true, kind:'excluido', note:'No es venta', amountCents:(p.totalCents||p.amountCents||0), createdAt:p.createdAt||'', assignedAt:new Date().toISOString(), assignedBy:who });
     _sqPays=_sqPays.filter(x=>x.id!==id); renderSquarePays();
     document.getElementById('sq-count').textContent=_sqPays.length+' sin asignar';
   }catch(e){ alert('Error: '+((e&&e.message)||e)); }
