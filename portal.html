@@ -193,6 +193,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, collection, getDocs, query, where, doc, getDoc, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
 // Convert any picked image (including iPhone HEIC) to a web-friendly JPEG via canvas.
 // Runs on the phone where the browser can decode HEIC; if a browser can't decode
@@ -262,6 +263,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const functions = getFunctions(app);
 
 let currentClient = null;
 let serviceAppointments = [];
@@ -540,6 +542,7 @@ onAuthStateChanged(auth, async (user)=>{
   if(!user || !user.phoneNumber){
     document.getElementById('app').style.display='none';
     document.getElementById('login-screen').style.display='flex';
+    { const _hf=document.getElementById('help-fab'); if(_hf) _hf.style.display='none'; const _hp=document.getElementById('help-panel'); if(_hp) _hp.style.display='none'; }
     return;
   }
   try{
@@ -551,11 +554,62 @@ onAuthStateChanged(auth, async (user)=>{
     showLoginError('');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='block';
+    { const _hf=document.getElementById('help-fab'); if(_hf) _hf.style.display='flex'; }
     renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); maybeAskConsent();
     checkSquareReturn();   // 💳 si viene de pagar con Square, registra y refresca
     try{ await updateDoc(doc(db,'clients',currentClient.id), { lastLogin: new Date().toISOString() }); }catch(e){}
   }catch(e){ showLoginError(t('errConn')); }
 });
+
+// ===== 💬 BURBUJA DE AYUDA DEL PORTAL =====
+let _helpMsgs = [];
+const HELP_PHONE = '5595405145';
+function _helpCtx(){
+  const c = currentClient || {};
+  const bal = (typeof calcBalance==='function') ? calcBalance(c) : null;
+  const np = (typeof getNextPayDate==='function') ? getNextPayDate(c) : null;
+  return {
+    name: c.name||'',
+    car: [c.year,c.make,c.model].filter(Boolean).join(' '),
+    balance: (bal!=null) ? formatMoney(bal) : '',
+    nextPay: np || '',
+    payAmount: (c.weekly!=null && c.weekly!=='') ? formatMoney(c.weekly) : '',
+    contractSigned: !!(c.signedContract && c.signedContract.url),
+  };
+}
+function _helpAppend(role, text){
+  const box=document.getElementById('help-msgs'); if(!box) return;
+  const me = role==='user';
+  const div=document.createElement('div');
+  div.style.cssText='max-width:85%;margin:6px 0;padding:9px 12px;border-radius:14px;font-size:14px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word;'+(me?'align-self:flex-end;background:#c8a24a;color:#0f1320;border-bottom-right-radius:4px;':'align-self:flex-start;background:#1e2a4a;color:#fff;border-bottom-left-radius:4px;');
+  div.textContent=text; box.appendChild(div); box.scrollTop=box.scrollHeight;
+}
+window.toggleHelp = function(){
+  const p=document.getElementById('help-panel'); if(!p) return;
+  const open = p.style.display!=='flex'; p.style.display = open?'flex':'none';
+  const esp = L!=='en';
+  const tt=document.getElementById('help-title'); if(tt) tt.textContent = esp?'💬 Ayuda · Legacy':'💬 Help · Legacy';
+  const ci=document.getElementById('help-input'); if(ci) ci.placeholder = esp?'Escribe tu pregunta…':'Type your question…';
+  const cb=document.getElementById('help-call-btn'); if(cb) cb.textContent = esp?'📞 Hablar con Legacy':'📞 Talk to Legacy';
+  if(open && !_helpMsgs.length){ const fn=(currentClient&&currentClient.name)?(' '+currentClient.name.split(' ')[0]):''; _helpAppend('assistant', esp?('¡Hola'+fn+'! 👋 Te ayudo con pagos, tu saldo, tu contrato, subir tu seguro/identificación o agendar un servicio. ¿Qué necesitas?'):('Hi'+fn+'! 👋 I can help with payments, your balance, your contract, uploading your insurance/ID, or booking service. What do you need?')); }
+  if(open && ci) setTimeout(()=>ci.focus(),120);
+};
+window.closeHelp = function(){ const p=document.getElementById('help-panel'); if(p) p.style.display='none'; };
+window.helpSend = async function(){
+  const inp=document.getElementById('help-input'); if(!inp) return;
+  const text=(inp.value||'').trim(); if(!text) return; inp.value='';
+  _helpAppend('user', text); _helpMsgs.push({role:'user', text});
+  const box=document.getElementById('help-msgs');
+  const typing=document.createElement('div'); typing.id='help-typing'; typing.textContent='…'; typing.style.cssText='align-self:flex-start;color:#8a94a6;padding:4px 12px;font-size:20px;'; box.appendChild(typing); box.scrollTop=box.scrollHeight;
+  try{
+    const r = await httpsCallable(functions,'portalHelp')({ messages:_helpMsgs.slice(-12), client:_helpCtx(), clientId:(currentClient&&currentClient.id)||'', lang:L });
+    const reply = (r&&r.data&&r.data.reply) || (L==='en'?'Sorry, I could not answer. Tap "Talk to Legacy".':'Perdón, no pude responder. Toca "Hablar con Legacy".');
+    _helpAppend('assistant', reply); _helpMsgs.push({role:'assistant', text:reply});
+  }catch(e){ _helpAppend('assistant', L==='en'?'Connection issue. Tap "Talk to Legacy" below.':'Hubo un problema de conexión. Toca "Hablar con Legacy" abajo.'); }
+  finally{ const tp=document.getElementById('help-typing'); if(tp) tp.remove(); }
+};
+window.helpCall = function(){ location.href='tel:'+HELP_PHONE; };
+window.helpText = function(){ const c=currentClient||{}; const msg=(L==='en'?('Hi Legacy, this is '+(c.name||'')):('Hola Legacy, soy '+(c.name||''))); location.href='sms:'+HELP_PHONE+'?&body='+encodeURIComponent(msg); };
 
 function updateInsuranceDisplay() {
   const c = currentClient;
@@ -1244,5 +1298,23 @@ window.saveSmsConsent = async function() {
   setTimeout(() => { box.style.display = 'none'; }, 5000);
 };
 </script></script>
+
+<!-- 💬 Burbuja de ayuda del cliente -->
+<button id="help-fab" onclick="toggleHelp()" aria-label="Ayuda" style="display:none;position:fixed;right:18px;bottom:18px;z-index:9000;width:58px;height:58px;border-radius:50%;border:none;background:linear-gradient(135deg,#c8a24a,#9c7a28);color:#0f1320;font-size:26px;box-shadow:0 6px 20px rgba(0,0,0,0.45);cursor:pointer;align-items:center;justify-content:center;">💬</button>
+<div id="help-panel" style="display:none;position:fixed;right:16px;bottom:84px;z-index:9001;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 120px));flex-direction:column;background:#0f1320;border:1px solid rgba(200,162,74,0.35);border-radius:18px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.55);">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:#1e2a4a;border-bottom:1px solid rgba(200,162,74,0.25);">
+    <div id="help-title" style="font-weight:700;color:#c8a24a;font-size:15px;">💬 Ayuda · Legacy</div>
+    <span onclick="closeHelp()" style="cursor:pointer;color:#8a94a6;font-size:20px;line-height:1;">✕</span>
+  </div>
+  <div id="help-msgs" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;"></div>
+  <div style="display:flex;gap:6px;padding:8px 10px;border-top:1px solid rgba(255,255,255,0.08);">
+    <button id="help-call-btn" onclick="helpCall()" style="flex:1;background:transparent;border:1px solid rgba(200,162,74,0.4);color:#c8a24a;border-radius:10px;padding:8px;font-size:12px;cursor:pointer;">📞 Hablar con Legacy</button>
+    <button onclick="helpText()" style="flex:0 0 auto;background:transparent;border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:10px;padding:8px 12px;font-size:12px;cursor:pointer;">💬 SMS</button>
+  </div>
+  <div style="display:flex;gap:8px;padding:10px;border-top:1px solid rgba(255,255,255,0.08);">
+    <input id="help-input" onkeydown="if(event.key==='Enter')helpSend()" placeholder="Escribe tu pregunta…" style="flex:1;background:#1e2a4a;border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:11px 14px;color:#fff;font-size:14px;outline:none;">
+    <button onclick="helpSend()" aria-label="Enviar" style="flex:0 0 auto;width:44px;border:none;border-radius:12px;background:linear-gradient(135deg,#c8a24a,#9c7a28);color:#0f1320;font-size:18px;cursor:pointer;">➤</button>
+  </div>
+</div>
 </body>
 </html>

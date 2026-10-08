@@ -285,6 +285,63 @@ exports.translateText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 20 },
   } catch (e) { return { es: text, en: text }; }
 });
 
+// 💬 BOT DE AYUDA del PORTAL DEL CLIENTE — dudas de uso + de su cuenta; escala a humano. Guarda la plática para revisión.
+exports.portalHelp = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 40 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const data = request.data || {};
+  const lang = (data.lang === "en") ? "en" : "es";
+  const ctx = data.client || {};
+  const history = Array.isArray(data.messages) ? data.messages.slice(-12) : [];
+  const ctxLines = [
+    ctx.name ? ("Nombre: " + ctx.name) : "",
+    ctx.car ? ("Vehículo: " + ctx.car) : "",
+    (ctx.balance != null && ctx.balance !== "") ? ("Saldo que debe: " + ctx.balance) : "",
+    ctx.nextPay ? ("Próximo pago (fecha): " + ctx.nextPay) : "",
+    (ctx.payAmount != null && ctx.payAmount !== "") ? ("Monto del pago: " + ctx.payAmount) : "",
+    (ctx.contractSigned === true) ? "Contrato: firmado" : ((ctx.contractSigned === false) ? "Contrato: aún sin firmar" : ""),
+  ].filter(Boolean).join("\n");
+  const SYS =
+`Eres el asistente del PORTAL DE CLIENTES de Legacy Motors Garage (dealer de autos usados, Buy Here Pay Here, en Porterville, CA). Atiendes a un cliente que YA inició sesión en su portal.
+Responde SIEMPRE en ${lang === "en" ? "English" : "español"}, claro, corto y amable (de tú). Usa máximo 2-4 oraciones por respuesta.
+PUEDES ayudar con:
+- Cómo PAGAR: desde el portal con el botón de pago (Square). Por el link se agrega un cargo por servicio de 2.9% (ej. $100 → $102.90); su deuda baja por el monto base.
+- Dónde VER/descargar su CONTRATO firmado.
+- Su SALDO y su próximo PAGO (usa los datos de "CUENTA DEL CLIENTE"; si no los tienes, dile que los ve en la pantalla principal del portal).
+- Subir su LICENCIA/IDENTIFICACIÓN y su SEGURO.
+- Agendar un SERVICIO.
+REGLAS:
+- Usa SOLO los datos de la cuenta que te doy abajo; NUNCA inventes montos ni fechas. Si falta un dato, dilo y dile dónde verlo.
+- NO des asesoría legal ni cambies montos/acuerdos/fechas. Para disputas, cambios de pago, prórrogas, o algo delicado o que no puedas resolver → dile que toque el botón "Hablar con Legacy" para hablar con una persona.
+CUENTA DEL CLIENTE:
+${ctxLines || "(sin datos de cuenta)"}`;
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msgs = history
+      .map((m) => ({ role: (m.role === "assistant" ? "assistant" : "user"), content: String(m.text || m.content || "").slice(0, 2000) }))
+      .filter((m) => m.content);
+    if (!msgs.length) throw new HttpsError("invalid-argument", "Mensaje vacío.");
+    const resp = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 500, system: SYS, messages: msgs });
+    const reply = (resp.content && resp.content[0] && resp.content[0].text) || "";
+    try {
+      const cid = String(data.clientId || "anon").slice(0, 80);
+      await admin.firestore().collection("portal_bot_convos").doc(cid).set({
+        clientId: cid, name: ctx.name || "", lastAt: new Date().toISOString(),
+        messages: admin.firestore.FieldValue.arrayUnion(
+          { role: "user", text: msgs[msgs.length - 1].content, at: new Date().toISOString() },
+          { role: "assistant", text: reply, at: new Date().toISOString() }
+        ),
+      }, { merge: true });
+    } catch (e) { console.error("portalHelp save", e); }
+    return { reply };
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.error("portalHelp", e);
+    throw new HttpsError("internal", String((e && e.message) || e));
+  }
+});
+
 // ✨ GENERA EL POST BILINGÜE para Facebook Marketplace de un carro del inventario.
 // onRequest + CORS (index.html no tiene el SDK de Functions). Protegido con el ID token del usuario.
 // Reglas anti-baneo de Marketplace: NADA de "financing/credit/approval/warranty included/buy here pay here".
