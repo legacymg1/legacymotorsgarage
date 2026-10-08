@@ -474,7 +474,7 @@ exports.squareWebhook = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSecon
 
 // 💳 Lista los PAGOS recientes de Square (incluye los de la TERMINAL en persona) para asignarlos a clientes en Finanzas.
 // Solo lee; NO registra nada. El front muestra la lista y Enrique asigna cada pago a un cliente/cuenta.
-exports.squareRecentPayments = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (request) => {
+exports.squareRecentPayments = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const days = Math.min(400, Math.max(1, Number(request.data && request.data.days) || 90));
   const begin = new Date(Date.now() - days * 864e5).toISOString();
@@ -510,6 +510,24 @@ exports.squareRecentPayments = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutS
       }
       cursor = j.cursor || "";
       if (!cursor) break;
+    }
+    // La lista NO siempre trae processing_fee → pedir el detalle (GetPayment) de los que falten, en paralelo por lotes.
+    const needFee = out.filter((p) => !p.feeReady).slice(0, 120);
+    for (let i = 0; i < needFee.length; i += 10) {
+      const batch = needFee.slice(i, i + 10);
+      await Promise.all(batch.map(async (p) => {
+        try {
+          const rr = await fetch(SQUARE_API + "/v2/payments/" + encodeURIComponent(p.id), { headers: _sqHeaders() });
+          const jj = await rr.json().catch(() => ({}));
+          const pp = (jj && jj.payment) || {};
+          if (pp.processing_fee && pp.processing_fee.length) {
+            const fee = pp.processing_fee.reduce((s, f) => s + ((f.amount_money && f.amount_money.amount) || 0), 0);
+            p.feeCents = fee;
+            p.netCents = Math.max(0, (p.totalCents || 0) - fee);
+            p.feeReady = true;
+          }
+        } catch (e) { /* deja el pago sin fee si falla */ }
+      }));
     }
   } catch (e) {
     if (e instanceof HttpsError) throw e;
