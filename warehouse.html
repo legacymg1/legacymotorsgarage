@@ -92,6 +92,28 @@
   </div>
   <div class="tabs" id="tabs"></div>
 
+  <!-- ===================== 🕐 RELOJ (todos) ===================== -->
+  <div class="card" id="clock-card" style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:800;">🕐 Mi reloj</span>
+      <span id="clock-week" class="sub" style="font-weight:700;"></span>
+    </div>
+    <div id="clock-status" class="sub" style="margin:8px 0;">Cargando…</div>
+    <div class="row2">
+      <button class="btn green" id="clock-in-btn" onclick="clockPunch('in')">🟢 Entrada</button>
+      <button class="btn" id="clock-out-btn" onclick="clockPunch('out')" style="background:#b45309;color:#fff;">🔴 Salida</button>
+    </div>
+    <div id="clock-msg" class="sub" style="margin-top:6px;"></div>
+    <div id="clock-owner" style="display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;">
+      <div class="sub" style="margin-bottom:6px;">📍 Ubicaciones para el GPS (solo dueño) — párate en el lugar y toca:</div>
+      <div class="row2">
+        <button class="btn ghost sm" onclick="captureLoc('dealer')">📍 Guardar Dealer (aquí)</button>
+        <button class="btn ghost sm" onclick="captureLoc('yonke')">📍 Guardar Yonke (aquí)</button>
+      </div>
+      <div id="clock-loc-msg" class="sub" style="margin-top:6px;"></div>
+    </div>
+  </div>
+
   <!-- ===================== CAPTURA ===================== -->
   <div id="view-yard" style="display:none;">
     <div class="card" id="addcar-card" style="margin-bottom:14px;">
@@ -414,6 +436,63 @@ window.doLogin=async function(){
 };
 window.doLogout=function(){ if(confirm(t('logoutConfirm'))) signOut(auth); };
 
+// ===== 🕐 RELOJ (check-in/out con GPS) =====
+function _getGPS(){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation){ reject(new Error('Este teléfono no permite ubicación en el navegador.')); return; }
+    navigator.geolocation.getCurrentPosition(
+      p=>resolve({lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy}),
+      e=>reject(new Error(e && e.code===1 ? 'Permiso de ubicación denegado. Actívalo para poder fichar.' : 'No se pudo leer tu ubicación. Inténtalo de nuevo.')),
+      {enableHighAccuracy:true, timeout:15000, maximumAge:0}
+    );
+  });
+}
+function _clockErr(e){ return (e&&e.message)||(e&&e.details)||'Error'; }
+window.clockPunch = async function(action){
+  const msg=document.getElementById('clock-msg');
+  const inB=document.getElementById('clock-in-btn'), outB=document.getElementById('clock-out-btn');
+  if(inB) inB.disabled=true; if(outB) outB.disabled=true;
+  if(msg){ msg.style.color=''; msg.textContent='📍 Leyendo tu ubicación…'; }
+  try{
+    const g=await _getGPS();
+    if(msg) msg.textContent='Registrando…';
+    const r=await httpsCallable(functions,'clockPunch')({action, lat:g.lat, lng:g.lng});
+    const d=(r&&r.data)||{};
+    if(msg){ msg.style.color='#3ecf8e'; msg.textContent = action==='in'
+      ? ('✅ Entrada registrada'+(d.location&&d.location!=='(sin ubicación)'?(' ('+(d.location==='dealer'?'Dealer':'Yonke')+')'):''))
+      : ('✅ Salida registrada — '+(d.hours||0)+' h en este turno'); }
+    refreshClock();
+  }catch(e){ if(msg){ msg.style.color='#ff6b6b'; msg.textContent='⚠️ '+_clockErr(e); } }
+  if(inB) inB.disabled=false; if(outB) outB.disabled=false;
+};
+window.refreshClock = async function(){
+  const st=document.getElementById('clock-status'), wk=document.getElementById('clock-week');
+  const inB=document.getElementById('clock-in-btn'), outB=document.getElementById('clock-out-btn');
+  try{
+    const r=await httpsCallable(functions,'clockMine')({});
+    const d=(r&&r.data)||{};
+    if(wk) wk.textContent='Semana: '+Number(d.hours||0).toFixed(2)+' h';
+    if(d.open){
+      const since=new Date(d.open.inAt);
+      const loc=d.open.location&&d.open.location!=='(sin ubicación)'?(d.open.location==='dealer'?'Dealer':'Yonke'):'';
+      if(st){ st.style.color='#3ecf8e'; st.textContent='🟢 Entrada abierta desde '+since.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})+(loc?(' · '+loc):''); }
+      if(inB) inB.style.opacity='0.45'; if(outB) outB.style.opacity='1';
+    } else {
+      if(st){ st.style.color=''; st.textContent='⚪ Sin entrada abierta. Toca "Entrada" al llegar.'; }
+      if(inB) inB.style.opacity='1'; if(outB) outB.style.opacity='0.45';
+    }
+  }catch(e){ if(st){ st.textContent='(No se pudo cargar el reloj)'; } }
+};
+window.captureLoc = async function(which){
+  const msg=document.getElementById('clock-loc-msg');
+  if(msg){ msg.style.color=''; msg.textContent='📍 Leyendo tu ubicación…'; }
+  try{
+    const g=await _getGPS();
+    await httpsCallable(functions,'cfgSet')({docId:'timeclock', data:{[which]:{lat:g.lat, lng:g.lng, savedAt:new Date().toISOString()}}});
+    if(msg){ msg.style.color='#3ecf8e'; msg.textContent='✅ Ubicación de '+(which==='dealer'?'Dealer':'Yonke')+' guardada (precisión ~'+Math.round(g.acc||0)+' m).'; }
+  }catch(e){ if(msg){ msg.style.color='#ff6b6b'; msg.textContent='⚠️ '+_clockErr(e); } }
+};
+
 onAuthStateChanged(auth,(user)=>{
   const email=((user&&user.email)||'').toLowerCase();
   role = user ? (ROLE_BY_EMAIL[email]||'') : '';
@@ -436,6 +515,9 @@ onAuthStateChanged(auth,(user)=>{
     const def = (canTabs||role==='yard')?'yard':(role==='lister'?'lister':'pack');
     let saved=''; try{ saved=localStorage.getItem('lmg_wh_view')||''; }catch(e){}
     setView(allowed.indexOf(saved)>=0?saved:def);
+    // 🕐 Reloj: muestra config de ubicaciones al dueño y refresca el estado/horas de la semana.
+    const _co=document.getElementById('clock-owner'); if(_co) _co.style.display = (role==='owner')?'block':'none';
+    refreshClock();
   } else {
     _carView=''; document.body.classList.remove('owner-nav'); const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
     const fc=document.getElementById('fab-chat'); if(fc) fc.style.display='none'; closeChat();
@@ -999,13 +1081,16 @@ window.whSearch=function(){
   if(!q){ dd.style.display='none'; dd.innerHTML=''; return; }
   const w=q.split(/\s+/), match=hay=>{ hay=(hay||'').toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); };
   const cars=vehicles.filter(v=>match(vehLabel(v)+' '+(v.vin||'')+' '+(v.color||'')+' '+(v.engine||''))).slice(0,8);
-  const prods=parts.filter(p=>match((p.name||'')+' '+(p.partNumber||'')+' '+(p.ebayTitle||'')+' '+(p.vehicleLabel||'')+' '+((p.location&&p.location.bin)||''))).slice(0,25);
+  const carIds=new Set(cars.map(c=>c.id));
+  // Partes: NO listamos las que pertenecen a un carro ya mostrado (esas se ven al abrir el carro) → así "honda" muestra el carro, no un montón de partes.
+  const prods=parts.filter(p=>!carIds.has(p.vehicleId) && match((p.name||'')+' '+(p.partNumber||'')+' '+(p.ebayTitle||'')+' '+(p.vehicleLabel||'')+' '+((p.location&&p.location.bin)||''))).slice(0,25);
   const H=txt=>'<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--faint);padding:9px 12px 4px;">'+txt+'</div>';
   const row=(inner,onclk)=>'<div style="display:flex;gap:10px;align-items:center;padding:9px 12px;cursor:pointer;border-top:1px solid var(--border);" onclick="'+onclk+'">'+inner+'</div>';
   let html='';
-  if(cars.length){ html+=H(t('carsDismantling'))+cars.map(v=>row(
-    carThumb(v,44)+'<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+vehLabel(v)+'</div><div class="sub">'+(v.vin?'VIN '+v.vin.slice(-6):'')+(v.color?' · '+esc(v.color):'')+'</div></div><span class="gold" style="flex:0 0 auto;">▸</span>',
-    "whPick('car','"+v.id+"')")).join(''); }
+  if(cars.length){ html+=H(t('carsDismantling'))+cars.map(v=>{ const np=parts.filter(p=>p.vehicleId===v.id).length;
+    return row(
+    carThumb(v,44)+'<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+vehLabel(v)+'</div><div class="sub">'+(v.vin?'VIN '+v.vin.slice(-6):'')+(v.color?' · '+esc(v.color):'')+'</div></div><span class="gold" style="flex:0 0 auto;white-space:nowrap;">'+np+' '+t('part')+' ▸</span>',
+    "whPick('car','"+v.id+"')"); }).join(''); }
   if(prods.length){ html+=H(t('partsTitle'))+prods.map(p=>{ const u=(p.photoURLs||[]).find(x=>x&&!/00_QR/.test(x))||'';
     const th=u?'<img src="'+u+'" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex:0 0 auto;">':'<div style="width:44px;height:44px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">🔧</div>';
     return row(th+'<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(p.name||'')+(p.partNumber?' · '+esc(p.partNumber):'')+'</div><div class="sub">'+esc(p.vehicleLabel||'')+((p.location&&p.location.bin)?' · 📍 '+esc(p.location.bin):'')+'</div></div>'+statusTag(p.status),
