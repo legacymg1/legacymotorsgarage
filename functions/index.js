@@ -502,6 +502,7 @@ exports.squareRecentPayments = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutS
           feeReady: (p.processing_fee && p.processing_fee.length) ? true : false,  // la comisión a veces tarda ~1 día en aparecer
           cardBrand: card.card_brand || card.bin || "",
           last4: card.last_4 || "",
+          cardholderName: card.cardholder_name || "",                         // nombre del tarjetahabiente (cuando viene)
           entryMethod: (p.card_details && p.card_details.entry_method) || "", // KEYED, SWIPED, CONTACTLESS, EMV…
           orderId: p.order_id || "",
           note: p.note || "",
@@ -525,6 +526,10 @@ exports.squareRecentPayments = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutS
             p.feeCents = fee;
             p.netCents = Math.max(0, (p.totalCents || 0) - fee);
             p.feeReady = true;
+          }
+          if (!p.cardholderName) {
+            const cc = (pp.card_details && pp.card_details.card) || {};
+            if (cc.cardholder_name) p.cardholderName = cc.cardholder_name;
           }
         } catch (e) { /* deja el pago sin fee si falla */ }
       }));
