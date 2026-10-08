@@ -381,7 +381,7 @@ exports.createSquareCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors:
         line_items: [{ name: "Pago — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
         // 💳 Cargo por servicio 2.9% sobre el monto base (lo paga el cliente por usar el link).
         service_charges: [{ name: "Cargo por servicio / Service fee (2.9%)", percentage: "2.9", calculation_phase: "SUBTOTAL_PHASE" }],
-        // Guardamos el monto BASE (sin el 2.5%): es lo que reduce la deuda del cliente al registrar el abono.
+        // Guardamos el monto BASE (sin el 2.9%): es lo que reduce la deuda del cliente al registrar el abono.
         metadata: { baseCents: String(amountCents) },
       },
       checkout_options: {
@@ -411,7 +411,7 @@ async function _sqRecordOrderId(orderId) {
   const clientId = String(order.reference_id || "");
   if (!clientId) { return { ok: false, error: "no_ref" }; }
   const payId = (tenders[0] && tenders[0].id) || order.id;
-  // El abono que reduce la deuda = monto BASE (sin el 2.5%). Lo sacamos de metadata; si no está,
+  // El abono que reduce la deuda = monto BASE (sin el 2.9%). Lo sacamos de metadata; si no está,
   // usamos el total de los line items (sin el cargo por servicio); último recurso: el total.
   let amountCents = 0;
   try { amountCents = parseInt(order.metadata && order.metadata.baseCents, 10) || 0; } catch (e) {}
