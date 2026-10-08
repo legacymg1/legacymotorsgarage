@@ -2111,7 +2111,8 @@ function renderSquarePays(){
         +'<button class="btn-add" style="font-size:13px;" onclick="markSquareMine(\''+p.id+'\')" title="Este cargo fue mío (El Frenchie), no una venta. Se excluye.">🚫 Mío</button>'
       +'</div>'
       +'<div id="sqsrch-'+p.id+'" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">'
-        +'<input id="sqsrchq-'+p.id+'" oninput="renderSqSearch(\''+p.id+'\',this.value)" placeholder="🔎 Buscar cargo por monto, cliente, nota o fecha…" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:12px;color:var(--muted);">🔎 Buscar el cargo</span><span onclick="toggleSqSearch(\''+p.id+'\')" style="cursor:pointer;color:var(--gold);font-size:12.5px;font-weight:700;padding:4px 6px;">▲ minimizar</span></div>'
+        +'<input id="sqsrchq-'+p.id+'" oninput="renderSqSearch(\''+p.id+'\',this.value)" placeholder="Monto, cliente, nota o fecha…" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;">'
         +'<div id="sqsrchres-'+p.id+'" style="margin-top:8px;"></div>'
       +'</div>'
       +'</div>';
