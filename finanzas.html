@@ -2129,11 +2129,15 @@ window.toggleSqSearch=function(sqId){
 window.renderSqSearch=function(sqId,q){
   const p=_sqPays.find(x=>x.id===sqId); const res=document.getElementById('sqsrchres-'+sqId); if(!res) return;
   const payCents=p?(p.totalCents||p.amountCents||0):0;
-  const clean=(q||'').trim().replace(/[$,]/g,'').toLowerCase();   // acepta $ y comas
+  const raw=(q||'').trim();
+  const dp=parseDateQuery(raw);                                   // ¿trae una FECHA? (15/9, sep 15, hoy…)
+  const afterDate=(dp?raw.replace(dp.matchedText,' '):raw);
+  const clean=afterDate.replace(/[$,]/g,'').replace(/\s+/g,' ').trim().toLowerCase();   // acepta $ y comas
   const numMatch=clean.match(/^\d+(\.\d{1,2})?$/);                // ¿escribió una cantidad (con o sin centavos)?
   const searchCents = numMatch ? Math.round(parseFloat(clean)*100) : null;
   const MONEYIN={income:1,down:1,payment:1,cash_sale:1};
   let list=txns.filter(t=>MONEYIN[t.type]);
+  if(dp) list=list.filter(t=>t.date && dp.test(t.date));          // filtra por la fecha escrita
   if(clean){
     const words=clean.split(/\s+/);
     list=list.filter(t=>{
