@@ -223,6 +223,7 @@
     <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
     <button class="btn-add" onclick="openDevol()" style="font-size:15px;">↩️ Devoluciones</button>
     <button class="btn-add" onclick="openClientes()" style="font-size:15px;">👤 Clientes de partes</button>
+    <button class="btn-add" onclick="openSquarePays()" style="font-size:15px;" title="Ver los pagos de la terminal Square y asignarlos a un cliente/cuenta">💳 Pagos de Square</button>
     <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
     <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
     <button class="btn-add" id="btn-total" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
@@ -234,6 +235,7 @@
     <button class="btn-add" onclick="openAudit()" style="font-size:15px;" title="Revisar (solo lectura) que cada venta de Dealer tenga su ingreso correcto (carro+$70) y sus taxes/DMV en la caja">🔎 Auditar Dealer</button>
     <button class="btn-add" onclick="platePayout()" style="font-size:15px;" title="Sacar efectivo del corte para pagar placas/DMV (dinero de clientes). No es gasto ni baja la ganancia.">🪪 Salida placas</button>
     <button class="btn-add" onclick="openDcarReport()" style="font-size:15px;" title="Cuánto va dejando cada carro del yonke: ventas de partes registradas − lo que costó el carro.">🔧 Por carro (yonke)</button>
+    <button class="btn-add" onclick="openHoras()" style="font-size:15px;" title="Horas trabajadas de la semana por empleado (check-in GPS) y pago según su tarifa.">👷 Horas / Nómina</button>
   </div>
 
   <div class="coll-head" style="margin-top:22px;" onclick="toggleSubs()">
@@ -595,6 +597,35 @@
   </div>
 </div>
 
+<!-- 👷 HORAS / NÓMINA: horas de la semana por empleado (check-in GPS) + pago -->
+<div class="overlay" id="horas-overlay" onclick="if(event.target===this)closeHoras()">
+  <div class="sheet" style="max-width:720px;">
+    <div class="sheet-head"><div class="sheet-title">👷 Horas / Nómina de la semana</div><button class="close" onclick="closeHoras()">✕</button></div>
+    <div id="horas-week-nav" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-ghost" onclick="horasWeek(-1)">◀ Semana</button>
+      <div id="horas-week-label" style="font-weight:700;"></div>
+      <button class="btn btn-ghost" onclick="horasWeek(1)">Semana ▶</button>
+    </div>
+    <div id="horas-body"></div>
+  </div>
+</div>
+
+<!-- 💳 PAGOS DE SQUARE (terminal) por asignar a cliente/cuenta -->
+<div class="overlay" id="sqpay-overlay">
+  <div class="sheet" style="max-width:640px;">
+    <div class="sheet-head"><div class="sheet-title">💳 Pagos de Square</div><button class="close" onclick="closeSquarePays()">✕</button></div>
+    <div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;flex-wrap:wrap;">
+      <label style="font-size:12px;color:var(--muted);">Últimos</label>
+      <select id="sq-days" onchange="loadSquarePays()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);font-size:13px;">
+        <option value="30">30 días</option><option value="90" selected>90 días</option><option value="180">6 meses</option><option value="365">1 año</option>
+      </select>
+      <button class="btn-add" onclick="loadSquarePays()" style="font-size:13px;">🔄 Actualizar</button>
+      <span id="sq-count" style="font-size:12px;color:var(--faint);margin-left:auto;"></span>
+    </div>
+    <div id="sqpay-body"><div class="empty"><div class="empty-ic">💳</div><div class="empty-title">Cargando…</div></div></div>
+  </div>
+</div>
+
 <!-- CLIENTES DE PARTES (compradores, con semáforo de garantía) -->
 <div class="overlay" id="clientes-overlay">
   <div class="sheet" style="max-width:640px;">
@@ -705,6 +736,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
@@ -718,6 +750,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
+const functions = getFunctions(app);
 
 // Convierte cualquier foto (incluida HEIC del iPhone) a JPEG en el telefono.
 function _loadScriptOnce(src){ return new Promise(function(res,rej){ if(Array.prototype.some.call(document.scripts,function(s){return s.src===src;})) return res(); var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=function(){rej(new Error('load '+src));}; document.head.appendChild(s); }); }
@@ -1995,6 +2028,7 @@ window.doBulkAssign=async function(){
 
 window.openInc = function(){
   _incAccount=null;
+  window._pendingSq=null; const _sqb0=document.getElementById('sq-assign-banner'); if(_sqb0) _sqb0.style.display='none';
   document.getElementById('i-amount').value='';
   document.getElementById('i-total').value=''; document.getElementById('i-down').value='';
   document.getElementById('i-acct-concept').value='';
@@ -2010,6 +2044,68 @@ window.openInc = function(){
   document.getElementById('inc-overlay').classList.add('open');
 };
 window.closeInc = function(){ document.getElementById('inc-overlay').classList.remove('open'); };
+
+// ===== 💳 PAGOS DE SQUARE (terminal) → ver y asignar a cliente/cuenta =====
+let _sqPays = [];               // pagos traídos de Square (sin asignar)
+let _sqAssigned = new Set();    // ids ya asignados/marcados (de Firestore square_payments)
+window._pendingSq = null;       // pago que se está asignando (se marca al guardar el ingreso)
+window.openSquarePays = function(){ document.getElementById('sqpay-overlay').classList.add('open'); loadSquarePays(); };
+window.closeSquarePays = function(){ document.getElementById('sqpay-overlay').classList.remove('open'); };
+window.loadSquarePays = async function(){
+  const body=document.getElementById('sqpay-body'), cnt=document.getElementById('sq-count');
+  body.innerHTML='<div class="empty"><div class="empty-ic">💳</div><div class="empty-title">Cargando pagos de Square…</div></div>'; cnt.textContent='';
+  const days=Number(document.getElementById('sq-days').value)||90;
+  try{
+    _sqAssigned=new Set();
+    try{ const asn=await getDocs(collection(db,'square_payments')); asn.forEach(d=>{ if((d.data()||{}).assigned) _sqAssigned.add(d.id); }); }catch(e){}
+    const r=await httpsCallable(functions,'squareRecentPayments')({days});
+    const all=((r&&r.data&&r.data.payments)||[]).filter(p=>p.status==='COMPLETED'||p.status==='APPROVED');
+    _sqPays=all.filter(p=>!_sqAssigned.has(p.id));
+    renderSquarePays();
+    cnt.textContent=_sqPays.length+' sin asignar · '+all.length+' total';
+  }catch(e){ body.innerHTML='<div class="empty"><div class="empty-ic">⚠️</div><div class="empty-title">No se pudieron cargar</div><div class="empty-sub">'+((e&&e.message)||e)+'</div></div>'; }
+};
+function sqFmtDate(iso){ try{ const d=new Date(iso); return d.toLocaleDateString('es-MX',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('es-MX',{hour:'numeric',minute:'2-digit'}); }catch(e){ return (iso||'').slice(0,10); } }
+function renderSquarePays(){
+  const body=document.getElementById('sqpay-body');
+  if(!_sqPays.length){ body.innerHTML='<div class="empty"><div class="empty-ic">✅</div><div class="empty-title">Nada por asignar</div><div class="empty-sub">Todos los pagos de Square ya están asignados o no hay en el rango.</div></div>'; return; }
+  body.innerHTML=_sqPays.map(p=>{
+    const amt=centsToUSD(p.totalCents||p.amountCents||0);
+    const card=(p.cardBrand||p.sourceType||'')+(p.last4?(' ····'+p.last4):'');
+    const ent=p.entryMethod?(' · '+p.entryMethod):'';
+    return '<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;background:var(--surface2);">'
+      +'<div style="font-weight:800;font-size:17px;">'+amt+'</div>'
+      +'<div style="font-size:12px;color:var(--muted);">'+sqFmtDate(p.createdAt)+' · '+(card||'Square')+ent+(p.note?(' · '+p.note):'')+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
+        +'<button class="btn-add" style="font-size:13px;flex:1;min-width:130px;background:linear-gradient(135deg,#3ecf8e,#1f9d6a);color:#06231a;border-color:#3ecf8e;" onclick="assignSquarePay(\''+p.id+'\')">➕ Asignar a cliente</button>'
+        +'<button class="btn-add" style="font-size:13px;" onclick="markSquareMine(\''+p.id+'\')" title="Este cargo fue mío (El Frenchie), no una venta. Se excluye.">🚫 No es venta (mío)</button>'
+      +'</div></div>';
+  }).join('');
+}
+window.assignSquarePay = function(id){
+  const p=_sqPays.find(x=>x.id===id); if(!p) return;
+  closeSquarePays();
+  openInc();   // limpia la forma (y _pendingSq)
+  window._pendingSq={ id:p.id, cents:(p.totalCents||p.amountCents||0), createdAt:p.createdAt };
+  document.getElementById('i-amount').value=((p.totalCents||p.amountCents||0)/100).toFixed(2);
+  document.getElementById('i-method').value='terminal';
+  const note=document.getElementById('i-note'); if(note&&!note.value) note.value='Square '+(p.cardBrand||'')+(p.last4?(' ····'+p.last4):'');
+  if(p.createdAt){ try{ document.getElementById('i-date').value=new Date(p.createdAt).toISOString().slice(0,10); }catch(e){} }
+  let b=document.getElementById('sq-assign-banner');
+  if(!b){ b=document.createElement('div'); b.id='sq-assign-banner'; b.style.cssText='background:rgba(62,207,142,0.12);border:1px solid rgba(62,207,142,0.4);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;color:#3ecf8e;font-weight:700;'; const host=document.querySelector('#inc-overlay .sheet'); const firstField=host&&host.querySelector('.field'); if(host&&firstField) host.insertBefore(b,firstField); }
+  if(b){ b.textContent='💳 Asignando pago Square '+centsToUSD(window._pendingSq.cents)+' — elige el cliente/cuenta y guarda.'; b.style.display=''; }
+};
+window.markSquareMine = async function(id){
+  const p=_sqPays.find(x=>x.id===id); if(!p) return;
+  if(!confirm('Marcar este pago de '+centsToUSD(p.totalCents||p.amountCents||0)+' como TUYO (El Frenchie, no venta)?\n\nSe excluye del CRM y no vuelve a salir aquí.')) return;
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
+  try{
+    await setDoc(doc(db,'square_payments',id), { assigned:true, kind:'mio_frenchie', note:'El Frenchie / no venta', amountCents:(p.totalCents||p.amountCents||0), createdAt:p.createdAt||'', assignedAt:new Date().toISOString(), assignedBy:who });
+    _sqPays=_sqPays.filter(x=>x.id!==id); renderSquarePays();
+    document.getElementById('sq-count').textContent=_sqPays.length+' sin asignar';
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
+document.getElementById('sqpay-overlay').addEventListener('click',e=>{ if(e.target.id==='sqpay-overlay') closeSquarePays(); });
 
 let _assignTxId=null;
 window.openAssignCar=function(txId){
@@ -2343,6 +2439,11 @@ window.saveInc = async function(){
       if(dcarId){ data.dismantleCarId=dcarId; data.dismantleCarLabel=dcarLabelStr; }
       await setDoc(doc(db,'transactions',id), data);
     }
+    // 💳 Si venía de asignar un pago de Square, lo marcamos asignado (ya no vuelve a salir).
+    if(window._pendingSq){
+      try{ await setDoc(doc(db,'square_payments',window._pendingSq.id), { assigned:true, kind:'venta', entryId:id, clientId:(clientId||''), clientName:(clientName||''), amountCents:window._pendingSq.cents, createdAt:window._pendingSq.createdAt||'', assignedAt:new Date().toISOString(), assignedBy:who }); }catch(e){}
+      window._pendingSq=null; const _sqb=document.getElementById('sq-assign-banner'); if(_sqb) _sqb.style.display='none';
+    }
     closeInc();
   }catch(e){ alert('Error: '+e.message); }
   btn.disabled=false; btn.textContent='Guardar ingreso';
@@ -2543,6 +2644,48 @@ window.openAudit=function(){ renderAudit(); document.getElementById('audit-overl
 window.closeAudit=function(){ document.getElementById('audit-overlay').classList.remove('open'); };
 
 // 🔧 POR CARRO (yonke): cuánto va dejando cada carro = ventas de partes registradas en Finanzas − costo del carro
+// ===== 👷 HORAS / NÓMINA (check-in GPS de empleados) =====
+let _horasWK = null;
+window.openHoras=function(){ _horasWK=null; renderHoras(); document.getElementById('horas-overlay').classList.add('open'); };
+window.closeHoras=function(){ document.getElementById('horas-overlay').classList.remove('open'); };
+window.horasWeek=function(delta){
+  if(!_horasWK) return;
+  const base=new Date(_horasWK+'T12:00:00Z'); base.setUTCDate(base.getUTCDate()+delta*7);
+  _horasWK=base.toISOString().slice(0,10); renderHoras();
+};
+window.setEmpRate=async function(email, val){
+  const rate=Number(val)||0;
+  try{ await httpsCallable(functions,'cfgSet')({docId:'timeclock', data:{rates:{[email]:rate}}}); renderHoras(); }
+  catch(e){ alert('No se pudo guardar la tarifa (solo el dueño puede): '+((e&&e.message)||e)); }
+};
+async function renderHoras(){
+  const box=document.getElementById('horas-body'); if(!box) return;
+  const lbl=document.getElementById('horas-week-label');
+  box.innerHTML='<div style="color:var(--faint);padding:18px;text-align:center;">Cargando horas…</div>';
+  let d;
+  try{ const r=await httpsCallable(functions,'clockWeek')(_horasWK?{weekKey:_horasWK}:{}); d=(r&&r.data)||{}; }
+  catch(e){ box.innerHTML='<div style="color:#ff6b6b;padding:18px;">No se pudo cargar: '+((e&&e.message)||e)+'<br><span style="color:var(--faint);font-size:12px;">Si dice "internal", el backend aún se está desplegando (unos minutos).</span></div>'; return; }
+  _horasWK=d.weekKey||_horasWK;
+  if(lbl){ const sun=new Date((d.weekKey||'')+'T12:00:00Z'); sun.setUTCDate(sun.getUTCDate()+6); lbl.textContent=fmtDate(d.weekKey)+' – '+fmtDate(sun.toISOString().slice(0,10)); }
+  const owner=isOwnerUser(); const cfg=d.config||{};
+  const locNote=(cfg.dealer&&cfg.dealer.lat!=null?'🚗 Dealer ✓':'🚗 Dealer ✗')+' · '+(cfg.yonke&&cfg.yonke.lat!=null?'🔧 Yonke ✓':'🔧 Yonke ✗')+' · radio '+(cfg.radiusM||150)+' m';
+  const list=d.list||[];
+  let html='<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">📍 GPS: '+locNote+(owner?' · <span style="color:var(--faint);">(la ubicación se configura en Warehouse)</span>':'')+'</div>';
+  if(!list.length){ html+='<div style="color:var(--faint);padding:16px 4px;line-height:1.5;">Nadie ha fichado esta semana.<br>Los empleados hacen <b>Entrada/Salida</b> en la app del almacén (Warehouse).</div>'; }
+  else {
+    html+=list.map(r=>{
+      const rateInput = owner
+        ? '<input type="number" inputmode="decimal" value="'+(r.rate||'')+'" onchange="setEmpRate(\''+r.email+'\',this.value)" placeholder="0" style="width:74px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-size:13px;">'
+        : ('$'+Number(r.rate||0).toFixed(2));
+      return '<div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="font-weight:800;">'+esc(r.name||r.email)+(r.open?' <span style="color:#3ecf8e;font-size:12px;font-weight:600;">🟢 adentro</span>':'')+'</div><div style="font-weight:800;color:var(--gold);">'+centsToUSD(Math.round((r.pay||0)*100))+'</div></div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin-top:6px;gap:8px;"><span>⏱ '+Number(r.hours||0).toFixed(2)+' h · '+(r.shifts||0)+' turno(s)</span><span>$/h: '+rateInput+'</span></div>'
+        +'</div>';
+    }).join('');
+    html+='<div style="border-top:2px solid var(--border);margin-top:6px;padding-top:8px;display:flex;justify-content:space-between;font-weight:800;"><span>TOTAL a pagar (semana)</span><span style="color:var(--gold);">'+centsToUSD(Math.round((d.totalPay||0)*100))+'</span></div>';
+  }
+  box.innerHTML=html;
+}
 window.openDcarReport=function(){ renderDcarReport(); document.getElementById('dcar-overlay').classList.add('open'); };
 window.closeDcarReport=function(){ document.getElementById('dcar-overlay').classList.remove('open'); };
 function renderDcarReport(){

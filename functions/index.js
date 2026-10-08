@@ -472,6 +472,48 @@ exports.squareWebhook = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSecon
   res.status(200).send("ok");   // siempre 200 para que Square no reintente en loop
 });
 
+// 💳 Lista los PAGOS recientes de Square (incluye los de la TERMINAL en persona) para asignarlos a clientes en Finanzas.
+// Solo lee; NO registra nada. El front muestra la lista y Enrique asigna cada pago a un cliente/cuenta.
+exports.squareRecentPayments = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const days = Math.min(400, Math.max(1, Number(request.data && request.data.days) || 90));
+  const begin = new Date(Date.now() - days * 864e5).toISOString();
+  const out = []; let cursor = "";
+  try {
+    for (let page = 0; page < 12; page++) {
+      const qs = new URLSearchParams({ begin_time: begin, location_id: SQUARE_LOCATION_ID, sort_order: "DESC", limit: "100" });
+      if (cursor) qs.set("cursor", cursor);
+      const r = await fetch(SQUARE_API + "/v2/payments?" + qs.toString(), { headers: _sqHeaders() });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { console.error("sqPayments", JSON.stringify(j)); throw new HttpsError("internal", (j.errors && j.errors[0] && j.errors[0].detail) || "square_error"); }
+      for (const p of (j.payments || [])) {
+        const card = (p.card_details && p.card_details.card) || {};
+        out.push({
+          id: p.id,
+          createdAt: p.created_at || "",
+          status: p.status || "",
+          sourceType: p.source_type || "",                                   // CARD, CASH, EXTERNAL, etc.
+          amountCents: (p.amount_money && p.amount_money.amount) || 0,
+          totalCents: (p.total_money && p.total_money.amount) || (p.amount_money && p.amount_money.amount) || 0,
+          cardBrand: card.card_brand || card.bin || "",
+          last4: card.last_4 || "",
+          entryMethod: (p.card_details && p.card_details.entry_method) || "", // KEYED, SWIPED, CONTACTLESS, EMV…
+          orderId: p.order_id || "",
+          note: p.note || "",
+          receiptUrl: p.receipt_url || "",
+        });
+      }
+      cursor = j.cursor || "";
+      if (!cursor) break;
+    }
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.error("squareRecentPayments", e);
+    throw new HttpsError("internal", String((e && e.message) || e));
+  }
+  return { payments: out, count: out.length };
+});
+
 // 🔔 NOTIFICACIONES PUSH del chat interno.
 // Debe empatar con CHAT_CHANNELS del frontend (quién es miembro de cada canal).
 const CHAT_MEMBERS = {
