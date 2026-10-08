@@ -2087,28 +2087,72 @@ function renderSquarePays(){
   if(!_sqPays.length){ body.innerHTML='<div class="empty"><div class="empty-ic">✅</div><div class="empty-title">Nada por asignar</div><div class="empty-sub">Todos los pagos de Square ya están asignados o no hay en el rango.</div></div>'; return; }
   const nMatch=_sqPays.filter(p=>p._match).length;
   let head='';
-  if(nMatch) head='<div style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;">⚠️ <b>'+nMatch+'</b> parecen YA registrados en tu sistema (mismo monto y fecha). <button class="btn-add" style="font-size:12px;margin-left:6px;" onclick="bulkMarkMatched()">✓ Marcar los '+nMatch+' como ya registrados</button></div>';
+  if(nMatch) head='<div style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;">⚠️ <b>'+nMatch+'</b> parecen YA registrados (mismo monto y fecha). <button class="btn-add" style="font-size:12px;margin-left:6px;" onclick="bulkMarkMatched()">✓ Marcar los '+nMatch+' como ya registrados</button></div>';
   body.innerHTML=head+_sqPays.map(p=>{
-    const amt=centsToUSD(p.totalCents||p.amountCents||0);
+    const paid=p.totalCents||p.amountCents||0;
+    const fee=p.feeCents||0; const net=(p.netCents!=null?p.netCents:paid);
     const card=(p.cardBrand||p.sourceType||'')+(p.last4?(' ····'+p.last4):'');
     const ent=p.entryMethod?(' · '+p.entryMethod):'';
     const m=p._match;
-    const mLine = m ? '<div style="font-size:12px;color:#f0c040;margin-top:6px;">⚠️ Ya parece registrado: '+(m.note||m.category||m.clientName||'ingreso')+' · '+centsToUSD(m.amountCents||m.downCents||0)+' · '+((m.date||'').slice(0,10))+'</div>' : '';
+    // desglose
+    let brk='';
+    if(p.feeReady && fee>0){ brk='<div style="font-size:12px;margin-top:6px;line-height:1.7;">Pagó el cliente: <b>'+centsToUSD(paid)+'</b><br>Comisión Square: <span style="color:#e06a6a;">−'+centsToUSD(fee)+'</span><br>✅ Depositado: <b style="color:#3ecf8e;">'+centsToUSD(net)+'</b></div>'; }
+    else { brk='<div style="font-size:12px;margin-top:6px;color:var(--muted);">Pagó el cliente: <b>'+centsToUSD(paid)+'</b> · <span title="La comisión y el neto aparecen ~1 día después del cobro">comisión/depósito pendiente</span></div>'; }
+    const mLine = m ? '<div style="font-size:12.5px;color:#f0c040;margin-top:8px;background:rgba(240,192,64,0.08);border-radius:8px;padding:7px 9px;">⚠️ Coincide con: <b>'+(m.note||m.category||m.clientName||'ingreso')+'</b>'+(m.clientName&&m.note?(' · '+m.clientName):'')+' · '+centsToUSD(m.amountCents||m.downCents||0)+' · '+((m.date||'').slice(0,10))+'</div>' : '';
     const primary = m
-      ? '<button class="btn-add" style="font-size:13px;flex:1;min-width:150px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;" onclick="markSquareDone(\''+p.id+'\')">✓ Ya está (no duplicar)</button>'
-        +'<button class="btn-add" style="font-size:13px;" onclick="assignSquarePay(\''+p.id+'\')">➕ Asignar igual</button>'
-      : '<button class="btn-add" style="font-size:13px;flex:1;min-width:150px;background:linear-gradient(135deg,#3ecf8e,#1f9d6a);color:#06231a;border-color:#3ecf8e;" onclick="assignSquarePay(\''+p.id+'\')">➕ Asignar a cliente</button>'
-        +'<button class="btn-add" style="font-size:13px;" onclick="markSquareDone(\''+p.id+'\')" title="Ya lo tengo registrado en el sistema">✓ Ya está</button>';
+      ? '<button class="btn-add" style="font-size:13px;flex:1;min-width:170px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;" onclick="linkSquareToTx(\''+p.id+'\',\''+m.id+'\')" title="Liga este pago al cargo y ajusta el cargo al monto NETO depositado y la fecha de Square">✓ Cotejar con este'+((p.feeReady&&fee>0)?(' → '+centsToUSD(net)):'')+'</button>'
+        +'<button class="btn-add" style="font-size:13px;" onclick="toggleSqSearch(\''+p.id+'\')">🔎 Buscar otro</button>'
+      : '<button class="btn-add" style="font-size:13px;flex:1;min-width:150px;background:linear-gradient(135deg,#3ecf8e,#1f9d6a);color:#06231a;border-color:#3ecf8e;" onclick="assignSquarePay(\''+p.id+'\')">➕ Registrar venta nueva</button>'
+        +'<button class="btn-add" style="font-size:13px;" onclick="toggleSqSearch(\''+p.id+'\')">🔎 Buscar el cargo</button>';
     return '<div style="border:1px solid '+(m?'rgba(240,192,64,0.4)':'var(--border)')+';border-radius:12px;padding:12px;margin-bottom:10px;background:var(--surface2);">'
-      +'<div style="font-weight:800;font-size:17px;">'+amt+'</div>'
       +'<div style="font-size:12px;color:var(--muted);">'+sqFmtDate(p.createdAt)+' · '+(card||'Square')+ent+(p.note?(' · '+p.note):'')+'</div>'
-      +mLine
-      +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
-        +primary
+      +brk+mLine
+      +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'+primary
         +'<button class="btn-add" style="font-size:13px;" onclick="markSquareMine(\''+p.id+'\')" title="Este cargo fue mío (El Frenchie), no una venta. Se excluye.">🚫 Mío</button>'
-      +'</div></div>';
+      +'</div>'
+      +'<div id="sqsrch-'+p.id+'" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">'
+        +'<input id="sqsrchq-'+p.id+'" oninput="renderSqSearch(\''+p.id+'\',this.value)" placeholder="🔎 Buscar cargo por monto, cliente, nota o fecha…" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;">'
+        +'<div id="sqsrchres-'+p.id+'" style="margin-top:8px;"></div>'
+      +'</div>'
+      +'</div>';
   }).join('');
 }
+window.toggleSqSearch=function(sqId){
+  const box=document.getElementById('sqsrch-'+sqId); if(!box) return;
+  const show=box.style.display==='none'; box.style.display=show?'':'none';
+  if(show){ renderSqSearch(sqId,''); const q=document.getElementById('sqsrchq-'+sqId); if(q) q.focus(); }
+};
+window.renderSqSearch=function(sqId,q){
+  const p=_sqPays.find(x=>x.id===sqId); const res=document.getElementById('sqsrchres-'+sqId); if(!res) return;
+  const cents=p?(p.totalCents||p.amountCents||0):0;
+  q=(q||'').trim().toLowerCase();
+  const MONEYIN={income:1,down:1,payment:1,cash_sale:1};
+  let list=txns.filter(t=>MONEYIN[t.type]);
+  if(q){ const words=q.split(/\s+/); list=list.filter(t=>{ const hay=((t.note||'')+' '+(t.category||'')+' '+(t.clientName||'')+' '+(t.date||'')+' '+((t.amountCents||t.downCents||0)/100).toFixed(2)).toLowerCase(); return words.every(w=>hay.indexOf(w)>=0); }); }
+  // ordenar por cercanía de monto, luego fecha
+  list.sort((a,b)=>Math.abs((a.amountCents||a.downCents||0)-cents)-Math.abs((b.amountCents||b.downCents||0)-cents));
+  list=list.slice(0,12);
+  if(!list.length){ res.innerHTML='<div style="font-size:12px;color:var(--faint);padding:6px;">Sin cargos. Prueba otra búsqueda o usa "Registrar venta nueva".</div>'; return; }
+  res.innerHTML=list.map(t=>'<div onclick="linkSquareToTx(\''+sqId+'\',\''+t.id+'\')" style="padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;border:1px solid var(--border);margin-bottom:6px;">'
+    +'<b>'+centsToUSD(t.amountCents||t.downCents||0)+'</b> · '+(t.note||t.category||'ingreso')+(t.clientName?(' · '+t.clientName):'')+' · '+((t.date||'').slice(0,10))+'</div>').join('');
+};
+// Cotejar: liga el pago de Square a un cargo existente y AJUSTA el cargo al NETO depositado + fecha de Square.
+window.linkSquareToTx=async function(sqId,txId){
+  const p=_sqPays.find(x=>x.id===sqId); const t=txns.find(x=>x.id===txId); if(!p||!t) return;
+  const net=(p.netCents!=null?p.netCents:(p.totalCents||p.amountCents||0));
+  const sqDate=(()=>{ try{ return new Date(p.createdAt).toISOString().slice(0,10); }catch(e){ return t.date||''; } })();
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
+  const msg='Cotejar este pago de Square con:\n\n'+(t.note||t.category||'ingreso')+(t.clientName?(' · '+t.clientName):'')+'\nMonto actual: '+centsToUSD(t.amountCents||t.downCents||0)+' → '+centsToUSD(net)+' (neto depositado)\nFecha: '+((t.date||'').slice(0,10))+' → '+sqDate+'\n\n¿Ajustar el cargo a los datos de Square?';
+  if(!confirm(msg)) return;
+  try{
+    const upd={ date:sqDate, amountCents:net, method:'terminal', squarePaymentId:sqId,
+      squareGrossCents:(p.totalCents||p.amountCents||0), squareFeeCents:(p.feeCents||0), squareNetCents:net, squareLinkedAt:new Date().toISOString(), squareLinkedBy:who };
+    await updateDoc(doc(db,'transactions',txId), upd);
+    await setDoc(doc(db,'square_payments',sqId), { assigned:true, kind:'cotejado', linkTxId:txId, grossCents:(p.totalCents||p.amountCents||0), feeCents:(p.feeCents||0), netCents:net, createdAt:p.createdAt||'', assignedAt:new Date().toISOString(), assignedBy:who });
+    _sqPays=_sqPays.filter(x=>x.id!==sqId); renderSquarePays();
+    const cnt=document.getElementById('sq-count'); if(cnt) cnt.textContent=_sqPays.length+' sin asignar';
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
 window.assignSquarePay = function(id){
   const p=_sqPays.find(x=>x.id===id); if(!p) return;
   closeSquarePays();

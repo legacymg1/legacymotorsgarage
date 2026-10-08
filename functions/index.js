@@ -488,13 +488,18 @@ exports.squareRecentPayments = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutS
       if (!r.ok) { console.error("sqPayments", JSON.stringify(j)); throw new HttpsError("internal", (j.errors && j.errors[0] && j.errors[0].detail) || "square_error"); }
       for (const p of (j.payments || [])) {
         const card = (p.card_details && p.card_details.card) || {};
+        const totalCents = (p.total_money && p.total_money.amount) || (p.amount_money && p.amount_money.amount) || 0;
+        const feeCents = (p.processing_fee || []).reduce((s, f) => s + ((f.amount_money && f.amount_money.amount) || 0), 0);
         out.push({
           id: p.id,
           createdAt: p.created_at || "",
           status: p.status || "",
           sourceType: p.source_type || "",                                   // CARD, CASH, EXTERNAL, etc.
-          amountCents: (p.amount_money && p.amount_money.amount) || 0,
-          totalCents: (p.total_money && p.total_money.amount) || (p.amount_money && p.amount_money.amount) || 0,
+          amountCents: (p.amount_money && p.amount_money.amount) || 0,        // lo que pagó el cliente (base)
+          totalCents: totalCents,                                            // total cobrado (base + propina si hubo)
+          feeCents: feeCents,                                                // comisión que se quedó Square
+          netCents: Math.max(0, totalCents - feeCents),                      // lo que SE DEPOSITÓ a la cuenta
+          feeReady: (p.processing_fee && p.processing_fee.length) ? true : false,  // la comisión a veces tarda ~1 día en aparecer
           cardBrand: card.card_brand || card.bin || "",
           last4: card.last_4 || "",
           entryMethod: (p.card_details && p.card_details.entry_method) || "", // KEYED, SWIPED, CONTACTLESS, EMV…
