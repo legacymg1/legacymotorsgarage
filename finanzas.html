@@ -2061,24 +2061,51 @@ window.loadSquarePays = async function(){
     const r=await httpsCallable(functions,'squareRecentPayments')({days});
     const all=((r&&r.data&&r.data.payments)||[]).filter(p=>p.status==='COMPLETED'||p.status==='APPROVED');
     _sqPays=all.filter(p=>!_sqAssigned.has(p.id));
+    _sqPays.forEach(p=>{ p._match=sqMatchTx(p); });
     renderSquarePays();
-    cnt.textContent=_sqPays.length+' sin asignar · '+all.length+' total';
+    const nMatch=_sqPays.filter(p=>p._match).length;
+    cnt.textContent=_sqPays.length+' sin asignar'+(nMatch?(' · '+nMatch+' ya registrados'):'')+' · '+all.length+' total';
   }catch(e){ body.innerHTML='<div class="empty"><div class="empty-ic">⚠️</div><div class="empty-title">No se pudieron cargar</div><div class="empty-sub">'+((e&&e.message)||e)+'</div></div>'; }
 };
 function sqFmtDate(iso){ try{ const d=new Date(iso); return d.toLocaleDateString('es-MX',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('es-MX',{hour:'numeric',minute:'2-digit'}); }catch(e){ return (iso||'').slice(0,10); } }
+// Busca si un pago de Square YA está registrado como ingreso (mismo monto ± fecha cercana).
+function sqMatchTx(p){
+  const cents=p.totalCents||p.amountCents||0; if(!cents) return null;
+  let pd; try{ pd=new Date(p.createdAt); }catch(e){ pd=null; }
+  const MONEYIN={income:1,down:1,payment:1,cash_sale:1};
+  for(const t of txns){
+    if(!MONEYIN[t.type]) continue;
+    const tc=Number(t.amountCents||t.downCents||0);
+    if(Math.abs(tc-cents)>2) continue;
+    if(pd && t.date){ const td=new Date(t.date+'T12:00:00'); const dd=Math.abs((td-pd)/864e5); if(dd>4) continue; }
+    return t;
+  }
+  return null;
+}
 function renderSquarePays(){
   const body=document.getElementById('sqpay-body');
   if(!_sqPays.length){ body.innerHTML='<div class="empty"><div class="empty-ic">✅</div><div class="empty-title">Nada por asignar</div><div class="empty-sub">Todos los pagos de Square ya están asignados o no hay en el rango.</div></div>'; return; }
-  body.innerHTML=_sqPays.map(p=>{
+  const nMatch=_sqPays.filter(p=>p._match).length;
+  let head='';
+  if(nMatch) head='<div style="background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;">⚠️ <b>'+nMatch+'</b> parecen YA registrados en tu sistema (mismo monto y fecha). <button class="btn-add" style="font-size:12px;margin-left:6px;" onclick="bulkMarkMatched()">✓ Marcar los '+nMatch+' como ya registrados</button></div>';
+  body.innerHTML=head+_sqPays.map(p=>{
     const amt=centsToUSD(p.totalCents||p.amountCents||0);
     const card=(p.cardBrand||p.sourceType||'')+(p.last4?(' ····'+p.last4):'');
     const ent=p.entryMethod?(' · '+p.entryMethod):'';
-    return '<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;background:var(--surface2);">'
+    const m=p._match;
+    const mLine = m ? '<div style="font-size:12px;color:#f0c040;margin-top:6px;">⚠️ Ya parece registrado: '+(m.note||m.category||m.clientName||'ingreso')+' · '+centsToUSD(m.amountCents||m.downCents||0)+' · '+((m.date||'').slice(0,10))+'</div>' : '';
+    const primary = m
+      ? '<button class="btn-add" style="font-size:13px;flex:1;min-width:150px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;" onclick="markSquareDone(\''+p.id+'\')">✓ Ya está (no duplicar)</button>'
+        +'<button class="btn-add" style="font-size:13px;" onclick="assignSquarePay(\''+p.id+'\')">➕ Asignar igual</button>'
+      : '<button class="btn-add" style="font-size:13px;flex:1;min-width:150px;background:linear-gradient(135deg,#3ecf8e,#1f9d6a);color:#06231a;border-color:#3ecf8e;" onclick="assignSquarePay(\''+p.id+'\')">➕ Asignar a cliente</button>'
+        +'<button class="btn-add" style="font-size:13px;" onclick="markSquareDone(\''+p.id+'\')" title="Ya lo tengo registrado en el sistema">✓ Ya está</button>';
+    return '<div style="border:1px solid '+(m?'rgba(240,192,64,0.4)':'var(--border)')+';border-radius:12px;padding:12px;margin-bottom:10px;background:var(--surface2);">'
       +'<div style="font-weight:800;font-size:17px;">'+amt+'</div>'
       +'<div style="font-size:12px;color:var(--muted);">'+sqFmtDate(p.createdAt)+' · '+(card||'Square')+ent+(p.note?(' · '+p.note):'')+'</div>'
+      +mLine
       +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'
-        +'<button class="btn-add" style="font-size:13px;flex:1;min-width:130px;background:linear-gradient(135deg,#3ecf8e,#1f9d6a);color:#06231a;border-color:#3ecf8e;" onclick="assignSquarePay(\''+p.id+'\')">➕ Asignar a cliente</button>'
-        +'<button class="btn-add" style="font-size:13px;" onclick="markSquareMine(\''+p.id+'\')" title="Este cargo fue mío (El Frenchie), no una venta. Se excluye.">🚫 No es venta (mío)</button>'
+        +primary
+        +'<button class="btn-add" style="font-size:13px;" onclick="markSquareMine(\''+p.id+'\')" title="Este cargo fue mío (El Frenchie), no una venta. Se excluye.">🚫 Mío</button>'
       +'</div></div>';
   }).join('');
 }
@@ -2104,6 +2131,28 @@ window.markSquareMine = async function(id){
     _sqPays=_sqPays.filter(x=>x.id!==id); renderSquarePays();
     document.getElementById('sq-count').textContent=_sqPays.length+' sin asignar';
   }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
+// Marca un pago como YA registrado (ya está en el sistema) — NO crea ingreso, solo lo quita de la lista.
+window.markSquareDone = async function(id){
+  const p=_sqPays.find(x=>x.id===id); if(!p) return;
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
+  try{
+    await setDoc(doc(db,'square_payments',id), { assigned:true, kind:'ya_registrado', linkTxId:(p._match&&p._match.id)||'', amountCents:(p.totalCents||p.amountCents||0), createdAt:p.createdAt||'', assignedAt:new Date().toISOString(), assignedBy:who });
+    _sqPays=_sqPays.filter(x=>x.id!==id); renderSquarePays();
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
+// Marca de un jalón TODOS los que parecen ya registrados.
+window.bulkMarkMatched = async function(){
+  const matched=_sqPays.filter(p=>p._match); if(!matched.length) return;
+  if(!confirm('Marcar '+matched.length+' pagos como YA registrados (no se duplican)?\n\nSolo los que coinciden en monto y fecha con un ingreso que ya tienes.')) return;
+  const who=(auth.currentUser&&auth.currentUser.email)||'';
+  let ok=0;
+  for(const p of matched){
+    try{ await setDoc(doc(db,'square_payments',p.id), { assigned:true, kind:'ya_registrado', linkTxId:(p._match&&p._match.id)||'', amountCents:(p.totalCents||p.amountCents||0), createdAt:p.createdAt||'', assignedAt:new Date().toISOString(), assignedBy:who }); ok++; }catch(e){}
+  }
+  _sqPays=_sqPays.filter(p=>!p._match); renderSquarePays();
+  const cnt=document.getElementById('sq-count'); if(cnt) cnt.textContent=_sqPays.length+' sin asignar';
+  alert('✓ '+ok+' marcados como ya registrados.');
 };
 document.getElementById('sqpay-overlay').addEventListener('click',e=>{ if(e.target.id==='sqpay-overlay') closeSquarePays(); });
 
