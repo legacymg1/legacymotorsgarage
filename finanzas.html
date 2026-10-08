@@ -2059,7 +2059,7 @@ window.loadSquarePays = async function(){
     _sqAssigned=new Set();
     try{ const asn=await getDocs(collection(db,'square_payments')); asn.forEach(d=>{ if((d.data()||{}).assigned) _sqAssigned.add(d.id); }); }catch(e){}
     const r=await httpsCallable(functions,'squareRecentPayments')({days});
-    const all=((r&&r.data&&r.data.payments)||[]).filter(p=>p.status==='COMPLETED'||p.status==='APPROVED');
+    const all=((r&&r.data&&r.data.payments)||[]).filter(p=>(p.status==='COMPLETED'||p.status==='APPROVED') && (p.totalCents||p.amountCents||0)>0);
     _sqPays=all.filter(p=>!_sqAssigned.has(p.id));
     _sqPays.forEach(p=>{ p._match=sqMatchTx(p); });
     renderSquarePays();
