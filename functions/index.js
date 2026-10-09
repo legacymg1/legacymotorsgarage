@@ -1157,6 +1157,43 @@ exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
   return { ok: true, weekKey: wk, rates, config: { dealer: cfg.dealer || null, yonke: cfg.yonke || null, radiusM: Number(cfg.radiusM) || 150 }, list, totalPay: Math.round(totalPay * 100) / 100 };
 });
 
+// 🧽 Trabajos de detallado (SOP guiado). op:'save' guarda/actualiza; op:'mine' trae los míos (7 días).
+// Guarda tiempo por paso y por carro → métricas de cuánto tarda/cuesta cada proceso.
+exports.detailJob = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  if (id.notRegistered || !id.active) throw new HttpsError("permission-denied", "No autorizado.");
+  const db = admin.firestore();
+  const op = String((request.data && request.data.op) || "save");
+  if (op === "mine") {
+    const since = new Date(Date.now() - 7 * 864e5).toISOString();
+    const snap = await db.collection("detail_jobs").where("empKey", "==", id.key).get();
+    const jobs = [];
+    snap.forEach((d) => { const x = d.data(); if ((x.startedAt || "") >= since) jobs.push(Object.assign({ id: d.id }, x)); });
+    jobs.sort((a, b) => String(b.startedAt || "").localeCompare(String(a.startedAt || "")));
+    return { ok: true, jobs: jobs.slice(0, 50) };
+  }
+  // save
+  const job = (request.data && request.data.job) || {};
+  const jobId = (String(job.id || "").trim().match(/^[A-Za-z0-9_]{3,60}$/) ? job.id : ("dj_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6)));
+  const steps = Array.isArray(job.steps) ? job.steps.slice(0, 40).map((s) => ({
+    id: String(s.id || "").slice(0, 40), title: String(s.title || "").slice(0, 80),
+    seconds: Math.max(0, Math.round(Number(s.seconds) || 0)), done: !!s.done, skipped: !!s.skipped,
+  })) : [];
+  const clean = {
+    empKey: id.key, empId: id.empId, name: id.name, phone: id.phone,
+    car: String(job.car || "").slice(0, 120), vin: String(job.vin || "").slice(0, 20),
+    steps, totalSeconds: Math.max(0, Math.round(Number(job.totalSeconds) || 0)),
+    status: (job.status === "done") ? "done" : "active",
+    startedAt: String(job.startedAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString(),
+  };
+  if (clean.status === "done") clean.finishedAt = String(job.finishedAt || new Date().toISOString());
+  await db.collection("detail_jobs").doc(jobId).set(clean, { merge: true });
+  return { ok: true, id: jobId };
+});
+
 // 📮 Enviar el sales sheet a Lendmark directo por el SMTP de Zoho (from ev@, cc a ev@).
 exports.sendLendmarkEmail = onCall({ timeoutSeconds: 60, memory: "512MiB" }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
