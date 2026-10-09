@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Legacy Equipo">
+<meta name="theme-color" content="#0b0e14">
+<title>Legacy · Equipo</title>
+<link rel="apple-touch-icon" href="https://legacymotorsgarage.com/icon-192.png">
+<style>
+  :root{
+    --bg:#0b0e14; --surface:#12161f; --surface2:#1a1f2b;
+    --border:rgba(255,255,255,0.07); --border-strong:rgba(255,255,255,0.13);
+    --text:#f4f6f8; --muted:#8b93a3; --faint:#5b6472;
+    --gold:#e8b64a; --gold-soft:rgba(232,182,74,0.14);
+    --green:#32d74b; --green-soft:rgba(50,215,75,0.14);
+    --red:#ff453a; --red-soft:rgba(255,69,58,0.14);
+    --blue:#0a84ff; --radius:18px; --radius-sm:12px;
+    --shadow:0 10px 40px rgba(0,0,0,0.45);
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;}
+  body{min-height:100vh;min-height:100dvh;}
+  .wrap{max-width:520px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));}
+  .center{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px calc(24px + env(safe-area-inset-bottom));}
+  h1,h2,h3{margin:0;font-weight:800;letter-spacing:-0.02em;}
+  .muted{color:var(--muted);} .faint{color:var(--faint);}
+  .logo{font-weight:900;font-size:22px;letter-spacing:-0.03em;}
+  .logo span{color:var(--gold);}
+  .btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;transition:transform .08s ease,filter .15s ease;}
+  .btn:active{transform:scale(.98);}
+  .btn-gold{background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;}
+  .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border-strong);}
+  .btn-green{background:linear-gradient(135deg,#34d75a,#1ea544);color:#04130a;}
+  .btn-red{background:var(--red-soft);color:#ff6b6b;border:1px solid rgba(255,69,58,0.3);}
+  .btn[disabled]{opacity:.5;pointer-events:none;}
+  .field{width:100%;background:var(--surface2);border:1px solid var(--border-strong);border-radius:14px;padding:16px;font-size:18px;color:var(--text);font-family:inherit;text-align:center;letter-spacing:.04em;}
+  .field:focus{outline:none;border-color:var(--gold);}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
+  .err{color:#ff6b6b;font-size:14px;min-height:18px;text-align:center;margin-top:6px;}
+  .hide{display:none!important;}
+  /* Home */
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .avatar{width:48px;height:48px;border-radius:50%;object-fit:cover;background:var(--gold-soft);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--gold);font-size:19px;flex:0 0 auto;border:1px solid var(--border-strong);}
+  .clock-card{background:linear-gradient(160deg,#171d29,#11151e);border:1px solid var(--border-strong);border-radius:22px;padding:20px;text-align:center;margin-bottom:18px;box-shadow:var(--shadow);}
+  .clock-status{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+  .clock-hours{font-size:40px;font-weight:900;letter-spacing:-0.03em;margin:4px 0 2px;font-variant-numeric:tabular-nums;}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:700;}
+  .sec-title{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:22px 2px 11px;}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 14px;cursor:pointer;display:flex;flex-direction:column;gap:7px;min-height:96px;transition:transform .08s ease,border-color .15s ease;position:relative;overflow:hidden;}
+  .tile:active{transform:scale(.98);}
+  .tile .ico{font-size:26px;}
+  .tile .nm{font-weight:800;font-size:15px;}
+  .tile .sub{font-size:11px;color:var(--faint);font-weight:600;}
+  .tile .soon{position:absolute;top:9px;right:9px;font-size:9px;font-weight:800;letter-spacing:.05em;color:var(--gold);background:var(--gold-soft);padding:3px 7px;border-radius:999px;}
+  .reminder{display:flex;gap:11px;align-items:flex-start;background:var(--gold-soft);border:1px solid rgba(232,182,74,0.25);border-radius:14px;padding:13px 15px;margin-top:20px;font-size:13px;line-height:1.45;}
+  .foot{text-align:center;margin-top:26px;}
+  .linkbtn{background:none;border:none;color:var(--faint);font-size:13px;cursor:pointer;font-family:inherit;padding:8px;}
+  .spin{width:34px;height:34px;border:3px solid var(--border-strong);border-top-color:var(--gold);border-radius:50%;animation:sp 0.8s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#0f1420;border:1px solid var(--border-strong);color:var(--text);padding:13px 18px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:var(--shadow);z-index:99;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.err{border-color:rgba(255,69,58,0.4);color:#ff8a80;}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="screen-login" class="center">
+  <div class="logo" style="margin-bottom:6px;">LEGACY <span>·</span> EQUIPO</div>
+  <div class="muted" style="font-size:14px;margin-bottom:28px;">App del equipo de trabajo</div>
+
+  <div class="card" style="width:100%;max-width:380px;">
+    <div id="step-phone">
+      <h3 style="font-size:17px;margin-bottom:4px;">Entra con tu teléfono</h3>
+      <div class="faint" style="font-size:13px;margin-bottom:16px;">Te mandamos un código por mensaje.</div>
+      <input id="l-phone" class="field" type="tel" inputmode="numeric" placeholder="559 123 4567" autocomplete="tel">
+      <div id="l-err" class="err"></div>
+      <button id="send-code-btn" class="btn btn-gold" onclick="sendCode()" style="margin-top:6px;">Enviar código</button>
+    </div>
+    <div id="step-code" class="hide">
+      <h3 style="font-size:17px;margin-bottom:4px;">Escribe el código</h3>
+      <div class="faint" style="font-size:13px;margin-bottom:16px;">Te llegó por mensaje de texto.</div>
+      <input id="l-code" class="field" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="______" maxlength="6" style="letter-spacing:.5em;">
+      <div id="l-err2" class="err"></div>
+      <button id="verify-code-btn" class="btn btn-gold" onclick="verifyCode()" style="margin-top:6px;">Entrar</button>
+      <button class="linkbtn" onclick="backToPhone()" style="width:100%;margin-top:4px;">← Cambiar número</button>
+    </div>
+  </div>
+  <div id="recaptcha-container"></div>
+</div>
+
+<!-- ===== LOADING ===== -->
+<div id="screen-loading" class="center hide">
+  <div class="spin"></div>
+  <div class="muted" style="margin-top:16px;font-size:14px;">Cargando…</div>
+</div>
+
+<!-- ===== NOT REGISTERED ===== -->
+<div id="screen-noreg" class="center hide">
+  <div style="font-size:48px;margin-bottom:10px;">🔒</div>
+  <h2 style="font-size:20px;text-align:center;">Todavía no estás registrado</h2>
+  <p class="muted" style="text-align:center;font-size:15px;line-height:1.5;margin:12px 0 22px;max-width:320px;">
+    Tu número <b id="noreg-phone" style="color:var(--text);"></b> no está en el sistema. Pídele a Legacy que te dé de alta con este mismo número.
+  </p>
+  <a class="btn btn-gold" href="tel:5595405145" style="max-width:320px;text-decoration:none;">📞 Llamar a Legacy</a>
+  <button class="linkbtn" onclick="doSignOut()" style="margin-top:14px;">Cerrar sesión</button>
+</div>
+
+<!-- ===== INACTIVE ===== -->
+<div id="screen-inactive" class="center hide">
+  <div style="font-size:48px;margin-bottom:10px;">⏸️</div>
+  <h2 style="font-size:20px;text-align:center;">Cuenta inactiva</h2>
+  <p class="muted" style="text-align:center;font-size:15px;line-height:1.5;margin:12px 0 22px;max-width:320px;">
+    Tu cuenta está pausada. Si crees que es un error, habla con Legacy.
+  </p>
+  <a class="btn btn-gold" href="tel:5595405145" style="max-width:320px;text-decoration:none;">📞 Llamar a Legacy</a>
+  <button class="linkbtn" onclick="doSignOut()" style="margin-top:14px;">Cerrar sesión</button>
+</div>
+
+<!-- ===== HOME ===== -->
+<div id="screen-home" class="wrap hide">
+  <div class="topbar">
+    <div id="home-avatar" class="avatar">?</div>
+    <div style="flex:1;min-width:0;">
+      <div class="faint" style="font-size:13px;" id="home-greet">Hola</div>
+      <h2 style="font-size:20px;line-height:1.1;" id="home-name">—</h2>
+    </div>
+    <button class="linkbtn" onclick="doSignOut()" title="Salir" style="font-size:20px;">⏏︎</button>
+  </div>
+
+  <!-- Reloj -->
+  <div class="clock-card">
+    <div id="clk-status" class="clock-status muted">Fuera</div>
+    <div id="clk-hours" class="clock-hours">0.00 h</div>
+    <div class="faint" style="font-size:12px;margin-bottom:16px;">esta semana</div>
+    <button id="clk-btn" class="btn btn-green" onclick="punch()">🟢 Registrar entrada</button>
+    <div id="clk-note" class="faint" style="font-size:11px;margin-top:10px;"></div>
+  </div>
+
+  <!-- Roles -->
+  <div class="sec-title">Tus tareas de hoy</div>
+  <div id="home-tiles" class="tiles"></div>
+  <div id="home-noroles" class="card hide" style="text-align:center;color:var(--muted);font-size:14px;line-height:1.5;">
+    Todavía no tienes tareas asignadas.<br>Legacy te las va a asignar pronto.
+  </div>
+
+  <!-- Recordatorio fin de jornada -->
+  <div class="reminder">
+    <div style="font-size:18px;">🔔</div>
+    <div>
+      <b>Antes de salir:</b> regresa tus herramientas, pon las pilas a cargar y limpia tu área.
+    </div>
+  </div>
+
+  <div class="foot">
+    <button class="linkbtn" onclick="loadHome()">↻ Actualizar</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
+  authDomain: "legacy-motors-garage.firebaseapp.com",
+  projectId: "legacy-motors-garage",
+  storageBucket: "legacy-motors-garage.firebasestorage.app",
+  messagingSenderId: "783567672493",
+  appId: "1:783567672493:web:3a825f2f59ec1c25e9a224"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const functions = getFunctions(app);
+
+let confirmationResult = null;
+let ME = null;          // { name, roles, empId, photoURL, isOwner }
+let CLK = null;         // estado del reloj { open, hours }
+
+// Catálogo de roles → tile. 'ready' = ya construido; si no, muestra "Pronto".
+const ROLE_TILES = {
+  'Detallador':        { ico:'🧽', sub:'Lavado y detallado', ready:false },
+  'Mecánico':          { ico:'🔧', sub:'Inspección y reparación', ready:false },
+  'Empaque':           { ico:'📦', sub:'Empacar pedidos', ready:false },
+  'Captura':           { ico:'📸', sub:'Fotos de partes', ready:false },
+  'Listado':           { ico:'🏷️', sub:'Publicar en eBay', ready:false },
+  'Desmantelador':     { ico:'🚗', sub:'Desarmar carros', ready:false },
+  'Ayudante general':  { ico:'🛠️', sub:'Apoyo general', ready:false },
+  'Oficina':           { ico:'🗂️', sub:'Oficina', ready:false },
+  'Ventas':            { ico:'🤝', sub:'Ventas', ready:false },
+};
+
+function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home'].forEach(s=>{ document.getElementById(s).classList.toggle('hide', s!==id); }); }
+function toast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); clearTimeout(window._tt); window._tt=setTimeout(()=>{t.className='toast'+(isErr?' err':'');},3200); }
+
+// ---------- Login ----------
+window.sendCode = async function(){
+  const digits=String(document.getElementById('l-phone').value||'').replace(/\D/g,'');
+  const err=document.getElementById('l-err'); err.textContent='';
+  let e164='';
+  if(digits.length===10) e164='+1'+digits;
+  else if(digits.length===11 && digits[0]==='1') e164='+'+digits;
+  else { err.textContent='Escribe tu número a 10 dígitos.'; return; }
+  const btn=document.getElementById('send-code-btn'); btn.disabled=true; btn.textContent='Enviando…';
+  try{
+    await setPersistence(auth, browserLocalPersistence);
+    if(!window._recaptcha){ window._recaptcha = new RecaptchaVerifier(auth, 'recaptcha-container', {size:'invisible'}); }
+    confirmationResult = await signInWithPhoneNumber(auth, e164, window._recaptcha);
+    document.getElementById('step-phone').classList.add('hide');
+    document.getElementById('step-code').classList.remove('hide');
+    const cf=document.getElementById('l-code'); if(cf) cf.focus();
+  }catch(e){
+    const code=(e&&e.code)||'';
+    err.textContent = code==='auth/too-many-requests' ? 'Demasiados intentos, espera un momento.'
+      : code==='auth/invalid-phone-number' ? 'Ese número no es válido.'
+      : 'No se pudo enviar el código. Intenta de nuevo.';
+    try{ if(window._recaptcha){ window._recaptcha.clear(); window._recaptcha=null; } }catch(_){}
+  }
+  btn.disabled=false; btn.textContent='Enviar código';
+};
+window.verifyCode = async function(){
+  const code=String(document.getElementById('l-code').value||'').trim();
+  const err=document.getElementById('l-err2'); err.textContent='';
+  if(!code || !confirmationResult){ err.textContent='Escribe el código.'; return; }
+  const btn=document.getElementById('verify-code-btn'); btn.disabled=true; btn.textContent='Entrando…';
+  try{ await confirmationResult.confirm(code); /* onAuthStateChanged sigue */ }
+  catch(e){ err.textContent='Código incorrecto. Vuelve a intentar.'; }
+  btn.disabled=false; btn.textContent='Entrar';
+};
+window.backToPhone = function(){
+  document.getElementById('step-code').classList.add('hide');
+  document.getElementById('step-phone').classList.remove('hide');
+  document.getElementById('l-code').value=''; document.getElementById('l-err2').textContent='';
+};
+window.doSignOut = async function(){ try{ await signOut(auth); }catch(_){} location.reload(); };
+
+// ---------- Sesión ----------
+onAuthStateChanged(auth, async (user)=>{
+  if(!user){ show('screen-login'); return; }
+  show('screen-loading');
+  try{
+    const r = await httpsCallable(functions,'empMe')({});
+    const d = (r&&r.data)||{};
+    if(!d.found){
+      document.getElementById('noreg-phone').textContent = d.phone || (user.phoneNumber||'');
+      show('screen-noreg'); return;
+    }
+    if(d.active===false){ show('screen-inactive'); return; }
+    ME = d;
+    renderHome();
+    show('screen-home');
+    loadClock();
+  }catch(e){
+    toast('No se pudo cargar: '+((e&&e.message)||e), true);
+    show('screen-login');
+  }
+});
+
+// ---------- Home ----------
+function initials(name){ const p=String(name||'').trim().split(/\s+/); return ((p[0]||'')[0]||'?').toUpperCase()+((p[1]||'')[0]||'').toUpperCase(); }
+function renderHome(){
+  const av=document.getElementById('home-avatar');
+  if(ME.photoURL){ av.outerHTML='<img id="home-avatar" class="avatar" src="'+ME.photoURL+'" alt="">'; }
+  else { av.textContent=initials(ME.name); }
+  const h=new Date().getHours();
+  document.getElementById('home-greet').textContent = h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches';
+  document.getElementById('home-name').textContent = ME.name || 'Equipo';
+  const roles = Array.isArray(ME.roles)?ME.roles:[];
+  const box=document.getElementById('home-tiles'); const none=document.getElementById('home-noroles');
+  if(!roles.length){ box.classList.add('hide'); none.classList.remove('hide'); return; }
+  box.classList.remove('hide'); none.classList.add('hide');
+  box.innerHTML = roles.map(role=>{
+    const t = ROLE_TILES[role] || { ico:'•', sub:'', ready:false };
+    const soon = t.ready ? '' : '<div class="soon">PRONTO</div>';
+    return '<div class="tile" onclick="openRole(\''+role.replace(/'/g,"\\'")+'\')">'+soon
+      +'<div class="ico">'+t.ico+'</div>'
+      +'<div class="nm">'+role+'</div>'
+      +'<div class="sub">'+(t.sub||'')+'</div></div>';
+  }).join('');
+}
+window.openRole = function(role){
+  const t = ROLE_TILES[role] || {};
+  if(t.ready && t.href){ location.href=t.href; return; }
+  if(t.href){ // existe en warehouse aunque no sea el flujo guiado nuevo
+    if(confirm(role+': por ahora se hace en la app del Almacén. ¿Abrir Almacén?')) location.href=t.href;
+    return;
+  }
+  toast('🚧 '+role+': lo estamos armando. Muy pronto aquí mismo.');
+};
+
+// ---------- Reloj ----------
+async function loadClock(){
+  try{ const r=await httpsCallable(functions,'clockMine')({}); CLK=(r&&r.data)||{}; }
+  catch(e){ CLK={}; }
+  renderClock();
+}
+function renderClock(){
+  const open = CLK && CLK.open;
+  const hrs = (CLK && CLK.hours!=null) ? Number(CLK.hours) : 0;
+  const st=document.getElementById('clk-status'); const hb=document.getElementById('clk-hours'); const btn=document.getElementById('clk-btn'); const note=document.getElementById('clk-note');
+  hb.textContent = hrs.toFixed(2)+' h';
+  if(open){
+    st.innerHTML='<span class="dot" style="background:var(--green);"></span>ADENTRO · '+(open.location==='yonke'?'Yonke':open.location==='dealer'?'Dealer':'trabajando');
+    st.style.color='var(--green)';
+    btn.className='btn btn-red'; btn.textContent='🔴 Registrar salida';
+    const since=open.inAt?new Date(open.inAt):null;
+    note.textContent = since ? ('Entraste a las '+since.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})) : '';
+  } else {
+    st.innerHTML='Fuera'; st.style.color='var(--muted)';
+    btn.className='btn btn-green'; btn.textContent='🟢 Registrar entrada';
+    note.textContent='Debes estar en el Dealer o el Yonke para marcar.';
+  }
+}
+window.punch = function(){
+  const btn=document.getElementById('clk-btn'); const wasOpen = CLK && CLK.open;
+  btn.disabled=true; const prev=btn.textContent; btn.textContent='Ubicando…';
+  if(!navigator.geolocation){ toast('Tu teléfono no da ubicación.', true); btn.disabled=false; btn.textContent=prev; return; }
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    try{
+      const r=await httpsCallable(functions,'clockPunch')({ action: wasOpen?'out':'in', lat:pos.coords.latitude, lng:pos.coords.longitude });
+      const d=(r&&r.data)||{};
+      if(d.action==='in') toast('✅ Entrada registrada · '+(d.location==='yonke'?'Yonke':'Dealer'));
+      else toast('✅ Salida · +'+Number(d.hours||0).toFixed(2)+' h');
+      await loadClock();
+    }catch(e){ toast((e&&e.message)||'No se pudo registrar.', true); }
+    btn.disabled=false;
+  }, (err)=>{
+    toast('Activa la ubicación (GPS) para marcar.', true);
+    btn.disabled=false; btn.textContent=prev;
+  }, { enableHighAccuracy:true, timeout:12000, maximumAge:0 });
+};
+
+window.loadHome = function(){ if(ME){ loadClock(); } };
+</script>
+</body>
+</html>

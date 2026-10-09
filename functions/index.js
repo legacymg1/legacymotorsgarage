@@ -1026,13 +1026,53 @@ function _checkGeofence(cfg, lat, lng) {
   return { ok: best.distM <= radius, location: best.location, distM: Math.round(best.distM) };
 }
 function _emailKey(email) { return String(email || "").replace(/[/#?]/g, "_"); }
+// Lista completa de roles (debe coincidir con EMP_ROLES en finanzas.html).
+const ALL_EMP_ROLES = ["Detallador", "Mecánico", "Empaque", "Captura", "Listado", "Desmantelador", "Ayudante general", "Oficina", "Ventas"];
+// Resuelve QUIÉN llama: dueño/staff por CORREO, o empleado por TELÉFONO (registro `employees`).
+// Devuelve { key, name, email, phone, empId, roles, rate, photoURL, isOwner, active, notRegistered }.
+async function _actorIdentity(request) {
+  if (!request.auth) return null;
+  const tok = request.auth.token || {};
+  const email = String(tok.email || "").toLowerCase();
+  const phone = String(tok.phone_number || "");
+  if (email) {
+    return { key: _emailKey(email), name: tok.name || email.split("@")[0], email, phone: "", empId: "", roles: [], rate: 0, photoURL: "", active: true, isOwner: OWNER_EMAILS.includes(email), notRegistered: false };
+  }
+  if (phone) {
+    const key = "ph_" + phone.replace(/\D/g, "");
+    let snap;
+    try { snap = await admin.firestore().collection("employees").where("phoneE164", "==", phone).limit(1).get(); }
+    catch (e) { snap = { empty: true }; }
+    if (snap && !snap.empty) {
+      const docSnap = snap.docs[0]; const d = docSnap.data() || {};
+      return { key, name: d.name || "Empleado", email: "", phone, empId: docSnap.id, roles: Array.isArray(d.roles) ? d.roles : [], rate: Number(d.rate) || 0, photoURL: d.photoURL || "", active: d.active !== false, isOwner: false, notRegistered: false };
+    }
+    return { key, name: "", email: "", phone, empId: "", roles: [], rate: 0, photoURL: "", active: false, isOwner: false, notRegistered: true };
+  }
+  return null;
+}
+// La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
+exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  if (id.email) {
+    // Dueño/staff entrando por correo (para pruebas): ve todos los roles.
+    return { ok: true, found: true, active: true, name: id.name, roles: id.isOwner ? ALL_EMP_ROLES : [], empId: "", photoURL: "", isOwner: id.isOwner, via: "email" };
+  }
+  if (id.notRegistered) return { ok: true, found: false, phone: id.phone, via: "phone" };
+  if (!id.active) return { ok: true, found: true, active: false, name: id.name, roles: [], empId: id.empId, photoURL: id.photoURL, via: "phone" };
+  return { ok: true, found: true, active: true, name: id.name, roles: id.roles, empId: id.empId, photoURL: id.photoURL, isOwner: false, via: "phone" };
+});
 // Entrada / salida. request.data = { action:'in'|'out', lat, lng }
-// Turno ABIERTO en timeclock_open/<email> (1 por empleado) → sin índices compuestos.
+// Turno ABIERTO en timeclock_open/<actorKey> (1 por persona) → sin índices compuestos.
 // Turnos CERRADOS en timeclock/<autoId> con weekKey (índice de un solo campo, automático).
 exports.clockPunch = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
-  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
-  const name = (request.auth.token && request.auth.token.name) || email.split("@")[0];
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  if (id.notRegistered) throw new HttpsError("permission-denied", "Tu teléfono no está registrado. Pídele a Legacy que te dé de alta.");
+  if (!id.active) throw new HttpsError("permission-denied", "Tu cuenta está inactiva. Habla con Legacy.");
   const action = String((request.data && request.data.action) || "").trim();
   const lat = request.data && request.data.lat != null ? Number(request.data.lat) : null;
   const lng = request.data && request.data.lng != null ? Number(request.data.lng) : null;
@@ -1041,20 +1081,21 @@ exports.clockPunch = onCall({ timeoutSeconds: 30 }, async (request) => {
   const cfg = await _tcConfig();
   const geo = _checkGeofence(cfg, lat, lng);
   if (geo.noGps) throw new HttpsError("failed-precondition", "No pudimos leer tu ubicación (GPS). Activa la ubicación e inténtalo de nuevo.");
-  const openRef = db.collection("timeclock_open").doc(_emailKey(email));
+  const openRef = db.collection("timeclock_open").doc(id.key);
   const openSnap = await openRef.get();
   const nowIso = new Date().toISOString();
   if (action === "in") {
     if (openSnap.exists) throw new HttpsError("failed-precondition", "Ya tienes una ENTRADA abierta. Haz Salida primero.");
     if (!geo.ok) throw new HttpsError("failed-precondition", "No estás en el Dealer ni en el Yonke (estás a " + geo.distM + " m). Acércate para registrar tu entrada.");
-    await openRef.set({ email, name, location: geo.location, inAt: nowIso, inLat: lat, inLng: lng, weekKey: _laMondayKey(new Date()) });
+    await openRef.set({ actorKey: id.key, email: id.email, phone: id.phone, empId: id.empId, name: id.name, location: geo.location, inAt: nowIso, inLat: lat, inLng: lng, weekKey: _laMondayKey(new Date()) });
     return { ok: true, action: "in", location: geo.location, at: nowIso };
   } else {
     if (!openSnap.exists) throw new HttpsError("failed-precondition", "No tienes una entrada abierta. Haz Entrada primero.");
     const d = openSnap.data();
     const hours = Math.max(0, (new Date(nowIso) - new Date(d.inAt)) / 3600000);
     await db.collection("timeclock").add({
-      email, name, location: d.location || geo.location, outLocation: geo.location,
+      actorKey: id.key, email: id.email, phone: id.phone, empId: id.empId, name: id.name,
+      location: d.location || geo.location, outLocation: geo.location,
       inAt: d.inAt, outAt: nowIso, inLat: d.inLat, inLng: d.inLng, outLat: lat, outLng: lng,
       hours: Math.round(hours * 100) / 100, weekKey: d.weekKey || _laMondayKey(new Date()), createdAt: nowIso,
     });
@@ -1062,21 +1103,27 @@ exports.clockPunch = onCall({ timeoutSeconds: 30 }, async (request) => {
     return { ok: true, action: "out", hours: Math.round(hours * 100) / 100, at: nowIso };
   }
 });
-// Estado + horas de la semana del empleado que llama. Para su tarjeta en warehouse.
+// Estado + horas de la semana de quien llama. Para su tarjeta en la app.
 exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
-  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
   const db = admin.firestore();
   const wk = _laMondayKey(new Date());
-  const openSnap = await db.collection("timeclock_open").doc(_emailKey(email)).get();
+  const openSnap = await db.collection("timeclock_open").doc(id.key).get();
   const open = openSnap.exists ? { inAt: openSnap.data().inAt, location: openSnap.data().location } : null;
   const snap = await db.collection("timeclock").where("weekKey", "==", wk).get();
+  const emailLc = (id.email || "").toLowerCase();
   let hours = 0;
-  snap.forEach((d) => { const x = d.data(); if ((x.email || "").toLowerCase() === email) hours += Number(x.hours) || 0; });
+  snap.forEach((d) => {
+    const x = d.data();
+    const mine = (x.actorKey && x.actorKey === id.key) || (!x.actorKey && emailLc && (x.email || "").toLowerCase() === emailLc);
+    if (mine) hours += Number(x.hours) || 0;
+  });
   if (open) hours += Math.max(0, (Date.now() - new Date(open.inAt)) / 3600000);
   return { ok: true, weekKey: wk, hours: Math.round(hours * 100) / 100, open };
 });
-// Panel del dueño (Finanzas): horas + pago de la semana por empleado.
+// Panel del dueño (Finanzas): horas + pago de la semana por persona (correo o teléfono).
 exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
@@ -1085,25 +1132,26 @@ exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
   const cfg = await _tcConfig();
   const rates = cfg.rates || {};
   const wk = (request.data && request.data.weekKey) || _laMondayKey(new Date());
-  const byEmp = {};
+  // Tarifas de empleados por teléfono (viven en el registro `employees`).
+  const empRateById = {};
+  try { const es = await db.collection("employees").get(); es.forEach((e) => { empRateById[e.id] = Number((e.data() || {}).rate) || 0; }); }
+  catch (e) {}
+  const keyOf = (x) => x.actorKey || ("em_" + _emailKey((x.email || "?").toLowerCase()));
+  const byKey = {};
+  const touch = (x) => {
+    const k = keyOf(x);
+    if (!byKey[k]) byKey[k] = { key: k, email: (x.email || "").toLowerCase(), phone: x.phone || "", empId: x.empId || "", name: x.name || (x.email || "").split("@")[0] || "Empleado", hours: 0, open: false, shifts: 0 };
+    return byKey[k];
+  };
   const snap = await db.collection("timeclock").where("weekKey", "==", wk).get();
-  snap.forEach((d) => {
-    const x = d.data(); const e = (x.email || "?").toLowerCase();
-    if (!byEmp[e]) byEmp[e] = { email: e, name: x.name || e.split("@")[0], hours: 0, open: false, shifts: 0 };
-    byEmp[e].hours += Number(x.hours) || 0; byEmp[e].shifts += 1;
-  });
-  // turnos abiertos (todos los empleados con entrada sin salida)
+  snap.forEach((d) => { const x = d.data(); const r = touch(x); r.hours += Number(x.hours) || 0; r.shifts += 1; });
+  // turnos abiertos (entrada sin salida)
   const openSnap = await db.collection("timeclock_open").get();
-  openSnap.forEach((d) => {
-    const x = d.data(); if ((x.weekKey || "") !== wk) return;
-    const e = (x.email || "?").toLowerCase();
-    if (!byEmp[e]) byEmp[e] = { email: e, name: x.name || e.split("@")[0], hours: 0, open: false, shifts: 0 };
-    byEmp[e].open = true; byEmp[e].hours += Math.max(0, (Date.now() - new Date(x.inAt)) / 3600000);
-  });
-  const list = Object.values(byEmp).map((r) => {
-    const rate = Number(rates[r.email]) || 0;
+  openSnap.forEach((d) => { const x = d.data(); if ((x.weekKey || "") !== wk) return; const r = touch(x); r.open = true; r.hours += Math.max(0, (Date.now() - new Date(x.inAt)) / 3600000); });
+  const list = Object.values(byKey).map((r) => {
+    const rate = r.empId ? (empRateById[r.empId] || 0) : (Number(rates[r.email]) || 0);
     const hrs = Math.round(r.hours * 100) / 100;
-    return { email: r.email, name: r.name, hours: hrs, open: r.open, shifts: r.shifts, rate, pay: Math.round(hrs * rate * 100) / 100 };
+    return { key: r.key, email: r.email, phone: r.phone, empId: r.empId, name: r.name, hours: hrs, open: r.open, shifts: r.shifts, rate, rateSource: r.empId ? "emp" : "email", pay: Math.round(hrs * rate * 100) / 100 };
   }).sort((a, b) => b.hours - a.hours);
   const totalPay = list.reduce((s, r) => s + r.pay, 0);
   return { ok: true, weekKey: wk, rates, config: { dealer: cfg.dealer || null, yonke: cfg.yonke || null, radiusM: Number(cfg.radiusM) || 150 }, list, totalPay: Math.round(totalPay * 100) / 100 };

@@ -2919,9 +2919,11 @@ async function renderHoras(){
   if(!list.length){ html+='<div style="color:var(--faint);padding:16px 4px;line-height:1.5;">Nadie ha fichado esta semana.<br>Los empleados hacen <b>Entrada/Salida</b> en la app del almacén (Warehouse).</div>'; }
   else {
     html+=list.map(r=>{
-      const rateInput = owner
+      const rateInput = (owner && r.rateSource!=='emp' && r.email)
         ? '<input type="number" inputmode="decimal" value="'+(r.rate||'')+'" onchange="setEmpRate(\''+r.email+'\',this.value)" placeholder="0" style="width:74px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-size:13px;">'
-        : ('$'+Number(r.rate||0).toFixed(2));
+        : (r.rateSource==='emp'
+            ? ('$'+Number(r.rate||0).toFixed(2)+' <span style="color:var(--faint);font-size:11px;">· edítala en 🪪 Empleados</span>')
+            : ('$'+Number(r.rate||0).toFixed(2)));
       return '<div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="font-weight:800;">'+esc(r.name||r.email)+(r.open?' <span style="color:#3ecf8e;font-size:12px;font-weight:600;">🟢 adentro</span>':'')+'</div><div style="font-weight:800;color:var(--gold);">'+centsToUSD(Math.round((r.pay||0)*100))+'</div></div>'
         +'<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin-top:6px;gap:8px;"><span>⏱ '+Number(r.hours||0).toFixed(2)+' h · '+(r.shifts||0)+' turno(s)</span><span>$/h: '+rateInput+'</span></div>'
