@@ -66,6 +66,9 @@
   .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#0f1420;border:1px solid var(--border-strong);color:var(--text);padding:13px 18px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:var(--shadow);z-index:99;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .toast.err{border-color:rgba(255,69,58,0.4);color:#ff8a80;}
+  .alabel{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px;}
+  .afield{width:100%;background:var(--surface2);border:1px solid var(--border-strong);border-radius:12px;padding:13px;font-size:16px;color:var(--text);font-family:inherit;}
+  .afield:focus{outline:none;border-color:var(--gold);}
 </style>
 </head>
 <body>
@@ -142,6 +145,9 @@
     <button id="clk-btn" class="btn btn-green" onclick="punch()">🟢 Registrar entrada</button>
     <div id="clk-note" class="faint" style="font-size:11px;margin-top:10px;"></div>
   </div>
+
+  <!-- Admin (solo dueños) -->
+  <button id="home-admin-btn" class="btn btn-ghost hide" onclick="openAdmin()" style="margin-bottom:18px;">👑 Equipo (admin)</button>
 
   <!-- Roles -->
   <div class="sec-title">Tus tareas de hoy</div>
@@ -234,6 +240,35 @@
   </div>
 </div>
 
+<!-- ===== ADMIN (dueños): gestión del equipo ===== -->
+<div id="screen-admin" class="wrap hide">
+  <div class="topbar">
+    <button class="linkbtn" onclick="adminBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <div style="flex:1;min-width:0;">
+      <div class="faint" style="font-size:13px;">👑 Admin</div>
+      <h2 id="admin-h" style="font-size:20px;">Equipo</h2>
+    </div>
+  </div>
+
+  <div id="admin-list-view">
+    <button class="btn btn-gold" onclick="adminNew()">➕ Nuevo empleado</button>
+    <div id="admin-list" style="margin-top:16px;"></div>
+  </div>
+
+  <div id="admin-form-view" class="hide">
+    <div class="card" style="display:flex;flex-direction:column;gap:13px;">
+      <div><label class="alabel">Nombre</label><input id="adm-name" class="afield" type="text" placeholder="Nombre completo"></div>
+      <div><label class="alabel">Teléfono (su login)</label><input id="adm-phone" class="afield" type="tel" inputmode="numeric" placeholder="559 123 4567"></div>
+      <div><label class="alabel">Tarifa $/hora</label><input id="adm-rate" class="afield" type="number" inputmode="decimal" placeholder="0.00"></div>
+      <div><label class="alabel">Funciones (puede tener varias)</label><div id="adm-roles" style="display:flex;flex-wrap:wrap;gap:8px;"></div></div>
+      <label style="display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer;"><input type="checkbox" id="adm-active" checked style="width:19px;height:19px;"> Activo</label>
+      <label style="display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer;"><input type="checkbox" id="adm-owner" style="width:19px;height:19px;"> 👑 Dueño / admin</label>
+    </div>
+    <button class="btn btn-gold" id="adm-save" onclick="adminSave()" style="margin-top:14px;">💾 Guardar</button>
+    <button class="linkbtn" onclick="adminCancel()" style="width:100%;margin-top:4px;">Cancelar</button>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script type="module">
@@ -260,6 +295,8 @@ let CLK = null;         // estado del reloj { open, hours }
 // Catálogo de roles → tile. 'ready' = ya construido; si no, muestra "Pronto".
 const ROLE_TILES = {
   'Detallador':        { ico:'🧽', sub:'Lavado y detallado', ready:true },
+  'Fotos':             { ico:'📸', sub:'Fotos del carro', ready:false },
+  'Limpieza':          { ico:'🧹', sub:'Oficina, baño, basura, blow', ready:false },
   'Mecánico':          { ico:'🔧', sub:'Inspección y reparación', ready:false },
   'Empaque':           { ico:'📦', sub:'Empacar pedidos', ready:false },
   'Captura':           { ico:'📸', sub:'Fotos de partes', ready:false },
@@ -270,7 +307,7 @@ const ROLE_TILES = {
   'Ventas':            { ico:'🤝', sub:'Ventas', ready:false },
 };
 
-function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail'].forEach(s=>{ document.getElementById(s).classList.toggle('hide', s!==id); }); }
+function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail','screen-admin'].forEach(s=>{ document.getElementById(s).classList.toggle('hide', s!==id); }); }
 function toast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); clearTimeout(window._tt); window._tt=setTimeout(()=>{t.className='toast'+(isErr?' err':'');},3200); }
 
 // ---------- Login ----------
@@ -345,6 +382,7 @@ function renderHome(){
   const h=new Date().getHours();
   document.getElementById('home-greet').textContent = h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches';
   document.getElementById('home-name').textContent = ME.name || 'Equipo';
+  document.getElementById('home-admin-btn').classList.toggle('hide', !ME.isOwner);
   const roles = Array.isArray(ME.roles)?ME.roles:[];
   const box=document.getElementById('home-tiles'); const none=document.getElementById('home-noroles');
   if(!roles.length){ box.classList.add('hide'); none.classList.remove('hide'); return; }
@@ -634,6 +672,55 @@ window.resumeJob = function(id){
   detailView('run'); renderRunner();
 };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ========================= ADMIN (dueños): gestión del equipo =========================
+let ADM_EMPS=[], ADM_ROLES=[], admEditId=null, admSel=[];
+window.openAdmin=function(){ if(!ME||!ME.isOwner){ toast('Solo dueños.',true); return; } show('screen-admin'); adminListView(); loadAdmin(); };
+window.adminBack=function(){ if(!document.getElementById('admin-form-view').classList.contains('hide')){ adminListView(); return; } show('screen-home'); loadClock(); };
+function adminListView(){ document.getElementById('admin-list-view').classList.remove('hide'); document.getElementById('admin-form-view').classList.add('hide'); document.getElementById('admin-h').textContent='Equipo'; }
+function adminFormView(){ document.getElementById('admin-list-view').classList.add('hide'); document.getElementById('admin-form-view').classList.remove('hide'); document.getElementById('admin-h').textContent= admEditId?'Editar empleado':'Nuevo empleado'; }
+async function loadAdmin(){
+  const box=document.getElementById('admin-list'); box.innerHTML='<div class="faint" style="padding:14px 2px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); const d=(r&&r.data)||{}; ADM_EMPS=d.emps||[]; ADM_ROLES=d.roles||[]; }
+  catch(e){ box.innerHTML='<div style="color:#ff6b6b;padding:14px 2px;">No se pudo cargar: '+esc((e&&e.message)||e)+'</div>'; return; }
+  renderAdminList();
+}
+function renderAdminList(){
+  const box=document.getElementById('admin-list');
+  if(!ADM_EMPS.length){ box.innerHTML='<div class="faint" style="padding:14px 2px;line-height:1.5;">Todavía no hay empleados.<br>Toca <b>➕ Nuevo empleado</b>.</div>'; return; }
+  box.innerHTML=ADM_EMPS.map(e=>{
+    const fns=(e.roles||[]).length?('<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;">'+e.roles.map(r=>'<span style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px 9px;font-size:11px;">'+esc(r)+'</span>').join('')+'</div>'):'<div class="faint" style="font-size:12px;margin-top:7px;">Sin funciones</div>';
+    return '<div class="card" style="padding:14px;margin-bottom:9px;'+(e.active?'':'opacity:.55;')+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
+      +'<div style="min-width:0;"><div style="font-weight:800;">'+(e.owner?'👑 ':'')+esc(e.name||'—')+(e.active?'':' <span class="faint" style="font-size:11px;">(inactivo)</span>')+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">'+esc(e.phone||'sin teléfono')+(e.rate?(' · $'+e.rate+'/h'):'')+'</div>'+fns+'</div>'
+      +'<button onclick="adminEdit(\''+e.id+'\')" style="flex:0 0 auto;background:var(--gold-soft);color:var(--gold);border:1px solid rgba(232,182,74,0.3);padding:8px 13px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;">Editar</button>'
+      +'</div></div>';
+  }).join('');
+}
+function admFillRoles(){
+  const box=document.getElementById('adm-roles');
+  const list = ADM_ROLES.length?ADM_ROLES:['Detallador','Fotos','Limpieza','Mecánico','Empaque','Captura','Listado','Desmantelador','Ayudante general','Oficina','Ventas'];
+  box.innerHTML=list.map(r=>{
+    const on=admSel.indexOf(r)>=0;
+    return '<button type="button" onclick="admToggleRole(\''+r.replace(/'/g,"\\'")+'\')" style="border:1px solid '+(on?'var(--gold)':'var(--border-strong)')+';background:'+(on?'var(--gold-soft)':'var(--surface2)')+';color:'+(on?'var(--gold)':'var(--text)')+';border-radius:999px;padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">'+esc(r)+'</button>';
+  }).join('');
+}
+window.admToggleRole=function(r){ const i=admSel.indexOf(r); if(i>=0) admSel.splice(i,1); else admSel.push(r); admFillRoles(); };
+window.adminNew=function(){ admEditId=null; admSel=[]; document.getElementById('adm-name').value=''; document.getElementById('adm-phone').value=''; document.getElementById('adm-rate').value=''; document.getElementById('adm-active').checked=true; document.getElementById('adm-owner').checked=false; admFillRoles(); adminFormView(); };
+window.adminEdit=function(id){ const e=ADM_EMPS.find(x=>x.id===id); if(!e) return; admEditId=id; admSel=(e.roles||[]).slice(); document.getElementById('adm-name').value=e.name||''; document.getElementById('adm-phone').value=e.phone||''; document.getElementById('adm-rate').value=e.rate||''; document.getElementById('adm-active').checked=e.active!==false; document.getElementById('adm-owner').checked=e.owner===true; admFillRoles(); adminFormView(); };
+window.adminCancel=function(){ adminListView(); };
+window.adminSave=async function(){
+  const name=document.getElementById('adm-name').value.trim(); if(!name){ toast('Pon el nombre.',true); return; }
+  const btn=document.getElementById('adm-save'); btn.disabled=true; const prev=btn.textContent; btn.textContent='Guardando…';
+  try{
+    const payload={ op:'save', name, phone:document.getElementById('adm-phone').value.trim(), rate:Number(document.getElementById('adm-rate').value)||0, active:document.getElementById('adm-active').checked, owner:document.getElementById('adm-owner').checked, roles:admSel };
+    if(admEditId) payload.id=admEditId;
+    await httpsCallable(functions,'empAdmin')(payload);
+    toast('✅ Guardado'); adminListView(); loadAdmin();
+  }catch(e){ toast((e&&e.message)||'No se pudo guardar.',true); }
+  btn.disabled=false; btn.textContent=prev;
+};
 </script>
 </body>
 </html>

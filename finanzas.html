@@ -644,8 +644,9 @@
         <div class="field"><label>Teléfono (su login)</label><input id="emp-phone" type="tel" placeholder="(559) 555-0100"></div>
         <div class="field"><label>Tarifa $/hora</label><input id="emp-rate" type="number" inputmode="decimal" placeholder="0.00"></div>
       </div>
-      <div class="field"><label>Roles (puede tener varios)</label><div id="emp-roles" style="display:flex;flex-wrap:wrap;gap:8px;"></div></div>
+      <div class="field"><label>Funciones (puede tener varias)</label><div id="emp-roles" style="display:flex;flex-wrap:wrap;gap:8px;"></div></div>
       <div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="emp-active" checked style="width:18px;height:18px;"> Activo</label></div>
+      <div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="emp-owner" style="width:18px;height:18px;"> 👑 Dueño / admin <span style="color:var(--faint);font-size:11px;font-weight:400;">— puede gestionar al equipo desde Pit Crew</span></label></div>
       <details style="margin:8px 0 10px;border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:0 12px;background:rgba(240,192,64,0.05);">
         <summary style="cursor:pointer;padding:10px 0;font-weight:700;color:var(--gold);font-size:13px;">🔒 Datos sensibles (solo tú los ves)</summary>
         <div class="row2"><div class="field"><label>SSN / ITIN</label><input id="emp-ssn" placeholder="###-##-####"></div><div class="field"><label># de identificación</label><input id="emp-idnum" placeholder="Licencia / ID"></div></div>
@@ -2823,7 +2824,7 @@ window.closeAudit=function(){ document.getElementById('audit-overlay').classList
 // 🔧 POR CARRO (yonke): cuánto va dejando cada carro = ventas de partes registradas en Finanzas − costo del carro
 // ===== 👷 HORAS / NÓMINA (check-in GPS de empleados) =====
 // ===== 🪪 EMPLEADOS (registro: foto, roles, tarifa + datos sensibles solo dueño) =====
-const EMP_ROLES = ['Detallador','Mecánico','Empaque','Captura','Listado','Desmantelador','Ayudante general','Oficina','Ventas'];
+const EMP_ROLES = ['Detallador','Fotos','Mecánico','Empaque','Captura','Listado','Desmantelador','Limpieza','Ayudante general','Oficina','Ventas'];
 let _emps=[], _empEditId=null, _empPhotoFile=null, _empIdFile=null;
 window.openEmp=function(){ if(!isOwnerUser()){ alert('Solo el dueño puede ver el registro de empleados.'); return; } empCancel(); document.getElementById('emp-overlay').classList.add('open'); loadEmps(); };
 window.closeEmp=function(){ document.getElementById('emp-overlay').classList.remove('open'); };
@@ -2851,12 +2852,12 @@ function _empSelRoles(){ return [...document.querySelectorAll('#emp-roles input:
 function _empShowForm(show){ document.getElementById('emp-form').style.display=show?'':'none'; document.getElementById('emp-list-wrap').style.display=show?'none':''; }
 window.empNew=function(){ _empEditId=null; _empPhotoFile=null; _empIdFile=null;
   ['emp-name','emp-phone','emp-rate','emp-ssn','emp-idnum','emp-addr','emp-emg-name','emp-emg-phone','emp-notes'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('emp-active').checked=true; document.getElementById('emp-photo-box').innerHTML='📷'; document.getElementById('emp-id-status').textContent='';
+  document.getElementById('emp-active').checked=true; document.getElementById('emp-owner').checked=false; document.getElementById('emp-photo-box').innerHTML='📷'; document.getElementById('emp-id-status').textContent='';
   document.getElementById('emp-del-btn').style.display='none'; _empFillRoles([]); _empShowForm(true); };
 window.empEdit=async function(id){ const e=_emps.find(x=>x.id===id); if(!e) return;
   _empEditId=id; _empPhotoFile=null; _empIdFile=null;
   document.getElementById('emp-name').value=e.name||''; document.getElementById('emp-phone').value=e.phone||''; document.getElementById('emp-rate').value=e.rate||'';
-  document.getElementById('emp-active').checked=e.active!==false; _empFillRoles(e.roles||[]);
+  document.getElementById('emp-active').checked=e.active!==false; document.getElementById('emp-owner').checked=e.owner===true; _empFillRoles(e.roles||[]);
   document.getElementById('emp-photo-box').innerHTML=e.photoURL?('<img src="'+e.photoURL+'" style="width:100%;height:100%;object-fit:cover;">'):'📷';
   let pv={}; try{ const s=await getDoc(doc(db,'employees',id,'private','data')); pv=s.exists()?s.data():{}; }catch(_){}
   document.getElementById('emp-ssn').value=pv.ssn||''; document.getElementById('emp-idnum').value=pv.idNumber||''; document.getElementById('emp-addr').value=pv.address||'';
@@ -2875,7 +2876,7 @@ window.empSave=async function(){
     const id=_empEditId || ('emp_'+Date.now()+'_'+Math.random().toString(36).slice(2,6));
     let photoURL=(_emps.find(x=>x.id===id)||{}).photoURL||'';
     if(_empPhotoFile){ const jpg=await toJpeg(_empPhotoFile); const r=ref(storage,'employees/'+id+'/photo_'+Date.now()+'.jpg'); await uploadBytes(r,jpg); photoURL=await getDownloadURL(r); }
-    const base={ name, phone, phoneE164:_empE164(phone), roles:_empSelRoles(), rate:Number(document.getElementById('emp-rate').value)||0, active:document.getElementById('emp-active').checked, photoURL, updatedAt:new Date().toISOString(), updatedBy:(auth.currentUser&&auth.currentUser.email)||'' };
+    const base={ name, phone, phoneE164:_empE164(phone), roles:_empSelRoles(), rate:Number(document.getElementById('emp-rate').value)||0, active:document.getElementById('emp-active').checked, owner:document.getElementById('emp-owner').checked, photoURL, updatedAt:new Date().toISOString(), updatedBy:(auth.currentUser&&auth.currentUser.email)||'' };
     if(!_empEditId) base.createdAt=new Date().toISOString();
     await setDoc(doc(db,'employees',id), base, {merge:true});
     let idPhotoURL;

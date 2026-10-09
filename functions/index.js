@@ -1028,8 +1028,10 @@ function _checkGeofence(cfg, lat, lng) {
   return { ok: best.distM <= radius, location: best.location, distM: Math.round(best.distM) };
 }
 function _emailKey(email) { return String(email || "").replace(/[/#?]/g, "_"); }
-// Lista completa de roles (debe coincidir con EMP_ROLES en finanzas.html).
-const ALL_EMP_ROLES = ["Detallador", "Mecánico", "Empaque", "Captura", "Listado", "Desmantelador", "Ayudante general", "Oficina", "Ventas"];
+// Catálogo de FUNCIONES/tareas (debe coincidir con EMP_ROLES en finanzas.html y ROLE_TILES en empleado.html).
+const ALL_EMP_ROLES = ["Detallador", "Fotos", "Mecánico", "Empaque", "Captura", "Listado", "Desmantelador", "Limpieza", "Ayudante general", "Oficina", "Ventas"];
+// Teléfono → E.164 (igual que _empE164 en finanzas.html).
+function _toE164(s) { const d = String(s || "").replace(/\D/g, ""); if (d.length === 10) return "+1" + d; if (d.length === 11 && d[0] === "1") return "+" + d; return ""; }
 // Resuelve QUIÉN llama: dueño/staff por CORREO, o empleado por TELÉFONO (registro `employees`).
 // Devuelve { key, name, email, phone, empId, roles, rate, photoURL, isOwner, active, notRegistered }.
 async function _actorIdentity(request) {
@@ -1047,7 +1049,7 @@ async function _actorIdentity(request) {
     catch (e) { snap = { empty: true }; }
     if (snap && !snap.empty) {
       const docSnap = snap.docs[0]; const d = docSnap.data() || {};
-      return { key, name: d.name || "Empleado", email: "", phone, empId: docSnap.id, roles: Array.isArray(d.roles) ? d.roles : [], rate: Number(d.rate) || 0, photoURL: d.photoURL || "", active: d.active !== false, isOwner: false, notRegistered: false };
+      return { key, name: d.name || "Empleado", email: "", phone, empId: docSnap.id, roles: Array.isArray(d.roles) ? d.roles : [], rate: Number(d.rate) || 0, photoURL: d.photoURL || "", active: d.active !== false, isOwner: d.owner === true, notRegistered: false };
     }
     return { key, name: "", email: "", phone, empId: "", roles: [], rate: 0, photoURL: "", active: false, isOwner: false, notRegistered: true };
   }
@@ -1064,7 +1066,63 @@ exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   }
   if (id.notRegistered) return { ok: true, found: false, phone: id.phone, via: "phone" };
   if (!id.active) return { ok: true, found: true, active: false, name: id.name, roles: [], empId: id.empId, photoURL: id.photoURL, via: "phone" };
-  return { ok: true, found: true, active: true, name: id.name, roles: id.roles, empId: id.empId, photoURL: id.photoURL, isOwner: false, via: "phone" };
+  return { ok: true, found: true, active: true, name: id.name, roles: id.roles, empId: id.empId, photoURL: id.photoURL, isOwner: id.isOwner, via: "phone" };
+});
+
+// 👑 Panel del dueño en Pit Crew: listar y gestionar el equipo desde el teléfono. Solo dueños.
+exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo los dueños.");
+  const db = admin.firestore();
+  const d = (request.data && request.data) || {};
+  const op = String(d.op || "list");
+  if (op === "list") {
+    const snap = await db.collection("employees").get();
+    const emps = [];
+    snap.forEach((doc) => {
+      const x = doc.data() || {};
+      emps.push({ id: doc.id, name: x.name || "", phone: x.phone || "", phoneE164: x.phoneE164 || "", roles: Array.isArray(x.roles) ? x.roles : [], rate: Number(x.rate) || 0, active: x.active !== false, owner: x.owner === true, photoURL: x.photoURL || "" });
+    });
+    emps.sort((a, b) => (Number(b.active) - Number(a.active)) || a.name.localeCompare(b.name));
+    return { ok: true, emps, roles: ALL_EMP_ROLES };
+  }
+  if (op === "save") {
+    const name = String(d.name || "").trim();
+    if (!name) throw new HttpsError("invalid-argument", "Falta el nombre.");
+    const phone = String(d.phone || "").trim();
+    const roles = Array.isArray(d.roles) ? d.roles.filter((r) => ALL_EMP_ROLES.includes(r)) : [];
+    const empId = (String(d.id || "").match(/^[A-Za-z0-9_]{3,80}$/) ? d.id : ("emp_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6)));
+    const ref = db.collection("employees").doc(empId);
+    const base = { name, phone, phoneE164: _toE164(phone), roles, rate: Math.max(0, Number(d.rate) || 0), active: d.active !== false, owner: d.owner === true, updatedAt: new Date().toISOString(), updatedBy: id.email || id.phone || id.key };
+    const exists = (await ref.get()).exists;
+    if (!exists) base.createdAt = new Date().toISOString();
+    await ref.set(base, { merge: true });
+    return { ok: true, id: empId };
+  }
+  if (op === "setActive") {
+    const empId = String(d.id || "");
+    if (!empId) throw new HttpsError("invalid-argument", "Falta el empleado.");
+    await db.collection("employees").doc(empId).set({ active: d.active !== false, updatedAt: new Date().toISOString() }, { merge: true });
+    return { ok: true };
+  }
+  if (op === "toggleRole") {
+    const empId = String(d.id || "");
+    const role = String(d.role || "");
+    const on = !!d.on;
+    if (!empId) throw new HttpsError("invalid-argument", "Falta el empleado.");
+    if (!ALL_EMP_ROLES.includes(role)) throw new HttpsError("invalid-argument", "Función inválida.");
+    const ref = db.collection("employees").doc(empId);
+    await db.runTransaction(async (tx) => {
+      const s = await tx.get(ref);
+      const x = s.exists ? (s.data() || {}) : {};
+      let roles = Array.isArray(x.roles) ? x.roles.slice() : [];
+      if (on) { if (!roles.includes(role)) roles.push(role); } else { roles = roles.filter((r) => r !== role); }
+      tx.set(ref, { roles, updatedAt: new Date().toISOString() }, { merge: true });
+    });
+    return { ok: true };
+  }
+  throw new HttpsError("invalid-argument", "Operación inválida.");
 });
 // Entrada / salida. request.data = { action:'in'|'out', lat, lng }
 // Turno ABIERTO en timeclock_open/<actorKey> (1 por persona) → sin índices compuestos.
