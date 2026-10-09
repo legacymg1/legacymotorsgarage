@@ -14657,6 +14657,16 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <div id="car-prep-only" style="display:none;">
       <div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">🔧 <b>Preparación (interno).</b> Registra lo que nos costó el carro. Puedes agregar una foto ya. El video, la descripción y el precio de venta se piden después, al editarlo para exhibición.</div>
     </div>
+    <div id="car-recon-block" style="display:none;background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.3);border-radius:8px;padding:10px 11px;margin:2px 0 10px;">
+      <label style="display:block;font-size:12px;color:#ffb74d;font-weight:800;margin-bottom:6px;">🔧 Etapa de preparación (línea)</label>
+      <select class="cf-input" id="car-recon-stage" style="margin:0;">
+        <option value="mecanico">1) Con el mecánico — smog, aceite, estéreo, reparaciones</option>
+        <option value="pintura">2) En pintura (outsourced)</option>
+        <option value="detalle">3) ✅ Listo para DETALLAR (el detallador ya lo puede tomar)</option>
+        <option value="listo">4) Detallado — listo para fotos / exhibición</option>
+      </select>
+      <div style="font-size:11px;color:#9caa88;margin-top:6px;line-height:1.4;">El detallador en su app <b>solo ve los carros en la etapa “Listo para detallar”</b>. Al terminar de detallar, el carro pasa solo a la etapa 4.</div>
+    </div>
     <div id="car-cost-block" style="display:none;">
       <div id="car-cost-editnote" style="display:none;background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">💰 Este carro <b>aún no tiene costo de compra</b>. Puedes registrarlo aquí.</div>
       <input class="cf-input" id="car-cost" placeholder="Costo de compra / lo que pagamos ($)" type="number">
@@ -15170,6 +15180,13 @@ window.openCarModal = function(carId){
   // Nuevo = etapa PREP (solo costo); Editar = etapa EXHIBICIÓN (formulario completo)
   document.getElementById('car-prep-only').style.display = carId ? 'none' : 'block';
   document.getElementById('car-exhib-only').style.display = carId ? 'block' : 'none';
+  // 🔧 Etapa de recondicionamiento: se muestra para carros en prep (nuevos o al editarlos)
+  const _reconBlk=document.getElementById('car-recon-block');
+  const _reconSel=document.getElementById('car-recon-stage');
+  const _carForRecon = carId ? (cars.find(x=>x.id===carId)||{}) : null;
+  const _isPrepCar = !carId || (_carForRecon && _carForRecon.status==='prep');
+  if(_reconBlk) _reconBlk.style.display = _isPrepCar ? 'block' : 'none';
+  if(_reconSel) _reconSel.value = (_carForRecon && _carForRecon.reconStage) || 'mecanico';
   const _ms=document.getElementById('car-manage-section'); if(_ms) _ms.style.display = carId ? 'block' : 'none';   // mover/devolver solo al editar
   if(carId){ const _tp=document.getElementById('car-toparts-btn'), _rt=document.getElementById('car-return-btn'); if(_tp) _tp.dataset.cid=carId; if(_rt) _rt.dataset.cid=carId; }
   const _cc=document.getElementById('car-cost'); if(_cc) _cc.value='';
@@ -15473,6 +15490,7 @@ window.saveCar = async function(){
       img: photos[0]||existing.img||'',
       inventoryNum: existing.inventoryNum || generateInvNum(),
       status: existing.status || 'prep',
+      reconStage: (((existing.status||'prep')==='prep') ? (((document.getElementById('car-recon-stage')||{}).value) || existing.reconStage || 'mecanico') : (existing.reconStage || null)),
       gpsPhotoURL,
       smogPhotoURL,
       vin: (document.getElementById('car-vin')?document.getElementById('car-vin').value.trim():'').toUpperCase(),

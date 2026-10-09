@@ -180,6 +180,25 @@
     <div id="detail-list"></div>
   </div>
 
+  <!-- PICK (carros en prep) -->
+  <div id="detail-pick" class="hide">
+    <div class="faint" style="font-size:13px;margin-bottom:12px;line-height:1.45;">Elige el carro que vas a detallar. Son los que están <b style="color:#ff9800;">🔧 En prep</b> en el inventario.</div>
+    <div id="pick-list"></div>
+    <button class="linkbtn" onclick="detailManual()" style="width:100%;margin-top:10px;">¿No está en la lista? Escribirlo a mano</button>
+  </div>
+
+  <!-- TRIAGE (checklist previo ~5 min) -->
+  <div id="detail-triage" class="hide">
+    <div id="triage-car" class="faint" style="font-size:14px;margin-bottom:6px;font-weight:700;color:var(--text);"></div>
+    <div class="faint" style="font-size:13px;margin-bottom:14px;line-height:1.45;">Revisa rápido el carro y marca cómo está cada cosa. Toma ~5 min y nos ayuda a calcular el tiempo.</div>
+    <div id="triage-body"></div>
+    <div class="clock-card" style="margin:16px 0 0;padding:16px;">
+      <div class="clock-status muted">Tiempo estimado</div>
+      <div class="clock-hours" id="triage-est" style="font-size:32px;">—</div>
+    </div>
+    <button class="btn btn-gold" id="triage-go" onclick="triageDone()" style="margin-top:14px;" disabled>Empezar a detallar</button>
+  </div>
+
   <!-- RUNNER -->
   <div id="detail-run" class="hide">
     <div id="run-car" class="faint" style="font-size:14px;margin-bottom:10px;font-weight:700;color:var(--text);"></div>
@@ -397,14 +416,14 @@ window.loadHome = function(){ if(ME){ loadClock(); } };
 // ========================= DETALLADOR (SOP guiado) =========================
 // SOP de detallado tal cual lo pidió Enrique, con instrucciones, cuidados y tiempo sugerido.
 const DETAIL_SOP = [
-  { id:'faros', title:'Faros', min:15, skippable:true,
-    steps:'Revisa los faros. Si están opacos o amarillos, haz la restauración: lija (grano fino → más fino), pule y sella. Si ya están claros, salta este paso.',
+  { id:'faros', tri:'faros', title:'Faros', min:15, skippable:true,
+    steps:'Revisa los faros. Si están opacos o quemados, haz la restauración: lija (grano fino → más fino), pule y sella. Si ya están claros, salta este paso.',
     care:'Cubre con cinta la pintura y los bordes antes de lijar — no toques el vidrio ni la pintura. No dejes el sellador secando al rayo del sol.' },
-  { id:'asientos', title:'Interior — asientos', min:25, skippable:true,
-    steps:'Revisa qué tan mal están los asientos. Si están muy manchados o son de color claro, quítalos y lávalos aparte. Si están bien, solo límpialos en su lugar.',
-    care:'Al quitar asientos, desconecta la batería si tienen airbag/sensores y cuida los conectores. Guarda los tornillos marcados. No mojes módulos eléctricos debajo del asiento.' },
-  { id:'aspirar', title:'Aspirada', min:20, skippable:false,
-    steps:'Saca los tapetes y aspira todo el interior. Si la carpeta (alfombra) está muy sucia, lávala y pon los pods de secado para que seque rápido.',
+  { id:'asientos', tri:'asientos', title:'Interior — asientos', min:25, skippable:true,
+    steps:'Según la revisión: si son de tela y están manchados, restáuralos/lávalos; si son de piel, límpiala y acondiciónala. Si están bien, solo límpialos en su lugar.',
+    care:'Al quitar asientos, desconecta la batería si tienen airbag/sensores y cuida los conectores. Guarda los tornillos marcados. No mojes módulos eléctricos debajo del asiento. La piel NO se talla duro ni se encharca.' },
+  { id:'aspirar', tri:'carpeta', title:'Aspirada / carpeta', min:20, skippable:false,
+    steps:'Saca los tapetes y aspira todo el interior y la cajuela. Si la carpeta está sucia o manchada, lávala y pon los pods de secado para que seque rápido.',
     care:'No encharques la carpeta encima de los módulos del piso. Usa SIEMPRE los drying pods para que no quede humedad (si no, huele a moho).' },
   { id:'interior-rapido', title:'Interior rápido', min:20, skippable:false,
     steps:'Detalla el interior con brocha y fórmula MUY rebajada: cupholders, botones, rejillas de aire, costuras y tablero. Deja todo limpio y parejo.',
@@ -412,40 +431,150 @@ const DETAIL_SOP = [
   { id:'cielo', title:'Cielo y sun visors', min:15, skippable:false,
     steps:'Limpia el cielo (techo por dentro), los sun visors y cualquier mancha que haya quedado.',
     care:'El cielo es delicado: toques suaves, no frotes duro ni lo encharques — se despega la tela.' },
-  { id:'motor', title:'Lavar el motor', min:20, skippable:true,
+  { id:'motor', tri:'motor', title:'Lavar el motor', min:20, skippable:true,
     steps:'Con el motor FRÍO: cubre las partes eléctricas, aplica desengrasante, talla, enjuaga suave y sopla/seca al final.',
     care:'Cubre bien: caja de fusibles, computadora, alternador, bobinas y toma de aire. NUNCA agua a presión directo a los conectores. Motor frío. Al terminar, sopla el agua para que no queden charcos.' },
-  { id:'clay', title:'Clay mitt', min:25, skippable:false,
+  { id:'rines', tri:'rines', title:'Rines y tolvas', min:12, skippable:false,
+    steps:'Lava bien los rines y las tolvas (guardafangos interiores). Quita el polvo de freno y la tierra pegada.',
+    care:'Usa producto adecuado para el tipo de rin (no ácido en rines delicados). Enjuaga bien para que no quede producto que manche.' },
+  { id:'clay', title:'Clay mitt (guante)', min:25, skippable:false,
     steps:'Pasa el clay mitt con jabón a TODO el carro, duro y en todas direcciones, hasta que la pintura se sienta lisa.',
     care:'La superficie siempre con jabón/lubricante — nunca en seco porque raya. Enjuaga el mitt seguido. Si se cae al piso, ya no lo uses (recoge tierra y raya).' },
-  { id:'encerar', title:'Pulir / encerar y ventanas', min:30, skippable:false,
-    steps:'Pule o encera todo el carro para dar brillo y protección. Al final limpia TODAS las ventanas por dentro y por fuera.',
-    care:'Poca cera, capa delgada. No enceres sobre plásticos ni gomas (quedan blancos). Ventanas al final con microfibra limpia, sin dejar rayas.' },
+  { id:'encerar', tri:'acabado', title:'Pulir / encerar', min:30, skippable:true,
+    steps:'Según la revisión: pule para rescatar la pintura si lo necesita, luego encera para dar brillo y protección. Si solo pide guante, salta esto.',
+    care:'Poca cera, capa delgada. No enceres sobre plásticos ni gomas (quedan blancos). La pulidora con cuidado en filos y orillas (no quemar la pintura).' },
+  { id:'ventanas', title:'Ventanas', min:12, skippable:false,
+    steps:'Limpia TODAS las ventanas y espejos, por dentro y por fuera, hasta que queden sin rayas.',
+    care:'Microfibra limpia y seca. Hazlo a la sombra (al sol se seca y deja marcas).' },
+  { id:'tireshine', title:'Tire shine', min:8, skippable:false,
+    steps:'Justo ANTES de las fotos: pon tire shine a las llantas y a los plásticos exteriores para que se vean negros y como nuevos.',
+    care:'Que no escurra ni salpique la pintura ni los rines. Aplica parejo. Hazlo al último, justo antes de las fotos, para que luzca fresco.' },
+  { id:'placas-fotos', title:'Placas Legacy y fotos', min:12, skippable:false,
+    steps:'Coloca las placas de Legacy en el carro y toma las fotos del vehículo: todos los ángulos por fuera, el interior y el motor. Buena luz, fondo limpio.',
+    care:'Placas derechas y bien puestas. Carro ya con el tire shine fresco. Fotos parejas, sin basura, mangueras ni herramientas en el fondo.' },
 ];
-let JOB=null, runIdx=0, stepStart=0, tickHandle=null;
+// Checklist PREVIO (triage ~5 min): el detallador marca el estado → estimamos el tiempo del carro.
+const TRIAGE=[
+  { id:'faros', q:'Faros', opts:[ {v:'ok',label:'Bien',min:0}, {v:'opacos',label:'Opacos',min:12}, {v:'quemados',label:'Muy quemados',min:22} ] },
+  { id:'asientos', q:'Asientos', opts:[ {v:'tela',label:'Tela',min:15}, {v:'piel',label:'Piel',min:12}, {v:'tela-rest',label:'Tela — restaurar',min:35}, {v:'piel-rest',label:'Piel — restaurar',min:35} ] },
+  { id:'carpeta', q:'Carpeta (alfombra)', opts:[ {v:'aspirar',label:'Solo aspirar',min:10}, {v:'lavar',label:'Lavar',min:20}, {v:'muy',label:'Manchada / muy sucia',min:30} ] },
+  { id:'cajuela', q:'Cajuela', opts:[ {v:'aspirar',label:'Solo aspirar',min:5}, {v:'lavar',label:'Lavar',min:15} ] },
+  { id:'ventanas', q:'Ventanas', opts:[ {v:'si',label:'Limpiar',min:12} ] },
+  { id:'rines', q:'Rines y tolvas', opts:[ {v:'normal',label:'Normal',min:8}, {v:'sucio',label:'Muy sucio',min:16} ] },
+  { id:'motor', q:'Motor', opts:[ {v:'polvo',label:'Solo polvoso',min:10}, {v:'aceite',label:'Aceite tirado',min:22} ] },
+  { id:'acabado', q:'Acabado de pintura (puede ser varios)', multi:true, opts:[ {v:'guante',label:'Guante (clay)',min:20}, {v:'encerar',label:'Encerada',min:20}, {v:'pulir',label:'Pulida',min:35}, {v:'rescate',label:'Pulir para rescatar pintura',min:60} ] },
+];
+const TRI_BASE_MIN=40;   // interior rápido + cielo + tire shine + placas/fotos (fijos)
+let JOB=null, runIdx=0, stepStart=0, tickHandle=null, TRI={};
 
 window.openDetailer = function(){ show('screen-detail'); detailView('home'); loadMyJobs(); };
 function detailView(v){
   document.getElementById('detail-home').classList.toggle('hide', v!=='home');
+  document.getElementById('detail-pick').classList.toggle('hide', v!=='pick');
+  document.getElementById('detail-triage').classList.toggle('hide', v!=='triage');
   document.getElementById('detail-run').classList.toggle('hide', v!=='run');
   document.getElementById('detail-done').classList.toggle('hide', v!=='done');
-  document.getElementById('detail-h').textContent = v==='run'?'Detallando':v==='done'?'Terminado':'Carros de hoy';
+  document.getElementById('detail-h').textContent = v==='run'?'Detallando':v==='done'?'Terminado':v==='triage'?'Revisión del carro':v==='pick'?'Elige el carro':'Carros de hoy';
 }
 window.detailBack = function(){
   if(!document.getElementById('detail-run').classList.contains('hide')){
     if(!confirm('¿Salir de este carro? Se guarda como empezado y puedes seguir después.')) return;
     stopTick(); saveJob();
+  } else if(!document.getElementById('detail-triage').classList.contains('hide')){
+    detailView('pick'); return;   // de la revisión regresa a elegir carro
+  } else if(!document.getElementById('detail-pick').classList.contains('hide')){
+    detailView('home'); return;   // del picker regresa al home del detallador
   }
   JOB=null; show('screen-home'); loadClock();
 };
-window.detailStart = function(){
+// Abre el selector de carros en prep (del inventario real).
+window.detailStart = function(){ detailView('pick'); loadPrepCars(); };
+async function loadPrepCars(){
+  const box=document.getElementById('pick-list');
+  box.innerHTML='<div class="faint" style="padding:16px 2px;font-size:13px;">Cargando carros en prep…</div>';
+  let cars=[];
+  try{ const r=await httpsCallable(functions,'prepCars')({}); cars=((r&&r.data)||{}).cars||[]; }
+  catch(e){ box.innerHTML='<div style="color:#ff6b6b;padding:14px 2px;font-size:14px;">No se pudo cargar el inventario: '+esc((e&&e.message)||e)+'</div>'; return; }
+  window._prepCars=cars;
+  if(!cars.length){ box.innerHTML='<div class="faint" style="padding:16px 2px;font-size:14px;line-height:1.5;">No hay carros marcados <b style="color:#ff9800;">🔧 En prep</b> ahorita.<br>Legacy los marca al agregarlos al inventario.</div>'; return; }
+  box.innerHTML=cars.map((c,i)=>{
+    const thumb = c.photo
+      ? '<img src="'+esc(c.photo)+'" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex:0 0 auto;background:var(--surface2);">'
+      : '<div style="width:52px;height:52px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto;">🚗</div>';
+    return '<div class="card" style="padding:12px;margin-bottom:9px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="pickPrep('+i+')">'
+      +thumb
+      +'<div style="min-width:0;flex:1;"><div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.label||'Carro')+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+(c.vin?('VIN …'+esc(String(c.vin).slice(-6))):'sin VIN')+'</div></div>'
+      +'<div style="color:var(--gold);font-size:20px;flex:0 0 auto;">›</div></div>';
+  }).join('');
+}
+window.pickPrep = function(i){
+  const c=(window._prepCars||[])[i]; if(!c){ toast('No se encontró el carro.',true); return; }
+  startDetailJob({ car:c.label, vin:c.vin||'', inventoryId:c.id, inventoryNum:c.inventoryNum||'' });
+};
+window.detailManual = function(){
   const car=prompt('¿Qué carro vas a detallar?\n(marca / modelo / año, o VIN)');
   if(car===null) return;
   if(!String(car).trim()){ toast('Escribe cuál carro.', true); return; }
-  JOB={ id:'dj_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), car:String(car).trim(), startedAt:new Date().toISOString(), status:'active',
+  startDetailJob({ car:String(car).trim(), vin:'', inventoryId:'', inventoryNum:'' });
+};
+function startDetailJob(info){
+  JOB={ id:'dj_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), car:info.car, vin:info.vin||'', inventoryId:info.inventoryId||'', inventoryNum:info.inventoryNum||'',
+        startedAt:new Date().toISOString(), status:'active', triage:{}, estMin:0,
         steps:DETAIL_SOP.map(s=>({id:s.id,title:s.title,seconds:0,done:false,skipped:false})) };
+  TRI={}; detailView('triage'); renderTriage();
+}
+// ---------- Checklist previo (triage) ----------
+function renderTriage(){
+  document.getElementById('triage-car').textContent='🚗 '+(JOB.car||'Carro');
+  const box=document.getElementById('triage-body');
+  box.innerHTML=TRIAGE.map(t=>{
+    const chips=t.opts.map(o=>{
+      const sel = t.multi ? (Array.isArray(TRI[t.id])&&TRI[t.id].indexOf(o.v)>=0) : (TRI[t.id]===o.v);
+      return '<button type="button" onclick="triagePick(\''+t.id+'\',\''+o.v+'\','+(t.multi?'true':'false')+')" '
+        +'style="border:1px solid '+(sel?'var(--gold)':'var(--border-strong)')+';background:'+(sel?'var(--gold-soft)':'var(--surface2)')+';color:'+(sel?'var(--gold)':'var(--text)')+';border-radius:999px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">'+o.label+'</button>';
+    }).join('');
+    return '<div style="margin-bottom:16px;"><div style="font-weight:800;font-size:15px;margin-bottom:9px;">'+t.q+(t.multi?' <span class="faint" style="font-size:11px;font-weight:600;">(varios)</span>':'')+'</div><div style="display:flex;flex-wrap:wrap;gap:8px;">'+chips+'</div></div>';
+  }).join('');
+  triageRecalc();
+}
+window.triagePick = function(id,v,multi){
+  if(multi){ if(!Array.isArray(TRI[id])) TRI[id]=[]; const i=TRI[id].indexOf(v); if(i>=0) TRI[id].splice(i,1); else TRI[id].push(v); }
+  else { TRI[id]= (TRI[id]===v? null : v); }
+  renderTriage();
+};
+function triageEstMin(){
+  let m=TRI_BASE_MIN;
+  TRIAGE.forEach(t=>{
+    const val=TRI[t.id];
+    if(t.multi){ (val||[]).forEach(v=>{ const o=t.opts.find(o=>o.v===v); if(o) m+=o.min; }); }
+    else if(val){ const o=t.opts.find(o=>o.v===val); if(o) m+=o.min; }
+  });
+  return m;
+}
+function triageAnswered(){
+  // requiere al menos las preguntas de una sola opción contestadas
+  return TRIAGE.filter(t=>!t.multi).every(t=>!!TRI[t.id]);
+}
+function triageRecalc(){
+  const est=triageEstMin();
+  const el=document.getElementById('triage-est'); const go=document.getElementById('triage-go');
+  const ready=triageAnswered();
+  el.textContent = ready ? ('~'+est+' min') : '—';
+  go.disabled=!ready;
+}
+window.triageDone = function(){
+  if(!triageAnswered()){ toast('Contesta todas las revisiones.', true); return; }
+  JOB.triage=JSON.parse(JSON.stringify(TRI)); JOB.estMin=triageEstMin();
   runIdx=0; detailView('run'); renderRunner(); saveJob();
 };
+// etiqueta corta de lo que se marcó para un paso (para el hint en el runner)
+function triageHint(triId){
+  const t=TRIAGE.find(x=>x.id===triId); if(!t||!JOB||!JOB.triage) return '';
+  const val=JOB.triage[triId];
+  if(t.multi){ const arr=(val||[]).map(v=>(t.opts.find(o=>o.v===v)||{}).label).filter(Boolean); return arr.join(' + '); }
+  const o=t.opts.find(o=>o.v===val); return o?o.label:'';
+}
 function fmtT(sec){ sec=Math.max(0,Math.round(sec)); const m=Math.floor(sec/60), s=sec%60; if(m>=60){const h=Math.floor(m/60);return h+':'+String(m%60).padStart(2,'0')+':'+String(s).padStart(2,'0');} return m+':'+String(s).padStart(2,'0'); }
 function renderRunner(){
   const sop=DETAIL_SOP[runIdx];
@@ -453,7 +582,9 @@ function renderRunner(){
   document.getElementById('run-count').textContent='Paso '+(runIdx+1)+' de '+DETAIL_SOP.length;
   document.getElementById('run-sug').textContent='~'+sop.min+' min';
   document.getElementById('run-title').textContent=sop.title;
-  document.getElementById('run-steps').textContent=sop.steps;
+  const hint = sop.tri ? triageHint(sop.tri) : '';
+  const hintHtml = hint ? '<div style="display:inline-block;background:var(--gold-soft);color:var(--gold);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800;margin-bottom:10px;">🔎 Revisión: '+esc(hint)+'</div><br>' : '';
+  document.getElementById('run-steps').innerHTML = hintHtml + esc(sop.steps);
   document.getElementById('run-care').textContent=sop.care;
   document.getElementById('run-skip').style.display = sop.skippable ? 'block':'none';
   document.getElementById('run-prog').innerHTML = DETAIL_SOP.map((s,i)=>'<div style="flex:1;height:5px;border-radius:3px;background:'+(i<runIdx?'var(--gold)':i===runIdx?'var(--green)':'var(--surface2)')+';"></div>').join('');
@@ -471,7 +602,9 @@ function finishJob(){
   saveJob();
   document.getElementById('done-car').textContent='🚗 '+(JOB.car||'');
   document.getElementById('done-total').textContent=fmtT(JOB.totalSeconds);
-  document.getElementById('done-break').innerHTML=JOB.steps.map(s=>'<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span>'+(s.skipped?'<span style="color:var(--faint)">⤼ </span>':'<span style="color:var(--green)">✓ </span>')+s.title+'</span><span style="color:'+(s.skipped?'var(--faint)':'var(--muted)')+';font-variant-numeric:tabular-nums;">'+(s.skipped?'no aplicó':fmtT(s.seconds))+'</span></div>').join('');
+  const est=JOB.estMin||0; const realMin=Math.round(JOB.totalSeconds/60);
+  const cmp = est ? '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;"><span class="faint">Estimado vs real</span><span class="faint" style="font-variant-numeric:tabular-nums;">~'+est+' min · real '+realMin+' min</span></div>' : '';
+  document.getElementById('done-break').innerHTML=cmp+JOB.steps.map(s=>'<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span>'+(s.skipped?'<span style="color:var(--faint)">⤼ </span>':'<span style="color:var(--green)">✓ </span>')+s.title+'</span><span style="color:'+(s.skipped?'var(--faint)':'var(--muted)')+';font-variant-numeric:tabular-nums;">'+(s.skipped?'no aplicó':fmtT(s.seconds))+'</span></div>').join('');
   detailView('done');
 }
 async function saveJob(){ if(!JOB) return; try{ const r=await httpsCallable(functions,'detailJob')({op:'save',job:JOB}); if(r&&r.data&&r.data.id) JOB.id=r.data.id; }catch(e){ /* sigue en local */ } }
@@ -495,7 +628,7 @@ async function loadMyJobs(){
 }
 window.resumeJob = function(id){
   const j=(window._myJobs||[]).find(x=>x.id===id); if(!j){ toast('No se encontró el carro.',true); return; }
-  JOB={ id:j.id, car:j.car, startedAt:j.startedAt, status:'active',
+  JOB={ id:j.id, car:j.car, vin:j.vin||'', inventoryId:j.inventoryId||'', inventoryNum:j.inventoryNum||'', triage:j.triage||{}, estMin:Number(j.estMin)||0, startedAt:j.startedAt, status:'active',
         steps:DETAIL_SOP.map(s=>{ const p=(j.steps||[]).find(x=>x.id===s.id)||{}; return {id:s.id,title:s.title,seconds:Number(p.seconds)||0,done:!!p.done,skipped:!!p.skipped}; }) };
   runIdx=JOB.steps.findIndex(s=>!s.done && !s.skipped); if(runIdx<0) runIdx=0;
   detailView('run'); renderRunner();

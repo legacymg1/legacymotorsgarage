@@ -1187,6 +1187,8 @@ exports.detailJob = onCall({ timeoutSeconds: 30 }, async (request) => {
     empKey: id.key, empId: id.empId, name: id.name, phone: id.phone,
     car: String(job.car || "").slice(0, 120), vin: String(job.vin || "").slice(0, 20),
     inventoryId: String(job.inventoryId || "").slice(0, 60), inventoryNum: String(job.inventoryNum || "").slice(0, 20),
+    triage: (job.triage && typeof job.triage === "object" && !Array.isArray(job.triage) && JSON.stringify(job.triage).length < 2000) ? job.triage : {},
+    estMin: Math.max(0, Math.round(Number(job.estMin) || 0)),
     steps, totalSeconds: Math.max(0, Math.round(Number(job.totalSeconds) || 0)),
     status: (job.status === "done") ? "done" : "active",
     startedAt: String(job.startedAt || new Date().toISOString()),
