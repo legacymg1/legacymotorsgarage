@@ -236,6 +236,7 @@
     <button class="btn-add" onclick="platePayout()" style="font-size:15px;" title="Sacar efectivo del corte para pagar placas/DMV (dinero de clientes). No es gasto ni baja la ganancia.">🪪 Salida placas</button>
     <button class="btn-add" onclick="openDcarReport()" style="font-size:15px;" title="Cuánto va dejando cada carro del yonke: ventas de partes registradas − lo que costó el carro.">🔧 Por carro (yonke)</button>
     <button class="btn-add" onclick="openHoras()" style="font-size:15px;" title="Horas trabajadas de la semana por empleado (check-in GPS) y pago según su tarifa.">👷 Horas / Nómina</button>
+    <button class="btn-add" onclick="openEmp()" style="font-size:15px;" title="Registro de empleados: foto, roles, tarifa y datos (lo sensible solo lo ves tú).">🪪 Empleados</button>
   </div>
 
   <div class="coll-head" style="margin-top:22px;" onclick="toggleSubs()">
@@ -594,6 +595,44 @@
   <div class="sheet" style="max-width:720px;">
     <div class="sheet-head"><div class="sheet-title">🔧 Por carro del yonke</div><button class="close" onclick="closeDcarReport()">✕</button></div>
     <div id="dcar-body"></div>
+  </div>
+</div>
+
+<!-- 🪪 EMPLEADOS: registro (foto, roles, tarifa) + datos sensibles (solo dueño) -->
+<div class="overlay" id="emp-overlay" onclick="if(event.target===this)closeEmp()">
+  <div class="sheet" style="max-width:620px;">
+    <div class="sheet-head"><div class="sheet-title">🪪 Empleados</div><button class="close" onclick="closeEmp()">✕</button></div>
+    <div id="emp-list-wrap">
+      <button class="btn-add" onclick="empNew()" style="margin-bottom:12px;width:100%;">➕ Nuevo empleado</button>
+      <div id="emp-list"></div>
+    </div>
+    <div id="emp-form" style="display:none;">
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;">
+        <div onclick="document.getElementById('emp-photo-in').click()" id="emp-photo-box" style="width:76px;height:76px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:30px;cursor:pointer;overflow:hidden;flex:0 0 auto;">📷</div>
+        <input type="file" id="emp-photo-in" accept="image/*" capture="user" style="display:none;" onchange="empPhotoPick(this)">
+        <div style="flex:1;"><label style="font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:1px;">Foto</label><div style="font-size:12px;color:var(--muted);">Toca el círculo para tomar/subir la foto del empleado.</div></div>
+      </div>
+      <div class="field"><label>Nombre completo</label><input id="emp-name" placeholder="Nombre y apellidos"></div>
+      <div class="row2">
+        <div class="field"><label>Teléfono (su login)</label><input id="emp-phone" type="tel" placeholder="(559) 555-0100"></div>
+        <div class="field"><label>Tarifa $/hora</label><input id="emp-rate" type="number" inputmode="decimal" placeholder="0.00"></div>
+      </div>
+      <div class="field"><label>Roles (puede tener varios)</label><div id="emp-roles" style="display:flex;flex-wrap:wrap;gap:8px;"></div></div>
+      <div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="emp-active" checked style="width:18px;height:18px;"> Activo</label></div>
+      <details style="margin:8px 0 10px;border:1px solid rgba(240,192,64,0.3);border-radius:10px;padding:0 12px;background:rgba(240,192,64,0.05);">
+        <summary style="cursor:pointer;padding:10px 0;font-weight:700;color:var(--gold);font-size:13px;">🔒 Datos sensibles (solo tú los ves)</summary>
+        <div class="row2"><div class="field"><label>SSN / ITIN</label><input id="emp-ssn" placeholder="###-##-####"></div><div class="field"><label># de identificación</label><input id="emp-idnum" placeholder="Licencia / ID"></div></div>
+        <div class="field"><label>Dirección</label><input id="emp-addr" placeholder="Calle, ciudad, CP"></div>
+        <div class="row2"><div class="field"><label>Contacto de emergencia</label><input id="emp-emg-name" placeholder="Nombre"></div><div class="field"><label>Tel. emergencia</label><input id="emp-emg-phone" type="tel" placeholder="(559) …"></div></div>
+        <div class="field"><label>Foto de la identificación</label><input type="file" id="emp-id-in" accept="image/*" onchange="empIdPick(this)"><div id="emp-id-status" style="font-size:12px;color:var(--muted);margin-top:4px;"></div></div>
+        <div class="field"><label>Notas (solo tú)</label><input id="emp-notes" placeholder="Opcional"></div>
+      </details>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button class="btn-add" id="emp-save-btn" onclick="empSave()" style="flex:1;background:linear-gradient(135deg,#3ecf8e,#1f9d6a);color:#06231a;border-color:#3ecf8e;">💾 Guardar</button>
+        <button class="btn-add" onclick="empCancel()">Cancelar</button>
+        <button class="btn-add" id="emp-del-btn" onclick="empDelete()" style="display:none;border-color:#ff6b6b;color:#ff6b6b;">🗑</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2756,6 +2795,74 @@ window.closeAudit=function(){ document.getElementById('audit-overlay').classList
 
 // 🔧 POR CARRO (yonke): cuánto va dejando cada carro = ventas de partes registradas en Finanzas − costo del carro
 // ===== 👷 HORAS / NÓMINA (check-in GPS de empleados) =====
+// ===== 🪪 EMPLEADOS (registro: foto, roles, tarifa + datos sensibles solo dueño) =====
+const EMP_ROLES = ['Detallador','Mecánico','Empaque','Captura','Listado','Desmantelador','Oficina','Ventas'];
+let _emps=[], _empEditId=null, _empPhotoFile=null, _empIdFile=null;
+window.openEmp=function(){ if(!isOwnerUser()){ alert('Solo el dueño puede ver el registro de empleados.'); return; } empCancel(); document.getElementById('emp-overlay').classList.add('open'); loadEmps(); };
+window.closeEmp=function(){ document.getElementById('emp-overlay').classList.remove('open'); };
+async function loadEmps(){
+  const box=document.getElementById('emp-list'); box.innerHTML='<div style="color:var(--faint);padding:12px;">Cargando…</div>';
+  try{ const s=await getDocs(collection(db,'employees')); _emps=s.docs.map(d=>({id:d.id,...d.data()})); }
+  catch(e){ box.innerHTML='<div style="color:#ff6b6b;padding:12px;">Error: '+((e&&e.message)||e)+'</div>'; return; }
+  renderEmpList();
+}
+function renderEmpList(){
+  const box=document.getElementById('emp-list'); if(!box) return;
+  const list=_emps.slice().sort((a,b)=>Number(b.active!==false)-Number(a.active!==false) || (a.name||'').localeCompare(b.name||''));
+  if(!list.length){ box.innerHTML='<div style="color:var(--faint);padding:14px 4px;line-height:1.5;">Aún no hay empleados. Toca <b>➕ Nuevo empleado</b>.</div>'; return; }
+  box.innerHTML=list.map(e=>{
+    const ph=e.photoURL?'<img src="'+e.photoURL+'" style="width:46px;height:46px;border-radius:50%;object-fit:cover;flex:0 0 auto;">':'<div style="width:46px;height:46px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;">👤</div>';
+    const roles=(e.roles||[]).join(' · ')||'sin rol';
+    const inact=e.active===false?' <span style="color:var(--faint);font-size:11px;">(inactivo)</span>':'';
+    return '<div onclick="empEdit(\''+e.id+'\')" style="display:flex;gap:10px;align-items:center;border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;cursor:pointer;">'
+      +ph+'<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(e.name||'(sin nombre)')+inact+'</div><div style="font-size:12px;color:var(--muted);">'+esc(roles)+(e.rate?(' · $'+Number(e.rate).toFixed(2)+'/h'):'')+'</div></div><span class="gold">›</span></div>';
+  }).join('');
+}
+function _empFillRoles(sel){ sel=sel||[]; document.getElementById('emp-roles').innerHTML=EMP_ROLES.map(r=>{ const on=sel.indexOf(r)>=0;
+  return '<label style="display:inline-flex;align-items:center;gap:5px;border:1px solid '+(on?'var(--gold)':'var(--border)')+';border-radius:20px;padding:5px 11px;font-size:12.5px;cursor:pointer;'+(on?'color:var(--gold);':'')+'"><input type="checkbox" value="'+r+'" '+(on?'checked':'')+' style="display:none;" onchange="this.parentElement.style.borderColor=this.checked?\'var(--gold)\':\'var(--border)\';this.parentElement.style.color=this.checked?\'var(--gold)\':\'\';">'+r+'</label>'; }).join(''); }
+function _empSelRoles(){ return [...document.querySelectorAll('#emp-roles input:checked')].map(i=>i.value); }
+function _empShowForm(show){ document.getElementById('emp-form').style.display=show?'':'none'; document.getElementById('emp-list-wrap').style.display=show?'none':''; }
+window.empNew=function(){ _empEditId=null; _empPhotoFile=null; _empIdFile=null;
+  ['emp-name','emp-phone','emp-rate','emp-ssn','emp-idnum','emp-addr','emp-emg-name','emp-emg-phone','emp-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('emp-active').checked=true; document.getElementById('emp-photo-box').innerHTML='📷'; document.getElementById('emp-id-status').textContent='';
+  document.getElementById('emp-del-btn').style.display='none'; _empFillRoles([]); _empShowForm(true); };
+window.empEdit=async function(id){ const e=_emps.find(x=>x.id===id); if(!e) return;
+  _empEditId=id; _empPhotoFile=null; _empIdFile=null;
+  document.getElementById('emp-name').value=e.name||''; document.getElementById('emp-phone').value=e.phone||''; document.getElementById('emp-rate').value=e.rate||'';
+  document.getElementById('emp-active').checked=e.active!==false; _empFillRoles(e.roles||[]);
+  document.getElementById('emp-photo-box').innerHTML=e.photoURL?('<img src="'+e.photoURL+'" style="width:100%;height:100%;object-fit:cover;">'):'📷';
+  let pv={}; try{ const s=await getDoc(doc(db,'employees',id,'private','data')); pv=s.exists()?s.data():{}; }catch(_){}
+  document.getElementById('emp-ssn').value=pv.ssn||''; document.getElementById('emp-idnum').value=pv.idNumber||''; document.getElementById('emp-addr').value=pv.address||'';
+  document.getElementById('emp-emg-name').value=pv.emergencyName||''; document.getElementById('emp-emg-phone').value=pv.emergencyPhone||''; document.getElementById('emp-notes').value=pv.notes||'';
+  document.getElementById('emp-id-status').textContent=pv.idPhotoURL?'✓ Identificación guardada':''; document.getElementById('emp-del-btn').style.display='';
+  _empShowForm(true); };
+window.empCancel=function(){ _empShowForm(false); };
+window.empPhotoPick=function(inp){ _empPhotoFile=(inp.files||[])[0]||null; if(_empPhotoFile){ document.getElementById('emp-photo-box').innerHTML='<img src="'+URL.createObjectURL(_empPhotoFile)+'" style="width:100%;height:100%;object-fit:cover;">'; } };
+window.empIdPick=function(inp){ _empIdFile=(inp.files||[])[0]||null; if(_empIdFile) document.getElementById('emp-id-status').textContent='Foto lista para guardar…'; };
+function _empE164(s){ const d=String(s||'').replace(/\D/g,''); if(d.length===10) return '+1'+d; if(d.length===11&&d[0]==='1') return '+'+d; return ''; }
+window.empSave=async function(){
+  const name=document.getElementById('emp-name').value.trim(); if(!name){ alert('Pon el nombre'); return; }
+  const phone=document.getElementById('emp-phone').value.trim();
+  const btn=document.getElementById('emp-save-btn'); btn.disabled=true; btn.textContent='Guardando…';
+  try{
+    const id=_empEditId || ('emp_'+Date.now()+'_'+Math.random().toString(36).slice(2,6));
+    let photoURL=(_emps.find(x=>x.id===id)||{}).photoURL||'';
+    if(_empPhotoFile){ const jpg=await toJpeg(_empPhotoFile); const r=ref(storage,'employees/'+id+'/photo_'+Date.now()+'.jpg'); await uploadBytes(r,jpg); photoURL=await getDownloadURL(r); }
+    const base={ name, phone, phoneE164:_empE164(phone), roles:_empSelRoles(), rate:Number(document.getElementById('emp-rate').value)||0, active:document.getElementById('emp-active').checked, photoURL, updatedAt:new Date().toISOString(), updatedBy:(auth.currentUser&&auth.currentUser.email)||'' };
+    if(!_empEditId) base.createdAt=new Date().toISOString();
+    await setDoc(doc(db,'employees',id), base, {merge:true});
+    let idPhotoURL;
+    if(_empIdFile){ const jpg=await toJpeg(_empIdFile); const r=ref(storage,'employees/'+id+'/id_'+Date.now()+'.jpg'); await uploadBytes(r,jpg); idPhotoURL=await getDownloadURL(r); }
+    const priv={ ssn:document.getElementById('emp-ssn').value.trim(), idNumber:document.getElementById('emp-idnum').value.trim(), address:document.getElementById('emp-addr').value.trim(), emergencyName:document.getElementById('emp-emg-name').value.trim(), emergencyPhone:document.getElementById('emp-emg-phone').value.trim(), notes:document.getElementById('emp-notes').value.trim(), updatedAt:new Date().toISOString() };
+    if(idPhotoURL!==undefined) priv.idPhotoURL=idPhotoURL;
+    await setDoc(doc(db,'employees',id,'private','data'), priv, {merge:true});
+    _empShowForm(false); loadEmps();
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+  btn.disabled=false; btn.textContent='💾 Guardar';
+};
+window.empDelete=async function(){ if(!_empEditId) return; if(!confirm('¿Desactivar este empleado? (no se borra, deja de aparecer como activo)')) return;
+  try{ await setDoc(doc(db,'employees',_empEditId),{active:false, updatedAt:new Date().toISOString()},{merge:true}); _empShowForm(false); loadEmps(); }catch(e){ alert('Error: '+((e&&e.message)||e)); } };
+
 let _horasWK = null;
 window.openHoras=function(){ _horasWK=null; renderHoras(); document.getElementById('horas-overlay').classList.add('open'); };
 window.closeHoras=function(){ document.getElementById('horas-overlay').classList.remove('open'); };
