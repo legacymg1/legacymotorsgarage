@@ -86,6 +86,13 @@
   .section-title{font-size:18px;font-weight:600;letter-spacing:-0.3px;}
   .btn-add{background:var(--gold-soft);color:var(--gold);border:none;border-radius:11px;padding:9px 15px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;}
   .btn-add:hover{background:rgba(232,182,74,0.22);}
+  .fz-grp{border:1px solid var(--border);border-radius:13px;background:var(--surface);overflow:hidden;}
+  .fz-grp>summary{cursor:pointer;padding:12px 15px;font-weight:700;font-size:14px;list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none;-webkit-user-select:none;}
+  .fz-grp>summary::-webkit-details-marker{display:none;}
+  .fz-grp>summary::after{content:'▾';font-size:12px;color:var(--muted);transition:transform .18s ease;}
+  .fz-grp[open]>summary::after{transform:rotate(180deg);}
+  .fz-grp>summary:hover{background:var(--gold-soft);}
+  .fz-grp-body{display:flex;gap:8px;flex-wrap:wrap;padding:4px 12px 13px;}
 
   /* list */
   .list{display:flex;flex-direction:column;gap:10px;}
@@ -219,24 +226,44 @@
     <span id="por-cobrar-total" style="font-weight:800;font-size:17px;color:#f0c040;">$0.00</span>
   </div>
 
-  <div style="margin:16px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
-    <button class="btn-add" onclick="openDevol()" style="font-size:15px;">↩️ Devoluciones</button>
-    <button class="btn-add" onclick="openClientes()" style="font-size:15px;">👤 Clientes de partes</button>
-    <button class="btn-add" onclick="openSquarePays()" style="font-size:15px;" title="Ver los pagos de la terminal Square y asignarlos a un cliente/cuenta">💳 Pagos de Square</button>
-    <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
-    <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
-    <button class="btn-add" id="btn-total" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
-    <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
-    <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
-    <button class="btn-add" onclick="openComis()" style="font-size:15px;" title="Total pagado en comisiones/sueldos">💼 Comisiones</button>
-    <button class="btn-add" onclick="openBulkAssign()" style="font-size:15px;" title="Asignar gastos a un carro por búsqueda (dueño)">🔗 Asignar a carro</button>
-    <button class="btn-add" onclick="openDmv()" style="font-size:15px;" title="Impuestos y DMV cobrados al cliente, por cotejar contra el cobro real del DMV">🏛️ DMV / Impuestos</button>
-    <button class="btn-add" onclick="openAudit()" style="font-size:15px;" title="Revisar (solo lectura) que cada venta de Dealer tenga su ingreso correcto (carro+$70) y sus taxes/DMV en la caja">🔎 Auditar Dealer</button>
-    <button class="btn-add" onclick="platePayout()" style="font-size:15px;" title="Sacar efectivo del corte para pagar placas/DMV (dinero de clientes). No es gasto ni baja la ganancia.">🪪 Salida placas</button>
-    <button class="btn-add" onclick="openDcarReport()" style="font-size:15px;" title="Cuánto va dejando cada carro del yonke: ventas de partes registradas − lo que costó el carro.">🔧 Por carro (yonke)</button>
-    <button class="btn-add" onclick="openHoras()" style="font-size:15px;" title="Horas trabajadas de la semana por empleado (check-in GPS) y pago según su tarifa.">👷 Horas / Nómina</button>
-    <button class="btn-add" onclick="openEmp()" style="font-size:15px;" title="Registro de empleados: foto, roles, tarifa y datos (lo sensible solo lo ves tú).">🪪 Empleados</button>
+  <div style="margin:16px 0 0;display:flex;flex-direction:column;gap:10px;">
+    <details class="fz-grp" open>
+      <summary>💰 Caja y cobros</summary>
+      <div class="fz-grp-body">
+        <button class="btn-add" onclick="openCorte()" style="font-size:15px;">🧮 Corte de caja</button>
+        <button class="btn-add" onclick="platePayout()" style="font-size:15px;" title="Sacar efectivo del corte para pagar placas/DMV (dinero de clientes). No es gasto ni baja la ganancia.">🪪 Salida placas</button>
+        <button class="btn-add" onclick="openDmv()" style="font-size:15px;" title="Impuestos y DMV cobrados al cliente, por cotejar contra el cobro real del DMV">🏛️ DMV / Impuestos</button>
+        <button class="btn-add" onclick="openSquarePays()" style="font-size:15px;" title="Ver los pagos de la terminal Square y asignarlos a un cliente/cuenta">💳 Pagos de Square</button>
+        <button class="btn-add" onclick="openDevol()" style="font-size:15px;">↩️ Devoluciones</button>
+      </div>
+    </details>
+    <details class="fz-grp">
+      <summary>👥 Clientes y equipo</summary>
+      <div class="fz-grp-body">
+        <button class="btn-add" onclick="openClientes()" style="font-size:15px;">👤 Clientes de partes</button>
+        <button class="btn-add" onclick="openEmp()" style="font-size:15px;" title="Registro de empleados: foto, roles, tarifa y datos (lo sensible solo lo ves tú).">🪪 Empleados</button>
+        <button class="btn-add" onclick="openHoras()" style="font-size:15px;" title="Horas trabajadas de la semana por empleado (check-in GPS) y pago según su tarifa.">👷 Horas / Nómina</button>
+        <button class="btn-add" onclick="openComis()" style="font-size:15px;" title="Total pagado en comisiones/sueldos">💼 Comisiones</button>
+        <button class="btn-add" onclick="openSocios()" style="font-size:15px;">👥 Socios</button>
+      </div>
+    </details>
+    <details class="fz-grp">
+      <summary>📊 Reportes</summary>
+      <div class="fz-grp-body">
+        <button class="btn-add" id="btn-total" onclick="openPnl('total')" style="font-size:15px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border-color:#f0c040;">🏆 Resultados Totales</button>
+        <button class="btn-add" onclick="openPnl('legacy')" style="font-size:15px;">📊 Resultados Legacy</button>
+        <button class="btn-add" id="btn-priv" onclick="openPnl('privadas')" style="font-size:15px;">🔒 Resultados Privadas</button>
+        <button class="btn-add" onclick="openDcarReport()" style="font-size:15px;" title="Cuánto va dejando cada carro del yonke: ventas de partes registradas − lo que costó el carro.">🔧 Por carro (yonke)</button>
+      </div>
+    </details>
+    <details class="fz-grp">
+      <summary>🛠️ Herramientas</summary>
+      <div class="fz-grp-body">
+        <button class="btn-add" onclick="openImport()" style="font-size:15px;" title="Importar movimientos en lote (dueño)">⬆️ Importar</button>
+        <button class="btn-add" onclick="openBulkAssign()" style="font-size:15px;" title="Asignar gastos a un carro por búsqueda (dueño)">🔗 Asignar a carro</button>
+        <button class="btn-add" onclick="openAudit()" style="font-size:15px;" title="Revisar (solo lectura) que cada venta de Dealer tenga su ingreso correcto (carro+$70) y sus taxes/DMV en la caja">🔎 Auditar Dealer</button>
+      </div>
+    </details>
   </div>
 
   <div class="coll-head" style="margin-top:22px;" onclick="toggleSubs()">
