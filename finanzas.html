@@ -2796,7 +2796,7 @@ window.closeAudit=function(){ document.getElementById('audit-overlay').classList
 // 🔧 POR CARRO (yonke): cuánto va dejando cada carro = ventas de partes registradas en Finanzas − costo del carro
 // ===== 👷 HORAS / NÓMINA (check-in GPS de empleados) =====
 // ===== 🪪 EMPLEADOS (registro: foto, roles, tarifa + datos sensibles solo dueño) =====
-const EMP_ROLES = ['Detallador','Mecánico','Empaque','Captura','Listado','Desmantelador','Oficina','Ventas'];
+const EMP_ROLES = ['Detallador','Mecánico','Empaque','Captura','Listado','Desmantelador','Ayudante general','Oficina','Ventas'];
 let _emps=[], _empEditId=null, _empPhotoFile=null, _empIdFile=null;
 window.openEmp=function(){ if(!isOwnerUser()){ alert('Solo el dueño puede ver el registro de empleados.'); return; } empCancel(); document.getElementById('emp-overlay').classList.add('open'); loadEmps(); };
 window.closeEmp=function(){ document.getElementById('emp-overlay').classList.remove('open'); };
