@@ -982,10 +982,12 @@ exports.cfgSet = onCall({ timeoutSeconds: 30 }, async (request) => {
   const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
   const docId = String((request.data && request.data.docId) || "").trim();
   const data = (request.data && request.data.data) || {};
-  const RULES = { sellerSignature: "owner", stickerBatch: "staff", binBatch: "staff", timeclock: "owner" };
+  // "owner" = solo ev@ (firma del vendedor); "partners" = cualquiera de los dueños (ev@ / Ivan); "staff" = equipo.
+  const RULES = { sellerSignature: "owner", stickerBatch: "staff", binBatch: "staff", timeclock: "partners" };
   const level = RULES[docId];
   if (!level) throw new HttpsError("permission-denied", "Documento de config no permitido.");
   if (level === "owner" && email !== "ev@legacymotorsgarage.com") throw new HttpsError("permission-denied", "Solo el dueño.");
+  if (level === "partners" && !OWNER_EMAILS.includes(email)) throw new HttpsError("permission-denied", "Solo los dueños.");
   if (typeof data !== "object" || Array.isArray(data)) throw new HttpsError("invalid-argument", "Datos inválidos.");
   await admin.firestore().collection("config").doc(docId).set(data, { merge: true });
   return { ok: true };
@@ -1184,6 +1186,7 @@ exports.detailJob = onCall({ timeoutSeconds: 30 }, async (request) => {
   const clean = {
     empKey: id.key, empId: id.empId, name: id.name, phone: id.phone,
     car: String(job.car || "").slice(0, 120), vin: String(job.vin || "").slice(0, 20),
+    inventoryId: String(job.inventoryId || "").slice(0, 60), inventoryNum: String(job.inventoryNum || "").slice(0, 20),
     steps, totalSeconds: Math.max(0, Math.round(Number(job.totalSeconds) || 0)),
     status: (job.status === "done") ? "done" : "active",
     startedAt: String(job.startedAt || new Date().toISOString()),
@@ -1191,7 +1194,34 @@ exports.detailJob = onCall({ timeoutSeconds: 30 }, async (request) => {
   };
   if (clean.status === "done") clean.finishedAt = String(job.finishedAt || new Date().toISOString());
   await db.collection("detail_jobs").doc(jobId).set(clean, { merge: true });
+  // Al TERMINAR de detallar, el carro avanza a "listo" (sale de la lista del detallador → pasa a fotos/listado).
+  if (clean.status === "done" && clean.inventoryId) {
+    try { await db.collection("inventory").doc(clean.inventoryId).set({ reconStage: "listo", updatedAt: Date.now() }, { merge: true }); } catch (e) {}
+  }
   return { ok: true, id: jobId };
+});
+
+// 🚗 Carros LISTOS PARA DETALLAR: status:'prep' y reconStage:'detalle' (ya pasaron por mecánico + pintura).
+// El detallador solo toma carros que ya salieron de mecánico (smog/aceite/estéreo/reparaciones) y pintura.
+exports.prepCars = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  if (id.notRegistered || !id.active) throw new HttpsError("permission-denied", "No autorizado.");
+  const db = admin.firestore();
+  let snap;
+  try { snap = await db.collection("inventory").where("status", "==", "prep").get(); }
+  catch (e) { throw new HttpsError("internal", "No se pudo leer el inventario."); }
+  const cars = [];
+  snap.forEach((d) => {
+    const c = d.data() || {};
+    if ((c.reconStage || "mecanico") !== "detalle") return;   // gate: solo los listos para detallar
+    const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || c.carTitle || ("#" + (c.inventoryNum || ""));
+    const photo = (Array.isArray(c.photos) && c.photos[0]) || (Array.isArray(c.photoURLs) && c.photoURLs[0]) || c.photo || c.coverPhoto || "";
+    cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || "") });
+  });
+  cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
+  return { ok: true, cars };
 });
 
 // 📮 Enviar el sales sheet a Lendmark directo por el SMTP de Zoho (from ev@, cc a ev@).
