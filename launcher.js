@@ -62,12 +62,14 @@ function applyBars(){
   ensureBottomNav();
 }
 function ensureBottomNav(){
-  let nav = document.getElementById("lmg-nav");
-  if(!nav){ nav = document.createElement("nav"); nav.id = "lmg-nav"; document.body.appendChild(nav);
-    try{ document.body.style.paddingBottom = "calc(86px + env(safe-area-inset-bottom, 0px))"; }catch(e){} }
+  // IDEMPOTENTE: si ya existe, no la toques (si no, el MutationObserver entra en bucle y congela la página).
+  if (document.getElementById("lmg-nav")) return;
+  const nav = document.createElement("nav"); nav.id = "lmg-nav";
   const here = currentKey();
   nav.innerHTML = SECS.map(s =>
     `<a href="${s.href}" class="${s.k===here?'active':''}" aria-current="${s.k===here?'page':'false'}"><span class="ic">${s.ico}</span>${s.short||s.label}</a>`).join("");
+  document.body.appendChild(nav);
+  try{ document.body.style.paddingBottom = "calc(86px + env(safe-area-inset-bottom, 0px))"; }catch(e){}
 }
 function wireExisting(el){
   if (el.dataset.lmgWired === "1") return;
