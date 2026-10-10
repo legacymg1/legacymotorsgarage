@@ -855,6 +855,11 @@
     if(svc){ on(s); off(d); } else { on(d); off(s); }
     try{ window.scrollTo(0,0); }catch(e){}
   };
+  // Tareas de ESTA página (las muestra el logo de Legacy arriba).
+  window.LEGACY_ACTIONS = [
+    { label:'Cotizador', ico:'🧮', fn:'openCotizador' },
+    { label:'Lendmark sales', ico:'📄', fn:'openLendmarkList' }
+  ];
 </script>
 
 <!-- FIREBASE -->

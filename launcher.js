@@ -152,13 +152,26 @@ function buildMenu(){
   renderRows();
   window.addEventListener("resize", closeMenu);
 }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function renderRows(){
+  const dd = document.getElementById("lmg-dd"); if(!dd) return;
+  // Si la página define TAREAS propias (window.LEGACY_ACTIONS) → el logo las muestra.
+  const acts = (Array.isArray(window.LEGACY_ACTIONS) && window.LEGACY_ACTIONS.length) ? window.LEGACY_ACTIONS : null;
+  if (acts){
+    dd.innerHTML = acts.map((a,i) =>
+      `<button class="lmg-row" data-act="${i}"><span class="lmg-ico">${a.ico||"•"}</span><span>${esc(a.label)}</span></button>`).join("");
+    dd.querySelectorAll(".lmg-row").forEach((r,i) => {
+      r.addEventListener("click", () => { const a=acts[i]; closeMenu(); try{ if(typeof a.run==="function") a.run(); else if(typeof a.fn==="string" && typeof window[a.fn]==="function") window[a.fn](); }catch(e){} });
+    });
+    return;
+  }
+  // Fallback: navegación entre apps (para páginas que todavía no definen tareas).
   const here = currentKey();
-  document.getElementById("lmg-dd").innerHTML = SECS.map(s =>
+  dd.innerHTML = SECS.map(s =>
     `<button class="lmg-row ${s.k===here?'here':''}" data-href="${s.href}" data-here="${s.k===here?'1':'0'}">
        <span class="lmg-ico">${s.ico}</span><span>${s.label}</span>${s.k===here?'<span class="lmg-here">AQUÍ</span>':''}
      </button>`).join("");
-  document.getElementById("lmg-dd").querySelectorAll(".lmg-row").forEach(r => {
+  dd.querySelectorAll(".lmg-row").forEach(r => {
     r.addEventListener("click", () => { if (r.dataset.here === "1") { closeMenu(); return; } location.href = r.dataset.href; });
   });
 }
@@ -167,6 +180,7 @@ function toggleMenu(anchor){
   const dd = document.getElementById("lmg-dd");
   if (dd.classList.contains("open") && openAnchor === anchor) { closeMenu(); return; }
   openAnchor = anchor;
+  renderRows();
   const r = anchor.getBoundingClientRect();
   const w = Math.min(window.innerWidth * 0.84, 260);
   let left = r.left; if (left + w > window.innerWidth - 10) left = window.innerWidth - w - 10; if (left < 10) left = 10;
