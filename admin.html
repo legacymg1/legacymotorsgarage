@@ -2556,7 +2556,8 @@ window.renderAll = function() {
   let html='';
 
   const isListView = currentView === 'list';
-  html+=`<div class="section-title">Clientes con pagos activos</div><div class="${isListView ? 'client-list' : 'clients-grid'}" style="${isListView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
+  const actCol = (()=>{try{return localStorage.getItem('col_active-list')==='1';}catch(e){return false;}})();
+  html+=`<div class="sec-head" onclick="toggleSection('active-list','active-arrow')"><span>Clientes con pagos activos (${mainList.length})</span><span id="active-arrow" class="sec-arrow">${actCol?'▸':'▾'}</span></div><div id="active-list"${actCol?' style="display:none;"':''}><div class="${isListView ? 'client-list' : 'clients-grid'}" style="${isListView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
   if(!mainList.length){
     html+=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚗</div><div class="empty-text">Sin clientes con pagos activos</div><div style="font-size:14px">Los de servicio y liquidados están más abajo</div></div>`;
   } else if(isListView) {
@@ -2700,7 +2701,7 @@ window.renderAll = function() {
       </div>`;
     });
   }
-  html+='</div>';
+  html+='</div></div>';
 
   // ---- Sección: Servicio y Liquidados ----
   const archive = filtered.filter(c => c.kind==='service' || isPaidOff(c)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
