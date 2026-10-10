@@ -114,6 +114,10 @@ function injectStyle(){
     #lmg-dd.open{display:block;}
     .lmg-head2{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a8fa8;padding:10px 6px 5px;}
     .lmg-head2:first-child{padding-top:2px;}
+    .lmg-grp-head{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;cursor:pointer;font-family:inherit;
+      font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#c9a84c;padding:11px 8px 6px;margin-bottom:2px;}
+    .lmg-grp-head .lmg-grp-chev{font-size:11px;opacity:.8;}
+    .lmg-grp-head:active{opacity:.7;}
     @keyframes lmgDrop{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
     @media (prefers-reduced-motion:reduce){#lmg-dd{animation:none;}}
     .lmg-row{display:flex;align-items:center;gap:12px;width:100%;margin-bottom:8px;padding:11px 14px;border-radius:14px;cursor:pointer;
@@ -160,9 +164,22 @@ function renderRows(){
   // Si la página define TAREAS propias (window.LEGACY_ACTIONS) → el logo las muestra.
   const acts = (Array.isArray(window.LEGACY_ACTIONS) && window.LEGACY_ACTIONS.length) ? window.LEGACY_ACTIONS : null;
   if (acts){
-    dd.innerHTML = acts.map((a,i) => a && a.header
-      ? `<div class="lmg-head2">${esc(a.header)}</div>`
-      : `<button class="lmg-row" data-act="${i}"><span class="lmg-ico">${(a&&a.ico)||"•"}</span><span>${esc(a&&a.label)}</span></button>`).join("");
+    // Agrupa por encabezados → grupos minimizables.
+    const groups = []; let cur = null;
+    acts.forEach((a,i) => {
+      if (a && a.header){ cur = { header:a.header, items:[] }; groups.push(cur); }
+      else if (a){ if(!cur){ cur = { header:null, items:[] }; groups.push(cur); } cur.items.push({ a, idx:i }); }
+    });
+    if(!window._lmgCollapsed) window._lmgCollapsed = {};
+    dd.innerHTML = groups.map((g) => {
+      const col = g.header ? !!window._lmgCollapsed[g.header] : false;
+      const head = g.header ? `<button class="lmg-grp-head" data-grp="${esc(g.header)}">${esc(g.header)}<span class="lmg-grp-chev">${col?"▸":"▾"}</span></button>` : "";
+      const rows = g.items.map(it => `<button class="lmg-row" data-act="${it.idx}"${col?' style="display:none"':''}><span class="lmg-ico">${(it.a&&it.a.ico)||"•"}</span><span>${esc(it.a&&it.a.label)}</span></button>`).join("");
+      return head + rows;
+    }).join("");
+    dd.querySelectorAll(".lmg-grp-head").forEach((h) => {
+      h.addEventListener("click", (e) => { e.stopPropagation(); const k=h.getAttribute("data-grp"); window._lmgCollapsed[k]=!window._lmgCollapsed[k]; renderRows(); });
+    });
     dd.querySelectorAll(".lmg-row").forEach((r) => {
       const a = acts[+r.dataset.act];
       r.addEventListener("click", () => { closeMenu(); try{ if(a&&typeof a.run==="function") a.run(); else if(a&&typeof a.fn==="string" && typeof window[a.fn]==="function") window[a.fn](); }catch(e){} });
