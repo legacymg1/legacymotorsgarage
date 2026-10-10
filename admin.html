@@ -933,29 +933,22 @@ window.adminLogin = async function() {
 
 window.adminLogout = function() { signOut(auth); };
 
+// Abre/cierra CUALQUIER caja SUAVECITO (animación, sin brinco). Lo usan todas las secciones.
 window.toggleSection = function(id, arrowId){
   const el=document.getElementById(id); if(!el) return;
-  const show = el.style.display==='none';
-  el.style.display = show ? '' : 'none';
-  const ar=document.getElementById(arrowId); if(ar) ar.textContent = show ? '▾' : '▸';
-  try{ localStorage.setItem('col_'+id, show ? '0':'1'); }catch(e){}
-};
-// Abre/cierra la caja de Pagos activos SUAVECITO (sin brinco de pantalla).
-window.toggleActiveList = function(){
-  const el=document.getElementById('active-list'); const ar=document.getElementById('active-arrow');
-  if(!el) return;
   if(el._lmgAnim) return; // evita doble click a media animación
+  const ar=arrowId?document.getElementById(arrowId):null;
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
   const isOpen = el.style.display!=='none';
   if(isOpen){
-    try{ localStorage.setItem('col_active-list','1'); }catch(e){}
+    try{ localStorage.setItem('col_'+id,'1'); }catch(e){}
     if(ar) ar.textContent='▸';
     if(reduce){ el.style.display='none'; return; }
     el._lmgAnim=true; el.style.overflow='hidden'; el.style.maxHeight=el.scrollHeight+'px'; el.style.opacity='1';
     requestAnimationFrame(()=>{ el.style.transition='max-height .26s ease, opacity .2s ease'; el.style.maxHeight='0px'; el.style.opacity='0'; });
     setTimeout(()=>{ el.style.display='none'; el.style.maxHeight=''; el.style.opacity=''; el.style.overflow=''; el.style.transition=''; el._lmgAnim=false; }, 290);
   } else {
-    try{ localStorage.setItem('col_active-list','0'); }catch(e){}
+    try{ localStorage.setItem('col_'+id,'0'); }catch(e){}
     if(ar) ar.textContent='▾';
     el.style.display='';
     if(reduce) return;
@@ -965,6 +958,7 @@ window.toggleActiveList = function(){
     setTimeout(()=>{ el.style.maxHeight=''; el.style.opacity=''; el.style.overflow=''; el.style.transition=''; el._lmgAnim=false; }, 290);
   }
 };
+window.toggleActiveList = function(){ toggleSection('active-list','active-arrow'); };
 function applyCollapse(id, arrowId){
   try{ if(localStorage.getItem('col_'+id)==='1'){ const el=document.getElementById(id); if(el) el.style.display='none'; const ar=document.getElementById(arrowId); if(ar) ar.textContent='▸'; } }catch(e){}
 }
