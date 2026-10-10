@@ -9,17 +9,20 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Legacy Pit Crew</title>
 <link rel="apple-touch-icon" href="https://legacymotorsgarage.com/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
+  /* Sistema de diseño Legacy (navy + oro mate + Playfair) */
   :root{
-    --bg:#0b0e14; --surface:#12161f; --surface2:#1a1f2b;
-    --border:rgba(255,255,255,0.07); --border-strong:rgba(255,255,255,0.13);
-    --text:#f4f6f8; --muted:#8b93a3; --faint:#5b6472;
-    --gold:#e8b64a; --gold-soft:rgba(232,182,74,0.14);
+    --bg:#0f1320; --surface:#141828; --surface2:#1a2035;
+    --border:#2a3050; --border-strong:#3a4168;
+    --text:#f0ede6; --muted:#8a8fa8; --faint:#5b6484;
+    --gold:#c9a84c; --gold-soft:rgba(201,168,76,0.15); --gold2:#e8c97a; --gold3:#8a6520;
     --green:#32d74b; --green-soft:rgba(50,215,75,0.14);
     --red:#ff453a; --red-soft:rgba(255,69,58,0.14);
     --blue:#0a84ff; --radius:18px; --radius-sm:12px;
-    --shadow:0 10px 40px rgba(0,0,0,0.45);
-    --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",system-ui,sans-serif;
+    --shadow:0 10px 40px rgba(0,0,0,0.5);
+    --font:'DM Sans',-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+    --font-display:'Playfair Display',Georgia,serif;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;}
@@ -27,12 +30,13 @@
   .wrap{max-width:520px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));}
   .center{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px calc(24px + env(safe-area-inset-bottom));}
   h1,h2,h3{margin:0;font-weight:800;letter-spacing:-0.02em;}
+  h1,h2,h3,.logo,.clock-hours,.sec-title{font-family:var(--font-display);}
   .muted{color:var(--muted);} .faint{color:var(--faint);}
-  .logo{font-weight:900;font-size:22px;letter-spacing:-0.03em;}
+  .logo{font-weight:800;font-size:24px;letter-spacing:-0.01em;}
   .logo span{color:var(--gold);}
   .btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;transition:transform .08s ease,filter .15s ease;}
   .btn:active{transform:scale(.98);}
-  .btn-gold{background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;}
+  .btn-gold{background:linear-gradient(135deg,#d9b85a,#9a7420);color:#0f1320;}
   .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border-strong);}
   .btn-green{background:linear-gradient(135deg,#34d75a,#1ea544);color:#04130a;}
   .btn-red{background:var(--red-soft);color:#ff6b6b;border:1px solid rgba(255,69,58,0.3);}
