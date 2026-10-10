@@ -3813,8 +3813,9 @@ function renderTodayBox() {
 
   // Check birthdays
   const bdayClients = getBirthdayClients();
-  // Check service reminders (every 3 months from contract date)
-  const serviceClients = getServiceReminderClients();
+  // Los recordatorios de servicio YA NO van en "Pagos de hoy" → se mueven a la caja SERVICIO.
+  // (La lógica getServiceReminderClients() se conserva para reusarla en Service.)
+  const serviceClients = [];
   
   if (!todayClients.length && !overdueClients.length && !bdayClients.length && !serviceClients.length) {
     box.style.display = 'none';
