@@ -1,0 +1,47 @@
+/* =====================================================================
+   LEGACY — SISTEMA DE DISEÑO ÚNICO (fuente de verdad)
+   Cambia aquí UNA vez y aplica a TODAS las páginas que enlacen este archivo.
+   Vibra: navy cálido + oro mate + Playfair/DM Sans (estilo Clientes/Porsche).
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+:root{
+  /* Fondos (el mismo de la página de Inventario) */
+  --bg:#060810; --surface:#0d1018; --surface2:#141720; --surface3:#1a1f2c; --elev:#20263300;
+  /* Bordes */
+  --border:#20242e; --border-strong:#2e3442;
+  /* Texto */
+  --text:#f0ede6; --muted:#8a8fa8; --faint:#5b6484;
+  /* Oro (mate, elegante) */
+  --gold:#c9a84c; --gold-soft:rgba(201,168,76,0.15); --gold2:#e8c97a; --gold3:#8a6520;
+  /* Semánticos */
+  --green:#32d74b; --green-soft:rgba(50,215,75,0.14);
+  --red:#ff453a; --red-soft:rgba(255,69,58,0.14);
+  --blue:#0a84ff;
+  /* Forma */
+  --radius:18px; --radius-sm:12px;
+  --shadow:0 10px 40px rgba(0,0,0,0.5);
+  /* Tipografía */
+  --font:'DM Sans',-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  --font-display:'Playfair Display',Georgia,'Times New Roman',serif;
+  /* Alias de compatibilidad (páginas que usan otros nombres) */
+  --navy:#1a2035; --navy2:#141828; --navy3:#0f1320;
+}
+
+/* Títulos con la serif elegante en todas las páginas */
+h1,h2,h3,.title,.section-title,.brand-name,.stat-value,.login-title{ font-family:var(--font-display); letter-spacing:-0.01em; }
+
+/* ===== BARRA SUPERIOR ÚNICA =====
+   Toda página con [data-legacy-bar] usa ESTA barra: mismo tamaño, mismo feeling.
+   Cambia aquí una vez y todas las barras cambian igual. */
+[data-legacy-bar]{
+  position:sticky !important; top:0 !important; z-index:50 !important;
+  display:flex !important; align-items:center !important; justify-content:space-between !important; gap:12px !important;
+  min-height:66px !important; box-sizing:border-box !important;
+  padding:calc(env(safe-area-inset-top) + 9px) 16px 11px !important;
+  margin:0 !important;
+  background:rgba(6,8,16,0.88) !important;
+  -webkit-backdrop-filter:saturate(180%) blur(20px) !important; backdrop-filter:saturate(180%) blur(20px) !important;
+  border-bottom:1px solid var(--border) !important; border-top:none !important;
+}
+.lmg-logo{ margin-right:auto; }
