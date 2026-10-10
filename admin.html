@@ -268,6 +268,13 @@
     </div>
   </header>
 
+  <!-- Toggle Dealer | Servicio (justo debajo de la barra fija) -->
+  <div id="cli-switch" style="position:sticky;top:66px;z-index:40;display:flex;gap:8px;padding:10px 16px;background:var(--navy3);border-bottom:1px solid var(--border);justify-content:center;">
+    <button id="cli-dealer-btn" onclick="setCliView('dealer')" style="flex:1;max-width:240px;padding:11px;border-radius:13px;border:1px solid var(--gold);background:var(--gold);color:var(--navy3);font-weight:800;font-size:15px;font-family:inherit;cursor:pointer;">🚗 Dealer</button>
+    <button id="cli-service-btn" onclick="setCliView('service')" style="flex:1;max-width:240px;padding:11px;border-radius:13px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:800;font-size:15px;font-family:inherit;cursor:pointer;">🔧 Servicio</button>
+  </div>
+
+  <div id="dealer-view">
   <div class="sec-head" onclick="toggleSection('stats-bar','stats-arrow')"><span>Resumen</span><span id="stats-arrow" class="sec-arrow">▾</span></div>
   <div class="stats-bar" id="stats-bar">
     <div class="stat-card"><div class="stat-label">Clientes</div><div class="stat-value sv-gold" id="stat-total">0</div></div>
@@ -827,6 +834,28 @@
     </div>
   </div>
 </div>
+</div><!-- /dealer-view -->
+
+<!-- CAJA 2: SERVICIO (en construcción) -->
+<div id="service-view" style="display:none;padding:48px 24px 80px;text-align:center;color:var(--muted);">
+  <div style="font-size:52px;">🔧</div>
+  <h2 style="font-family:var(--font-display);font-size:26px;color:var(--text);margin:10px 0 6px;">Servicio</h2>
+  <p style="max-width:440px;margin:0 auto;line-height:1.6;font-size:15px;">Esta es la <b>caja 2</b> de Clientes. La estamos construyendo — aquí vivirán los clientes y recordatorios de <b>servicio</b> (reparaciones, ventas a pagos, etc.).<br><br>Un cliente puede estar en Dealer y en Servicio a la vez; su tarjeta mostrará todo su historial.</p>
+</div>
+
+<script>
+  window.setCliView = function(v){
+    var svc = (v === 'service');
+    var dv = document.getElementById('dealer-view'), sv = document.getElementById('service-view');
+    if(dv) dv.style.display = svc ? 'none' : '';
+    if(sv) sv.style.display = svc ? 'block' : 'none';
+    var d = document.getElementById('cli-dealer-btn'), s = document.getElementById('cli-service-btn');
+    function on(b){ if(!b) return; b.style.background='var(--gold)'; b.style.color='var(--navy3)'; b.style.borderColor='var(--gold)'; }
+    function off(b){ if(!b) return; b.style.background='transparent'; b.style.color='var(--muted)'; b.style.borderColor='var(--border)'; }
+    if(svc){ on(s); off(d); } else { on(d); off(s); }
+    try{ window.scrollTo(0,0); }catch(e){}
+  };
+</script>
 
 <!-- FIREBASE -->
 <script type="module">
