@@ -76,6 +76,16 @@
   .langsel{position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:999px;padding:3px;}
   .langbtn{background:none;border:none;color:var(--muted);font-family:inherit;font-size:12px;font-weight:800;letter-spacing:.05em;padding:6px 11px;border-radius:999px;cursor:pointer;}
   .langbtn.active{background:var(--gold);color:#0f1320;}
+  /* Menú de cuenta */
+  .acct-menu{position:fixed;top:calc(64px + env(safe-area-inset-top));right:14px;z-index:95;width:min(86vw,290px);background:var(--surface);border:1px solid var(--border-strong);border-radius:18px;box-shadow:var(--shadow);padding:14px;animation:lmgDrop .16s ease;}
+  @keyframes lmgDrop{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
+  .acct-head{display:flex;align-items:center;gap:11px;margin-bottom:12px;}
+  .acct-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 2px;font-size:14px;color:var(--muted);}
+  .acct-row b{color:var(--text);font-variant-numeric:tabular-nums;}
+  .acct-sep{height:1px;background:var(--border);margin:6px 0;}
+  .acct-signout{width:100%;margin-top:10px;background:var(--red-soft);color:#ff8a80;border:1px solid rgba(255,69,58,0.3);border-radius:12px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;}
+  /* En Pit Crew el logo-menú (dueños) va compacto para no saturar la barra */
+  #screen-home .lmg-logo-img{height:30px;}
 </style>
 </head>
 <body>
@@ -141,13 +151,26 @@
 
 <!-- ===== HOME ===== -->
 <div id="screen-home" class="wrap hide">
-  <div class="topbar">
-    <div id="home-avatar" class="avatar">?</div>
+  <div class="topbar" data-legacy-bar>
     <div style="flex:1;min-width:0;">
       <div class="faint" style="font-size:13px;" id="home-greet">Hola</div>
       <h2 style="font-size:20px;line-height:1.1;" id="home-name">—</h2>
     </div>
-    <button class="linkbtn" onclick="doSignOut()" title="Salir" style="font-size:20px;">⏏︎</button>
+    <button id="acct-btn" class="avatar" onclick="toggleAcct(event)" style="cursor:pointer;flex:0 0 auto;border:none;">?</button>
+  </div>
+
+  <!-- Menú de cuenta (perfil / idioma / cerrar sesión) -->
+  <div id="acct-catch" class="hide" onclick="closeAcct()" style="position:fixed;inset:0;z-index:90;"></div>
+  <div id="acct-menu" class="acct-menu hide">
+    <div class="acct-head">
+      <div id="acct-ava" class="avatar" style="width:44px;height:44px;font-size:17px;">?</div>
+      <div style="min-width:0;"><div id="acct-name" style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div><div id="acct-roles" class="faint" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div></div>
+    </div>
+    <div class="acct-row"><span data-i18n="profHours">Horas esta semana</span><b id="acct-hours">0 h</b></div>
+    <div class="acct-row"><span data-i18n="profPay">Próximo pago</span><b id="acct-pay" style="color:var(--gold);">$0</b></div>
+    <div class="acct-sep"></div>
+    <div class="acct-row"><span>🌐 <span data-i18n="profLang">Idioma</span></span><span style="display:flex;gap:4px;"><button class="langbtn" id="acct-es" onclick="setLang('es')">ES</button><button class="langbtn" id="acct-en" onclick="setLang('en')">EN</button></span></div>
+    <button class="acct-signout" onclick="doSignOut()">🚪 <span data-i18n="signOut">Cerrar sesión</span></button>
   </div>
 
   <!-- Reloj -->
@@ -338,14 +361,16 @@ const T = {
     noRoles:'Todavía no tienes tareas asignadas.<br>Legacy te las va a asignar pronto.',
     reminder:'<div style="font-size:18px;">🔔</div><div><b>Antes de salir:</b> regresa tus herramientas, pon las pilas a cargar y limpia tu área.</div>',
     morning:'Buenos días', afternoon:'Buenas tardes', evening:'Buenas noches', hello:'Hola', team:'Equipo',
-    checkIn:'🟢 Registrar entrada', checkOut:'🔴 Registrar salida', out:'Fuera' },
+    checkIn:'🟢 Registrar entrada', checkOut:'🔴 Registrar salida', out:'Fuera',
+    profHours:'Horas esta semana', profPay:'Próximo pago', profLang:'Idioma', signOut:'Cerrar sesión' },
   en:{ tagline:'🏁 The Legacy crew', signinTitle:'Sign in with your phone', signinSub:'We will text you a code.', sendBtn:'Send code', sending:'Sending…', codeTitle:'Enter the code', codeSub:'We texted it to you.', enterBtn:'Enter', entering:'Entering…', changeNum:'← Change number',
     adminBtn:'👑 Team (admin)', thisWeek:'this week', tasksTitle:"Today's tasks", refresh:'↻ Refresh',
     checkinHint:'👆 Clock <b style="color:var(--gold);">in</b> above to start your day and see your tasks.',
     noRoles:'No tasks assigned yet.<br>Legacy will assign them soon.',
     reminder:'<div style="font-size:18px;">🔔</div><div><b>Before you leave:</b> return your tools, put batteries to charge, and clean your area.</div>',
     morning:'Good morning', afternoon:'Good afternoon', evening:'Good evening', hello:'Hi', team:'Team',
-    checkIn:'🟢 Clock in', checkOut:'🔴 Clock out', out:'Out' }
+    checkIn:'🟢 Clock in', checkOut:'🔴 Clock out', out:'Out',
+    profHours:'Hours this week', profPay:'Next pay', profLang:'Language', signOut:'Sign out' }
 };
 function t(k){ return (T[LANG]&&T[LANG][k]!=null)?T[LANG][k]:(T.es[k]!=null?T.es[k]:k); }
 window.setLang = function(l){ LANG=(l==='en')?'en':'es'; try{ localStorage.setItem('pc_lang',LANG); }catch(e){} applyI18n(); };
@@ -354,6 +379,8 @@ function applyI18n(){
   document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML=t(el.getAttribute('data-i18n-html')); });
   const es=document.getElementById('lang-es'), en=document.getElementById('lang-en');
   if(es) es.classList.toggle('active', LANG==='es'); if(en) en.classList.toggle('active', LANG==='en');
+  const aes=document.getElementById('acct-es'), aen=document.getElementById('acct-en');
+  if(aes) aes.classList.toggle('active', LANG==='es'); if(aen) aen.classList.toggle('active', LANG==='en');
   if(ME){ try{ renderHome(); }catch(e){} try{ renderClock(); }catch(e){} }
 }
 
@@ -422,13 +449,15 @@ onAuthStateChanged(auth, async (user)=>{
 
 // ---------- Home ----------
 function initials(name){ const p=String(name||'').trim().split(/\s+/); return ((p[0]||'')[0]||'?').toUpperCase()+((p[1]||'')[0]||'').toUpperCase(); }
+function setAva(el){ if(!el) return; if(ME.photoURL){ el.innerHTML='<img src="'+ME.photoURL+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'; } else { el.textContent=initials(ME.name); } }
 function renderHome(){
-  const av=document.getElementById('home-avatar');
-  if(ME.photoURL){ av.outerHTML='<img id="home-avatar" class="avatar" src="'+ME.photoURL+'" alt="">'; }
-  else { av.textContent=initials(ME.name); }
+  setAva(document.getElementById('acct-btn'));
+  setAva(document.getElementById('acct-ava'));
   const h=new Date().getHours();
   document.getElementById('home-greet').textContent = h<12?t('morning'):h<19?t('afternoon'):t('evening');
   document.getElementById('home-name').textContent = ME.name || t('team');
+  document.getElementById('acct-name').textContent = ME.name || t('team');
+  document.getElementById('acct-roles').textContent = (Array.isArray(ME.roles)&&ME.roles.length)?ME.roles.join(' · '):(ME.isOwner?'👑':'');
   document.getElementById('home-admin-btn').classList.toggle('hide', !ME.isOwner);
   const roles = Array.isArray(ME.roles)?ME.roles:[];
   const box=document.getElementById('home-tiles'); const none=document.getElementById('home-noroles');
@@ -465,6 +494,8 @@ function renderClock(){
   const hrs = (CLK && CLK.hours!=null) ? Number(CLK.hours) : 0;
   const st=document.getElementById('clk-status'); const hb=document.getElementById('clk-hours'); const btn=document.getElementById('clk-btn'); const note=document.getElementById('clk-note');
   hb.textContent = hrs.toFixed(2)+' h';
+  const ah=document.getElementById('acct-hours'); if(ah) ah.textContent=hrs.toFixed(2)+' h';
+  const ap=document.getElementById('acct-pay'); if(ap){ const pay=(ME&&ME.rate)?hrs*Number(ME.rate):0; ap.textContent='$'+pay.toFixed(2); }
   if(open){
     st.innerHTML='<span class="dot" style="background:var(--green);"></span>ADENTRO · '+(open.location==='yonke'?'Yonke':open.location==='dealer'?'Dealer':'trabajando');
     st.style.color='var(--green)';
@@ -501,6 +532,8 @@ window.punch = function(){
 };
 
 window.loadHome = function(){ if(ME){ loadClock(); } };
+window.toggleAcct = function(e){ if(e) e.stopPropagation(); const m=document.getElementById('acct-menu'); if(m.classList.contains('hide')){ m.classList.remove('hide'); document.getElementById('acct-catch').classList.remove('hide'); } else { closeAcct(); } };
+window.closeAcct = function(){ document.getElementById('acct-menu').classList.add('hide'); document.getElementById('acct-catch').classList.add('hide'); };
 
 // ========================= DETALLADOR (SOP guiado) =========================
 // SOP de detallado tal cual lo pidió Enrique, con instrucciones, cuidados y tiempo sugerido.
