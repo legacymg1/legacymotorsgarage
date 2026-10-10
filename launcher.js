@@ -126,7 +126,7 @@ function injectStyle(){
     .lmg-ico{font-size:20px;width:26px;text-align:center;flex:0 0 auto;}
     .lmg-here{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.05em;color:#e8b64a;}
     /* Barra inferior ÚNICA — burbuja flotante de cristal (estilo iPhone), misma en todas */
-    #lmg-nav{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:2147482990;
+    #lmg-nav{position:fixed;top:auto !important;height:auto !important;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:2147482990;
       display:flex;gap:2px;padding:6px;border-radius:24px;
       background:rgba(13,16,24,0.62);border:1px solid rgba(255,255,255,0.14);
       -webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);
