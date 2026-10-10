@@ -268,6 +268,8 @@
     </div>
   </header>
 
+  <!-- eBay y Cuentas de equipo ya NO viven en Clientes (eBay se desarrolla aparte; equipo en Pit Crew) -->
+  <style>#ebm-box,#team-box{display:none !important;}</style>
   <!-- Toggle Dealer | Servicio (justo debajo de la barra fija) -->
   <div id="cli-switch" style="position:sticky;top:66px;z-index:40;display:flex;gap:8px;padding:10px 16px;background:var(--navy3);border-bottom:1px solid var(--border);justify-content:center;">
     <button id="cli-dealer-btn" onclick="setCliView('dealer')" style="flex:1;max-width:240px;padding:11px;border-radius:13px;border:1px solid var(--gold);background:var(--gold);color:var(--navy3);font-weight:800;font-size:15px;font-family:inherit;cursor:pointer;">🚗 Dealer</button>
