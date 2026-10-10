@@ -138,6 +138,8 @@ function injectStyle(){
     #lmg-nav a .ic{font-size:21px;line-height:1.05;}
     #lmg-nav a.active{color:#c9a84c;background:rgba(201,168,76,0.15);}
     #lmg-nav a:active{transform:scale(.94);}
+    /* Sube las burbujas de ayuda/chat por ENCIMA de la barra flotante (que no se escondan) */
+    #hb-fab, #lcw-fab{ bottom:92px !important; }
   `;
   document.head.appendChild(s);
 }
