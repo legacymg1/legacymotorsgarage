@@ -391,23 +391,7 @@
 </div></div>
 
 <div class="search-wrap">
-    <div style="display:flex;gap:10px;align-items:center;">
-      <input class="search-input" placeholder="🔍 Buscar cliente, carro o VIN..." id="search-box" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="flex:1;">
-      <button onclick="openCotizador()" style="display:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:0.5px;cursor:pointer;white-space:nowrap;" title="Simular pagos para un cliente">🧮 Cotizador</button>
-      <button onclick="openLendmarkList()" style="display:none;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:0.5px;cursor:pointer;white-space:nowrap;" title="Hojas de venta guardadas para Lendmark">📑 Lendmark Sales Sheets</button>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <button id="sort-next" class="sort-btn" onclick="setSort('next')" style="background:var(--gold);color:var(--navy3);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">💰 PRÓXIMO</button>
-        <button id="sort-date" class="sort-btn" onclick="setSort('date')" style="background:var(--border);color:var(--muted);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">📅 FECHA</button>
-        <button id="sort-name" class="sort-btn" onclick="setSort('name')" style="background:var(--border);color:var(--muted);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">A-Z</button>
-        <button id="sort-balance" class="sort-btn" onclick="setSort('balance')" style="background:var(--border);color:var(--muted);border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;">💰 SALDO</button>
-        <div style="width:1px;height:24px;background:var(--border);"></div>
-        <button id="btn-grid" onclick="setView('grid')" style="background:var(--gold);color:var(--navy3);border:none;border-radius:6px;padding:8px 12px;font-size:16px;cursor:pointer;" title="Vista tarjetas">⊞</button>
-        <button id="btn-list" onclick="setView('list')" style="background:var(--border);color:var(--text);border:none;border-radius:6px;padding:8px 12px;font-size:16px;cursor:pointer;" title="Vista lista">☰</button>
-      </div>
-    </div>
-    <div style="text-align:right;margin-top:8px;">
-      <button data-action="delete" onclick="openDelClient()" style="background:transparent;color:var(--red);border:1px solid var(--red);border-radius:6px;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;">🗑 Eliminar cliente</button>
-    </div>
+    <input class="search-input" placeholder="🔍 Buscar cliente, carro o VIN..." id="search-box" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="width:100%;">
   </div>
 
   <main id="main-content"><div class="loading">Cargando clientes...</div></main>
@@ -1029,21 +1013,9 @@ let editingId = null, payingId = null, waPhone = null, waLang = 'es';
 let currentView = 'grid';
 let currentSort = 'next'; // 'next', 'status', 'date', 'name', 'balance'
 
-window.setSort = function(s) {
-  currentSort = s;
-  // Update sort button styles
-  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById('sort-'+s);
-  if(btn) btn.classList.add('active');
-  renderAll();
-};
+window.setSort = function(s) { currentSort = s; renderAll(); };
 
-window.setView = function(v) {
-  currentView = v;
-  document.getElementById('btn-grid').classList.toggle('active', v==='grid');
-  document.getElementById('btn-list').classList.toggle('active', v==='list');
-  renderAll();
-};
+window.setView = function(v) { currentView = v; renderAll(); };
 
 function today() {
   const d = new Date();
@@ -2557,7 +2529,20 @@ window.renderAll = function() {
 
   const isListView = currentView === 'list';
   const actCol = (()=>{try{return localStorage.getItem('col_active-list')==='1';}catch(e){return false;}})();
-  html+=`<div class="sec-head" onclick="toggleSection('active-list','active-arrow')"><span>Clientes con pagos activos (${mainList.length})</span><span id="active-arrow" class="sec-arrow">${actCol?'▸':'▾'}</span></div><div id="active-list"${actCol?' style="display:none;"':''}><div class="${isListView ? 'client-list' : 'clients-grid'}" style="${isListView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
+  const _sb=(k,l)=>`<button onclick="setSort('${k}')" style="background:${currentSort===k?'var(--gold)':'var(--border)'};color:${currentSort===k?'var(--navy3)':'var(--muted)'};border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;white-space:nowrap;">${l}</button>`;
+  const _vb=(v,ic,t)=>`<button onclick="setView('${v}')" title="${t}" style="background:${currentView===v?'var(--gold)':'var(--border)'};color:${currentView===v?'var(--navy3)':'var(--text)'};border:none;border-radius:6px;padding:7px 11px;font-size:16px;cursor:pointer;">${ic}</button>`;
+  html+=`<div style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+      <div onclick="toggleSection('active-list','active-arrow')" style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);cursor:pointer;white-space:nowrap;">💰 PAGOS ACTIVOS (${mainList.length}) <span id="active-arrow" class="sec-arrow">${actCol?'▸':'▾'}</span></div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        ${_sb('next','💰 PRÓXIMO')}${_sb('date','📅 FECHA')}${_sb('name','A-Z')}${_sb('balance','💰 SALDO')}
+        <div style="width:1px;height:22px;background:var(--border);"></div>
+        ${_vb('grid','⊞','Tarjetas')}${_vb('list','☰','Lista')}
+        <div style="width:1px;height:22px;background:var(--border);"></div>
+        <button onclick="openDelClient()" style="background:transparent;color:var(--red);border:1px solid var(--red);border-radius:6px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">🗑 Eliminar</button>
+      </div>
+    </div>
+    <div id="active-list" style="padding:14px 16px;${actCol?'display:none;':''}"><div class="${isListView ? 'client-list' : 'clients-grid'}" style="${isListView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
   if(!mainList.length){
     html+=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚗</div><div class="empty-text">Sin clientes con pagos activos</div><div style="font-size:14px">Los de servicio y liquidados están más abajo</div></div>`;
   } else if(isListView) {
@@ -2701,7 +2686,7 @@ window.renderAll = function() {
       </div>`;
     });
   }
-  html+='</div></div>';
+  html+='</div></div></div>';
 
   // ---- Sección: Servicio y Liquidados ----
   const archive = filtered.filter(c => c.kind==='service' || isPaidOff(c)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
