@@ -940,6 +940,31 @@ window.toggleSection = function(id, arrowId){
   const ar=document.getElementById(arrowId); if(ar) ar.textContent = show ? '▾' : '▸';
   try{ localStorage.setItem('col_'+id, show ? '0':'1'); }catch(e){}
 };
+// Abre/cierra la caja de Pagos activos SUAVECITO (sin brinco de pantalla).
+window.toggleActiveList = function(){
+  const el=document.getElementById('active-list'); const ar=document.getElementById('active-arrow');
+  if(!el) return;
+  if(el._lmgAnim) return; // evita doble click a media animación
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const isOpen = el.style.display!=='none';
+  if(isOpen){
+    try{ localStorage.setItem('col_active-list','1'); }catch(e){}
+    if(ar) ar.textContent='▸';
+    if(reduce){ el.style.display='none'; return; }
+    el._lmgAnim=true; el.style.overflow='hidden'; el.style.maxHeight=el.scrollHeight+'px'; el.style.opacity='1';
+    requestAnimationFrame(()=>{ el.style.transition='max-height .26s ease, opacity .2s ease'; el.style.maxHeight='0px'; el.style.opacity='0'; });
+    setTimeout(()=>{ el.style.display='none'; el.style.maxHeight=''; el.style.opacity=''; el.style.overflow=''; el.style.transition=''; el._lmgAnim=false; }, 290);
+  } else {
+    try{ localStorage.setItem('col_active-list','0'); }catch(e){}
+    if(ar) ar.textContent='▾';
+    el.style.display='';
+    if(reduce) return;
+    el._lmgAnim=true; el.style.overflow='hidden'; el.style.opacity='0';
+    const h=el.scrollHeight; el.style.maxHeight='0px';
+    requestAnimationFrame(()=>{ el.style.transition='max-height .26s ease, opacity .2s ease'; el.style.maxHeight=h+'px'; el.style.opacity='1'; });
+    setTimeout(()=>{ el.style.maxHeight=''; el.style.opacity=''; el.style.overflow=''; el.style.transition=''; el._lmgAnim=false; }, 290);
+  }
+};
 function applyCollapse(id, arrowId){
   try{ if(localStorage.getItem('col_'+id)==='1'){ const el=document.getElementById(id); if(el) el.style.display='none'; const ar=document.getElementById(arrowId); if(ar) ar.textContent='▸'; } }catch(e){}
 }
@@ -2531,9 +2556,9 @@ window.renderAll = function() {
   const actCol = (()=>{try{return localStorage.getItem('col_active-list')==='1';}catch(e){return false;}})();
   const _sb=(k,l)=>`<button onclick="setSort('${k}')" style="background:${currentSort===k?'var(--gold)':'var(--border)'};color:${currentSort===k?'var(--navy3)':'var(--muted)'};border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;white-space:nowrap;">${l}</button>`;
   const _vb=(v,ic,t)=>`<button onclick="setView('${v}')" title="${t}" style="background:${currentView===v?'var(--gold)':'var(--border)'};color:${currentView===v?'var(--navy3)':'var(--text)'};border:none;border-radius:6px;padding:7px 11px;font-size:16px;cursor:pointer;">${ic}</button>`;
-  html+=`<div style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+  html+=`<div id="active-box" style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;scroll-margin-top:90px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
-      <div onclick="toggleSection('active-list','active-arrow')" style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);cursor:pointer;white-space:nowrap;">💰 PAGOS ACTIVOS (${mainList.length}) <span id="active-arrow" class="sec-arrow">${actCol?'▸':'▾'}</span></div>
+      <div onclick="toggleActiveList()" style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);cursor:pointer;white-space:nowrap;">💰 PAGOS ACTIVOS (${mainList.length}) <span id="active-arrow" class="sec-arrow">${actCol?'▸':'▾'}</span></div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         ${_sb('next','💰 PRÓXIMO')}${_sb('date','📅 FECHA')}${_sb('name','A-Z')}${_sb('balance','💰 SALDO')}
         <div style="width:1px;height:22px;background:var(--border);"></div>
