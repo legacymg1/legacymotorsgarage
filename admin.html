@@ -277,17 +277,26 @@
   </div>
 
   <div id="dealer-view">
-  <div class="sec-head" onclick="toggleSection('stats-bar','stats-arrow')"><span>Resumen</span><span id="stats-arrow" class="sec-arrow">▾</span></div>
-  <div class="stats-bar" id="stats-bar">
-    <div class="stat-card"><div class="stat-label">Clientes</div><div class="stat-value sv-gold" id="stat-total">0</div></div>
-    <div class="stat-card"><div class="stat-label">Vencidos</div><div class="stat-value sv-red" id="stat-overdue">0</div></div>
-    <div class="stat-card"><div class="stat-label">Esta semana</div><div class="stat-value sv-yellow" id="stat-soon">0</div></div>
-    <div class="stat-card"><div class="stat-label">Al corriente</div><div class="stat-value sv-green" id="stat-ok">0</div></div>
+  <!-- Resumen compacto (barra delgada) -->
+  <div id="stats-bar" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 24px 14px;padding:9px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;font-size:13.5px;">
+    <span style="color:var(--muted);font-weight:800;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;">Resumen</span>
+    <span>👥 <b id="stat-total" style="color:var(--gold);">0</b> <span style="color:var(--muted);">activos</span></span>
+    <span>🔴 <b id="stat-overdue" style="color:var(--red);">0</b> <span style="color:var(--muted);">vencidos</span></span>
+    <span>🟡 <b id="stat-soon" style="color:var(--yellow);">0</b> <span style="color:var(--muted);">esta semana</span></span>
+    <span>🟢 <b id="stat-ok" style="color:var(--green);">0</b> <span style="color:var(--muted);">al corriente</span></span>
   </div>
   <div style="display:none;text-align:right;margin:4px 2px 0;"><button type="button" id="seller-sign-btn" onclick="openSellerSign()" title="Tu firma como vendedor: firmas una vez y se estampa sola en cada contrato firmado." style="display:none;background:transparent;color:var(--gold);border:1px solid rgba(240,192,64,0.5);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:8px;">✍️ Mi firma (vendedor)</button><button type="button" onclick="repairDocs()" title="Convierte a imagen los ID/seguros que sean PDF o HEIC. Hazlo en el iPad para las fotos de iPhone." style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">🛠 Reparar fotos ID/seguro (PDF→imagen)</button></div>
 
-  <div class="sec-head" onclick="toggleSection('fin-summary-box','fin-arrow')"><span>Finanzas</span><span id="fin-arrow" class="sec-arrow">▾</span></div>
-<div id="fin-summary-box"></div>
+  <!-- Cobranza: resumen de cobros del dealer (se abre desde el LOGO). Nombre distinto a la página Finanzas. -->
+  <div class="modal-overlay" id="fin-modal">
+    <div class="modal" style="max-width:720px;max-height:85vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div class="modal-title">💵 Cobranza</div>
+        <button onclick="closeModal('fin-modal')" style="background:transparent;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;">✕</button>
+      </div>
+      <div id="fin-summary-box"></div>
+    </div>
+  </div>
 
   <!-- TODAY BOX -->
 <div id="today-box" style="display:none;margin:0 24px 16px;background:var(--card);border:1px solid var(--gold);border-radius:14px;overflow:hidden;">
@@ -304,7 +313,7 @@
 <!-- CITAS BOX -->
 <div id="citas-box" style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;" onclick="toggleSection('citas-list','citas-arrow')">
-    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">📅 CITAS</div>
+    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">📅 CITAS <span id="citas-count" style="font-size:12px;color:var(--muted);font-family:var(--font-body);letter-spacing:0;"></span></div>
     <div style="display:flex;gap:12px;align-items:center;">
       <button onclick="event.stopPropagation();openApptModal()" style="background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">＋ Nueva cita</button>
       <span id="citas-arrow" class="sec-arrow">▾</span>
@@ -876,7 +885,9 @@
     try{ window.scrollTo(0,0); }catch(e){}
   };
   // Tareas de ESTA página (las muestra el logo de Legacy arriba).
+  window.openFinModal = function(){ var m=document.getElementById('fin-modal'); if(m) m.classList.add('active'); };
   window.LEGACY_ACTIONS = [
+    { label:'Cobranza', ico:'💵', fn:'openFinModal' },
     { header:'🧮 Ventas' },
     { label:'Cotizador', ico:'🧮', fn:'openCotizador' },
     { label:'Lendmark sales', ico:'📄', fn:'openLendmarkList' },
@@ -974,7 +985,7 @@ window.toggleActiveList = function(){ toggleSection('active-list','active-arrow'
 function applyCollapse(id, arrowId){
   try{ if(localStorage.getItem('col_'+id)==='1'){ const el=document.getElementById(id); if(el) el.style.display='none'; const ar=document.getElementById(arrowId); if(ar) ar.textContent='▸'; } }catch(e){}
 }
-window.addEventListener('DOMContentLoaded', ()=>{ applyCollapse('stats-bar','stats-arrow'); applyCollapse('today-list','today-arrow'); applyCollapse('fin-summary-box','fin-arrow'); applyCollapse('citas-list','citas-arrow'); });
+window.addEventListener('DOMContentLoaded', ()=>{ applyCollapse('today-list','today-arrow'); applyCollapse('citas-list','citas-arrow'); });
 
 window.openPassModal = function(){
   ['pw-current','pw-new','pw-new2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -1890,6 +1901,7 @@ window.renderAppointments=function(){
   const box=document.getElementById('citas-list'); if(!box) return;
   const todayISO=apptTodayISO(), tomoISO=apptAddDays(todayISO,1);
   const up=appointments.filter(a=>a.status==='scheduled').sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  const _cc=document.getElementById('citas-count'); if(_cc) _cc.textContent = up.length ? ('('+up.length+')') : '';
   if(!up.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:6px 0;">No hay citas agendadas. Toca <strong style="color:var(--gold);">＋ Nueva cita</strong> para agendar.</div>'; return; }
   const groups=[
     {label:'⚠️ Atrasadas', color:'var(--red)', items:up.filter(a=>a.date<todayISO)},
