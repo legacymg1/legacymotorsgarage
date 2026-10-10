@@ -1,7 +1,9 @@
-// ===== Legacy Launcher — menú único para brincar entre apps (solo dueños) =====
-// Se incluye con: <script type="module" src="launcher.js"></script>
-// Reconoce al dueño por su sesión de correo (compartida en el dominio) y pinta
-// un botón-logo flotante que abre un menú de burbujas hacia cada sección.
+// ===== Legacy Launcher — menú único (solo dueños) =====
+// Reusa el LOGO que ya existe en la barra superior de cada página.
+// En cada página se marca el logo con  data-legacy-launch  y este script,
+// si el usuario es dueño, lo vuelve el disparador de un menú desplegable
+// de burbujas transparentes para brincar entre las apps (sin re-login).
+//   <script type="module" src="launcher.js"></script>
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -19,100 +21,126 @@ const SECTIONS = [
   { k:"index",        label:"Inventario",   ico:"🚗", href:"index.html" },
   { k:"admin",        label:"Clientes",     ico:"👥", href:"admin.html" },
   { k:"finanzas",     label:"Finanzas",     ico:"💰", href:"finanzas.html" },
-  // 🔒 PERSONAL de Enrique — datos privados y delicados. SOLO ev@ la ve en el menú.
+  // 🔒 PERSONAL de Enrique — solo ev@ la ve en el menú.
   { k:"mis-finanzas", label:"Mis Finanzas", ico:"📊", href:"mis-finanzas.html", only: EV },
   { k:"empleado",     label:"Pit Crew",     ico:"🏁", href:"empleado.html" },
   { k:"warehouse",    label:"Almacén",      ico:"📦", href:"warehouse.html" },
 ];
 
-// Reusa la app de Firebase de la página si ya existe (evita doble init).
 let app; try { app = getApps().length ? getApp() : initializeApp(CFG, "legacy-launcher"); }
 catch (e) { try { app = initializeApp(CFG, "legacy-launcher-" + Date.now()); } catch (_) { app = null; } }
-if (app) {
-  const auth = getAuth(app);
-  onAuthStateChanged(auth, (user) => {
-    const email = ((user && user.email) || "").toLowerCase();
-    if (email && OWNERS.includes(email)) mount(email); else unmount();
-  });
-}
+if (app) onAuthStateChanged(getAuth(app), (user) => {
+  const email = ((user && user.email) || "").toLowerCase();
+  if (email && OWNERS.includes(email)) enable(email); else disable();
+});
 
 function currentKey(){
-  const p = (location.pathname.split("/").pop() || "index.html").toLowerCase();
-  const f = p || "index.html";
+  const f = (location.pathname.split("/").pop() || "index.html").toLowerCase();
   const hit = SECTIONS.find(s => f === s.href || (f === "" && s.k === "index"));
   return hit ? hit.k : "index";
 }
-
-function unmount(){ const b=document.getElementById("lmg-launch-btn"); if(b) b.remove(); const o=document.getElementById("lmg-launch-ov"); if(o) o.remove(); }
-
-function mount(email){
-  if (document.getElementById("lmg-launch-btn")) return;
-  const secs = SECTIONS.filter(s => !s.only || s.only === email);
-  const style = document.createElement("style");
-  style.id = "lmg-launch-style";
-  style.textContent = `
-    #lmg-launch-btn{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:14px;z-index:2147483000;
-      width:46px;height:46px;border-radius:14px;border:1px solid rgba(232,182,74,0.55);
-      background:rgba(14,18,26,0.72);backdrop-filter:blur(10px) saturate(1.3);-webkit-backdrop-filter:blur(10px) saturate(1.3);
-      color:#e8b64a;font-weight:900;font-size:19px;letter-spacing:-0.03em;cursor:pointer;
-      display:flex;align-items:center;justify-content:center;box-shadow:0 6px 22px rgba(0,0,0,0.45);
-      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;transition:transform .12s ease;}
-    #lmg-launch-btn:active{transform:scale(.92);}
-    #lmg-launch-ov{position:fixed;inset:0;z-index:2147483001;display:none;align-items:center;justify-content:center;
-      background:rgba(6,9,14,0.62);backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);
-      padding:max(26px,env(safe-area-inset-top,0px)) 22px calc(26px + env(safe-area-inset-bottom,0px));
-      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;}
-    #lmg-launch-ov.open{display:flex;}
-    .lmg-sheet{width:100%;max-width:440px;text-align:center;animation:lmgIn .22s ease;}
-    @keyframes lmgIn{from{opacity:0;transform:translateY(10px) scale(.98);}to{opacity:1;transform:none;}}
-    @media (prefers-reduced-motion:reduce){.lmg-sheet{animation:none;}}
-    .lmg-brand{font-weight:900;font-size:19px;letter-spacing:0.14em;color:#f4f6f8;margin-bottom:3px;}
-    .lmg-brand b{color:#e8b64a;}
-    .lmg-sub{font-size:12px;color:#8b93a3;margin-bottom:24px;letter-spacing:0.04em;}
-    .lmg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-    @media (max-width:360px){.lmg-grid{grid-template-columns:repeat(2,1fr);}}
-    .lmg-bub{display:flex;flex-direction:column;align-items:center;gap:9px;cursor:pointer;background:none;border:none;
-      font-family:inherit;color:#f4f6f8;padding:4px;transition:transform .12s ease;}
-    .lmg-bub:active{transform:scale(.93);}
-    .lmg-circ{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;
-      background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);box-shadow:0 6px 20px rgba(0,0,0,0.35);
-      transition:border-color .15s ease,background .15s ease;}
-    .lmg-bub:hover .lmg-circ{border-color:rgba(232,182,74,0.55);background:rgba(232,182,74,0.12);}
-    .lmg-bub.here .lmg-circ{border-color:#e8b64a;background:rgba(232,182,74,0.16);}
-    .lmg-lab{font-size:12.5px;font-weight:700;}
-    .lmg-here{font-size:10px;color:#e8b64a;font-weight:800;letter-spacing:0.05em;}
-    .lmg-close{margin-top:26px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);color:#cfd6e0;
-      border-radius:999px;padding:11px 26px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
-  `;
-  document.head.appendChild(style);
-
-  const btn = document.createElement("button");
-  btn.id = "lmg-launch-btn"; btn.type = "button"; btn.title = "Menú Legacy"; btn.setAttribute("aria-label","Menú Legacy");
-  btn.textContent = "L";
-  btn.onclick = openMenu;
-  document.body.appendChild(btn);
-
-  const ov = document.createElement("div");
-  ov.id = "lmg-launch-ov";
-  const here = currentKey();
-  ov.innerHTML = `<div class="lmg-sheet">
-    <div class="lmg-brand">LEGACY <b>·</b> PIT CREW</div>
-    <div class="lmg-sub">🏁 TODO EN UN SOLO LUGAR</div>
-    <div class="lmg-grid">${secs.map(s => `
-      <button class="lmg-bub ${s.k===here?'here':''}" data-href="${s.href}" data-here="${s.k===here?'1':'0'}">
-        <div class="lmg-circ">${s.ico}</div>
-        <div class="lmg-lab">${s.label}</div>
-        ${s.k===here?'<div class="lmg-here">AQUÍ</div>':''}
-      </button>`).join("")}</div>
-    <button class="lmg-close" id="lmg-close">Cerrar</button>
-  </div>`;
-  ov.addEventListener("click", (e) => {
-    if (e.target === ov || e.target.id === "lmg-close") { closeMenu(); return; }
-    const b = e.target.closest(".lmg-bub"); if (!b) return;
-    if (b.dataset.here === "1") { closeMenu(); return; }
-    location.href = b.dataset.href;
-  });
-  document.body.appendChild(ov);
+let SECS = [];
+function enable(email){
+  SECS = SECTIONS.filter(s => !s.only || s.only === email);
+  injectStyle(); buildMenu();
+  applyBars();
+  // por si la barra se pinta/cambia después de cargar (apps que arman el header en JS)
+  if (!window.__lmgObs){
+    window.__lmgObs = new MutationObserver(() => { if (window.__lmgOwner) applyBars(); });
+    try { window.__lmgObs.observe(document.body, { childList:true, subtree:true }); } catch(e){}
+  }
+  window.__lmgOwner = true;
 }
-function openMenu(){ const o=document.getElementById("lmg-launch-ov"); if(o) o.classList.add("open"); }
-function closeMenu(){ const o=document.getElementById("lmg-launch-ov"); if(o) o.classList.remove("open"); }
+function applyBars(){
+  // Oculta el logo propio de cada página (para los dueños) y pone el logo estándar.
+  document.querySelectorAll("[data-legacy-brand]").forEach(b => { if (b.dataset.lmgHid !== "1"){ b.dataset.lmgHid="1"; b.dataset.lmgDisp = b.style.display||""; b.style.display="none"; } });
+  document.querySelectorAll("[data-legacy-bar]").forEach(ensureLogo);
+}
+function disable(){
+  window.__lmgOwner = false;
+  document.querySelectorAll(".lmg-logo").forEach(el => el.remove());
+  document.querySelectorAll('[data-legacy-brand][data-lmg-hid="1"]').forEach(b => { b.style.display = b.dataset.lmgDisp||""; b.removeAttribute("data-lmg-hid"); });
+  closeMenu();
+}
+function ensureLogo(bar){
+  if (bar.querySelector(":scope > .lmg-logo")) return;
+  const logo = document.createElement("button");
+  logo.type = "button"; logo.className = "lmg-logo"; logo.setAttribute("aria-label","Menú Legacy");
+  logo.innerHTML = `<span class="lmg-flag">🏁</span><span class="lmg-word">LEGACY</span><span class="lmg-chev">▾</span>`;
+  logo.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); toggleMenu(logo); });
+  bar.insertBefore(logo, bar.firstChild);
+}
+
+function injectStyle(){
+  if (document.getElementById("lmg-style")) return;
+  const s = document.createElement("style"); s.id = "lmg-style";
+  s.textContent = `
+    .lmg-logo{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px;border-radius:12px;cursor:pointer;
+      background:rgba(232,182,74,0.10);border:1px solid rgba(232,182,74,0.45);color:#e8b64a;
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;font-weight:900;letter-spacing:0.04em;
+      font-size:15px;line-height:1;flex:0 0 auto;transition:background .15s ease,transform .1s ease;}
+    .lmg-logo:hover{background:rgba(232,182,74,0.18);}
+    .lmg-logo:active{transform:scale(.96);}
+    .lmg-logo .lmg-flag{font-size:15px;}
+    .lmg-logo .lmg-word{font-weight:900;}
+    .lmg-chev{display:inline-block;font-size:11px;opacity:.8;transition:transform .18s ease;}
+    .lmg-logo[data-lmg-open] .lmg-chev{transform:rotate(180deg);}
+    #lmg-catch{position:fixed;inset:0;z-index:2147483000;display:none;background:transparent;}
+    #lmg-catch.open{display:block;}
+    #lmg-dd{position:fixed;z-index:2147483001;display:none;width:min(84vw,260px);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;
+      animation:lmgDrop .16s ease;}
+    #lmg-dd.open{display:block;}
+    @keyframes lmgDrop{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
+    @media (prefers-reduced-motion:reduce){#lmg-dd{animation:none;}}
+    .lmg-row{display:flex;align-items:center;gap:12px;width:100%;margin-bottom:8px;padding:11px 14px;border-radius:14px;cursor:pointer;
+      background:rgba(20,24,34,0.66);border:1px solid rgba(255,255,255,0.12);
+      backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);
+      box-shadow:0 6px 20px rgba(0,0,0,0.28);color:#f4f6f8;font-size:15px;font-weight:700;text-align:left;
+      font-family:inherit;transition:transform .1s ease,border-color .15s ease;}
+    .lmg-row:last-child{margin-bottom:0;}
+    .lmg-row:active{transform:scale(.98);}
+    .lmg-row:hover{border-color:rgba(232,182,74,0.55);}
+    .lmg-row.here{border-color:#e8b64a;background:rgba(232,182,74,0.16);}
+    .lmg-ico{font-size:20px;width:26px;text-align:center;flex:0 0 auto;}
+    .lmg-here{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.05em;color:#e8b64a;}
+  `;
+  document.head.appendChild(s);
+}
+function buildMenu(){
+  if (document.getElementById("lmg-dd")) { renderRows(); return; }
+  const catcher = document.createElement("div"); catcher.id = "lmg-catch";
+  catcher.addEventListener("click", closeMenu);
+  const dd = document.createElement("div"); dd.id = "lmg-dd";
+  document.body.appendChild(catcher); document.body.appendChild(dd);
+  renderRows();
+  window.addEventListener("resize", closeMenu);
+}
+function renderRows(){
+  const here = currentKey();
+  document.getElementById("lmg-dd").innerHTML = SECS.map(s =>
+    `<button class="lmg-row ${s.k===here?'here':''}" data-href="${s.href}" data-here="${s.k===here?'1':'0'}">
+       <span class="lmg-ico">${s.ico}</span><span>${s.label}</span>${s.k===here?'<span class="lmg-here">AQUÍ</span>':''}
+     </button>`).join("");
+  document.getElementById("lmg-dd").querySelectorAll(".lmg-row").forEach(r => {
+    r.addEventListener("click", () => { if (r.dataset.here === "1") { closeMenu(); return; } location.href = r.dataset.href; });
+  });
+}
+let openAnchor = null;
+function toggleMenu(anchor){
+  const dd = document.getElementById("lmg-dd");
+  if (dd.classList.contains("open") && openAnchor === anchor) { closeMenu(); return; }
+  openAnchor = anchor;
+  const r = anchor.getBoundingClientRect();
+  const w = Math.min(window.innerWidth * 0.84, 260);
+  let left = r.left; if (left + w > window.innerWidth - 10) left = window.innerWidth - w - 10; if (left < 10) left = 10;
+  dd.style.top = (r.bottom + 8) + "px"; dd.style.left = left + "px";
+  dd.classList.add("open"); document.getElementById("lmg-catch").classList.add("open");
+  anchor.setAttribute("data-lmg-open","1");
+}
+function closeMenu(){
+  const dd = document.getElementById("lmg-dd"); if (dd) dd.classList.remove("open");
+  const c = document.getElementById("lmg-catch"); if (c) c.classList.remove("open");
+  document.querySelectorAll("[data-lmg-open]").forEach(el => el.removeAttribute("data-lmg-open"));
+  openAnchor = null;
+}
