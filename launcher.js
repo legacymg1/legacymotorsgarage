@@ -108,7 +108,10 @@ function injectStyle(){
     .lmg-logo[data-lmg-open] .lmg-chev{transform:rotate(180deg);}
     #lmg-catch{position:fixed;inset:0;z-index:2147483000;display:none;background:transparent;}
     #lmg-catch.open{display:block;}
-    #lmg-dd{position:fixed;z-index:2147483001;display:none;width:min(86vw,270px);max-height:72vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    #lmg-dd{position:fixed;z-index:2147483001;display:none;width:min(86vw,280px);max-height:72vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+      background:rgba(10,13,22,0.94);border:1px solid rgba(255,255,255,0.16);border-radius:18px;padding:8px;
+      -webkit-backdrop-filter:blur(26px) saturate(1.4);backdrop-filter:blur(26px) saturate(1.4);
+      box-shadow:0 18px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
       font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;
       animation:lmgDrop .16s ease;}
     #lmg-dd.open{display:block;}
@@ -120,15 +123,14 @@ function injectStyle(){
     .lmg-grp-head:active{opacity:.7;}
     @keyframes lmgDrop{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
     @media (prefers-reduced-motion:reduce){#lmg-dd{animation:none;}}
-    .lmg-row{display:flex;align-items:center;gap:12px;width:100%;margin-bottom:8px;padding:11px 14px;border-radius:14px;cursor:pointer;
-      background:rgba(20,24,34,0.66);border:1px solid rgba(255,255,255,0.12);
-      backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);
-      box-shadow:0 6px 20px rgba(0,0,0,0.28);color:#f4f6f8;font-size:15px;font-weight:700;text-align:left;
-      font-family:inherit;transition:transform .1s ease,border-color .15s ease;}
+    .lmg-row{display:flex;align-items:center;gap:12px;width:100%;margin-bottom:3px;padding:11px 12px;border-radius:12px;cursor:pointer;
+      background:transparent;border:1px solid transparent;
+      color:#f4f6f8;font-size:15px;font-weight:700;text-align:left;
+      font-family:inherit;transition:background .12s ease,border-color .15s ease;}
     .lmg-row:last-child{margin-bottom:0;}
-    .lmg-row:active{transform:scale(.98);}
-    .lmg-row:hover{border-color:rgba(232,182,74,0.55);}
-    .lmg-row.here{border-color:#e8b64a;background:rgba(232,182,74,0.16);}
+    .lmg-row:active{background:rgba(255,255,255,0.05);}
+    .lmg-row:hover{background:rgba(255,255,255,0.06);border-color:rgba(201,168,76,0.4);}
+    .lmg-row.here{border-color:#c9a84c;background:rgba(201,168,76,0.16);}
     .lmg-ico{font-size:20px;width:26px;text-align:center;flex:0 0 auto;}
     .lmg-here{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.05em;color:#e8b64a;}
     /* Barra inferior ÚNICA — burbuja flotante de cristal (estilo iPhone), misma en todas */
