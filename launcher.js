@@ -66,7 +66,7 @@ function ensureLogo(bar){
   if (bar.querySelector(":scope > .lmg-logo")) return;
   const logo = document.createElement("button");
   logo.type = "button"; logo.className = "lmg-logo"; logo.setAttribute("aria-label","Menú Legacy");
-  logo.innerHTML = `<span class="lmg-flag">🏁</span><span class="lmg-word">LEGACY</span><span class="lmg-chev">▾</span>`;
+  logo.innerHTML = `<img class="lmg-logo-img" src="legacy-logo.png" alt="Legacy Motors Garage"><span class="lmg-chev">▾</span>`;
   logo.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); toggleMenu(logo); });
   bar.insertBefore(logo, bar.firstChild);
 }
@@ -75,15 +75,12 @@ function injectStyle(){
   if (document.getElementById("lmg-style")) return;
   const s = document.createElement("style"); s.id = "lmg-style";
   s.textContent = `
-    .lmg-logo{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px;border-radius:12px;cursor:pointer;
-      background:rgba(232,182,74,0.10);border:1px solid rgba(232,182,74,0.45);color:#e8b64a;
-      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;font-weight:900;letter-spacing:0.04em;
-      font-size:15px;line-height:1;flex:0 0 auto;transition:background .15s ease,transform .1s ease;}
-    .lmg-logo:hover{background:rgba(232,182,74,0.18);}
+    .lmg-logo{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:12px;cursor:pointer;
+      background:none;border:none;flex:0 0 auto;transition:background .15s ease,transform .1s ease;}
+    .lmg-logo:hover{background:rgba(232,182,74,0.12);}
     .lmg-logo:active{transform:scale(.96);}
-    .lmg-logo .lmg-flag{font-size:15px;}
-    .lmg-logo .lmg-word{font-weight:900;}
-    .lmg-chev{display:inline-block;font-size:11px;opacity:.8;transition:transform .18s ease;}
+    .lmg-logo-img{height:38px;width:auto;display:block;}
+    .lmg-chev{display:inline-block;font-size:12px;opacity:.85;color:#c9b896;transition:transform .18s ease;}
     .lmg-logo[data-lmg-open] .lmg-chev{transform:rotate(180deg);}
     #lmg-catch{position:fixed;inset:0;z-index:2147483000;display:none;background:transparent;}
     #lmg-catch.open{display:block;}
