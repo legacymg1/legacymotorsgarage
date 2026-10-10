@@ -168,11 +168,8 @@ function renderRows(){
   const dd = document.getElementById("lmg-dd"); if(!dd) return;
   // Si la página define TAREAS propias (window.LEGACY_ACTIONS) → el logo las muestra.
   let acts = (Array.isArray(window.LEGACY_ACTIONS) && window.LEGACY_ACTIONS.length) ? window.LEGACY_ACTIONS : null;
-  // Si NO hay barra inferior en esta página (ej. Inventario público), el logo TAMBIÉN trae la navegación.
-  if (acts && !document.getElementById("lmg-nav")){
-    const navActs = [{ header:"🧭 Ir a" }].concat(SECS.map(s => ({ label:s.label, ico:s.ico, run:(function(h){ return function(){ location.href=h; }; })(s.href) })));
-    acts = navActs.concat(acts);
-  }
+  // El logo = SOLO tareas de la página. La navegación entre apps vive en la barra inferior (#lmg-nav),
+  // que ahora está en todas las páginas del dueño. Por eso ya no inyectamos "Ir a" aquí.
   if (acts){
     // Agrupa por encabezados → grupos minimizables.
     const groups = []; let cur = null;
