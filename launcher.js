@@ -18,13 +18,13 @@ const CFG = {
 const OWNERS = ["ev@legacymotorsgarage.com", "ivan.garcia@legacymotorsgarage.com"];
 const EV = "ev@legacymotorsgarage.com";
 const SECTIONS = [
-  { k:"index",        label:"Inventario",   ico:"🚗", href:"index.html" },
-  { k:"admin",        label:"Clientes",     ico:"👥", href:"admin.html" },
-  { k:"finanzas",     label:"Finanzas",     ico:"💰", href:"finanzas.html" },
-  // 🔒 PERSONAL de Enrique — solo ev@ la ve en el menú.
-  { k:"mis-finanzas", label:"Mis Finanzas", ico:"📊", href:"mis-finanzas.html", only: EV },
-  { k:"empleado",     label:"Pit Crew",     ico:"🏁", href:"empleado.html" },
-  { k:"warehouse",    label:"Almacén",      ico:"📦", href:"warehouse.html" },
+  { k:"index",        label:"Inventario",   short:"Inventario", ico:"🚗", href:"index.html" },
+  { k:"admin",        label:"Clientes",     short:"Clientes",   ico:"👥", href:"admin.html" },
+  { k:"finanzas",     label:"Finanzas",     short:"Finanzas",   ico:"💰", href:"finanzas.html" },
+  // 🔒 PERSONAL de Enrique — solo ev@ la ve.
+  { k:"mis-finanzas", label:"Mis Finanzas", short:"Mis Fin.",   ico:"📊", href:"mis-finanzas.html", only: EV },
+  { k:"empleado",     label:"Pit Crew",     short:"Pit Crew",   ico:"🏁", href:"empleado.html" },
+  { k:"warehouse",    label:"Almacén",      short:"Almacén",    ico:"📦", href:"warehouse.html" },
 ];
 
 let app; try { app = getApps().length ? getApp() : initializeApp(CFG, "legacy-launcher"); }
@@ -57,8 +57,17 @@ function applyBars(){
   document.querySelectorAll("[data-legacy-bar]").forEach(ensureLogo);
   // Usa el LOGO que ya existe (ej. el grande de la página principal) como disparador.
   document.querySelectorAll("[data-legacy-launch]").forEach(wireExisting);
-  // La navegación entre apps ahora es por el logo → esconde la barra fija de abajo.
+  // Esconde las barras de abajo viejas (cada página tenía la suya) y pone UNA sola compartida (estilo Facebook).
   ["staff-tabbar","wh-tabbar"].forEach((id) => { const el=document.getElementById(id); if(el && el.dataset.lmgHidBar!=="1"){ el.dataset.lmgHidBar="1"; el.dataset.lmgBarDisp=el.style.display||""; el.style.display="none"; } });
+  ensureBottomNav();
+}
+function ensureBottomNav(){
+  let nav = document.getElementById("lmg-nav");
+  if(!nav){ nav = document.createElement("nav"); nav.id = "lmg-nav"; document.body.appendChild(nav);
+    try{ document.body.style.paddingBottom = "calc(86px + env(safe-area-inset-bottom, 0px))"; }catch(e){} }
+  const here = currentKey();
+  nav.innerHTML = SECS.map(s =>
+    `<a href="${s.href}" class="${s.k===here?'active':''}" aria-current="${s.k===here?'page':'false'}"><span class="ic">${s.ico}</span>${s.short||s.label}</a>`).join("");
 }
 function wireExisting(el){
   if (el.dataset.lmgWired === "1") return;
@@ -71,6 +80,8 @@ function disable(){
   document.querySelectorAll('[data-legacy-brand][data-lmg-hid="1"]').forEach(b => { b.style.display = b.dataset.lmgDisp||""; b.removeAttribute("data-lmg-hid"); });
   document.querySelectorAll('[data-legacy-launch][data-lmg-wired="1"]').forEach(el => el.removeAttribute("data-lmg-wired"));
   ["staff-tabbar","wh-tabbar"].forEach((id) => { const el=document.getElementById(id); if(el && el.dataset.lmgHidBar==="1"){ el.style.display=el.dataset.lmgBarDisp||""; delete el.dataset.lmgHidBar; } });
+  const nav=document.getElementById("lmg-nav"); if(nav) nav.remove();
+  try{ document.body.style.paddingBottom=""; }catch(e){}
   closeMenu();
 }
 function ensureLogo(bar){
@@ -112,6 +123,19 @@ function injectStyle(){
     .lmg-row.here{border-color:#e8b64a;background:rgba(232,182,74,0.16);}
     .lmg-ico{font-size:20px;width:26px;text-align:center;flex:0 0 auto;}
     .lmg-here{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.05em;color:#e8b64a;}
+    /* Barra inferior ÚNICA — burbuja flotante de cristal (estilo iPhone), misma en todas */
+    #lmg-nav{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:2147482990;
+      display:flex;gap:2px;padding:6px;border-radius:24px;
+      background:rgba(13,16,24,0.62);border:1px solid rgba(255,255,255,0.14);
+      -webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);
+      box-shadow:0 12px 34px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;max-width:560px;margin:0 auto;}
+    #lmg-nav a{flex:1;min-width:0;text-align:center;padding:8px 2px;text-decoration:none;color:#8a8fa8;border-radius:17px;
+      font-size:9.5px;font-weight:700;letter-spacing:.02em;display:flex;flex-direction:column;align-items:center;gap:3px;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .15s ease,background .15s ease;}
+    #lmg-nav a .ic{font-size:21px;line-height:1.05;}
+    #lmg-nav a.active{color:#c9a84c;background:rgba(201,168,76,0.15);}
+    #lmg-nav a:active{transform:scale(.94);}
   `;
   document.head.appendChild(s);
 }
