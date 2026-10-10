@@ -3262,6 +3262,33 @@ window.saveMov = async function(){
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:calc(env(safe-area-inset-bottom) + 4px);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 <script type="module" src="chat-widget.js"></script>
 <script type="module" src="help-bot.js"></script>
+<!-- Los grupos de botones de Finanzas ahora viven en el LOGO (tareas de la página) -->
+<style>.fz-grp{display:none !important;}</style>
+<script>
+  window.LEGACY_ACTIONS = [
+    { header:'💰 Caja y cobros' },
+    { label:'Corte de caja',       ico:'🧮', fn:'openCorte' },
+    { label:'Salida placas',       ico:'🪪', fn:'platePayout' },
+    { label:'DMV / Impuestos',     ico:'🏛️', fn:'openDmv' },
+    { label:'Pagos de Square',     ico:'💳', fn:'openSquarePays' },
+    { label:'Devoluciones',        ico:'↩️', fn:'openDevol' },
+    { header:'👥 Clientes y equipo' },
+    { label:'Clientes de partes',  ico:'👤', fn:'openClientes' },
+    { label:'Empleados',           ico:'🪪', fn:'openEmp' },
+    { label:'Horas / Nómina',      ico:'👷', fn:'openHoras' },
+    { label:'Comisiones',          ico:'💼', fn:'openComis' },
+    { label:'Socios',              ico:'👥', fn:'openSocios' },
+    { header:'📊 Reportes' },
+    { label:'Resultados Totales',  ico:'🏆', run:function(){ openPnl('total'); } },
+    { label:'Resultados Legacy',   ico:'📊', run:function(){ openPnl('legacy'); } },
+    { label:'Resultados Privadas', ico:'🔒', run:function(){ openPnl('privadas'); } },
+    { label:'Por carro (yonke)',   ico:'🔧', fn:'openDcarReport' },
+    { header:'🛠️ Herramientas' },
+    { label:'Importar',            ico:'⬆️', fn:'openImport' },
+    { label:'Asignar a carro',     ico:'🔗', fn:'openBulkAssign' },
+    { label:'Auditar Dealer',      ico:'🔎', fn:'openAudit' }
+  ];
+</script>
 <script type="module" src="launcher.js"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="admin.html"><link rel="prefetch" href="warehouse.html">
 </body>

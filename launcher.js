@@ -108,10 +108,12 @@ function injectStyle(){
     .lmg-logo[data-lmg-open] .lmg-chev{transform:rotate(180deg);}
     #lmg-catch{position:fixed;inset:0;z-index:2147483000;display:none;background:transparent;}
     #lmg-catch.open{display:block;}
-    #lmg-dd{position:fixed;z-index:2147483001;display:none;width:min(84vw,260px);
+    #lmg-dd{position:fixed;z-index:2147483001;display:none;width:min(86vw,270px);max-height:72vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
       font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;
       animation:lmgDrop .16s ease;}
     #lmg-dd.open{display:block;}
+    .lmg-head2{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a8fa8;padding:10px 6px 5px;}
+    .lmg-head2:first-child{padding-top:2px;}
     @keyframes lmgDrop{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
     @media (prefers-reduced-motion:reduce){#lmg-dd{animation:none;}}
     .lmg-row{display:flex;align-items:center;gap:12px;width:100%;margin-bottom:8px;padding:11px 14px;border-radius:14px;cursor:pointer;
@@ -158,10 +160,12 @@ function renderRows(){
   // Si la página define TAREAS propias (window.LEGACY_ACTIONS) → el logo las muestra.
   const acts = (Array.isArray(window.LEGACY_ACTIONS) && window.LEGACY_ACTIONS.length) ? window.LEGACY_ACTIONS : null;
   if (acts){
-    dd.innerHTML = acts.map((a,i) =>
-      `<button class="lmg-row" data-act="${i}"><span class="lmg-ico">${a.ico||"•"}</span><span>${esc(a.label)}</span></button>`).join("");
-    dd.querySelectorAll(".lmg-row").forEach((r,i) => {
-      r.addEventListener("click", () => { const a=acts[i]; closeMenu(); try{ if(typeof a.run==="function") a.run(); else if(typeof a.fn==="string" && typeof window[a.fn]==="function") window[a.fn](); }catch(e){} });
+    dd.innerHTML = acts.map((a,i) => a && a.header
+      ? `<div class="lmg-head2">${esc(a.header)}</div>`
+      : `<button class="lmg-row" data-act="${i}"><span class="lmg-ico">${(a&&a.ico)||"•"}</span><span>${esc(a&&a.label)}</span></button>`).join("");
+    dd.querySelectorAll(".lmg-row").forEach((r) => {
+      const a = acts[+r.dataset.act];
+      r.addEventListener("click", () => { closeMenu(); try{ if(a&&typeof a.run==="function") a.run(); else if(a&&typeof a.fn==="string" && typeof window[a.fn]==="function") window[a.fn](); }catch(e){} });
     });
     return;
   }
