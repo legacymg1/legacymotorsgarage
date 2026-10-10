@@ -57,6 +57,8 @@ function applyBars(){
   document.querySelectorAll("[data-legacy-bar]").forEach(ensureLogo);
   // Usa el LOGO que ya existe (ej. el grande de la página principal) como disparador.
   document.querySelectorAll("[data-legacy-launch]").forEach(wireExisting);
+  // La navegación entre apps ahora es por el logo → esconde la barra fija de abajo.
+  ["staff-tabbar","wh-tabbar"].forEach((id) => { const el=document.getElementById(id); if(el && el.dataset.lmgHidBar!=="1"){ el.dataset.lmgHidBar="1"; el.dataset.lmgBarDisp=el.style.display||""; el.style.display="none"; } });
 }
 function wireExisting(el){
   if (el.dataset.lmgWired === "1") return;
@@ -68,6 +70,7 @@ function disable(){
   document.querySelectorAll(".lmg-logo").forEach(el => el.remove());
   document.querySelectorAll('[data-legacy-brand][data-lmg-hid="1"]').forEach(b => { b.style.display = b.dataset.lmgDisp||""; b.removeAttribute("data-lmg-hid"); });
   document.querySelectorAll('[data-legacy-launch][data-lmg-wired="1"]').forEach(el => el.removeAttribute("data-lmg-wired"));
+  ["staff-tabbar","wh-tabbar"].forEach((id) => { const el=document.getElementById(id); if(el && el.dataset.lmgHidBar==="1"){ el.style.display=el.dataset.lmgBarDisp||""; delete el.dataset.lmgHidBar; } });
   closeMenu();
 }
 function ensureLogo(bar){

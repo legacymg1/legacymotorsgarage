@@ -253,8 +253,8 @@
 
 <!-- APP -->
 <div id="app">
-  <header>
-    <div class="header-logo">
+  <header data-legacy-bar>
+    <div class="header-logo" data-legacy-brand>
       <img src="logo.png" onerror="this.style.display='none'">
       <div class="header-logo-text">Legacy Motors Garage</div>
     </div>
@@ -4725,5 +4725,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
+<script type="module" src="launcher.js"></script>
 </body>
 </html>

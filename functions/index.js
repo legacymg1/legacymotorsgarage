@@ -1066,7 +1066,7 @@ exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   }
   if (id.notRegistered) return { ok: true, found: false, phone: id.phone, via: "phone" };
   if (!id.active) return { ok: true, found: true, active: false, name: id.name, roles: [], empId: id.empId, photoURL: id.photoURL, via: "phone" };
-  return { ok: true, found: true, active: true, name: id.name, roles: id.roles, empId: id.empId, photoURL: id.photoURL, isOwner: id.isOwner, via: "phone" };
+  return { ok: true, found: true, active: true, name: id.name, roles: id.roles, empId: id.empId, photoURL: id.photoURL, rate: id.rate, isOwner: id.isOwner, via: "phone" };
 });
 
 // 👑 Panel del dueño en Pit Crew: listar y gestionar el equipo desde el teléfono. Solo dueños.
