@@ -73,30 +73,39 @@
   .alabel{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px;}
   .afield{width:100%;background:var(--surface2);border:1px solid var(--border-strong);border-radius:12px;padding:13px;font-size:16px;color:var(--text);font-family:inherit;}
   .afield:focus{outline:none;border-color:var(--gold);}
+  .langsel{position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:999px;padding:3px;}
+  .langbtn{background:none;border:none;color:var(--muted);font-family:inherit;font-size:12px;font-weight:800;letter-spacing:.05em;padding:6px 11px;border-radius:999px;cursor:pointer;}
+  .langbtn.active{background:var(--gold);color:#0f1320;}
 </style>
 </head>
 <body>
 
 <!-- ===== LOGIN ===== -->
 <div id="screen-login" class="center">
-  <div class="logo" style="margin-bottom:6px;">LEGACY <span>·</span> PIT CREW</div>
-  <div class="muted" style="font-size:14px;margin-bottom:28px;">🏁 El equipo de Legacy</div>
+  <div class="langsel">
+    <button id="lang-es" class="langbtn" onclick="setLang('es')">ES</button>
+    <button id="lang-en" class="langbtn" onclick="setLang('en')">EN</button>
+  </div>
+
+  <img src="legacy-logo.png?v=3" alt="Legacy Motors Garage" style="width:210px;max-width:72%;height:auto;display:block;margin-bottom:4px;">
+  <div class="logo" style="font-size:20px;letter-spacing:0.2em;font-weight:800;margin-bottom:5px;">PIT CREW</div>
+  <div class="muted" data-i18n="tagline" style="font-size:14px;margin-bottom:28px;">🏁 El equipo de Legacy</div>
 
   <div class="card" style="width:100%;max-width:380px;">
     <div id="step-phone">
-      <h3 style="font-size:17px;margin-bottom:4px;">Entra con tu teléfono</h3>
-      <div class="faint" style="font-size:13px;margin-bottom:16px;">Te mandamos un código por mensaje.</div>
+      <h3 data-i18n="signinTitle" style="font-size:17px;margin-bottom:4px;">Entra con tu teléfono</h3>
+      <div class="faint" data-i18n="signinSub" style="font-size:13px;margin-bottom:16px;">Te mandamos un código por mensaje.</div>
       <input id="l-phone" class="field" type="tel" inputmode="numeric" placeholder="559 123 4567" autocomplete="tel">
       <div id="l-err" class="err"></div>
-      <button id="send-code-btn" class="btn btn-gold" onclick="sendCode()" style="margin-top:6px;">Enviar código</button>
+      <button id="send-code-btn" class="btn btn-gold" onclick="sendCode()" data-i18n="sendBtn" style="margin-top:6px;">Enviar código</button>
     </div>
     <div id="step-code" class="hide">
-      <h3 style="font-size:17px;margin-bottom:4px;">Escribe el código</h3>
-      <div class="faint" style="font-size:13px;margin-bottom:16px;">Te llegó por mensaje de texto.</div>
+      <h3 data-i18n="codeTitle" style="font-size:17px;margin-bottom:4px;">Escribe el código</h3>
+      <div class="faint" data-i18n="codeSub" style="font-size:13px;margin-bottom:16px;">Te llegó por mensaje de texto.</div>
       <input id="l-code" class="field" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="______" maxlength="6" style="letter-spacing:.5em;">
       <div id="l-err2" class="err"></div>
-      <button id="verify-code-btn" class="btn btn-gold" onclick="verifyCode()" style="margin-top:6px;">Entrar</button>
-      <button class="linkbtn" onclick="backToPhone()" style="width:100%;margin-top:4px;">← Cambiar número</button>
+      <button id="verify-code-btn" class="btn btn-gold" onclick="verifyCode()" data-i18n="enterBtn" style="margin-top:6px;">Entrar</button>
+      <button class="linkbtn" onclick="backToPhone()" data-i18n="changeNum" style="width:100%;margin-top:4px;">← Cambiar número</button>
     </div>
   </div>
   <div id="recaptcha-container"></div>
@@ -145,26 +154,31 @@
   <div class="clock-card">
     <div id="clk-status" class="clock-status muted">Fuera</div>
     <div id="clk-hours" class="clock-hours">0.00 h</div>
-    <div class="faint" style="font-size:12px;margin-bottom:16px;">esta semana</div>
+    <div class="faint" data-i18n="thisWeek" style="font-size:12px;margin-bottom:16px;">esta semana</div>
     <button id="clk-btn" class="btn btn-green" onclick="punch()">🟢 Registrar entrada</button>
     <div id="clk-note" class="faint" style="font-size:11px;margin-top:10px;"></div>
   </div>
 
   <!-- Admin (solo dueños) -->
-  <button id="home-admin-btn" class="btn btn-ghost hide" onclick="openAdmin()" style="margin-bottom:18px;">👑 Equipo (admin)</button>
+  <button id="home-admin-btn" class="btn btn-ghost hide" onclick="openAdmin()" data-i18n="adminBtn" style="margin-bottom:18px;">👑 Equipo (admin)</button>
 
-  <!-- Roles -->
-  <div class="sec-title">Tus tareas de hoy</div>
-  <div id="home-tiles" class="tiles"></div>
-  <div id="home-noroles" class="card hide" style="text-align:center;color:var(--muted);font-size:14px;line-height:1.5;">
-    Todavía no tienes tareas asignadas.<br>Legacy te las va a asignar pronto.
+  <!-- Antes de check-in: invita a marcar entrada -->
+  <div id="home-checkin-hint" class="card hide" style="text-align:center;color:var(--muted);font-size:15px;line-height:1.55;">
+    👆 Marca tu <b style="color:var(--gold);">entrada</b> arriba para empezar tu día y ver tus tareas.
   </div>
 
-  <!-- Recordatorio fin de jornada -->
-  <div class="reminder">
-    <div style="font-size:18px;">🔔</div>
-    <div>
-      <b>Antes de salir:</b> regresa tus herramientas, pon las pilas a cargar y limpia tu área.
+  <!-- Después de check-in: tareas del día -->
+  <div id="home-tasks-wrap" class="hide">
+    <div class="sec-title">Tus tareas de hoy</div>
+    <div id="home-tiles" class="tiles"></div>
+    <div id="home-noroles" class="card hide" style="text-align:center;color:var(--muted);font-size:14px;line-height:1.5;">
+      Todavía no tienes tareas asignadas.<br>Legacy te las va a asignar pronto.
+    </div>
+    <div class="reminder">
+      <div style="font-size:18px;">🔔</div>
+      <div>
+        <b>Antes de salir:</b> regresa tus herramientas, pon las pilas a cargar y limpia tu área.
+      </div>
     </div>
   </div>
 
@@ -314,6 +328,35 @@ const ROLE_TILES = {
 function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail','screen-admin'].forEach(s=>{ document.getElementById(s).classList.toggle('hide', s!==id); }); }
 function toast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); clearTimeout(window._tt); window._tt=setTimeout(()=>{t.className='toast'+(isErr?' err':'');},3200); }
 
+// ---------- Bilingüe (ES / EN) ----------
+let LANG = (function(){ try{ return localStorage.getItem('pc_lang')||''; }catch(e){ return ''; } })();
+if(LANG!=='en'&&LANG!=='es') LANG=((navigator.language||'es').slice(0,2).toLowerCase()==='en')?'en':'es';
+const T = {
+  es:{ tagline:'🏁 El equipo de Legacy', signinTitle:'Entra con tu teléfono', signinSub:'Te mandamos un código por mensaje.', sendBtn:'Enviar código', sending:'Enviando…', codeTitle:'Escribe el código', codeSub:'Te llegó por mensaje de texto.', enterBtn:'Entrar', entering:'Entrando…', changeNum:'← Cambiar número',
+    adminBtn:'👑 Equipo (admin)', thisWeek:'esta semana', tasksTitle:'Tus tareas de hoy', refresh:'↻ Actualizar',
+    checkinHint:'👆 Marca tu <b style="color:var(--gold);">entrada</b> arriba para empezar tu día y ver tus tareas.',
+    noRoles:'Todavía no tienes tareas asignadas.<br>Legacy te las va a asignar pronto.',
+    reminder:'<div style="font-size:18px;">🔔</div><div><b>Antes de salir:</b> regresa tus herramientas, pon las pilas a cargar y limpia tu área.</div>',
+    morning:'Buenos días', afternoon:'Buenas tardes', evening:'Buenas noches', hello:'Hola', team:'Equipo',
+    checkIn:'🟢 Registrar entrada', checkOut:'🔴 Registrar salida', out:'Fuera' },
+  en:{ tagline:'🏁 The Legacy crew', signinTitle:'Sign in with your phone', signinSub:'We will text you a code.', sendBtn:'Send code', sending:'Sending…', codeTitle:'Enter the code', codeSub:'We texted it to you.', enterBtn:'Enter', entering:'Entering…', changeNum:'← Change number',
+    adminBtn:'👑 Team (admin)', thisWeek:'this week', tasksTitle:"Today's tasks", refresh:'↻ Refresh',
+    checkinHint:'👆 Clock <b style="color:var(--gold);">in</b> above to start your day and see your tasks.',
+    noRoles:'No tasks assigned yet.<br>Legacy will assign them soon.',
+    reminder:'<div style="font-size:18px;">🔔</div><div><b>Before you leave:</b> return your tools, put batteries to charge, and clean your area.</div>',
+    morning:'Good morning', afternoon:'Good afternoon', evening:'Good evening', hello:'Hi', team:'Team',
+    checkIn:'🟢 Clock in', checkOut:'🔴 Clock out', out:'Out' }
+};
+function t(k){ return (T[LANG]&&T[LANG][k]!=null)?T[LANG][k]:(T.es[k]!=null?T.es[k]:k); }
+window.setLang = function(l){ LANG=(l==='en')?'en':'es'; try{ localStorage.setItem('pc_lang',LANG); }catch(e){} applyI18n(); };
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML=t(el.getAttribute('data-i18n-html')); });
+  const es=document.getElementById('lang-es'), en=document.getElementById('lang-en');
+  if(es) es.classList.toggle('active', LANG==='es'); if(en) en.classList.toggle('active', LANG==='en');
+  if(ME){ try{ renderHome(); }catch(e){} try{ renderClock(); }catch(e){} }
+}
+
 // ---------- Login ----------
 window.sendCode = async function(){
   const digits=String(document.getElementById('l-phone').value||'').replace(/\D/g,'');
@@ -322,7 +365,7 @@ window.sendCode = async function(){
   if(digits.length===10) e164='+1'+digits;
   else if(digits.length===11 && digits[0]==='1') e164='+'+digits;
   else { err.textContent='Escribe tu número a 10 dígitos.'; return; }
-  const btn=document.getElementById('send-code-btn'); btn.disabled=true; btn.textContent='Enviando…';
+  const btn=document.getElementById('send-code-btn'); btn.disabled=true; btn.textContent=t('sending');
   try{
     await setPersistence(auth, browserLocalPersistence);
     if(!window._recaptcha){ window._recaptcha = new RecaptchaVerifier(auth, 'recaptcha-container', {size:'invisible'}); }
@@ -337,16 +380,16 @@ window.sendCode = async function(){
       : 'No se pudo enviar el código. Intenta de nuevo.';
     try{ if(window._recaptcha){ window._recaptcha.clear(); window._recaptcha=null; } }catch(_){}
   }
-  btn.disabled=false; btn.textContent='Enviar código';
+  btn.disabled=false; btn.textContent=t('sendBtn');
 };
 window.verifyCode = async function(){
   const code=String(document.getElementById('l-code').value||'').trim();
   const err=document.getElementById('l-err2'); err.textContent='';
   if(!code || !confirmationResult){ err.textContent='Escribe el código.'; return; }
-  const btn=document.getElementById('verify-code-btn'); btn.disabled=true; btn.textContent='Entrando…';
+  const btn=document.getElementById('verify-code-btn'); btn.disabled=true; btn.textContent=t('entering');
   try{ await confirmationResult.confirm(code); /* onAuthStateChanged sigue */ }
   catch(e){ err.textContent='Código incorrecto. Vuelve a intentar.'; }
-  btn.disabled=false; btn.textContent='Entrar';
+  btn.disabled=false; btn.textContent=t('enterBtn');
 };
 window.backToPhone = function(){
   document.getElementById('step-code').classList.add('hide');
@@ -384,8 +427,8 @@ function renderHome(){
   if(ME.photoURL){ av.outerHTML='<img id="home-avatar" class="avatar" src="'+ME.photoURL+'" alt="">'; }
   else { av.textContent=initials(ME.name); }
   const h=new Date().getHours();
-  document.getElementById('home-greet').textContent = h<12?'Buenos días':h<19?'Buenas tardes':'Buenas noches';
-  document.getElementById('home-name').textContent = ME.name || 'Equipo';
+  document.getElementById('home-greet').textContent = h<12?t('morning'):h<19?t('afternoon'):t('evening');
+  document.getElementById('home-name').textContent = ME.name || t('team');
   document.getElementById('home-admin-btn').classList.toggle('hide', !ME.isOwner);
   const roles = Array.isArray(ME.roles)?ME.roles:[];
   const box=document.getElementById('home-tiles'); const none=document.getElementById('home-noroles');
@@ -425,14 +468,18 @@ function renderClock(){
   if(open){
     st.innerHTML='<span class="dot" style="background:var(--green);"></span>ADENTRO · '+(open.location==='yonke'?'Yonke':open.location==='dealer'?'Dealer':'trabajando');
     st.style.color='var(--green)';
-    btn.className='btn btn-red'; btn.textContent='🔴 Registrar salida';
+    btn.className='btn btn-red'; btn.textContent=t('checkOut');
     const since=open.inAt?new Date(open.inAt):null;
     note.textContent = since ? ('Entraste a las '+since.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})) : '';
   } else {
-    st.innerHTML='Fuera'; st.style.color='var(--muted)';
-    btn.className='btn btn-green'; btn.textContent='🟢 Registrar entrada';
+    st.innerHTML=t('out'); st.style.color='var(--muted)';
+    btn.className='btn btn-green'; btn.textContent=t('checkIn');
     note.textContent='Debes estar en el Dealer o el Yonke para marcar.';
   }
+  // Las tareas aparecen SOLO después de hacer check-in (dueños las ven siempre, para probar).
+  const showTasks = (ME && ME.isOwner) || !!open;
+  const tw=document.getElementById('home-tasks-wrap'); if(tw) tw.classList.toggle('hide', !showTasks);
+  const hint=document.getElementById('home-checkin-hint'); if(hint) hint.classList.toggle('hide', showTasks);
 }
 window.punch = function(){
   const btn=document.getElementById('clk-btn'); const wasOpen = CLK && CLK.open;
@@ -725,6 +772,9 @@ window.adminSave=async function(){
   }catch(e){ toast((e&&e.message)||'No se pudo guardar.',true); }
   btn.disabled=false; btn.textContent=prev;
 };
+
+// Aplica el idioma al cargar (login en ES/EN según elección guardada o el teléfono).
+applyI18n();
 </script>
 <script type="module" src="launcher.js"></script>
 </body>
