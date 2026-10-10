@@ -3974,18 +3974,14 @@ function renderTodayBox() {
       <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);">Pagan Hoy — ${new Date().toLocaleDateString('es-MX',{weekday:'long',month:'long',day:'numeric'})}</div>
       <button onclick="sendTodayMessages()" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:7px 13px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">💬 Enviar a todos (${todayClients.length})</button>
     </div>`;
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">';
     todayClients.forEach(c => {
-      html += `<div style="background:var(--navy2);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-weight:600;font-size:15px;">${c.name}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${c.year} ${c.make} ${c.model}</div>
-        </div>
-        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-          <div style="font-family:var(--font-display);font-size:20px;color:var(--green);">${formatMoney(dueNow(c))}</div>
-          <div style="font-size:10px;color:${dueNow(c)<(Number(c.weekly)||0)?'var(--gold)':'var(--muted)'};text-transform:uppercase;letter-spacing:1px;">${dueNow(c)<(Number(c.weekly)||0)?'Último pago':(c.freq==='monthly'?'Mensual':c.freq==='biweekly'?'Quincenal':'Semanal')}</div>
-          <button onclick="sendFriendlyTodayMsg('${c.id}')" style="background:var(--green);color:#000;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">💬 SMS</button>
-        </div>
+      const _last = dueNow(c)<(Number(c.weekly)||0);
+      html += `<div style="background:var(--navy2);border-radius:9px;padding:8px 12px;display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="font-weight:600;font-size:14px;">${c.name}</span> <span style="font-size:12px;color:var(--muted);">· ${c.year} ${c.make} ${c.model}</span></div>
+        ${_last?'<span style="font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">Último</span>':''}
+        <div style="font-family:var(--font-display);font-size:16px;color:var(--green);white-space:nowrap;">${formatMoney(dueNow(c))}</div>
+        <button onclick="sendFriendlyTodayMsg('${c.id}')" title="SMS" style="background:var(--green);color:#000;border:none;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">💬</button>
       </div>`;
     });
     html += '</div>';
@@ -3996,19 +3992,14 @@ function renderTodayBox() {
       <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--red);">⚠️ Pagos Vencidos</div>
       <button onclick="sendOverdueMessages()" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">💬 Enviar a todos (${overdueClients.length})</button>
     </div>`;
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;">';
     overdueClients.forEach(c => {
       const days = Math.abs(daysUntil(getNextPayDate(c)));
-      html += `<div style="background:rgba(255,59,59,0.08);border:1px solid rgba(255,59,59,0.2);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-weight:600;font-size:15px;">${c.name}</div>
-          <div style="font-size:12px;color:#ff8080;margin-top:2px;">${c.year} ${c.make} ${c.model} · ${days}d vencido</div>
-        </div>
-        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-          <div style="font-family:var(--font-display);font-size:20px;color:var(--red);">${formatMoney(c.weekly)}</div>
-          <div style="font-size:10px;color:#ff8080;text-transform:uppercase;letter-spacing:1px;">Adeuda ${formatMoney(calcBalance(c))}</div>
-          <button onclick="openWhatsApp('${c.id}','overdue')" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">💬 SMS</button>
-        </div>
+      html += `<div style="background:rgba(255,59,59,0.08);border:1px solid rgba(255,59,59,0.2);border-radius:9px;padding:8px 12px;display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="font-weight:600;font-size:14px;">${c.name}</span> <span style="font-size:12px;color:#ff8080;">· ${c.year} ${c.make} ${c.model} · ${days}d</span></div>
+        <div style="font-size:9px;color:#ff8080;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">debe ${formatMoney(calcBalance(c))}</div>
+        <div style="font-family:var(--font-display);font-size:16px;color:var(--red);white-space:nowrap;">${formatMoney(c.weekly)}</div>
+        <button onclick="openWhatsApp('${c.id}','overdue')" title="SMS" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">💬</button>
       </div>`;
     });
     html += '</div>';
