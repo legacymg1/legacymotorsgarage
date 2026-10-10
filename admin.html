@@ -284,7 +284,7 @@
     <div class="stat-card"><div class="stat-label">Esta semana</div><div class="stat-value sv-yellow" id="stat-soon">0</div></div>
     <div class="stat-card"><div class="stat-label">Al corriente</div><div class="stat-value sv-green" id="stat-ok">0</div></div>
   </div>
-  <div style="text-align:right;margin:4px 2px 0;"><button type="button" id="seller-sign-btn" onclick="openSellerSign()" title="Tu firma como vendedor: firmas una vez y se estampa sola en cada contrato firmado." style="display:none;background:transparent;color:var(--gold);border:1px solid rgba(240,192,64,0.5);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:8px;">✍️ Mi firma (vendedor)</button><button type="button" onclick="repairDocs()" title="Convierte a imagen los ID/seguros que sean PDF o HEIC. Hazlo en el iPad para las fotos de iPhone." style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">🛠 Reparar fotos ID/seguro (PDF→imagen)</button></div>
+  <div style="display:none;text-align:right;margin:4px 2px 0;"><button type="button" id="seller-sign-btn" onclick="openSellerSign()" title="Tu firma como vendedor: firmas una vez y se estampa sola en cada contrato firmado." style="display:none;background:transparent;color:var(--gold);border:1px solid rgba(240,192,64,0.5);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:8px;">✍️ Mi firma (vendedor)</button><button type="button" onclick="repairDocs()" title="Convierte a imagen los ID/seguros que sean PDF o HEIC. Hazlo en el iPad para las fotos de iPhone." style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">🛠 Reparar fotos ID/seguro (PDF→imagen)</button></div>
 
   <div class="sec-head" onclick="toggleSection('fin-summary-box','fin-arrow')"><span>Finanzas</span><span id="fin-arrow" class="sec-arrow">▾</span></div>
 <div id="fin-summary-box"></div>
@@ -314,7 +314,7 @@
 </div>
 
 <!-- 💬 CONVERSACIONES DEL BOT DE VENTAS (repaso + contador de personas) -->
-<div id="botc-box" style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+<div id="botc-box" style="display:none;margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;" onclick="toggleSection('botc-list','botc-arrow');loadBotConvos()">
     <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">💬 CONVERSACIONES DEL BOT</div>
     <div style="display:flex;gap:12px;align-items:center;">
@@ -868,8 +868,11 @@
   };
   // Tareas de ESTA página (las muestra el logo de Legacy arriba).
   window.LEGACY_ACTIONS = [
+    { header:'🧮 Ventas' },
     { label:'Cotizador', ico:'🧮', fn:'openCotizador' },
-    { label:'Lendmark sales', ico:'📄', fn:'openLendmarkList' }
+    { label:'Lendmark sales', ico:'📄', fn:'openLendmarkList' },
+    { header:'🛠️ Herramientas' },
+    { label:'Reparar fotos ID/seguro', ico:'🛠', fn:'repairDocs' }
   ];
 </script>
 
