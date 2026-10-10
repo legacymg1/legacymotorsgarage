@@ -62,8 +62,9 @@ function applyBars(){
   ensureBottomNav();
 }
 function ensureBottomNav(){
-  // En INVENTARIO (página pública) NO va la barra inferior del dueño — ahí se navega por el logo y abajo queda la barra pública.
-  if (currentKey()==="index"){ return; }
+  // La barra inferior es SOLO para dueños (este launcher solo monta si OWNERS.includes(email)),
+  // así que en Inventario también la ve el admin; el público NUNCA la ve. Lo que se le salía al
+  // cliente era #staff-tabbar, ya oculto en applyBars().
   // IDEMPOTENTE: si ya existe, no la toques (si no, el MutationObserver entra en bucle y congela la página).
   if (document.getElementById("lmg-nav")) return;
   const nav = document.createElement("nav"); nav.id = "lmg-nav";
