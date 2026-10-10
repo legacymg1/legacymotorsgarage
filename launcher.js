@@ -66,7 +66,7 @@ function ensureLogo(bar){
   if (bar.querySelector(":scope > .lmg-logo")) return;
   const logo = document.createElement("button");
   logo.type = "button"; logo.className = "lmg-logo"; logo.setAttribute("aria-label","Menú Legacy");
-  logo.innerHTML = `<img class="lmg-logo-img" src="legacy-logo.png" alt="Legacy Motors Garage"><span class="lmg-chev">▾</span>`;
+  logo.innerHTML = `<img class="lmg-logo-img" src="legacy-logo.png?v=3" alt="Legacy Motors Garage"><span class="lmg-chev">▾</span>`;
   logo.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); toggleMenu(logo); });
   bar.insertBefore(logo, bar.firstChild);
 }
@@ -79,7 +79,7 @@ function injectStyle(){
       background:none;border:none;flex:0 0 auto;transition:background .15s ease,transform .1s ease;}
     .lmg-logo:hover{background:rgba(232,182,74,0.12);}
     .lmg-logo:active{transform:scale(.96);}
-    .lmg-logo-img{height:40px;width:auto;display:block;}
+    .lmg-logo-img{height:46px;width:auto;display:block;}
     .lmg-chev{display:inline-block;font-size:12px;opacity:.85;color:#c9b896;transition:transform .18s ease;}
     .lmg-logo[data-lmg-open] .lmg-chev{transform:rotate(180deg);}
     #lmg-catch{position:fixed;inset:0;z-index:2147483000;display:none;background:transparent;}
