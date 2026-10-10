@@ -396,13 +396,22 @@
 
   <main id="main-content"><div class="loading">Cargando clientes...</div></main>
 
-  <!-- 🧮 COTIZACIONES guardadas (prospectos) — junto a liquidados -->
-  <div id="cotiz-box" style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;" onclick="toggleSection('cotiz-list','cotiz-arrow');loadCotiz()">
-      <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">🧮 COTIZACIONES <span id="cotiz-count" style="font-size:12px;color:var(--muted);font-family:var(--font-body);letter-spacing:0;"></span></div>
-      <span id="cotiz-arrow" class="sec-arrow">▸</span>
+  <!-- ✅ Clientes liquidados  |  🧮 Cotizaciones  — lado a lado (mitad y mitad) -->
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin:0 24px 16px;">
+    <div style="flex:1 1 300px;min-width:300px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;" onclick="toggleSection('liquidados-list','liquidados-arrow')">
+        <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--green);">✅ CLIENTES LIQUIDADOS <span id="liquidados-count" style="font-size:12px;color:var(--muted);font-family:var(--font-body);letter-spacing:0;"></span></div>
+        <span id="liquidados-arrow" class="sec-arrow">▾</span>
+      </div>
+      <div id="liquidados-list" style="padding:14px 16px;"></div>
     </div>
-    <div id="cotiz-list" style="padding:14px 18px;display:none;"><div style="color:var(--muted);font-size:13px;">Toca para cargar…</div></div>
+    <div id="cotiz-box" style="flex:1 1 300px;min-width:300px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;" onclick="toggleSection('cotiz-list','cotiz-arrow');loadCotiz()">
+        <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">🧮 COTIZACIONES <span id="cotiz-count" style="font-size:12px;color:var(--muted);font-family:var(--font-body);letter-spacing:0;"></span></div>
+        <span id="cotiz-arrow" class="sec-arrow">▸</span>
+      </div>
+      <div id="cotiz-list" style="padding:14px 16px;display:none;"><div style="color:var(--muted);font-size:13px;">Toca para cargar…</div></div>
+    </div>
   </div>
 
   <!-- Ver cotización -->
@@ -1948,7 +1957,7 @@ window.openCotizador=function(){
     document.getElementById('cot-lang').value='es';
     document.getElementById('cot-tax-note').innerHTML='';
     cotOpts=[]; cotSeq=0;
-    cotAddBlank();
+    renderCotOptions();
   }
   document.getElementById('cot-modal').classList.add('active');
 };
@@ -1962,7 +1971,7 @@ window.cotNueva=function(){
   document.getElementById('cot-lang').value='es';
   document.getElementById('cot-tax-note').innerHTML='';
   document.getElementById('cot-car-search').value='';
-  cotOpts=[]; cotSeq=0; cotAddBlank();
+  cotOpts=[]; cotSeq=0; renderCotOptions();
 };
 // 💵 Tabla de impuesto de venta de California (tasa combinada). ⚠️ VERIFICAR/ACTUALIZAR con Enrique — el tax field queda editable como override.
 // Clave = ciudad (minúsculas, sin acentos) o ZIP de 5 dígitos → tasa decimal.
@@ -2710,38 +2719,36 @@ window.renderAll = function() {
   }
   html+='</div></div></div>';
 
-  // ---- Sección: Servicio y Liquidados ----
-  const archive = filtered.filter(c => c.kind==='service' || isPaidOff(c)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  const archCol = (()=>{try{return localStorage.getItem('col_archive-list')==='1';}catch(e){return false;}})();
-  html += `<div class="sec-head" style="margin-top:22px;" onclick="toggleSection('archive-list','archive-arrow')"><span>🔧 Servicio y ✅ Liquidados (${archive.length})</span><span id="archive-arrow" class="sec-arrow">${archCol?'▸':'▾'}</span></div><div id="archive-list" style="margin:0 24px;${archCol?'display:none;':''}">`;
-  if(!archive.length){
-    html += `<div style="color:var(--muted);font-size:13px;padding:8px 0;">Aún no hay clientes de servicio ni contratos liquidados.</div>`;
+  // ---- CLIENTES LIQUIDADOS (se pinta en su tarjeta, al lado de Cotizaciones) ----
+  // Solo liquidados. Los de servicio se buscan o irán a la caja SERVICIO.
+  const liquidados = filtered.filter(c => isPaidOff(c)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  let liqHtml='';
+  if(!liquidados.length){
+    liqHtml = `<div style="color:var(--muted);font-size:13px;padding:6px 0;">Aún no hay contratos liquidados.</div>`;
   } else {
-    archive.forEach(c=>{
-      const serv = c.kind==='service';
-      const abadge = serv ? `<span style="font-size:10px;background:rgba(33,150,243,0.15);color:#64b5f6;border:1px solid #2196F3;border-radius:5px;padding:2px 7px;">🔧 Servicio</span>` : `<span style="font-size:10px;background:rgba(0,200,83,0.12);color:var(--green);border:1px solid var(--green);border-radius:5px;padding:2px 7px;">✅ Liquidado</span>`;
+    liquidados.forEach(c=>{
+      const abadge = `<span style="font-size:10px;background:rgba(0,200,83,0.12);color:var(--green);border:1px solid var(--green);border-radius:5px;padding:2px 7px;">✅ Liquidado</span>`;
       const acar = clientVehicles(c).map(x=>x.label).join(' · ');
-      const _bcss='border:1px solid var(--border);background:transparent;border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;';
+      const _bcss='border:1px solid var(--border);background:transparent;border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer;';
       const docBtns =
-        (!serv ? `<button onclick="event.stopPropagation();generateContract('${c.id}')" title="Contrato" style="${_bcss}color:var(--gold);">📄</button>` : '')
+        `<button onclick="event.stopPropagation();generateContract('${c.id}')" title="Contrato" style="${_bcss}color:var(--gold);">📄</button>`
         + ((c.signedContract&&c.signedContract.url) ? `<button onclick="event.stopPropagation();window.open('${c.signedContract.url}','_blank')" title="Ver contrato firmado" style="${_bcss}color:var(--green);">📑</button>` : '')
         + (c.idPhotoURL ? `<button onclick="event.stopPropagation();showPhoto('${c.idPhotoURL}','ID')" title="Ver foto del ID" style="${_bcss}color:var(--text);">🪪</button>` : '')
         + (c.insurancePhotoURL ? `<button onclick="event.stopPropagation();showPhoto('${c.insurancePhotoURL}','Seguro')" title="Ver foto del seguro" style="${_bcss}color:var(--text);">🛡</button>` : '');
-      html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-        <div style="min-width:170px;flex:1;">
+      liqHtml += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+        <div style="min-width:150px;flex:1;">
           <div style="font-weight:600;font-size:14px;">${c.name} ${abadge} ${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
           <div style="font-size:12px;color:var(--muted);">${acar}${c.vin?' · …'+c.vin.slice(-6):''}${c.phone?' · '+c.phone:''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           ${docBtns}
-          <button onclick="openApptModal('${c.id}')" title="Agendar cita" style="background:var(--gold);color:var(--navy3);border:none;border-radius:7px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">📅</button>
-          <button type="button" onclick="smsPlain('${c.id}')" title="SMS" style="background:#2196F3;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">💬</button>
-          <button type="button" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Editar" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;">✏️</button>
+          <button onclick="openApptModal('${c.id}')" title="Agendar cita" style="background:var(--gold);color:var(--navy3);border:none;border-radius:7px;padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer;">📅</button>
+          <button type="button" onclick="smsPlain('${c.id}')" title="SMS" style="background:#2196F3;color:#fff;border:none;border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer;">💬</button>
+          <button type="button" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Editar" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer;">✏️</button>
         </div>
       </div>`;
     });
   }
-  html += `</div>`;
 
   // Financial summary - se pinta ARRIBA, en su propio contenedor
   let finHTML = '';
@@ -2791,6 +2798,9 @@ window.renderAll = function() {
   if(finBox) finBox.innerHTML = finHTML;
 
   main.innerHTML=html;
+  // Tarjeta de LIQUIDADOS (al lado de Cotizaciones)
+  const _liqEl=document.getElementById('liquidados-list'); if(_liqEl) _liqEl.innerHTML=liqHtml;
+  const _liqCnt=document.getElementById('liquidados-count'); if(_liqCnt) _liqCnt.textContent='('+liquidados.length+')';
 };
 
 window.toggleSchedule=function(id){const el=document.getElementById('sched-'+id);if(el)el.style.display=el.style.display==='none'?'block':'none';};
