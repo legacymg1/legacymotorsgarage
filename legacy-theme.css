@@ -37,6 +37,7 @@ h1,h2,h3,.title,.section-title,.brand-name,.stat-value,.login-title{ font-family
 [data-legacy-bar]{
   position:sticky !important; top:0 !important; z-index:50 !important;
   display:flex !important; align-items:center !important; justify-content:space-between !important; gap:12px !important;
+  flex-wrap:nowrap !important; height:auto !important; row-gap:0 !important;
   min-height:66px !important; box-sizing:border-box !important;
   padding:calc(env(safe-area-inset-top) + 9px) 16px 11px !important;
   margin:0 !important;
