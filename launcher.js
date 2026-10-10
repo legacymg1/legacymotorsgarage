@@ -62,6 +62,8 @@ function applyBars(){
   ensureBottomNav();
 }
 function ensureBottomNav(){
+  // En INVENTARIO (página pública) NO va la barra inferior del dueño — ahí se navega por el logo y abajo queda la barra pública.
+  if (currentKey()==="index"){ return; }
   // IDEMPOTENTE: si ya existe, no la toques (si no, el MutationObserver entra en bucle y congela la página).
   if (document.getElementById("lmg-nav")) return;
   const nav = document.createElement("nav"); nav.id = "lmg-nav";
@@ -164,7 +166,12 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;",
 function renderRows(){
   const dd = document.getElementById("lmg-dd"); if(!dd) return;
   // Si la página define TAREAS propias (window.LEGACY_ACTIONS) → el logo las muestra.
-  const acts = (Array.isArray(window.LEGACY_ACTIONS) && window.LEGACY_ACTIONS.length) ? window.LEGACY_ACTIONS : null;
+  let acts = (Array.isArray(window.LEGACY_ACTIONS) && window.LEGACY_ACTIONS.length) ? window.LEGACY_ACTIONS : null;
+  // Si NO hay barra inferior en esta página (ej. Inventario público), el logo TAMBIÉN trae la navegación.
+  if (acts && !document.getElementById("lmg-nav")){
+    const navActs = [{ header:"🧭 Ir a" }].concat(SECS.map(s => ({ label:s.label, ico:s.ico, run:(function(h){ return function(){ location.href=h; }; })(s.href) })));
+    acts = navActs.concat(acts);
+  }
   if (acts){
     // Agrupa por encabezados → grupos minimizables.
     const groups = []; let cur = null;
