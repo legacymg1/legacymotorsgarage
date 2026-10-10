@@ -62,7 +62,7 @@
 </div>
 
 <div id="app">
-  <div class="topbar">
+  <div class="topbar" data-legacy-bar>
     <span class="lock">🔒</span>
     <h1>Mis Finanzas</h1>
     <button class="btn sm ghost" onclick="refreshPrices()" id="px-btn">🔄 Precios</button>
@@ -663,5 +663,6 @@ window.saveForm=async function(sec,id){
   await save(); closeSheet(); refreshPrices();
 };
 </script>
+<script type="module" src="launcher.js"></script>
 </body>
 </html>

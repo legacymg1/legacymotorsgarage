@@ -55,11 +55,19 @@ function applyBars(){
   // Oculta el logo propio de cada página (para los dueños) y pone el logo estándar.
   document.querySelectorAll("[data-legacy-brand]").forEach(b => { if (b.dataset.lmgHid !== "1"){ b.dataset.lmgHid="1"; b.dataset.lmgDisp = b.style.display||""; b.style.display="none"; } });
   document.querySelectorAll("[data-legacy-bar]").forEach(ensureLogo);
+  // Usa el LOGO que ya existe (ej. el grande de la página principal) como disparador.
+  document.querySelectorAll("[data-legacy-launch]").forEach(wireExisting);
+}
+function wireExisting(el){
+  if (el.dataset.lmgWired === "1") return;
+  el.dataset.lmgWired = "1"; el.style.cursor = "pointer";
+  el.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); toggleMenu(el); });
 }
 function disable(){
   window.__lmgOwner = false;
   document.querySelectorAll(".lmg-logo").forEach(el => el.remove());
   document.querySelectorAll('[data-legacy-brand][data-lmg-hid="1"]').forEach(b => { b.style.display = b.dataset.lmgDisp||""; b.removeAttribute("data-lmg-hid"); });
+  document.querySelectorAll('[data-legacy-launch][data-lmg-wired="1"]').forEach(el => el.removeAttribute("data-lmg-wired"));
   closeMenu();
 }
 function ensureLogo(bar){
