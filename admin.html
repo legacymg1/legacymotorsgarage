@@ -865,11 +865,21 @@
 </div>
 </div><!-- /dealer-view -->
 
-<!-- CAJA 2: SERVICIO (en construcción) -->
-<div id="service-view" style="display:none;padding:48px 24px 80px;text-align:center;color:var(--muted);">
-  <div style="font-size:52px;">🔧</div>
-  <h2 style="font-family:var(--font-display);font-size:26px;color:var(--text);margin:10px 0 6px;">Servicio</h2>
-  <p style="max-width:440px;margin:0 auto;line-height:1.6;font-size:15px;">Esta es la <b>caja 2</b> de Clientes. La estamos construyendo — aquí vivirán los clientes y recordatorios de <b>servicio</b> (reparaciones, ventas a pagos, etc.).<br><br>Un cliente puede estar en Dealer y en Servicio a la vez; su tarjeta mostrará todo su historial.</p>
+<!-- CAJA 2: SERVICIO (taller) -->
+<div id="service-view" style="display:none;padding:12px 0 90px;">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+    <button onclick="svcNewOrder()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:11px 18px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">➕ Nueva orden de servicio</button>
+    <input id="svc-search" oninput="svcRenderOrders()" placeholder="🔍 Buscar cliente, carro, placa o VIN…" style="flex:1 1 220px;max-width:420px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;">
+  </div>
+  <div id="svc-filters" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;"></div>
+  <div id="svc-orders"><div class="faint" style="padding:40px;text-align:center;">Cargando…</div></div>
+</div>
+
+<!-- Modal: nueva orden de servicio -->
+<div id="svc-modal" style="display:none;position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 14px;cursor:pointer;" onclick="if(event.target===this)svcClose()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:20px;max-width:560px;width:100%;margin:auto;cursor:default;" onclick="event.stopPropagation()">
+    <div id="svc-modal-body"></div>
+  </div>
 </div>
 
 <script>
@@ -882,6 +892,7 @@
     function on(b){ if(!b) return; b.style.background='var(--gold)'; b.style.color='var(--navy3)'; b.style.borderColor='var(--gold)'; }
     function off(b){ if(!b) return; b.style.background='transparent'; b.style.color='var(--muted)'; b.style.borderColor='var(--border)'; }
     if(svc){ on(s); off(d); } else { on(d); off(s); }
+    if(svc && window.svcRenderOrders){ try{ window.svcRenderOrders(); }catch(e){} }
     try{ window.scrollTo(0,0); }catch(e){}
   };
   // Tareas de ESTA página (las muestra el logo de Legacy arriba).
@@ -1343,24 +1354,251 @@ function clientVehicles(c){
   const list=[]; const seen=new Set();
   const pl=[c.year,c.make,c.model].filter(Boolean).join(' ');
   const pvin=(c.vin||'').toUpperCase();
-  if(pl||pvin){ list.push({vin:pvin, label:(pl||('VIN …'+pvin.slice(-6))), color:c.color||'', primary:true, lastServiceDate:c.lastServiceDate||''}); if(pvin) seen.add(pvin); }
+  if(pl||pvin){ list.push({vin:pvin, plate:(c.plate||''), label:(pl||('VIN …'+pvin.slice(-6))), color:c.color||'', primary:true, lastServiceDate:c.lastServiceDate||''}); if(pvin) seen.add(pvin); }
   (c.vehicles||[]).forEach(v=>{
     const k=(v.vin||'').toUpperCase();
     if(k && seen.has(k)) return; if(k) seen.add(k);
-    list.push({vin:k, label:(v.label||[v.year,v.make,v.model].filter(Boolean).join(' ')||('VIN …'+k.slice(-6))), color:v.color||'', lastServiceDate:v.lastServiceDate||''});
+    list.push({vin:k, plate:(v.plate||''), label:(v.label||[v.year,v.make,v.model].filter(Boolean).join(' ')||('VIN …'+k.slice(-6))), color:v.color||'', lastServiceDate:v.lastServiceDate||''});
   });
   return list;
 }
 async function addVehicleToClient(clientId, veh){
-  const c=clients.find(x=>x.id===clientId); if(!c) return;
+  const c=clients.find(x=>x.id===clientId); if(!c) return null;
   const vin=(veh.vin||'').toUpperCase().trim();
+  const plate=(veh.plate||'').toUpperCase().trim();
   const label=(veh.label||'').trim();
-  if(!vin && !label) return;
-  const dup = clientVehicles(c).some(x=> (vin && (x.vin||'').toUpperCase()===vin) || (!vin && label && (x.label||'').toLowerCase()===label.toLowerCase()) );
-  if(dup) return;
-  const arr=(c.vehicles||[]).concat([{ vin, label, lastServiceDate: today(), addedAt: new Date().toISOString() }]);
+  if(!vin && !plate && !label) return null;
+  const existing = clientVehicles(c).find(x=> (vin && (x.vin||'').toUpperCase()===vin) || (!vin && label && (x.label||'').toLowerCase()===label.toLowerCase()) );
+  if(existing) return existing;
+  const v={ vin, plate, label:(label || (vin?('VIN …'+vin.slice(-6)):('Placa '+plate))), lastServiceDate: today(), addedAt: new Date().toISOString() };
+  const arr=(c.vehicles||[]).concat([v]);
   try{ await updateDoc(doc(db,'clients',clientId), {vehicles:arr}); }catch(e){ console.warn('addVehicle', e); }
+  return v;
 }
+
+// ===================== SERVICE (TALLER) — Fase 1 =====================
+let svcOrders = [], svcRoster = [], svcRosterLoaded = false;
+const SVC_ROLES = ['Mecánico','Detallador','Fotos','Limpieza','Ayudante general'];
+const SVC_STATUS = {
+  agendado:      {lbl:'📅 Agendado',         c:'#0a84ff'},
+  por_recibir:   {lbl:'🕐 Por recibir',      c:'#c9a84c'},
+  recibido:      {lbl:'📋 Recibido',         c:'#c9a84c'},
+  en_proceso:    {lbl:'🔧 En proceso',       c:'#32d74b'},
+  pausado_partes:{lbl:'⏸️ Esperando partes', c:'#ff9800'},
+  listo:         {lbl:'✅ Listo',            c:'#32d74b'},
+  entregado:     {lbl:'🏁 Entregado',        c:'#8a8fa8'},
+};
+const SVC_IN='width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box;';
+function svcEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function SVC_SEC(title,inner){ return '<div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'+title+'</div>'+inner+'</div>'; }
+
+function startSvcListening(){
+  try{
+    onSnapshot(query(collection(db,'serviceOrders')), (snap)=>{
+      svcOrders = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      const sv=document.getElementById('service-view');
+      if(sv && sv.style.display!=='none') svcRenderOrders();
+    }, (e)=>{ console.warn('serviceOrders offline', e); });
+  }catch(e){ console.warn('startSvcListening', e); }
+}
+async function svcLoadRoster(){
+  if(svcRosterLoaded) return svcRoster;
+  try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); svcRoster=((r&&r.data)||{}).emps||[]; svcRosterLoaded=true; }
+  catch(e){ svcRoster=[]; }
+  return svcRoster;
+}
+
+window.svcRenderOrders = function(){
+  const box=document.getElementById('svc-orders'); if(!box) return;
+  const q=(document.getElementById('svc-search')?.value||'').toLowerCase().trim();
+  let list=svcOrders.filter(o=>o.status!=='entregado');
+  if(window._svcFilter && window._svcFilter!=='all') list=list.filter(o=>o.status===window._svcFilter);
+  if(q){ list=list.filter(o=>((o.clientName||'')+' '+(o.clientPhone||'')+' '+(o.vehicleLabel||'')+' '+(o.vin||'')+' '+(o.plate||'')+' '+(o.reason||'')+' '+(o.assignName||'')).toLowerCase().includes(q)); }
+  const rank={por_recibir:0,recibido:1,en_proceso:2,pausado_partes:3,agendado:4,listo:5};
+  list.sort((a,b)=> (rank[a.status]??9)-(rank[b.status]??9) || ((a.scheduledAt||a.createdAt||'')<(b.scheduledAt||b.createdAt||'')?-1:1));
+  svcRenderFilters();
+  if(!list.length){ box.innerHTML='<div class="faint" style="padding:40px 20px;text-align:center;line-height:1.6;">Sin órdenes de servicio abiertas.<br>Toca <b>➕ Nueva orden de servicio</b> para empezar.</div>'; return; }
+  box.innerHTML='<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">'+list.map(svcCard).join('')+'</div>';
+};
+function svcRenderFilters(){
+  const box=document.getElementById('svc-filters'); if(!box) return;
+  const cur=window._svcFilter||'all';
+  const open=svcOrders.filter(o=>o.status!=='entregado'); const counts={};
+  open.forEach(o=>{counts[o.status]=(counts[o.status]||0)+1;});
+  const chip=(k,lbl,n)=>'<button onclick="window._svcFilter=\''+k+'\';svcRenderOrders()" style="padding:6px 12px;border-radius:999px;border:1px solid '+(cur===k?'var(--gold)':'var(--border)')+';background:'+(cur===k?'var(--gold)':'transparent')+';color:'+(cur===k?'var(--navy3)':'var(--muted)')+';font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;">'+lbl+(n!=null?(' '+n):'')+'</button>';
+  let html=chip('all','Todas',open.length);
+  ['por_recibir','agendado','en_proceso','pausado_partes','listo'].forEach(k=>{ if(counts[k]) html+=chip(k,SVC_STATUS[k].lbl,counts[k]); });
+  box.innerHTML=html;
+}
+function svcCard(o){
+  const s=SVC_STATUS[o.status]||{lbl:o.status,c:'#8a8fa8'};
+  const when = o.scheduledAt ? ('📅 '+new Date(o.scheduledAt).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : '🕐 Ahora';
+  const car = svcEsc(o.vehicleLabel || (o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
+  const idbits=[ o.plate?('🪪 '+svcEsc(o.plate)):'', o.vin?('VIN …'+svcEsc((o.vin||'').slice(-6))):'' ].filter(Boolean).join(' · ');
+  const assign = o.assignName ? ((o.assignRole||'')+' · '+svcEsc(o.assignName)) : (o.assignRole||'');
+  const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
+  const stOpts=Object.keys(SVC_STATUS).map(k=>'<option value="'+k+'" '+(k===o.status?'selected':'')+'>'+SVC_STATUS[k].lbl+'</option>').join('');
+  return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:800;font-size:15px;">'+svcEsc(o.clientName||'Cliente')+'</span>'
+    +'<span style="font-size:11px;font-weight:800;color:'+s.c+';background:'+s.c+'22;padding:3px 9px;border-radius:999px;white-space:nowrap;">'+s.lbl+'</span></div>'
+    +'<div style="font-size:13px;color:var(--text);">🚗 '+car+'</div>'
+    +(idbits?'<div style="font-size:12px;color:var(--muted);">'+idbits+'</div>':'')
+    +'<div style="font-size:13px;color:var(--text);background:var(--surface3);border-radius:9px;padding:7px 10px;line-height:1.4;">🔧 '+svcEsc(o.reason||'')+'</div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);gap:8px;"><span>'+when+'</span><span style="text-align:right;">👤 '+svcEsc(assign)+'</span></div>'
+    +'<div style="display:flex;gap:7px;align-items:center;margin-top:3px;">'
+    +'<select onchange="svcSetStatus(\''+o.id+'\',this.value)" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-family:inherit;">'+stOpts+'</select>'
+    +(phone?'<a href="sms:'+phone+'" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:7px 11px;font-size:13px;">💬</a>':'')
+    +'</div></div>';
+}
+window.svcSetStatus=async function(id,st){ try{ await updateDoc(doc(db,'serviceOrders',id),{status:st, updatedAt:new Date().toISOString()}); }catch(e){ alert('No se pudo actualizar.'); } };
+
+window.svcNewOrder=function(){
+  window._svcDraft={ clientId:'', clientName:'', clientPhone:'', lang:'es', vin:'', plate:'', vehicleLabel:'', vehPick:'', reason:'', when:'now', scheduledAt:'', assignRole:'Mecánico', assignEmpId:'', assignName:'' };
+  svcRenderModal();
+  document.getElementById('svc-modal').style.display='flex';
+  svcLoadRoster().then(()=>svcRenderModal());
+};
+window.svcClose=function(){ const m=document.getElementById('svc-modal'); if(m) m.style.display='none'; };
+function svcCapture(){
+  const d=window._svcDraft; if(!d) return; const g=id=>document.getElementById(id);
+  if(g('svc-new-name')) d.clientName=g('svc-new-name').value;
+  if(g('svc-new-phone')) d.clientPhone=g('svc-new-phone').value;
+  if(g('svc-new-lang')) d.lang=g('svc-new-lang').value;
+  if(g('svc-reason')) d.reason=g('svc-reason').value;
+  if(g('svc-sched')) d.scheduledAt=g('svc-sched').value;
+  if(g('svc-veh-vin')) d.vin=g('svc-veh-vin').value;
+  if(g('svc-veh-plate')) d.plate=g('svc-veh-plate').value;
+  if(g('svc-veh-label')) d.vehicleLabel=g('svc-veh-label').value;
+  const r=document.querySelector('input[name=svc-veh]:checked'); if(r) d.vehPick=r.value;
+  if(g('svc-role')) d.assignRole=g('svc-role').value;
+  if(g('svc-emp')) d.assignEmpId=g('svc-emp').value;
+}
+window.svcCapture=svcCapture;
+window.svcCliSearch=function(){
+  const q=(document.getElementById('svc-cli-search')?.value||'').toLowerCase().trim();
+  const box=document.getElementById('svc-cli-results'); if(!box) return;
+  if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+  const hits=clients.filter(c=>((c.name||'')+' '+(c.phone||'')).toLowerCase().includes(q)).slice(0,8);
+  if(!hits.length){ box.style.display='none'; return; }
+  box.style.display='block';
+  box.innerHTML=hits.map(c=>'<div onclick="svcPickClient(\''+c.id+'\')" style="padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">'+svcEsc(c.name||'')+' <span style="color:var(--muted);">· '+svcEsc(c.phone||'')+'</span></div>').join('');
+};
+window.svcPickClient=function(id){ svcCapture(); window._svcDraft.clientId=id; window._svcDraft.vehPick=''; svcRenderModal(); };
+window.svcClearClient=function(){ svcCapture(); window._svcDraft.clientId=''; window._svcDraft.vehPick=''; svcRenderModal(); };
+window.svcDecodeVin=async function(){
+  svcCapture(); const vin=(window._svcDraft.vin||'').toUpperCase().trim();
+  if(vin.length<11){ alert('Escribe el VIN completo.'); return; }
+  const btn=document.getElementById('svc-decode-btn'); if(btn){ btn.disabled=true; btn.textContent='…'; }
+  try{
+    const r=await fetch('https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/'+encodeURIComponent(vin)+'?format=json');
+    const j=await r.json(); const row=(j.Results||[]); const get=n=>{ const f=row.find(x=>x.Variable===n); return f?(f.Value||''):''; };
+    const label=[get('Model Year'),get('Make'),get('Model'),get('Trim')].filter(Boolean).join(' ');
+    if(label) window._svcDraft.vehicleLabel=label;
+  }catch(e){}
+  if(btn){ btn.disabled=false; btn.textContent='🔎 Decodificar'; }
+  svcRenderModal();
+};
+function svcRenderModal(){
+  const d=window._svcDraft; if(!d) return;
+  const body=document.getElementById('svc-modal-body'); if(!body) return;
+  // 1 · CLIENTE
+  let cliHtml;
+  if(d.clientId){
+    const c=clients.find(x=>x.id===d.clientId);
+    cliHtml='<div style="background:var(--surface3);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+      +'<div><div style="font-weight:800;">'+svcEsc(c?c.name:'')+'</div><div style="font-size:12px;color:var(--muted);">'+svcEsc(c?(c.phone||''):'')+'</div></div>'
+      +'<button onclick="svcClearClient()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;">Cambiar</button></div>';
+  } else {
+    cliHtml='<input id="svc-cli-search" oninput="svcCliSearch()" placeholder="🔍 Buscar cliente existente…" style="'+SVC_IN+'">'
+      +'<div id="svc-cli-results" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:6px;max-height:180px;overflow-y:auto;"></div>'
+      +'<div style="text-align:center;color:var(--faint);font-size:12px;margin:10px 0;">— o cliente nuevo —</div>'
+      +'<input id="svc-new-name" value="'+svcEsc(d.clientName||'')+'" placeholder="Nombre del cliente" style="'+SVC_IN+';margin-bottom:8px;">'
+      +'<div style="display:flex;gap:8px;"><input id="svc-new-phone" value="'+svcEsc(d.clientPhone||'')+'" placeholder="Teléfono" inputmode="tel" style="'+SVC_IN+';flex:1;">'
+      +'<select id="svc-new-lang" style="'+SVC_IN+';width:130px;"><option value="es"'+(d.lang==='es'?' selected':'')+'>Español</option><option value="en"'+(d.lang==='en'?' selected':'')+'>English</option></select></div>';
+  }
+  // 2 · AUTO
+  const c=d.clientId?clients.find(x=>x.id===d.clientId):null;
+  const vs=c?clientVehicles(c):[];
+  let vehHtml='';
+  if(vs.length){
+    vehHtml=vs.map((v,i)=>'<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;">'
+      +'<input type="radio" name="svc-veh" value="'+i+'" '+((d.vehPick===String(i)||(!d.vehPick&&i===0))?'checked':'')+' onchange="svcCapture();svcRenderModal()">'
+      +'<span><b>'+svcEsc(v.label||'')+'</b>'+(v.plate?(' · 🪪 '+svcEsc(v.plate)):'')+(v.vin?(' · VIN …'+svcEsc((v.vin||'').slice(-6))):'')+'</span></label>').join('');
+    vehHtml+='<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px dashed var(--border);border-radius:10px;cursor:pointer;">'
+      +'<input type="radio" name="svc-veh" value="__new__" '+(d.vehPick==='__new__'?'checked':'')+' onchange="svcCapture();svcRenderModal()"><span>➕ Otro auto</span></label>';
+  }
+  const showNewVeh = !vs.length || d.vehPick==='__new__';
+  if(showNewVeh){
+    vehHtml+='<div style="margin-top:'+(vs.length?'8px':'0')+';display:flex;flex-direction:column;gap:8px;">'
+      +'<div style="display:flex;gap:8px;"><input id="svc-veh-vin" value="'+svcEsc(d.vin||'')+'" placeholder="VIN (opcional)" style="'+SVC_IN+';flex:1;text-transform:uppercase;">'
+      +'<button id="svc-decode-btn" onclick="svcDecodeVin()" style="background:var(--surface3);border:1px solid var(--border);color:var(--gold);border-radius:10px;padding:0 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">🔎 Decodificar</button></div>'
+      +'<div style="display:flex;gap:8px;"><input id="svc-veh-plate" value="'+svcEsc(d.plate||'')+'" placeholder="Placas (opcional)" style="'+SVC_IN+';flex:1;text-transform:uppercase;">'
+      +'<input id="svc-veh-label" value="'+svcEsc(d.vehicleLabel||'')+'" placeholder="Año / Marca / Modelo" style="'+SVC_IN+';flex:2;"></div></div>';
+  }
+  // 3 · SERVICIO
+  const svcHtml='<textarea id="svc-reason" placeholder="¿Qué servicio necesita? (la falla, por qué viene)" style="'+SVC_IN+';min-height:70px;resize:vertical;">'+svcEsc(d.reason||'')+'</textarea>'
+    +'<div style="display:flex;gap:8px;margin-top:8px;">'
+    +'<button onclick="svcCapture();window._svcDraft.when=\'now\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when!=='later'?'var(--gold)':'var(--border)')+';background:'+(d.when!=='later'?'var(--gold)':'transparent')+';color:'+(d.when!=='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">🕐 Ahora</button>'
+    +'<button onclick="svcCapture();window._svcDraft.when=\'later\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">📅 Agendar</button></div>'
+    +(d.when==='later'?'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" style="'+SVC_IN+';margin-top:8px;">':'');
+  // 4 · ASIGNAR
+  const roleOpts=SVC_ROLES.map(r=>'<option value="'+r+'" '+(d.assignRole===r?'selected':'')+'>'+r+'</option>').join('');
+  const emps=svcRoster.filter(e=>!d.assignRole || (Array.isArray(e.roles)&&e.roles.includes(d.assignRole)));
+  const empOpts='<option value="">Cualquiera con ese rol</option>'+emps.map(e=>'<option value="'+e.empId+'" '+(String(d.assignEmpId)===String(e.empId)?'selected':'')+'>'+svcEsc(e.name)+'</option>').join('');
+  const asgHtml='<div style="display:flex;gap:8px;"><select id="svc-role" onchange="svcCapture();window._svcDraft.assignEmpId=\'\';svcRenderModal()" style="'+SVC_IN+';flex:1;">'+roleOpts+'</select>'
+    +'<select id="svc-emp" style="'+SVC_IN+';flex:1;">'+empOpts+'</select></div>';
+
+  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+    +'<h2 style="font-family:var(--font-display);font-size:21px;margin:0;">Nueva orden de servicio</h2>'
+    +'<button onclick="svcClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>'
+    +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio',svcHtml)+SVC_SEC('4 · Asignar a',asgHtml)
+    +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:6px;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">✅ Crear orden</button>';
+}
+window.svcRenderModal=svcRenderModal;
+window.svcSaveOrder=async function(){
+  svcCapture(); const d=window._svcDraft;
+  // 1 · cliente
+  let clientId=d.clientId, clientName='', clientPhone='', lang=d.lang||'es';
+  if(clientId){ const c=clients.find(x=>x.id===clientId); clientName=c?c.name:''; clientPhone=c?(c.phone||''):''; }
+  else {
+    const nm=(d.clientName||'').trim(), ph=(d.clientPhone||'').trim();
+    if(!nm){ alert('Escribe el nombre del cliente.'); return; }
+    const e164=(typeof toE164==='function'?toE164(ph):'')||'';
+    const match=e164?clients.find(c=>c.phoneE164===e164):null;
+    if(match){ clientId=match.id; clientName=match.name; clientPhone=match.phone||ph; }
+    else {
+      const ref=doc(collection(db,'clients')); clientId=ref.id;
+      try{ await setDoc(ref,{ name:nm, phone:ph, phoneE164:e164, lang, kind:'service', vehicles:[], createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' }); }
+      catch(e){ alert('No se pudo guardar el cliente: '+(e.message||e)); return; }
+      clientName=nm; clientPhone=ph;
+    }
+  }
+  // 2 · vehículo
+  let vin='', plate='', vehicleLabel='';
+  if(d.vehPick && d.vehPick!=='__new__'){
+    const c=clients.find(x=>x.id===clientId); const vs=c?clientVehicles(c):[]; const v=vs[+d.vehPick];
+    if(v){ vin=v.vin||''; plate=v.plate||''; vehicleLabel=v.label||''; }
+  }
+  if(!vin && !plate && !vehicleLabel){
+    vin=(d.vin||'').toUpperCase().trim(); plate=(d.plate||'').toUpperCase().trim(); vehicleLabel=(d.vehicleLabel||'').trim();
+    if(!vin && !plate && !vehicleLabel){ alert('Agrega el auto (VIN, placas o descripción).'); return; }
+    const v=await addVehicleToClient(clientId,{vin,plate,label:vehicleLabel});
+    if(v){ vin=v.vin||vin; plate=v.plate||plate; vehicleLabel=v.label||vehicleLabel; }
+  }
+  // 3 · servicio
+  const reason=(d.reason||'').trim(); if(!reason){ alert('Escribe qué servicio necesita.'); return; }
+  let scheduledAt=null, status='por_recibir';
+  if(d.when==='later'){ if(!d.scheduledAt){ alert('Elige la fecha de la cita.'); return; } scheduledAt=new Date(d.scheduledAt).toISOString(); status='agendado'; }
+  // 4 · asignar
+  const assignRole=d.assignRole||'Mecánico'; let assignEmpId=d.assignEmpId||'', assignName='';
+  if(assignEmpId){ const e=svcRoster.find(x=>String(x.empId)===String(assignEmpId)); assignName=e?e.name:''; }
+  // guardar
+  const oref=doc(collection(db,'serviceOrders'));
+  try{ await setDoc(oref,{ clientId, clientName, clientPhone, vin, plate, vehicleLabel, reason, scheduledAt, assignRole, assignEmpId, assignName, status, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' }); }
+  catch(e){ alert('No se pudo guardar la orden: '+(e.message||e)); return; }
+  svcClose();
+  alert('✅ Orden de servicio creada'+(status==='agendado'?' (agendada)':'')+'.');
+};
 
 window.calcCCOA = function() {
   const price = parseFloat(document.getElementById('f-total')?.value) || 0;
@@ -1601,6 +1839,7 @@ function startListening() {
   });
   startApptListening();
   startInvListening();
+  startSvcListening();
 }
 // Inventario en vivo para el cotizador (siempre listo, sin depender del getDocs de una vez)
 function startInvListening(){
