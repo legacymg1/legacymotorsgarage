@@ -1544,7 +1544,7 @@ function svcRenderModal(){
   // 4 · ASIGNAR
   const roleOpts=SVC_ROLES.map(r=>'<option value="'+r+'" '+(d.assignRole===r?'selected':'')+'>'+r+'</option>').join('');
   const emps=svcRoster.filter(e=>!d.assignRole || (Array.isArray(e.roles)&&e.roles.includes(d.assignRole)));
-  const empOpts='<option value="">Cualquiera con ese rol</option>'+emps.map(e=>'<option value="'+e.empId+'" '+(String(d.assignEmpId)===String(e.empId)?'selected':'')+'>'+svcEsc(e.name)+'</option>').join('');
+  const empOpts='<option value="">Cualquiera con ese rol</option>'+emps.map(e=>'<option value="'+e.id+'" '+(String(d.assignEmpId)===String(e.id)?'selected':'')+'>'+svcEsc(e.name)+'</option>').join('');
   const asgHtml='<div style="display:flex;gap:8px;"><select id="svc-role" onchange="svcCapture();window._svcDraft.assignEmpId=\'\';svcRenderModal()" style="'+SVC_IN+';flex:1;">'+roleOpts+'</select>'
     +'<select id="svc-emp" style="'+SVC_IN+';flex:1;">'+empOpts+'</select></div>';
 
@@ -1591,7 +1591,7 @@ window.svcSaveOrder=async function(){
   if(d.when==='later'){ if(!d.scheduledAt){ alert('Elige la fecha de la cita.'); return; } scheduledAt=new Date(d.scheduledAt).toISOString(); status='agendado'; }
   // 4 · asignar
   const assignRole=d.assignRole||'Mecánico'; let assignEmpId=d.assignEmpId||'', assignName='';
-  if(assignEmpId){ const e=svcRoster.find(x=>String(x.empId)===String(assignEmpId)); assignName=e?e.name:''; }
+  if(assignEmpId){ const e=svcRoster.find(x=>String(x.id)===String(assignEmpId)); assignName=e?e.name:''; }
   // guardar
   const oref=doc(collection(db,'serviceOrders'));
   try{ await setDoc(oref,{ clientId, clientName, clientPhone, vin, plate, vehicleLabel, reason, scheduledAt, assignRole, assignEmpId, assignName, status, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' }); }

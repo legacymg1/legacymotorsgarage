@@ -268,6 +268,19 @@
   </div>
 </div>
 
+<!-- ===== SERVICIO (mecánico): órdenes asignadas ===== -->
+<div id="screen-service" class="wrap hide">
+  <div class="topbar">
+    <button class="linkbtn" onclick="svcBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <div style="flex:1;min-width:0;">
+      <div class="faint" style="font-size:13px;">🔧 Mecánico</div>
+      <h2 style="font-size:20px;">Mis órdenes de servicio</h2>
+    </div>
+    <button class="linkbtn" onclick="loadMyService()" style="font-size:20px;padding:0 6px;" title="Actualizar">⟳</button>
+  </div>
+  <div id="svc-emp-list"><div class="faint" style="text-align:center;padding:30px;">Cargando…</div></div>
+</div>
+
 <!-- ===== ADMIN (dueños): gestión del equipo ===== -->
 <div id="screen-admin" class="wrap hide">
   <div class="topbar">
@@ -325,7 +338,7 @@ const ROLE_TILES = {
   'Detallador':        { ico:'🧽', sub:'Lavado y detallado', ready:true },
   'Fotos':             { ico:'📸', sub:'Fotos del carro', ready:false },
   'Limpieza':          { ico:'🧹', sub:'Oficina, baño, basura, blow', ready:false },
-  'Mecánico':          { ico:'🔧', sub:'Inspección y reparación', ready:false },
+  'Mecánico':          { ico:'🔧', sub:'Órdenes de servicio', ready:true },
   'Empaque':           { ico:'📦', sub:'Empacar pedidos', ready:false },
   'Captura':           { ico:'📸', sub:'Fotos de partes', ready:false },
   'Listado':           { ico:'🏷️', sub:'Publicar en eBay', ready:false },
@@ -335,7 +348,7 @@ const ROLE_TILES = {
   'Ventas':            { ico:'🤝', sub:'Ventas', ready:false },
 };
 
-function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail','screen-admin'].forEach(s=>{ document.getElementById(s).classList.toggle('hide', s!==id); }); }
+function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail','screen-service','screen-admin'].forEach(s=>{ const el=document.getElementById(s); if(el) el.classList.toggle('hide', s!==id); }); }
 function toast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); clearTimeout(window._tt); window._tt=setTimeout(()=>{t.className='toast'+(isErr?' err':'');},3200); }
 
 // ---------- Bilingüe (ES / EN) ----------
@@ -461,6 +474,7 @@ function renderHome(){
 }
 window.openRole = function(role){
   if(role==='Detallador'){ openDetailer(); return; }
+  if(role==='Mecánico'){ openService(); return; }
   const t = ROLE_TILES[role] || {};
   if(t.ready && t.href){ location.href=t.href; return; }
   if(t.href){ // existe en warehouse aunque no sea el flujo guiado nuevo
@@ -577,6 +591,51 @@ const TRI_BASE_MIN=40;   // interior rápido + cielo + tire shine + placas/fotos
 let JOB=null, runIdx=0, stepStart=0, tickHandle=null, TRI={};
 
 window.openDetailer = function(){ show('screen-detail'); detailView('home'); loadMyJobs(); };
+
+// ========================= MECÁNICO / SERVICIO (órdenes asignadas) — Fase 2 =========================
+const SVC_ST = {
+  agendado:{l:'📅 Agendado',c:'#0a84ff'}, por_recibir:{l:'🕐 Por recibir',c:'#c9a84c'},
+  recibido:{l:'📋 Recibido',c:'#c9a84c'}, en_proceso:{l:'🔧 En proceso',c:'#32d74b'},
+  pausado_partes:{l:'⏸️ Esperando partes',c:'#ff9800'}, listo:{l:'✅ Listo',c:'#32d74b'}, entregado:{l:'🏁 Entregado',c:'#8a8fa8'}
+};
+let SVC_MY=[];
+function svcEscE(s){ return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+window.openService=function(){ show('screen-service'); loadMyService(); };
+window.svcBack=function(){ show('screen-home'); };
+window.loadMyService=async function(){
+  const box=document.getElementById('svc-emp-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:30px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'svcMyOrders')({}); SVC_MY=((r&&r.data)||{}).orders||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:30px;">No se pudieron cargar. Toca ⟳ para reintentar.</div>'; return; }
+  renderMyService();
+};
+function renderMyService(){
+  const box=document.getElementById('svc-emp-list'); if(!box) return;
+  if(!SVC_MY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:40px 20px;line-height:1.6;">No tienes órdenes de servicio ahora.<br>Cuando te asignen un carro, aquí aparece.</div>'; return; }
+  box.innerHTML=SVC_MY.map(o=>{
+    const s=SVC_ST[o.status]||{l:o.status,c:'#8a8fa8'};
+    const when=o.scheduledAt?('📅 '+new Date(o.scheduledAt).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})):'🕐 Ahora';
+    const car=svcEscE(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
+    const idbits=[o.plate?('🪪 '+svcEscE(o.plate)):'', o.vin?('VIN …'+svcEscE((o.vin||'').slice(-6))):''].filter(Boolean).join(' · ');
+    const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
+    let actions='';
+    if(o.status==='por_recibir'||o.status==='agendado') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'recibido\')">📋 Recibir carro</button>';
+    else if(o.status==='recibido') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">🔧 Empezar trabajo</button>';
+    else if(o.status==='en_proceso') actions='<div style="display:flex;gap:8px;"><button class="btn btn-ghost" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'pausado_partes\')">⏸️ Esperar partes</button><button class="btn btn-green" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'listo\')">✅ Listo</button></div>';
+    else if(o.status==='pausado_partes') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">▶️ Reanudar</button>';
+    return '<div class="card" style="padding:14px;margin-bottom:12px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-weight:800;font-size:16px;">'+svcEscE(o.clientName||'Cliente')+'</span>'
+      +'<span style="font-size:11px;font-weight:800;color:'+s.c+';background:'+s.c+'22;padding:3px 9px;border-radius:999px;white-space:nowrap;">'+s.l+'</span></div>'
+      +'<div style="font-size:14px;margin-bottom:3px;">🚗 '+car+'</div>'
+      +(idbits?'<div class="faint" style="font-size:12px;margin-bottom:6px;">'+idbits+'</div>':'')
+      +'<div style="font-size:14px;background:var(--surface2,#1a1f2c);border-radius:9px;padding:8px 10px;line-height:1.4;margin-bottom:8px;">🔧 '+svcEscE(o.reason||'')+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-bottom:10px;">'+when+(phone?(' · <a href="sms:'+phone+'" style="color:var(--gold,#c9a84c);text-decoration:none;">💬 Mensaje</a>'):'')+'</div>'
+      +actions+'</div>';
+  }).join('');
+}
+window.svcAdvance=async function(orderId,status){
+  try{ await httpsCallable(functions,'svcOrderStatus')({orderId:orderId,status:status}); toast('✅ Actualizado'); loadMyService(); }
+  catch(e){ toast((e&&e.message)||'No se pudo actualizar', true); }
+};
 function detailView(v){
   document.getElementById('detail-home').classList.toggle('hide', v!=='home');
   document.getElementById('detail-pick').classList.toggle('hide', v!=='pick');

@@ -1124,6 +1124,53 @@ exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true, found: true, active: true, name: id.name, roles: id.roles, empId: id.empId, photoURL: id.photoURL, rate: id.rate, isOwner: id.isOwner, via: "phone" };
 });
 
+// 🔧 SERVICE Fase 2: las órdenes asignadas al empleado que llama (mecánico/detallador/…).
+// Los empleados entran por TELÉFONO (no son staff), así que leen sus órdenes por aquí, no directo de Firestore.
+const SVC_ORDER_STATUSES = ["agendado", "por_recibir", "recibido", "en_proceso", "pausado_partes", "listo", "entregado"];
+exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const db = admin.firestore();
+  let docs = [];
+  try { const snap = await db.collection("serviceOrders").get(); docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) {}
+  const open = docs.filter((o) => o.status !== "entregado");
+  let mine;
+  if (id.isOwner || id.email) { mine = open; } // dueño/staff: ve todas (para probar)
+  else if (id.empId || (Array.isArray(id.roles) && id.roles.length)) {
+    mine = open.filter((o) => (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && o.assignRole && Array.isArray(id.roles) && id.roles.includes(o.assignRole)));
+  } else { mine = []; }
+  const rank = { por_recibir: 0, recibido: 1, en_proceso: 2, pausado_partes: 3, agendado: 4, listo: 5 };
+  mine.sort((a, b) => ((rank[a.status] == null ? 9 : rank[a.status]) - (rank[b.status] == null ? 9 : rank[b.status])) || ((a.scheduledAt || a.createdAt || "") < (b.scheduledAt || b.createdAt || "") ? -1 : 1));
+  const out = mine.map((o) => ({
+    id: o.id, clientName: o.clientName || "", clientPhone: o.clientPhone || "",
+    vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
+    reason: o.reason || "", scheduledAt: o.scheduledAt || null, status: o.status || "por_recibir",
+    assignRole: o.assignRole || "", assignName: o.assignName || "",
+  }));
+  return { ok: true, orders: out, roles: id.roles || [], name: id.name || "" };
+});
+
+// 🔧 SERVICE: el empleado asignado (o el dueño) mueve el estatus de la orden.
+exports.svcOrderStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  const status = String(d.status || "");
+  if (!orderId || SVC_ORDER_STATUSES.indexOf(status) < 0) throw new HttpsError("invalid-argument", "Datos inválidos.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const mine = (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && o.assignRole && Array.isArray(id.roles) && id.roles.includes(o.assignRole));
+  if (!(id.isOwner || id.email || mine)) throw new HttpsError("permission-denied", "No es tu orden.");
+  await ref.set({ status, updatedAt: new Date().toISOString(), updatedBy: id.email || id.name || id.empId || "" }, { merge: true });
+  return { ok: true };
+});
+
 // 👑 Panel del dueño en Pit Crew: listar y gestionar el equipo desde el teléfono. Solo dueños.
 exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
