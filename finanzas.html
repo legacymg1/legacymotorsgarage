@@ -739,6 +739,10 @@
         <button class="close" onclick="closeExp()">✕</button>
       </div>
     </div>
+    <div style="margin-bottom:12px;">
+      <button type="button" id="scan-btn" onclick="scanReceiptStart()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,var(--gold3,#8a6520),var(--gold,#c9a84c));color:#0b0e14;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">📸 Escanear recibo — llena todo solo</button>
+      <div id="scan-status" style="font-size:12px;text-align:center;margin-top:6px;min-height:16px;color:var(--muted);"></div>
+    </div>
     <div class="row2">
       <div class="field"><label>Monto ($)</label><input id="e-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
       <div class="field"><label>Fecha</label><input id="e-date" type="date"></div>
@@ -1072,6 +1076,33 @@ window.previewReceipt = function(){
   const f=document.getElementById('e-receipt').files[0]; const box=document.getElementById('e-receipt-preview');
   if(!f){ box.innerHTML=''; return; }
   box.innerHTML=`<div style="font-size:12px;color:var(--muted);">📎 ${f.name}</div>`;
+  scanReceiptNow(f);   // 📸 lee el recibo y llena todo solo
+};
+// Dispara el selector de foto (cámara en iPhone). La MISMA foto se usa para autollenar y se guarda como recibo.
+window.scanReceiptStart=function(){ const inp=document.getElementById('e-receipt'); if(inp){ inp.value=''; inp.click(); } };
+function _fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result||'')); r.onerror=rej; r.readAsDataURL(file); }); }
+window.scanReceiptNow=async function(file){
+  if(!file) return;
+  const st=document.getElementById('scan-status'), btn=document.getElementById('scan-btn');
+  try{
+    if(st) st.textContent='🔎 Leyendo el recibo…'; if(btn) btn.disabled=true;
+    const jpg=await toJpeg(file);                 // HEIC→JPG + reduce (regla de fotos)
+    const dataUrl=await _fileToDataURL(jpg);
+    const dept=document.getElementById('e-dept').value;
+    const r=await httpsCallable(functions,'scanReceipt')({ imageBase64:dataUrl, mediaType:'image/jpeg', categories:(EXP_CATS[dept]||[]) });
+    const d=(r&&r.data)||{};
+    if(d.amount>0) document.getElementById('e-amount').value=d.amount;
+    if(d.date) document.getElementById('e-date').value=d.date;
+    if(d.vendor) document.getElementById('e-vendor').value=d.vendor;
+    if(d.note) document.getElementById('e-note').value=d.note;
+    if(d.method){ const m=document.getElementById('e-method'); if(m) m.value=d.method; }
+    if(d.category){ const sel=document.getElementById('e-cat'); if(sel){ const opt=[...sel.options].find(o=>o.value===d.category||o.text===d.category); if(opt){ sel.value=opt.value; } } }
+    if(st) st.innerHTML='<span style="color:#32d74b;">✅ Listo — revisa los datos y guarda.</span>';
+  }catch(e){
+    console.warn('scanReceipt', e);
+    if(st) st.innerHTML='<span style="color:#ff9800;">No se pudo leer la foto. Llénalo a mano.</span>';
+  }
+  if(btn) btn.disabled=false;
 };
 window.openExp = function(){
   document.getElementById('e-amount').value='';
@@ -1083,6 +1114,7 @@ window.openExp = function(){
   document.getElementById('e-note').value='';
   document.getElementById('e-receipt').value='';
   document.getElementById('e-receipt-preview').innerHTML='';
+  const _ss=document.getElementById('scan-status'); if(_ss) _ss.textContent='';
   document.getElementById('exp-overlay').classList.add('open');
 };
 window.closeExp = function(){ document.getElementById('exp-overlay').classList.remove('open'); };

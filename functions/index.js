@@ -406,6 +406,61 @@ exports.generateCarPost = onRequest({ secrets: [ANTHROPIC_KEY], cors: true, time
   }
 });
 
+// ===== 📸 ESCANEAR RECIBO → autollenar gasto (Finanzas). Claude visión. onCall (finanzas tiene el SDK). =====
+exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, async (request) => {
+  if (!request.auth) { throw new HttpsError("unauthenticated", "Inicia sesión."); }
+  const data = request.data || {};
+  let b64 = String(data.imageBase64 || "");
+  let mt = String(data.mediaType || "image/jpeg");
+  if (b64.indexOf("base64,") >= 0) {
+    const pre = b64.slice(0, b64.indexOf("base64,"));
+    const m = pre.match(/image\/(jpeg|png|webp|gif)/i);
+    if (m) mt = "image/" + m[1].toLowerCase();
+    b64 = b64.split("base64,").pop();
+  }
+  if (!b64) { throw new HttpsError("invalid-argument", "Falta la imagen."); }
+  const cats = Array.isArray(data.categories) ? data.categories.slice(0, 30) : [];
+  const today = new Date().toISOString().slice(0, 10);
+  const sys = "You read a photo of a purchase receipt or invoice for a used-car dealership / parts yard. " +
+    "Extract the data and return ONLY a strict JSON object — no prose, no code fences. Keys:\n" +
+    "- amount: the GRAND TOTAL actually paid, in dollars, INCLUDING tax (number). If several totals appear, use the final grand total.\n" +
+    "- date: purchase date as YYYY-MM-DD. If the year is missing, assume " + today.slice(0, 4) + ". If no date is visible, use \"" + today + "\".\n" +
+    "- vendor: the store/business name, short.\n" +
+    "- note: a SHORT description in Spanish (2-6 words) of what was bought.\n" +
+    "- category: choose the SINGLE best match from this list, copied EXACTLY: " + JSON.stringify(cats) + ". If none fits, use \"Otro\".\n" +
+    "- method: one of \"cash\",\"terminal\",\"ach\",\"zelle\". Guess from the receipt (card/VISA/MASTERCARD/DEBIT => \"terminal\"; otherwise \"cash\"). Default \"cash\".\n" +
+    "If a value is unknown use an empty string, except amount (use 0). Return JSON only.";
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({
+      model: "claude-sonnet-5",
+      max_tokens: 400,
+      system: sys,
+      messages: [{ role: "user", content: [
+        { type: "image", source: { type: "base64", media_type: mt, data: b64 } },
+        { type: "text", text: "Extract the receipt data as strict JSON." },
+      ] }],
+    });
+    let txt = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    txt = txt.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
+    let out = {};
+    try { out = JSON.parse(txt); } catch (e) { const m = txt.match(/\{[\s\S]*\}/); if (m) { try { out = JSON.parse(m[0]); } catch (_) {} } }
+    return {
+      amount: Number(out.amount) || 0,
+      date: /^\d{4}-\d{2}-\d{2}$/.test(out.date || "") ? out.date : today,
+      vendor: String(out.vendor || "").slice(0, 80),
+      note: String(out.note || "").slice(0, 120),
+      category: String(out.category || "").slice(0, 60),
+      method: ["cash", "terminal", "ach", "zelle"].includes(out.method) ? out.method : "cash",
+    };
+  } catch (e) {
+    console.error("scanReceipt error", e);
+    throw new HttpsError("internal", String((e && e.message) || e));
+  }
+});
+
 // ===== 💳 PAGOS CON SQUARE (portal del cliente + "enviar cobro" desde el admin) =====
 const SQUARE_LOCATION_ID = "LDTPHV3ZR18D0";       // Ubicación de Production (NO es secreto)
 const SQUARE_API = "https://connect.squareup.com"; // Production
