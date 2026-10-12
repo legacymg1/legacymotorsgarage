@@ -298,7 +298,7 @@
 
   <div id="admin-form-view" class="hide">
     <div class="card" style="display:flex;flex-direction:column;gap:13px;">
-      <div><label class="alabel">Nombre</label><input id="adm-name" class="afield" type="text" placeholder="Nombre completo"></div>
+      <div><label class="alabel">Nombre</label><input id="adm-name" class="afield" type="text" autocapitalize="words" placeholder="Nombre completo" style="text-transform:capitalize;"></div>
       <div><label class="alabel">Teléfono (su login)</label><input id="adm-phone" class="afield" type="tel" inputmode="numeric" placeholder="559 123 4567"></div>
       <div><label class="alabel">Tarifa $/hora</label><input id="adm-rate" class="afield" type="number" inputmode="decimal" placeholder="0.00"></div>
       <div><label class="alabel">Funciones (puede tener varias)</label><div id="adm-roles" style="display:flex;flex-wrap:wrap;gap:8px;"></div></div>
@@ -466,11 +466,26 @@ function renderHome(){
   box.innerHTML = roles.map(role=>{
     const t = ROLE_TILES[role] || { ico:'•', sub:'', ready:false };
     const soon = t.ready ? '' : '<div class="soon">PRONTO</div>';
-    return '<div class="tile" onclick="openRole(\''+role.replace(/'/g,"\\'")+'\')">'+soon
+    const bid = 'tilebadge-'+role.replace(/[^a-zA-Z]/g,'');
+    const badge = '<div id="'+bid+'" style="display:none;position:absolute;top:8px;left:8px;min-width:22px;height:22px;line-height:22px;padding:0 6px;border-radius:999px;background:#ff453a;color:#fff;font-size:12px;font-weight:800;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.35);z-index:2;"></div>';
+    return '<div class="tile" style="position:relative;" onclick="openRole(\''+role.replace(/'/g,"\\'")+'\')">'+soon+badge
       +'<div class="ico">'+t.ico+'</div>'
       +'<div class="nm">'+role+'</div>'
       +'<div class="sub">'+(t.sub||'')+'</div></div>';
   }).join('');
+  loadTileCounts();
+}
+// Cola de tareas: pinta el # de pendientes en cada mosaico (por ahora Mecánico = sus órdenes de servicio abiertas).
+async function loadTileCounts(){
+  const roles = Array.isArray(ME.roles)?ME.roles:[];
+  if(roles.indexOf('Mecánico')>=0){
+    try{
+      const r=await httpsCallable(functions,'svcMyOrders')({});
+      const n=(((r&&r.data)||{}).orders||[]).length;
+      const b=document.getElementById('tilebadge-'+('Mecánico'.replace(/[^a-zA-Z]/g,'')));
+      if(b){ if(n>0){ b.textContent=n; b.style.display='block'; } else { b.style.display='none'; } }
+    }catch(e){}
+  }
 }
 window.openRole = function(role){
   if(role==='Detallador'){ openDetailer(); return; }
@@ -841,7 +856,7 @@ window.adminNew=function(){ admEditId=null; admSel=[]; document.getElementById('
 window.adminEdit=function(id){ const e=ADM_EMPS.find(x=>x.id===id); if(!e) return; admEditId=id; admSel=(e.roles||[]).slice(); document.getElementById('adm-name').value=e.name||''; document.getElementById('adm-phone').value=e.phone||''; document.getElementById('adm-rate').value=e.rate||''; document.getElementById('adm-active').checked=e.active!==false; document.getElementById('adm-owner').checked=e.owner===true; admFillRoles(); adminFormView(); };
 window.adminCancel=function(){ adminListView(); };
 window.adminSave=async function(){
-  const name=document.getElementById('adm-name').value.trim(); if(!name){ toast('Pon el nombre.',true); return; }
+  const name=document.getElementById('adm-name').value.trim().replace(/\b\w/g,c=>c.toUpperCase()); if(!name){ toast('Pon el nombre.',true); return; }
   const btn=document.getElementById('adm-save'); btn.disabled=true; const prev=btn.textContent; btn.textContent='Guardando…';
   try{
     const payload={ op:'save', name, phone:document.getElementById('adm-phone').value.trim(), rate:Number(document.getElementById('adm-rate').value)||0, active:document.getElementById('adm-active').checked, owner:document.getElementById('adm-owner').checked, roles:admSel };

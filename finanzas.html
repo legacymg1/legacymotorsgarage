@@ -629,7 +629,7 @@
         <input type="file" id="emp-photo-in" accept="image/*" capture="user" style="display:none;" onchange="empPhotoPick(this)">
         <div style="flex:1;"><label style="font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:1px;">Foto</label><div style="font-size:12px;color:var(--muted);">Toca el círculo para tomar/subir la foto del empleado.</div></div>
       </div>
-      <div class="field"><label>Nombre completo</label><input id="emp-name" placeholder="Nombre y apellidos"></div>
+      <div class="field"><label>Nombre completo</label><input id="emp-name" autocapitalize="words" placeholder="Nombre y apellidos" style="text-transform:capitalize;"></div>
       <div class="row2">
         <div class="field"><label>Teléfono (su login)</label><input id="emp-phone" type="tel" placeholder="(559) 555-0100"></div>
         <div class="field"><label>Tarifa $/hora</label><input id="emp-rate" type="number" inputmode="decimal" placeholder="0.00"></div>
@@ -641,7 +641,7 @@
         <summary style="cursor:pointer;padding:10px 0;font-weight:700;color:var(--gold);font-size:13px;">🔒 Datos sensibles (solo tú los ves)</summary>
         <div class="row2"><div class="field"><label>SSN / ITIN</label><input id="emp-ssn" placeholder="###-##-####"></div><div class="field"><label># de identificación</label><input id="emp-idnum" placeholder="Licencia / ID"></div></div>
         <div class="field"><label>Dirección</label><input id="emp-addr" placeholder="Calle, ciudad, CP"></div>
-        <div class="row2"><div class="field"><label>Contacto de emergencia</label><input id="emp-emg-name" placeholder="Nombre"></div><div class="field"><label>Tel. emergencia</label><input id="emp-emg-phone" type="tel" placeholder="(559) …"></div></div>
+        <div class="row2"><div class="field"><label>Contacto de emergencia</label><input id="emp-emg-name" autocapitalize="words" placeholder="Nombre" style="text-transform:capitalize;"></div><div class="field"><label>Tel. emergencia</label><input id="emp-emg-phone" type="tel" placeholder="(559) …"></div></div>
         <div class="field"><label>Foto de la identificación</label><input type="file" id="emp-id-in" accept="image/*" onchange="empIdPick(this)"><div id="emp-id-status" style="font-size:12px;color:var(--muted);margin-top:4px;"></div></div>
         <div class="field"><label>Notas (solo tú)</label><input id="emp-notes" placeholder="Opcional"></div>
       </details>
@@ -2895,7 +2895,7 @@ window.empPhotoPick=function(inp){ _empPhotoFile=(inp.files||[])[0]||null; if(_e
 window.empIdPick=function(inp){ _empIdFile=(inp.files||[])[0]||null; if(_empIdFile) document.getElementById('emp-id-status').textContent='Foto lista para guardar…'; };
 function _empE164(s){ const d=String(s||'').replace(/\D/g,''); if(d.length===10) return '+1'+d; if(d.length===11&&d[0]==='1') return '+'+d; return ''; }
 window.empSave=async function(){
-  const name=document.getElementById('emp-name').value.trim(); if(!name){ alert('Pon el nombre'); return; }
+  const name=document.getElementById('emp-name').value.trim().replace(/\b\w/g,c=>c.toUpperCase()); if(!name){ alert('Pon el nombre'); return; }
   const phone=document.getElementById('emp-phone').value.trim();
   const btn=document.getElementById('emp-save-btn'); btn.disabled=true; btn.textContent='Guardando…';
   try{
