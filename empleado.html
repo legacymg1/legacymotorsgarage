@@ -268,17 +268,37 @@
   </div>
 </div>
 
-<!-- ===== SERVICIO (mecánico): órdenes asignadas ===== -->
+<!-- ===== MECÁNICO: taller (carros por inspeccionar + órdenes de servicio) ===== -->
 <div id="screen-service" class="wrap hide">
   <div class="topbar">
     <button class="linkbtn" onclick="svcBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
     <div style="flex:1;min-width:0;">
       <div class="faint" style="font-size:13px;">🔧 Mecánico</div>
-      <h2 style="font-size:20px;">Mis órdenes de servicio</h2>
+      <h2 style="font-size:20px;">Mi taller</h2>
     </div>
     <button class="linkbtn" onclick="loadMyService()" style="font-size:20px;padding:0 6px;" title="Actualizar">⟳</button>
   </div>
-  <div id="svc-emp-list"><div class="faint" style="text-align:center;padding:30px;">Cargando…</div></div>
+  <button id="mech-addtask-btn" class="btn btn-ghost hide" onclick="mechOpenAddTask()" style="margin-bottom:14px;">➕ Agregar trabajo a un carro</button>
+  <div class="sec-title">🏁 Carros por inspeccionar</div>
+  <div id="mech-cars-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
+  <div class="sec-title" style="margin-top:20px;">🔧 Trabajos en cola</div>
+  <div id="mech-tasks-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
+  <div class="sec-title" style="margin-top:20px;">🔧 Órdenes de servicio (clientes)</div>
+  <div id="svc-emp-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
+</div>
+
+<!-- Panel de recepción del carro (intake del mecánico) -->
+<div id="mech-intake" class="hide" style="position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)mechCloseIntake()">
+  <div style="background:var(--card,#141924);border:1px solid var(--line,#232a3a);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));">
+    <div id="mech-intake-body"></div>
+  </div>
+</div>
+
+<!-- Panel del dueño: agregar trabajo (tarea) a un carro -->
+<div id="mech-addtask" class="hide" style="position:fixed;inset:0;z-index:121;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)mechCloseAddTask()">
+  <div style="background:var(--card,#141924);border:1px solid var(--line,#232a3a);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));">
+    <div id="mech-addtask-body"></div>
+  </div>
 </div>
 
 <!-- ===== ADMIN (dueños): gestión del equipo ===== -->
@@ -480,8 +500,12 @@ async function loadTileCounts(){
   const roles = Array.isArray(ME.roles)?ME.roles:[];
   if(roles.indexOf('Mecánico')>=0){
     try{
-      const r=await httpsCallable(functions,'svcMyOrders')({});
-      const n=(((r&&r.data)||{}).orders||[]).length;
+      const [so,mc,mt]=await Promise.all([
+        httpsCallable(functions,'svcMyOrders')({}),
+        httpsCallable(functions,'mechCars')({}),
+        httpsCallable(functions,'mechTasks')({})
+      ]);
+      const n=(((so&&so.data)||{}).orders||[]).length + (((mc&&mc.data)||{}).cars||[]).length + (((mt&&mt.data)||{}).tasks||[]).length;
       const b=document.getElementById('tilebadge-'+('Mecánico'.replace(/[^a-zA-Z]/g,'')));
       if(b){ if(n>0){ b.textContent=n; b.style.display='block'; } else { b.style.display='none'; } }
     }catch(e){}
@@ -613,15 +637,130 @@ const SVC_ST = {
   recibido:{l:'📋 Recibido',c:'#c9a84c'}, en_proceso:{l:'🔧 En proceso',c:'#32d74b'},
   pausado_partes:{l:'⏸️ Esperando partes',c:'#ff9800'}, listo:{l:'✅ Listo',c:'#32d74b'}, entregado:{l:'🏁 Entregado',c:'#8a8fa8'}
 };
-let SVC_MY=[];
+let SVC_MY=[], MECH_CARS=[], MECH_CUR=null, MECH_TASKS=[], MECH_PREP=[], MECH_ADDCAR=null;
 function svcEscE(s){ return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
-window.openService=function(){ show('screen-service'); loadMyService(); };
+window.openService=function(){ show('screen-service'); const b=document.getElementById('mech-addtask-btn'); if(b) b.classList.toggle('hide', !(ME&&ME.isOwner)); loadMyService(); };
 window.svcBack=function(){ show('screen-home'); };
 window.loadMyService=async function(){
-  const box=document.getElementById('svc-emp-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:30px;">Cargando…</div>';
+  loadMechCars(); loadMechTasks();
+  const box=document.getElementById('svc-emp-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
   try{ const r=await httpsCallable(functions,'svcMyOrders')({}); SVC_MY=((r&&r.data)||{}).orders||[]; }
-  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:30px;">No se pudieron cargar. Toca ⟳ para reintentar.</div>'; return; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudieron cargar. Toca ⟳ para reintentar.</div>'; return; }
   renderMyService();
+};
+// 🏁 Carros de dealer esperando inspección inicial (auto-encolado desde el inventario).
+async function loadMechCars(){
+  const box=document.getElementById('mech-cars-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'mechCars')({}); MECH_CARS=((r&&r.data)||{}).cars||[]; }
+  catch(e){ MECH_CARS=[]; if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudieron cargar.</div>'; return; }
+  renderMechCars();
+}
+function renderMechCars(){
+  const box=document.getElementById('mech-cars-list'); if(!box) return;
+  if(!MECH_CARS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:16px;line-height:1.5;">No hay carros esperando inspección.<br>Cuando se registra un carro, aparece aquí solo.</div>'; return; }
+  box.innerHTML=MECH_CARS.map(c=>{
+    const when=c.createdAt?('Recibido '+new Date(c.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'})):'';
+    const photo=c.photo?('<img src="'+c.photo+'" alt="" style="width:54px;height:54px;border-radius:10px;object-fit:cover;flex:0 0 auto;">'):'<div style="width:54px;height:54px;border-radius:10px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:24px;flex:0 0 auto;">🚗</div>';
+    return '<div class="card" style="padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:center;">'+photo
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:15px;">'+svcEscE(c.label)+'</div>'
+      +'<div class="faint" style="font-size:12px;">'+(c.inventoryNum?('#'+svcEscE(c.inventoryNum)+' · '):'')+when+'</div>'
+      +(c.inspStarted?'<div style="font-size:11px;color:var(--gold,#c9a84c);margin-top:2px;">● Inspección iniciada</div>':'')+'</div>'
+      +'<button class="btn btn-gold" style="width:auto;padding:9px 13px;font-size:13px;flex:0 0 auto;" onclick="mechOpenIntake(\''+c.id+'\')">'+(c.inspStarted?'Seguir':'🔍 Inspeccionar')+'</button></div>';
+  }).join('');
+}
+window.mechOpenIntake=function(carId){
+  const c=MECH_CARS.find(x=>x.id===carId); if(!c) return; MECH_CUR=c;
+  const when=c.createdAt?new Date(c.createdAt).toLocaleString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—';
+  document.getElementById('mech-intake-body').innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2 style="font-size:19px;margin:0;">Recepción del vehículo</h2>'
+    +'<button class="linkbtn" onclick="mechCloseIntake()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>'
+    +'<div class="card" style="padding:12px;margin-bottom:14px;"><div style="font-weight:800;font-size:16px;">'+svcEscE(c.label)+'</div>'
+    +'<div class="faint" style="font-size:12.5px;margin-top:4px;line-height:1.6;">'+(c.inventoryNum?('Inventario #'+svcEscE(c.inventoryNum)+'<br>'):'')
+    +(c.vin?('VIN '+svcEscE(c.vin)+'<br>'):'')+'Fecha de recepción: '+when+'</div></div>'
+    +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Millas con las que recibes el carro</label>'
+    +'<input id="mech-miles" type="number" inputmode="numeric" value="'+svcEscE(c.receivedMiles||'')+'" placeholder="Ej. 84250" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:16px;margin-bottom:16px;">'
+    +'<button class="btn btn-gold" style="width:100%;" onclick="mechStartInspection()">▶️ '+(c.inspStarted?'Continuar inspección':'Empezar inspección')+'</button>'
+    +'<div class="faint" style="font-size:11.5px;text-align:center;margin-top:10px;line-height:1.5;">La certificación paso a paso (DVI) se abre al registrar las millas.<br>(La construimos en el siguiente paso.)</div>';
+  document.getElementById('mech-intake').classList.remove('hide');
+};
+window.mechCloseIntake=function(){ document.getElementById('mech-intake').classList.add('hide'); };
+window.mechStartInspection=async function(){
+  if(!MECH_CUR) return;
+  const miles=(document.getElementById('mech-miles').value||'').trim();
+  if(!miles){ toast('Pon las millas con las que lo recibes.',true); return; }
+  try{
+    await httpsCallable(functions,'mechCarIntake')({ carId:MECH_CUR.id, receivedMiles:miles });
+    toast('✅ Millas registradas · inspección iniciada');
+    mechCloseIntake(); loadMechCars();
+  }catch(e){ toast((e&&e.message)||'No se pudo guardar',true); }
+};
+
+// 🔧 TRABAJOS EN COLA (car_tasks) — tareas que el dueño pone a cada carro.
+const MECH_TASK_ST={ cola:{l:'🕐 En cola',c:'#c9a84c'}, en_proceso:{l:'🔧 En proceso',c:'#32d74b'}, hecho:{l:'✅ Hecho',c:'#8a8fa8'} };
+async function loadMechTasks(){
+  const box=document.getElementById('mech-tasks-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'mechTasks')({}); MECH_TASKS=((r&&r.data)||{}).tasks||[]; }
+  catch(e){ MECH_TASKS=[]; if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudieron cargar.</div>'; return; }
+  renderMechTasks();
+}
+function renderMechTasks(){
+  const box=document.getElementById('mech-tasks-list'); if(!box) return;
+  if(!MECH_TASKS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:16px;line-height:1.5;">No hay trabajos en cola.'+((ME&&ME.isOwner)?'<br>Toca <b>➕ Agregar trabajo a un carro</b>.':'')+'</div>'; return; }
+  // agrupa por carro
+  const byCar={}; MECH_TASKS.forEach(t=>{ (byCar[t.carId]=byCar[t.carId]||{label:t.carLabel,inv:t.inventoryNum,carId:t.carId,items:[]}).items.push(t); });
+  box.innerHTML=Object.values(byCar).map(g=>{
+    const rows=g.items.map(t=>{
+      const s=MECH_TASK_ST[t.status]||{l:t.status,c:'#8a8fa8'};
+      const opts=Object.keys(MECH_TASK_ST).map(k=>'<option value="'+k+'" '+(k===t.status?'selected':'')+'>'+MECH_TASK_ST[k].l+'</option>').join('');
+      return '<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);">'
+        +'<span style="flex:1;min-width:0;font-size:14px;">'+svcEscE(t.title)+'</span>'
+        +'<select onchange="carTaskSetStatus(\''+t.id+'\',this.value)" style="padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:12px;">'+opts+'</select></div>';
+    }).join('');
+    const addBtn=(ME&&ME.isOwner)?'<button class="linkbtn" onclick="mechOpenAddTask(\''+g.carId+'\')" style="font-size:12px;color:var(--gold,#c9a84c);margin-top:6px;">➕ otra tarea a este carro</button>':'';
+    return '<div class="card" style="padding:12px 14px;margin-bottom:10px;"><div style="font-weight:800;font-size:15px;">'+(g.inv?('#'+svcEscE(g.inv)+' · '):'')+svcEscE(g.label)+'</div>'+rows+addBtn+'</div>';
+  }).join('');
+}
+window.carTaskSetStatus=async function(taskId,status){
+  try{ await httpsCallable(functions,'carTaskStatus')({taskId:taskId,status:status}); toast('✅ Actualizado'); loadMechTasks(); }
+  catch(e){ toast((e&&e.message)||'No se pudo',true); }
+};
+// Dueño: agregar trabajo a un carro (carId opcional = precargar ese carro).
+window.mechOpenAddTask=async function(carId){
+  if(!(ME&&ME.isOwner)) return;
+  MECH_ADDCAR = carId || null;
+  const body=document.getElementById('mech-addtask-body');
+  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2 style="font-size:19px;margin:0;">Agregar trabajo</h2>'
+    +'<button class="linkbtn" onclick="mechCloseAddTask()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>'
+    +'<div id="mech-addtask-inner"><div class="faint" style="text-align:center;padding:14px;">Cargando carros…</div></div>';
+  document.getElementById('mech-addtask').classList.remove('hide');
+  if(!MECH_PREP.length){ try{ const r=await httpsCallable(functions,'invPrepList')({}); MECH_PREP=((r&&r.data)||{}).cars||[]; }catch(e){ MECH_PREP=[]; } }
+  renderAddTaskForm();
+};
+function renderAddTaskForm(){
+  const inner=document.getElementById('mech-addtask-inner'); if(!inner) return;
+  const sel = MECH_ADDCAR ? (MECH_PREP.find(c=>c.id===MECH_ADDCAR)) : null;
+  let carUI;
+  if(sel){ carUI='<div class="card" style="padding:11px 13px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:700;">'+(sel.inventoryNum?('#'+svcEscE(sel.inventoryNum)+' · '):'')+svcEscE(sel.label)+'</span><button class="linkbtn" onclick="MECH_ADDCAR=null;renderAddTaskForm()" style="font-size:12px;color:var(--muted,#8a8fa8);">cambiar</button></div>'; }
+  else {
+    const opts='<option value="">— Elige el carro —</option>'+MECH_PREP.map(c=>'<option value="'+c.id+'">'+(c.inventoryNum?('#'+svcEscE(c.inventoryNum)+' · '):'')+svcEscE(c.label)+'</option>').join('');
+    carUI='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Carro</label><select id="mech-addtask-car" onchange="MECH_ADDCAR=this.value;renderAddTaskForm()" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:15px;margin-bottom:14px;">'+opts+'</select>';
+  }
+  inner.innerHTML=carUI
+    +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">¿Qué se le va a hacer? (el paso)</label>'
+    +'<input id="mech-task-title" autocapitalize="sentences" placeholder="Ej. Reemplazar motor" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:16px;margin-bottom:16px;">'
+    +'<button class="btn btn-gold" style="width:100%;" onclick="mechAddTaskSave()">➕ Agregar a la cola</button>';
+}
+window.mechCloseAddTask=function(){ document.getElementById('mech-addtask').classList.add('hide'); };
+window.mechAddTaskSave=async function(){
+  const carId=MECH_ADDCAR||'';
+  const title=(document.getElementById('mech-task-title').value||'').trim();
+  if(!carId){ toast('Elige el carro.',true); return; }
+  if(!title){ toast('Escribe qué se le va a hacer.',true); return; }
+  try{
+    await httpsCallable(functions,'carTaskAdd')({ carId:carId, title:title });
+    toast('✅ Trabajo agregado a la cola');
+    mechCloseAddTask(); loadMechTasks();
+  }catch(e){ toast((e&&e.message)||'No se pudo agregar',true); }
 };
 function renderMyService(){
   const box=document.getElementById('svc-emp-list'); if(!box) return;

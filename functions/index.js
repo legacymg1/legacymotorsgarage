@@ -1175,6 +1175,132 @@ exports.svcOrderStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true };
 });
 
+// 🏁 CICLO DEL CARRO (dealer) — carros esperando INSPECCIÓN INICIAL del mecánico (status 'prep' + reconStage 'mecanico').
+// Auto-encolado: un carro nuevo se guarda con status:'prep' y reconStage:'mecanico' → aparece aquí solo.
+exports.mechCars = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  if (id.notRegistered || !id.active) throw new HttpsError("permission-denied", "No autorizado.");
+  const isMech = id.isOwner || id.email || (Array.isArray(id.roles) && id.roles.indexOf("Mecánico") >= 0);
+  if (!isMech) return { ok: true, cars: [] };
+  const db = admin.firestore();
+  let snap;
+  try { snap = await db.collection("inventory").where("status", "==", "prep").get(); }
+  catch (e) { throw new HttpsError("internal", "No se pudo leer el inventario."); }
+  const cars = [];
+  snap.forEach((d) => {
+    const c = d.data() || {};
+    if ((c.reconStage || "mecanico") !== "mecanico") return;   // solo los que esperan inspección inicial
+    const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
+    const photo = (Array.isArray(c.photos) && c.photos[0]) || c.img || "";
+    const insp = c.inspection || {};
+    cars.push({
+      id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""),
+      photo: String(photo || ""), createdAt: c.createdAt || null, miles: String(c.miles || ""),
+      receivedMiles: String(c.receivedMiles || ""), inspStarted: !!insp.startedAt, inspDone: !!insp.reportAt,
+    });
+  });
+  cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
+  return { ok: true, cars };
+});
+
+// 🔧 El mecánico registra las MILLAS con las que recibe el carro y ARRANCA la inspección.
+exports.mechCarIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const isMech = id.isOwner || id.email || (Array.isArray(id.roles) && id.roles.indexOf("Mecánico") >= 0);
+  if (!isMech) throw new HttpsError("permission-denied", "No autorizado.");
+  const d = request.data || {};
+  const carId = String(d.carId || ""); if (!carId) throw new HttpsError("invalid-argument", "Falta el carro.");
+  const miles = String(d.receivedMiles || "").replace(/[^\d]/g, "");
+  const db = admin.firestore();
+  const ref = db.collection("inventory").doc(carId);
+  const snap = await ref.get(); if (!snap.exists) throw new HttpsError("not-found", "El carro no existe.");
+  const existing = (snap.data() || {}).inspection || {};
+  const insp = {
+    startedAt: existing.startedAt || new Date().toISOString(),
+    by: existing.by || (id.name || id.empId || ""),
+    byMiles: miles, updatedAt: new Date().toISOString(),
+  };
+  await ref.set({ receivedMiles: miles, inspection: insp }, { merge: true });
+  return { ok: true };
+});
+
+// 🔧 TAREAS DE TRABAJO POR CARRO (car_tasks) — el admin pone el siguiente paso (ej. "reemplazar motor"),
+// se acumulan, y van a la cola del mecánico. Solo por callables (admin SDK) → sin regla Firestore.
+exports.invPrepList = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  let snap;
+  try { snap = await db.collection("inventory").where("status", "==", "prep").get(); }
+  catch (e) { throw new HttpsError("internal", "No se pudo leer el inventario."); }
+  const cars = [];
+  snap.forEach((d) => {
+    const c = d.data() || {};
+    const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
+    cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || "") });
+  });
+  cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
+  return { ok: true, cars };
+});
+
+exports.carTaskAdd = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const d = request.data || {};
+  const carId = String(d.carId || ""); const title = String(d.title || "").trim().slice(0, 140);
+  if (!carId || !title) throw new HttpsError("invalid-argument", "Falta el carro o la tarea.");
+  const db = admin.firestore();
+  const carSnap = await db.collection("inventory").doc(carId).get();
+  if (!carSnap.exists) throw new HttpsError("not-found", "El carro no existe.");
+  const c = carSnap.data() || {};
+  const carLabel = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
+  const ref = db.collection("car_tasks").doc();
+  await ref.set({
+    carId, carLabel, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""),
+    title, status: "cola", role: "Mecánico", createdBy: id.name || id.email || id.empId || "",
+    createdAt: new Date().toISOString(), order: Date.now(),
+  });
+  return { ok: true, id: ref.id };
+});
+
+exports.mechTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const isMech = id.isOwner || id.email || (Array.isArray(id.roles) && id.roles.indexOf("Mecánico") >= 0);
+  if (!isMech) return { ok: true, tasks: [] };
+  const db = admin.firestore();
+  let snap;
+  try { snap = await db.collection("car_tasks").get(); } catch (e) { return { ok: true, tasks: [] }; }
+  const tasks = [];
+  snap.forEach((d) => { const t = d.data() || {}; if (t.status === "hecho") return; tasks.push({ id: d.id, ...t }); });
+  tasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+  return { ok: true, tasks };
+});
+
+exports.carTaskStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const isMech = id.isOwner || id.email || (Array.isArray(id.roles) && id.roles.indexOf("Mecánico") >= 0);
+  if (!isMech) throw new HttpsError("permission-denied", "No autorizado.");
+  const d = request.data || {};
+  const taskId = String(d.taskId || ""); const status = String(d.status || "");
+  if (!taskId || ["cola", "en_proceso", "hecho"].indexOf(status) < 0) throw new HttpsError("invalid-argument", "Datos inválidos.");
+  const db = admin.firestore();
+  const patch = { status, updatedAt: new Date().toISOString(), updatedBy: id.name || id.email || id.empId || "" };
+  if (status === "en_proceso") patch.startedAt = new Date().toISOString();
+  if (status === "hecho") patch.finishedAt = new Date().toISOString();
+  await db.collection("car_tasks").doc(taskId).set(patch, { merge: true });
+  return { ok: true };
+});
+
 // 👑 Panel del dueño en Pit Crew: listar y gestionar el equipo desde el teléfono. Solo dueños.
 exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
