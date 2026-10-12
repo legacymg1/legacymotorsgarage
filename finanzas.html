@@ -784,6 +784,7 @@
       <div id="e-receipt-preview" style="margin-top:8px;"></div>
     </div>
     <div class="field"><label>Concepto / qué fue</label><input id="e-note" placeholder="Ej. active grille shutter, radio, balatas…"></div>
+    <div class="field"><label># de orden / factura (opcional)</label><input id="e-orderno" placeholder="Orden de compra o # de factura del recibo"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeExp()">Cancelar</button>
       <button class="btn btn-primary" id="exp-save" onclick="saveExp()">Guardar gasto</button>
@@ -1095,6 +1096,7 @@ window.scanReceiptNow=async function(file){
     if(d.date) document.getElementById('e-date').value=d.date;
     if(d.vendor) document.getElementById('e-vendor').value=d.vendor;
     if(d.note) document.getElementById('e-note').value=d.note;
+    if(d.orderNo){ const el=document.getElementById('e-orderno'); if(el) el.value=d.orderNo; }
     if(d.method){ const m=document.getElementById('e-method'); if(m) m.value=d.method; }
     if(d.category){ const sel=document.getElementById('e-cat'); if(sel){ const opt=[...sel.options].find(o=>o.value===d.category||o.text===d.category); if(opt){ sel.value=opt.value; } } }
     if(st) st.innerHTML='<span style="color:#32d74b;">✅ Listo — revisa los datos y guarda.</span>';
@@ -1112,6 +1114,7 @@ window.openExp = function(){
   document.getElementById('e-method').value='cash';
   document.getElementById('e-vendor').value='';
   document.getElementById('e-note').value='';
+  document.getElementById('e-orderno').value='';
   document.getElementById('e-receipt').value='';
   document.getElementById('e-receipt-preview').innerHTML='';
   const _ss=document.getElementById('scan-status'); if(_ss) _ss.textContent='';
@@ -1130,6 +1133,7 @@ window.saveExp = async function(){
   const method=document.getElementById('e-method').value;
   const vendor=document.getElementById('e-vendor').value.trim();
   const note=document.getElementById('e-note').value.trim();
+  const orderNo=document.getElementById('e-orderno').value.trim();
   const carEl=document.getElementById('e-car');
   const carId=((dept==='dealer'||dept==='parts') && carEl)?carEl.value:'';
   const carLabel=carId?((carEl.dataset&&carEl.dataset.label)||''):'';
@@ -1148,7 +1152,7 @@ window.saveExp = async function(){
     await setDoc(doc(db,'transactions',id), {
       entryId:id, type:'expense', dept, category,
       amountCents:Math.round(amount*100),
-      method, date, vendor, carId, carLabel, receiptURL, note,
+      method, date, vendor, carId, carLabel, receiptURL, note, orderNo,
       createdAt:new Date().toISOString(),
       createdBy:(auth.currentUser&&auth.currentUser.email)||'',
       source:'finanzas'
@@ -2369,7 +2373,7 @@ window.openMovEdit=function(id){
   const inc = tx.type==='income';
   const canEdit = canEditTx(id);
   document.getElementById('me-title').textContent = inc?'Editar ingreso':'Editar gasto';
-  document.getElementById('me-info').textContent = (DEPT_LABEL[tx.dept]||tx.dept)+(tx.carLabel?' · '+tx.carLabel:'');
+  document.getElementById('me-info').textContent = (DEPT_LABEL[tx.dept]||tx.dept)+(tx.carLabel?' · '+tx.carLabel:'')+(tx.orderNo?' · 📄 Orden/Factura: '+tx.orderNo:'');
   document.getElementById('me-amount').value = (Number(tx.amountCents||0)/100).toFixed(2);
   document.getElementById('me-date').value = tx.date||'';
   document.getElementById('me-note').value = tx.note||'';

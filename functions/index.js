@@ -427,6 +427,7 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
     "- date: purchase date as YYYY-MM-DD. If the year is missing, assume " + today.slice(0, 4) + ". If no date is visible, use \"" + today + "\".\n" +
     "- vendor: the store/business name, short.\n" +
     "- note: a SHORT description in Spanish (2-6 words) of what was bought.\n" +
+    "- orderNo: the order / invoice / receipt number printed on the document (e.g. 'Order #', 'Invoice #', 'Receipt #', 'Transaction #'). Letters and digits only as printed. Empty string if none.\n" +
     "- category: choose the SINGLE best match from this list, copied EXACTLY: " + JSON.stringify(cats) + ". If none fits, use \"Otro\".\n" +
     "- method: one of \"cash\",\"terminal\",\"ach\",\"zelle\". Guess from the receipt (card/VISA/MASTERCARD/DEBIT => \"terminal\"; otherwise \"cash\"). Default \"cash\".\n" +
     "If a value is unknown use an empty string, except amount (use 0). Return JSON only.";
@@ -452,6 +453,7 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
       date: /^\d{4}-\d{2}-\d{2}$/.test(out.date || "") ? out.date : today,
       vendor: String(out.vendor || "").slice(0, 80),
       note: String(out.note || "").slice(0, 120),
+      orderNo: String(out.orderNo || "").slice(0, 50),
       category: String(out.category || "").slice(0, 60),
       method: ["cash", "terminal", "ach", "zelle"].includes(out.method) ? out.method : "cash",
     };
