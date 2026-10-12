@@ -1535,7 +1535,7 @@ function svcRenderModal(){
     cliHtml='<input id="svc-cli-search" oninput="svcCliSearch()" placeholder="🔍 Buscar cliente existente…" style="'+SVC_IN+'">'
       +'<div id="svc-cli-results" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:6px;max-height:180px;overflow-y:auto;"></div>'
       +'<div style="text-align:center;color:var(--faint);font-size:12px;margin:10px 0;">— o cliente nuevo —</div>'
-      +'<input id="svc-new-name" value="'+svcEsc(d.clientName||'')+'" placeholder="Nombre del cliente" style="'+SVC_IN+';margin-bottom:8px;">'
+      +'<input id="svc-new-name" value="'+svcEsc(d.clientName||'')+'" placeholder="Nombre del cliente" autocapitalize="words" style="'+SVC_IN+';margin-bottom:8px;text-transform:capitalize;">'
       +'<div style="display:flex;gap:8px;"><input id="svc-new-phone" value="'+svcEsc(d.clientPhone||'')+'" placeholder="Teléfono" inputmode="tel" style="'+SVC_IN+';flex:1;">'
       +'<select id="svc-new-lang" style="'+SVC_IN+';width:130px;"><option value="es"'+(d.lang==='es'?' selected':'')+'>Español</option><option value="en"'+(d.lang==='en'?' selected':'')+'>English</option></select></div>';
   }
@@ -1556,7 +1556,7 @@ function svcRenderModal(){
       +'<div style="display:flex;gap:8px;"><input id="svc-veh-vin" value="'+svcEsc(d.vin||'')+'" placeholder="VIN (opcional)" style="'+SVC_IN+';flex:1;text-transform:uppercase;">'
       +'<button id="svc-decode-btn" onclick="svcDecodeVin()" style="background:var(--surface3);border:1px solid var(--border);color:var(--gold);border-radius:10px;padding:0 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">🔎 Decodificar</button></div>'
       +'<div style="display:flex;gap:8px;"><input id="svc-veh-plate" value="'+svcEsc(d.plate||'')+'" placeholder="Placas (opcional)" style="'+SVC_IN+';flex:1;text-transform:uppercase;">'
-      +'<input id="svc-veh-label" value="'+svcEsc(d.vehicleLabel||'')+'" placeholder="Año / Marca / Modelo" style="'+SVC_IN+';flex:2;"></div></div>';
+      +'<input id="svc-veh-label" value="'+svcEsc(d.vehicleLabel||'')+'" placeholder="Año / Marca / Modelo" autocapitalize="words" style="'+SVC_IN+';flex:2;text-transform:capitalize;"></div></div>';
   }
   // 3 · SERVICIO
   const svcHtml='<textarea id="svc-reason" placeholder="¿Qué servicio necesita? (la falla, por qué viene)" style="'+SVC_IN+';min-height:70px;resize:vertical;">'+svcEsc(d.reason||'')+'</textarea>'
@@ -1587,7 +1587,7 @@ window.svcSaveOrder=async function(){
   let clientId=d.clientId, clientName='', clientPhone='', lang=d.lang||'es';
   if(clientId){ const c=clients.find(x=>x.id===clientId); clientName=c?c.name:''; clientPhone=c?(c.phone||''):''; }
   else {
-    const nm=(d.clientName||'').trim(), ph=(d.clientPhone||'').trim();
+    const nm=titleCase((d.clientName||'').trim()), ph=(d.clientPhone||'').trim();
     if(!nm){ alert('Escribe el nombre del cliente.'); return; }
     const e164=(typeof toE164==='function'?toE164(ph):'')||'';
     const match=e164?clients.find(c=>c.phoneE164===e164):null;
@@ -1606,7 +1606,7 @@ window.svcSaveOrder=async function(){
     if(v){ vin=v.vin||''; plate=v.plate||''; vehicleLabel=v.label||''; }
   }
   if(!vin && !plate && !vehicleLabel){
-    vin=(d.vin||'').toUpperCase().trim(); plate=(d.plate||'').toUpperCase().trim(); vehicleLabel=(d.vehicleLabel||'').trim();
+    vin=(d.vin||'').toUpperCase().trim(); plate=(d.plate||'').toUpperCase().trim(); vehicleLabel=titleCase((d.vehicleLabel||'').trim());
     if(!vin && !plate && !vehicleLabel){ alert('Agrega el auto (VIN, placas o descripción).'); return; }
     const v=await addVehicleToClient(clientId,{vin,plate,label:vehicleLabel});
     if(v){ vin=v.vin||vin; plate=v.plate||plate; vehicleLabel=v.label||vehicleLabel; }
