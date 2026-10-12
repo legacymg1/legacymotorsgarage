@@ -1378,7 +1378,19 @@ async function addVehicleToClient(clientId, veh){
 
 // ===================== SERVICE (TALLER) — Fase 1 =====================
 let svcOrders = [], svcRoster = [], svcRosterLoaded = false;
-const SVC_ROLES = ['Mecánico','Detallador','Fotos','Limpieza','Ayudante general'];
+const SVC_ROLES = ['Mecánico','Detallador'];
+const SVC_EST = [{m:30,l:'30 min'},{m:60,l:'1 hora'},{m:90,l:'1.5 horas'},{m:120,l:'2 horas'},{m:180,l:'3 horas'},{m:240,l:'4 horas'},{m:300,l:'Medio día'},{m:480,l:'1 día'}];
+function svcBusyByEmp(){
+  const m={};
+  (svcOrders||[]).forEach(o=>{
+    if(o.status==='en_proceso' && o.assignEmpId){
+      const eta=(o.startedAt && o.estMinutes)?(new Date(o.startedAt).getTime()+o.estMinutes*60000):null;
+      if(!m[o.assignEmpId] || (eta && (!m[o.assignEmpId].eta || eta>m[o.assignEmpId].eta))) m[o.assignEmpId]={order:o, eta:eta, since:o.startedAt||o.createdAt};
+    }
+  });
+  return m;
+}
+function svcHHMM(ms){ try{ return new Date(ms).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
 const SVC_STATUS = {
   agendado:      {lbl:'📅 Agendado',         c:'#0a84ff'},
   por_recibir:   {lbl:'🕐 Por recibir',      c:'#c9a84c'},
@@ -1417,8 +1429,18 @@ window.svcRenderOrders = function(){
   const rank={por_recibir:0,recibido:1,en_proceso:2,pausado_partes:3,agendado:4,listo:5};
   list.sort((a,b)=> (rank[a.status]??9)-(rank[b.status]??9) || ((a.scheduledAt||a.createdAt||'')<(b.scheduledAt||b.createdAt||'')?-1:1));
   svcRenderFilters();
-  if(!list.length){ box.innerHTML='<div class="faint" style="padding:40px 20px;text-align:center;line-height:1.6;">Sin órdenes de servicio abiertas.<br>Toca <b>➕ Nueva orden de servicio</b> para empezar.</div>'; return; }
-  box.innerHTML='<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">'+list.map(svcCard).join('')+'</div>';
+  if(!svcRosterLoaded){ svcLoadRoster().then(()=>{ const sv=document.getElementById('service-view'); if(sv && sv.style.display!=='none') svcRenderOrders(); }); }
+  // Strip "Taller": estado libre/ocupado de cada mecánico/detallador
+  let strip='';
+  if(svcRosterLoaded){
+    const mechs=svcRoster.filter(e=> Array.isArray(e.roles) && (e.roles.includes('Mecánico')||e.roles.includes('Detallador')) && e.active!==false);
+    if(mechs.length){
+      const busy=svcBusyByEmp();
+      strip='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'+mechs.map(e=>{ const info=busy[e.id]; const free=!info; const col=free?'#32d74b':'#ff9800'; const txt=free?'🟢 libre':('🔧 '+((info.eta&&info.eta>Date.now())?('~libre '+svcHHMM(info.eta)):'ocupado')); const car=(info&&info.order)?(' · '+svcEsc(info.order.vehicleLabel||info.order.plate||'')):''; return '<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid '+col+';border-radius:10px;padding:7px 11px;font-size:12px;"><b>'+svcEsc(e.name)+'</b> · '+txt+car+'</div>'; }).join('')+'</div>';
+    }
+  }
+  if(!list.length){ box.innerHTML=strip+'<div class="faint" style="padding:40px 20px;text-align:center;line-height:1.6;">Sin órdenes de servicio abiertas.<br>Toca <b>➕ Nueva orden de servicio</b> para empezar.</div>'; return; }
+  box.innerHTML=strip+'<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">'+list.map(svcCard).join('')+'</div>';
 };
 function svcRenderFilters(){
   const box=document.getElementById('svc-filters'); if(!box) return;
@@ -1450,10 +1472,10 @@ function svcCard(o){
     +(phone?'<a href="sms:'+phone+'" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:7px 11px;font-size:13px;">💬</a>':'')
     +'</div></div>';
 }
-window.svcSetStatus=async function(id,st){ try{ await updateDoc(doc(db,'serviceOrders',id),{status:st, updatedAt:new Date().toISOString()}); }catch(e){ alert('No se pudo actualizar.'); } };
+window.svcSetStatus=async function(id,st){ const patch={status:st, updatedAt:new Date().toISOString()}; if(st==='en_proceso'){ const o=svcOrders.find(x=>x.id===id); if(o && !o.startedAt) patch.startedAt=new Date().toISOString(); } try{ await updateDoc(doc(db,'serviceOrders',id),patch); }catch(e){ alert('No se pudo actualizar.'); } };
 
 window.svcNewOrder=function(){
-  window._svcDraft={ clientId:'', clientName:'', clientPhone:'', lang:'es', vin:'', plate:'', vehicleLabel:'', vehPick:'', reason:'', when:'now', scheduledAt:'', assignRole:'Mecánico', assignEmpId:'', assignName:'' };
+  window._svcDraft={ clientId:'', clientName:'', clientPhone:'', lang:'es', vin:'', plate:'', vehicleLabel:'', vehPick:'', reason:'', when:'now', scheduledAt:'', estMin:60, assignRole:'Mecánico', assignEmpId:'', assignName:'' };
   svcRenderModal();
   document.getElementById('svc-modal').style.display='flex';
   svcLoadRoster().then(()=>svcRenderModal());
@@ -1470,6 +1492,7 @@ function svcCapture(){
   if(g('svc-veh-plate')) d.plate=g('svc-veh-plate').value;
   if(g('svc-veh-label')) d.vehicleLabel=g('svc-veh-label').value;
   const r=document.querySelector('input[name=svc-veh]:checked'); if(r) d.vehPick=r.value;
+  if(g('svc-est')) d.estMin=g('svc-est').value;
   if(g('svc-role')) d.assignRole=g('svc-role').value;
   if(g('svc-emp')) d.assignEmpId=g('svc-emp').value;
 }
@@ -1540,11 +1563,14 @@ function svcRenderModal(){
     +'<div style="display:flex;gap:8px;margin-top:8px;">'
     +'<button onclick="svcCapture();window._svcDraft.when=\'now\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when!=='later'?'var(--gold)':'var(--border)')+';background:'+(d.when!=='later'?'var(--gold)':'transparent')+';color:'+(d.when!=='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">🕐 Ahora</button>'
     +'<button onclick="svcCapture();window._svcDraft.when=\'later\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">📅 Agendar</button></div>'
-    +(d.when==='later'?'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" style="'+SVC_IN+';margin-top:8px;">':'');
+    +(d.when==='later'?'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" style="'+SVC_IN+';margin-top:8px;">':'')
+    +'<div style="margin-top:8px;"><label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">⏱️ Tiempo estimado (para saber cuándo se desocupa)</label>'
+    +'<select id="svc-est" style="'+SVC_IN+'">'+SVC_EST.map(o=>'<option value="'+o.m+'" '+(String(d.estMin)===String(o.m)?'selected':'')+'>'+o.l+'</option>').join('')+'</select></div>';
   // 4 · ASIGNAR
   const roleOpts=SVC_ROLES.map(r=>'<option value="'+r+'" '+(d.assignRole===r?'selected':'')+'>'+r+'</option>').join('');
   const emps=svcRoster.filter(e=>!d.assignRole || (Array.isArray(e.roles)&&e.roles.includes(d.assignRole)));
-  const empOpts='<option value="">Cualquiera con ese rol</option>'+emps.map(e=>'<option value="'+e.id+'" '+(String(d.assignEmpId)===String(e.id)?'selected':'')+'>'+svcEsc(e.name)+'</option>').join('');
+  const busy=svcBusyByEmp();
+  const empOpts='<option value="">Cualquiera con ese rol</option>'+emps.map(e=>{ const info=busy[e.id]; let tag=' — 🟢 libre'; if(info){ tag=(info.eta&&info.eta>Date.now())?(' — 🔧 ocupado (~libre '+svcHHMM(info.eta)+')'):' — 🔧 ocupado'; } return '<option value="'+e.id+'" '+(String(d.assignEmpId)===String(e.id)?'selected':'')+'>'+svcEsc(e.name)+tag+'</option>'; }).join('');
   const asgHtml='<div style="display:flex;gap:8px;"><select id="svc-role" onchange="svcCapture();window._svcDraft.assignEmpId=\'\';svcRenderModal()" style="'+SVC_IN+';flex:1;">'+roleOpts+'</select>'
     +'<select id="svc-emp" style="'+SVC_IN+';flex:1;">'+empOpts+'</select></div>';
 
@@ -1594,7 +1620,8 @@ window.svcSaveOrder=async function(){
   if(assignEmpId){ const e=svcRoster.find(x=>String(x.id)===String(assignEmpId)); assignName=e?e.name:''; }
   // guardar
   const oref=doc(collection(db,'serviceOrders'));
-  try{ await setDoc(oref,{ clientId, clientName, clientPhone, vin, plate, vehicleLabel, reason, scheduledAt, assignRole, assignEmpId, assignName, status, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' }); }
+  const estMinutes=Number(d.estMin)||0;
+  try{ await setDoc(oref,{ clientId, clientName, clientPhone, vin, plate, vehicleLabel, reason, scheduledAt, estMinutes, assignRole, assignEmpId, assignName, status, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' }); }
   catch(e){ alert('No se pudo guardar la orden: '+(e.message||e)); return; }
   svcClose();
   alert('✅ Orden de servicio creada'+(status==='agendado'?' (agendada)':'')+'.');

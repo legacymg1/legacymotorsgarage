@@ -1167,7 +1167,9 @@ exports.svcOrderStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
   const o = snap.data() || {};
   const mine = (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && o.assignRole && Array.isArray(id.roles) && id.roles.includes(o.assignRole));
   if (!(id.isOwner || id.email || mine)) throw new HttpsError("permission-denied", "No es tu orden.");
-  await ref.set({ status, updatedAt: new Date().toISOString(), updatedBy: id.email || id.name || id.empId || "" }, { merge: true });
+  const patch = { status, updatedAt: new Date().toISOString(), updatedBy: id.email || id.name || id.empId || "" };
+  if (status === "en_proceso" && !o.startedAt) patch.startedAt = new Date().toISOString();
+  await ref.set(patch, { merge: true });
   return { ok: true };
 });
 
