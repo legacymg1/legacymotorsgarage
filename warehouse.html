@@ -51,6 +51,7 @@
   .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;}
   .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
   #quick-item-btn{display:none;} body.owner-nav #quick-item-btn, body.yard-quick #quick-item-btn{display:flex;}   /* Artículo rápido: dueños + captura (rol yard) */
+  body.wh-home #quick-item-btn{display:none !important;}   /* en el HOME de Pit Crew no se muestra el FAB de artículo rápido */
   #ebay-test-btn,#ebay-setup-btn{display:none;} body.owner-nav #ebay-test-btn,body.owner-nav #ebay-setup-btn{display:inline-block;}   /* Prueba/Config eBay: SOLO dueños */
   a{color:var(--gold);}
   #print-area{display:none;}
@@ -91,6 +92,16 @@
     </div>
   </div>
   <div class="tabs" id="tabs"></div>
+
+  <!-- ‹ Volver a casa (solo empleado por teléfono en modo home) -->
+  <button id="wh-home-back" onclick="whGoHome()" class="btn ghost sm" style="display:none;margin-bottom:12px;" data-i18n="homeBack">‹ Mi jornada</button>
+
+  <!-- ===================== 🏁 HOME DE EMPLEADO (Pit Crew) ===================== -->
+  <div id="view-home" style="display:none;">
+    <div class="sub" style="font-weight:800;font-size:15px;margin:2px 0 10px;" data-i18n="homeTitle">Tus funciones</div>
+    <div id="home-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
+    <div id="home-empty" class="sub" style="display:none;margin-top:10px;" data-i18n="homeTapFn">Toca una función para empezar.</div>
+  </div>
 
   <!-- ===================== 🕐 RELOJ (todos) ===================== -->
   <div class="card" id="clock-card" style="margin-bottom:14px;">
@@ -318,6 +329,8 @@ const T={
     needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Warehouse.',
     roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque', roleMech:'Mecánico',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
+    homeTitle:'Tus funciones', homeBack:'‹ Mi jornada', homeHi:'Hola', homeTapFn:'Toca una función para empezar.',
+    fnYardSub:'Fotos de partes', fnListerSub:'Publicar en eBay', fnPackSub:'Empacar pedidos',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Número de estampa o nombre…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte', reprintBtnQA:'🖨️ Reimprimir número de estampa', reprintTitle:'Reimprimir número', reprintHint:'Escribe el número de la estampa y dale imprimir — por si la de la parte ya está borrosa o no se ve.', reprintPh:'Número (ej. 0042)', reprintBtn:'🖨️ Imprimir', reprintAnother:'🔁 Otro número', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería', fromFile:'📁 Archivo', photoStarHint:'⭐ mándala al frente · 🤖 el bot lee las 3 primeras', photoToFront:'Mandar al frente', delPhotos:'Eliminar fotos', delSelected:'Eliminar', cancelBtn:'Cancelar', delSelectHint:'Toca las fotos que quieras borrar y confirma.', delConfirm:'¿Eliminar N foto(s)? No se puede deshacer.', airbagBtn:'Marcar como Airbag', airbagOn:'Airbag ✓ (bin AIRBAGS)', secAirbags:'Airbags', airbagNote:'Restringidos en eBay — no se listan por ahora. Guardados en inventario (bin AIRBAGS).',
@@ -338,6 +351,8 @@ const T={
     needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Warehouse.',
     roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing', roleMech:'Mechanic',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
+    homeTitle:'Your functions', homeBack:'‹ My day', homeHi:'Hi', homeTapFn:'Tap a function to start.',
+    fnYardSub:'Part photos', fnListerSub:'List on eBay', fnPackSub:'Pack orders',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Sticker number or name…',
     addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part', reprintBtnQA:'🖨️ Reprint sticker number', reprintTitle:'Reprint number', reprintHint:'Type the sticker number and print it — in case the one on the part is worn out or unreadable.', reprintPh:'Number (e.g. 0042)', reprintBtn:'🖨️ Print', reprintAnother:'🔁 Another number', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery', fromFile:'📁 File', photoStarHint:'⭐ send to front · 🤖 bot reads the first 3', photoToFront:'Send to front', delPhotos:'Delete photos', delSelected:'Delete', cancelBtn:'Cancel', delSelectHint:'Tap the photos you want to delete, then confirm.', delConfirm:'Delete N photo(s)? This can\'t be undone.', airbagBtn:'Mark as Airbag', airbagOn:'Airbag ✓ (AIRBAGS bin)', secAirbags:'Airbags', airbagNote:'Restricted on eBay — not listed for now. Kept in inventory (AIRBAGS bin).',
@@ -367,6 +382,7 @@ function setLang(l){
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
   if(document.getElementById('who') && myEmail) document.getElementById('who').textContent = whoLabel(myEmail,role);
   buildTabs();
+  if(_homeMode){ const vh=document.getElementById('view-home'); if(vh && vh.style.display!=='none') renderHomeTiles(); }
   if(_carView) renderCarDetail();
   else if(_view==='yard') renderVehicles();
   if(_view==='lister') renderLister();
@@ -506,7 +522,7 @@ onAuthStateChanged(auth, async (user)=>{
   const email=((user&&user.email)||'').toLowerCase();
   const phone=(user&&user.phoneNumber)||'';
   role = user ? (ROLE_BY_EMAIL[email]||'') : '';
-  myEmail = email; myEmpId=''; myName=''; _allowedTabs=null;
+  myEmail = email; myEmpId=''; myName=''; _allowedTabs=null; _homeMode=false;
   // Empleado por TELÉFONO (Pit Crew) sin correo: reconocer sus FUNCIONES y mapear a las herramientas de la yarda.
   // El acceso por CORREO queda IGUAL (los de arriba ya traen role por ROLE_BY_EMAIL).
   if(user && phone && !email && !role){
@@ -537,8 +553,11 @@ onAuthStateChanged(auth, async (user)=>{
     let allowed = canTabs?['yard','lister','pack']:(role==='yard'?['yard']:role==='lister'?['lister']:['pack']);
     if(_allowedTabs) allowed=_allowedTabs.slice();   // empleado por teléfono: solo las pestañas de sus funciones
     const def = allowed[0]||'yard';
-    let saved=''; try{ saved=localStorage.getItem('lmg_wh_view')||''; }catch(e){}
-    setView(allowed.indexOf(saved)>=0?saved:def);
+    // 🏁 Empleado por TELÉFONO (identidad Pit Crew) → cae en el HOME de funciones (no directo en la herramienta).
+    // Correos (capture@/listing@/empaque@/Sunmi) y dueño → EXACTAMENTE como hoy.
+    _homeMode = !!(_allowedTabs && _allowedTabs.length) && role!=='owner';
+    if(_homeMode){ _view=def; whGoHome(); }
+    else { let saved=''; try{ saved=localStorage.getItem('lmg_wh_view')||''; }catch(e){} setView(allowed.indexOf(saved)>=0?saved:def); }
     // 🕐 Reloj: muestra config de ubicaciones al dueño y refresca el estado/horas de la semana.
     const _co=document.getElementById('clock-owner'); if(_co) _co.style.display = (role==='owner')?'block':'none';
     refreshClock();
@@ -572,8 +591,10 @@ function whoLabel(email,r){ email=(email||'').toLowerCase(); const ti=TITLE_BY_E
 
 // ---- TABS ----
 let _view='yard';
+let _homeMode=false;   // empleado por teléfono (Pit Crew): navega por HOME de funciones, no por la barra de pestañas del Almacén
 function buildTabs(){
   const box=document.getElementById('tabs');
+  if(_homeMode){ box.style.display='none'; return; }   // en modo Pit Crew las pestañas se reemplazan por el home de funciones
   if(_carView){ box.style.display='none'; return; }
   let list=[['yard',t('tabCapture')],['lister',t('tabList')],['pack',t('tabPack')]];
   let show = (role==='owner' || role==='warehouse');
@@ -584,13 +605,42 @@ function buildTabs(){
 }
 window.setView=function(k){
   _view=k; try{ localStorage.setItem('lmg_wh_view',k); }catch(e){} buildTabs();
+  const vh=document.getElementById('view-home'); if(vh) vh.style.display='none';
   document.getElementById('view-yard').style.display   = k==='yard'?'':'none';
   document.getElementById('view-lister').style.display = k==='lister'?'':'none';
   document.getElementById('view-pack').style.display   = k==='pack'?'':'none';
+  const bb=document.getElementById('wh-home-back'); if(bb) bb.style.display=_homeMode?'':'none';   // en Pit Crew, dentro de una herramienta se ve "‹ Mi jornada"
   if(k==='yard') renderVehicles();
   if(k==='lister') renderLister();
   if(k==='pack'){ _pendingConfirm=''; _packMode='find'; renderPending(); loadEbayQueue(); }   // cola de eBay lista al entrar; el buscador queda minimizado
 };
+
+// 🏁 HOME del empleado (Pit Crew dentro de Warehouse): rejilla de funciones.
+const WH_FN_TILES = {
+  yard:   { ico:'📸', label:()=>t('roleYard'),   sub:()=>t('fnYardSub')   },
+  lister: { ico:'🏷️', label:()=>t('roleLister'), sub:()=>t('fnListerSub') },
+  pack:   { ico:'📦', label:()=>t('rolePack'),   sub:()=>t('fnPackSub')   }
+};
+window.whGoHome=function(){
+  _carView='';
+  ['view-yard','view-lister','view-pack'].forEach(v=>{ const e=document.getElementById(v); if(e) e.style.display='none'; });
+  const vh=document.getElementById('view-home'); if(vh) vh.style.display='';
+  const bb=document.getElementById('wh-home-back'); if(bb) bb.style.display='none';
+  const box=document.getElementById('tabs'); if(box) box.style.display='none';
+  document.body.classList.add('wh-home');
+  renderHomeTiles();
+};
+function renderHomeTiles(){
+  const box=document.getElementById('home-tiles'); if(!box) return;
+  const tabs=(_allowedTabs&&_allowedTabs.length)?_allowedTabs:['yard'];
+  box.innerHTML=tabs.map(k=>{ const m=WH_FN_TILES[k]||{ico:'•',label:()=>k,sub:()=>''};
+    return '<div onclick="whOpenTool(\''+k+'\')" style="cursor:pointer;background:var(--card,#141922);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px 14px;text-align:center;">'
+      +'<div style="font-size:34px;line-height:1;margin-bottom:8px;">'+m.ico+'</div>'
+      +'<div style="font-weight:800;font-size:15px;">'+m.label()+'</div>'
+      +'<div class="sub" style="font-size:12px;margin-top:2px;">'+m.sub()+'</div></div>';
+  }).join('');
+}
+window.whOpenTool=function(k){ document.body.classList.remove('wh-home'); setView(k); try{ window.scrollTo(0,0); }catch(e){} };
 
 // ---- 💬 CHAT INTERNO multi-canal (tiempo real) ----
 // 3 canales. Cada rol ve solo los suyos; los dueños ven los 3.
