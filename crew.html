@@ -410,6 +410,7 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+try{ setPersistence(auth, browserLocalPersistence); }catch(e){}   // la sesión del teléfono se guarda (no re-pedir código al refrescar)
 const functions = getFunctions(app);
 
 let confirmationResult = null;
@@ -512,22 +513,26 @@ window.doSignOut = async function(){ try{ await signOut(auth); }catch(_){} locat
 onAuthStateChanged(auth, async (user)=>{
   if(!user){ show('screen-login'); return; }
   show('screen-loading');
-  try{
-    const r = await httpsCallable(functions,'empMe')({});
-    const d = (r&&r.data)||{};
-    if(!d.found){
-      document.getElementById('noreg-phone').textContent = d.phone || (user.phoneNumber||'');
-      show('screen-noreg'); return;
-    }
-    if(d.active===false){ show('screen-inactive'); return; }
-    ME = d;
-    renderHome();
-    show('screen-home');
-    loadClock();
-  }catch(e){
-    toast('No se pudo cargar: '+((e&&e.message)||e), true);
-    show('screen-login');
+  // Reintenta empMe por si el backend arranca en frío o hay un tropiezo de red — SIN volver a pedir código.
+  let d=null;
+  for(let i=0; i<4 && !d; i++){
+    try{ const r = await httpsCallable(functions,'empMe')({}); d=(r&&r.data)||null; }
+    catch(e){ if(i<3){ await new Promise(function(res){ setTimeout(res, 700*(i+1)); }); } }
   }
+  if(!d){
+    const ld=document.getElementById('screen-loading');
+    if(ld) ld.innerHTML='<div class="wrap" style="text-align:center;padding:48px 20px;"><div class="faint" style="margin-bottom:16px;line-height:1.5;">No se pudo cargar tu información.<br>Tu sesión sigue abierta.</div><button class="btn btn-gold" onclick="location.reload()">Reintentar</button></div>';
+    show('screen-loading'); return;
+  }
+  if(!d.found){
+    document.getElementById('noreg-phone').textContent = d.phone || (user.phoneNumber||'');
+    show('screen-noreg'); return;
+  }
+  if(d.active===false){ show('screen-inactive'); return; }
+  ME = d;
+  renderHome();
+  show('screen-home');
+  loadClock();
 });
 
 // ---------- Home ----------
