@@ -418,7 +418,16 @@ const ROLE_BY_EMAIL={
   'mechanic@legacymotorsgarage.com':'mechanic',   // Mecánico (crear la cuenta en Firebase Auth cuando lo actives)
   'mecanico@legacymotorsgarage.com':'mechanic'
 };
-let role='', myEmail='';
+let role='', myEmail='', myEmpId='', myName='', _allowedTabs=null;
+// Empleado por TELÉFONO (Pit Crew): sus funciones → pestañas de la herramienta de Warehouse.
+function _whTabsFromRoles(roles){
+  roles = Array.isArray(roles)?roles:[];
+  const s=[];
+  if(roles.indexOf('Captura')>=0||roles.indexOf('Desmantelador')>=0) s.push('yard');
+  if(roles.indexOf('Listado')>=0) s.push('lister');
+  if(roles.indexOf('Empaque')>=0) s.push('pack');
+  return s;
+}
 let vehicles=[], parts=[], _selVeh='', _carView='', _restoredCar=false;
 // El QR de cada parte es un enlace → la cámara normal del iPhone abre la app en esa parte
 const WH_URL='https://legacymotorsgarage.com/warehouse.html';
@@ -493,26 +502,41 @@ window.captureLoc = async function(which){
   }catch(e){ if(msg){ msg.style.color='#ff6b6b'; msg.textContent='⚠️ '+_clockErr(e); } }
 };
 
-onAuthStateChanged(auth,(user)=>{
+onAuthStateChanged(auth, async (user)=>{
   const email=((user&&user.email)||'').toLowerCase();
+  const phone=(user&&user.phoneNumber)||'';
   role = user ? (ROLE_BY_EMAIL[email]||'') : '';
-  myEmail = email;
-  if(user && role){
+  myEmail = email; myEmpId=''; myName=''; _allowedTabs=null;
+  // Empleado por TELÉFONO (Pit Crew) sin correo: reconocer sus FUNCIONES y mapear a las herramientas de la yarda.
+  // El acceso por CORREO queda IGUAL (los de arriba ya traen role por ROLE_BY_EMAIL).
+  if(user && phone && !email && !role){
+    try{
+      const r=await httpsCallable(functions,'empMe')({});
+      const d=(r&&r.data)||{};
+      if(d && d.found && d.active!==false){
+        myEmpId=d.empId||''; myName=d.name||'';
+        if(d.isOwner){ role='owner'; }
+        else { const tabs=_whTabsFromRoles(d.roles); if(tabs.length){ _allowedTabs=tabs; } }
+      }
+    }catch(e){}
+  }
+  const entered = !!(user && (role || (_allowedTabs && _allowedTabs.length)));
+  if(entered){
     document.getElementById('login').style.display='none';
     document.getElementById('app').style.display='block';
     // 🔒 Neutraliza el campo de contraseña del login mientras estás dentro → iOS deja de ofrecer "contraseña" en el chat.
     try{ const lp=document.getElementById('l-pass'); if(lp){ lp.value=''; lp.type='text'; lp.setAttribute('autocomplete','off'); lp.disabled=true; } }catch(e){}
-    document.getElementById('who').textContent = whoLabel(email,role);
+    document.getElementById('who').textContent = myName || whoLabel(email,role);
     document.body.classList.toggle('owner-nav', role==='owner');
-    document.body.classList.toggle('yard-quick', role==='yard');   // captura (rol yard) también ve "⚡ Artículo rápido"
+    document.body.classList.toggle('yard-quick', role==='yard' || !!(_allowedTabs&&_allowedTabs.indexOf('yard')>=0));   // captura también ve "⚡ Artículo rápido"
     buildTabs();
     const acCard=document.getElementById('addcar-card'); if(acCard) acCard.style.display = (role==='owner') ? '' : 'none';   // solo el dueño agrega carros
     if(!_listening){ _listening=true; startListening(); }
-    // 💬 Chat AHORA lo maneja chat-widget.js (unificado, mismo en las 4 páginas). El chat inline queda desactivado.
-    // startChat(); initPush(); ?chat → los maneja el widget.
+    // 💬 Chat lo maneja chat-widget.js (unificado).
     const canTabs=(role==='owner'||role==='warehouse');
-    const allowed = canTabs?['yard','lister','pack']:(role==='yard'?['yard']:role==='lister'?['lister']:['pack']);
-    const def = (canTabs||role==='yard')?'yard':(role==='lister'?'lister':'pack');
+    let allowed = canTabs?['yard','lister','pack']:(role==='yard'?['yard']:role==='lister'?['lister']:['pack']);
+    if(_allowedTabs) allowed=_allowedTabs.slice();   // empleado por teléfono: solo las pestañas de sus funciones
+    const def = allowed[0]||'yard';
     let saved=''; try{ saved=localStorage.getItem('lmg_wh_view')||''; }catch(e){}
     setView(allowed.indexOf(saved)>=0?saved:def);
     // 🕐 Reloj: muestra config de ubicaciones al dueño y refresca el estado/horas de la semana.
@@ -526,7 +550,7 @@ onAuthStateChanged(auth,(user)=>{
     document.getElementById('app').style.display='none';
     document.getElementById('login').style.display='flex';
     try{ const lp=document.getElementById('l-pass'); if(lp){ lp.disabled=false; lp.type='password'; lp.setAttribute('autocomplete','current-password'); } }catch(e){}   // restaura para el login
-    if(user && !role){ document.getElementById('l-err').textContent=t('noAccess'); signOut(auth); }
+    if(user && email && !role){ document.getElementById('l-err').textContent=t('noAccess'); signOut(auth); }   // solo correos sin acceso; a los de teléfono NO los sacamos (siguen en Pit Crew)
   }
 });
 function roleLabel(r){ return r==='owner'?t('roleOwner'):r==='warehouse'?t('roleWh'):r==='yard'?t('roleYard'):r==='lister'?t('roleLister'):r==='packager'?t('rolePack'):r==='mechanic'?t('roleMech'):''; }
@@ -551,10 +575,12 @@ let _view='yard';
 function buildTabs(){
   const box=document.getElementById('tabs');
   if(_carView){ box.style.display='none'; return; }
-  if(role!=='owner' && role!=='warehouse'){ box.style.display='none'; return; }
+  let list=[['yard',t('tabCapture')],['lister',t('tabList')],['pack',t('tabPack')]];
+  let show = (role==='owner' || role==='warehouse');
+  if(_allowedTabs){ list = list.filter(([k])=> _allowedTabs.indexOf(k)>=0); show = list.length>1; }  // teléfono: solo sus funciones; pestañas solo si tiene 2+
+  if(!show){ box.style.display='none'; return; }
   box.style.display='flex';
-  box.innerHTML=[['yard',t('tabCapture')],['lister',t('tabList')],['pack',t('tabPack')]]
-    .map(([k,l])=>`<div class="tab${_view===k?' on':''}" onclick="setView('${k}')">${l}</div>`).join('');
+  box.innerHTML=list.map(([k,l])=>`<div class="tab${_view===k?' on':''}" onclick="setView('${k}')">${l}</div>`).join('');
 }
 window.setView=function(k){
   _view=k; try{ localStorage.setItem('lmg_wh_view',k); }catch(e){} buildTabs();
