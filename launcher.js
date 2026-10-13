@@ -23,7 +23,7 @@ const SECTIONS = [
   { k:"finanzas",     label:"Finanzas",     short:"Finanzas",   ico:"💰", href:"finanzas.html" },
   // 🔒 PERSONAL de Enrique — solo ev@ la ve.
   { k:"mis-finanzas", label:"Mis Finanzas", short:"Mis Fin.",   ico:"📊", href:"mis-finanzas.html", only: EV },
-  { k:"empleado",     label:"Pit Crew",     short:"Pit Crew",   ico:"🏁", href:"empleado.html" },
+  { k:"empleado",     label:"Pit Crew",     short:"Pit Crew",   ico:"🏁", href:"crew.html" },
   { k:"warehouse",    label:"Almacén",      short:"Almacén",    ico:"📦", href:"warehouse.html" },
 ];
 

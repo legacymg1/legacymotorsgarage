@@ -1,0 +1,1205 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Legacy Pit Crew">
+<meta name="theme-color" content="#0b0e14">
+<title>Legacy Pit Crew</title>
+<link rel="apple-touch-icon" href="https://legacymotorsgarage.com/icon-192.png">
+<link rel="stylesheet" href="legacy-theme.css">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;}
+  body{min-height:100vh;min-height:100dvh;}
+  .wrap{max-width:520px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));}
+  .center{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px calc(24px + env(safe-area-inset-bottom));}
+  h1,h2,h3{margin:0;font-weight:800;letter-spacing:-0.02em;}
+  h1,h2,h3,.logo,.clock-hours,.sec-title{font-family:var(--font-display);}
+  .muted{color:var(--muted);} .faint{color:var(--faint);}
+  .logo{font-weight:800;font-size:24px;letter-spacing:-0.01em;}
+  .logo span{color:var(--gold);}
+  .btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;transition:transform .08s ease,filter .15s ease;}
+  .btn:active{transform:scale(.98);}
+  .btn-gold{background:linear-gradient(135deg,#d9b85a,#9a7420);color:#0f1320;}
+  .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border-strong);}
+  .btn-green{background:linear-gradient(135deg,#34d75a,#1ea544);color:#04130a;}
+  .btn-red{background:var(--red-soft);color:#ff6b6b;border:1px solid rgba(255,69,58,0.3);}
+  .btn[disabled]{opacity:.5;pointer-events:none;}
+  .field{width:100%;background:var(--surface2);border:1px solid var(--border-strong);border-radius:14px;padding:16px;font-size:18px;color:var(--text);font-family:inherit;text-align:center;letter-spacing:.04em;}
+  .field:focus{outline:none;border-color:var(--gold);}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
+  .err{color:#ff6b6b;font-size:14px;min-height:18px;text-align:center;margin-top:6px;}
+  .hide{display:none!important;}
+  /* Home */
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .avatar{width:48px;height:48px;border-radius:50%;object-fit:cover;background:var(--gold-soft);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--gold);font-size:19px;flex:0 0 auto;border:1px solid var(--border-strong);}
+  .clock-card{background:linear-gradient(160deg,#171d29,#11151e);border:1px solid var(--border-strong);border-radius:22px;padding:20px;text-align:center;margin-bottom:18px;box-shadow:var(--shadow);}
+  .clock-status{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+  .clock-hours{font-size:40px;font-weight:900;letter-spacing:-0.03em;margin:4px 0 2px;font-variant-numeric:tabular-nums;}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:700;}
+  .sec-title{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:22px 2px 11px;}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 14px;cursor:pointer;display:flex;flex-direction:column;gap:7px;min-height:96px;transition:transform .08s ease,border-color .15s ease;position:relative;overflow:hidden;}
+  .tile:active{transform:scale(.98);}
+  .tile .ico{font-size:26px;}
+  .tile .nm{font-weight:800;font-size:15px;}
+  .tile .sub{font-size:11px;color:var(--faint);font-weight:600;}
+  .tile .soon{position:absolute;top:9px;right:9px;font-size:9px;font-weight:800;letter-spacing:.05em;color:var(--gold);background:var(--gold-soft);padding:3px 7px;border-radius:999px;}
+  .reminder{display:flex;gap:11px;align-items:flex-start;background:var(--gold-soft);border:1px solid rgba(232,182,74,0.25);border-radius:14px;padding:13px 15px;margin-top:20px;font-size:13px;line-height:1.45;}
+  .foot{text-align:center;margin-top:26px;}
+  .linkbtn{background:none;border:none;color:var(--faint);font-size:13px;cursor:pointer;font-family:inherit;padding:8px;}
+  .spin{width:34px;height:34px;border:3px solid var(--border-strong);border-top-color:var(--gold);border-radius:50%;animation:sp 0.8s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#0f1420;border:1px solid var(--border-strong);color:var(--text);padding:13px 18px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:var(--shadow);z-index:99;max-width:90%;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.err{border-color:rgba(255,69,58,0.4);color:#ff8a80;}
+  .alabel{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px;}
+  .afield{width:100%;background:var(--surface2);border:1px solid var(--border-strong);border-radius:12px;padding:13px;font-size:16px;color:var(--text);font-family:inherit;}
+  .afield:focus{outline:none;border-color:var(--gold);}
+  .langsel{position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:999px;padding:3px;}
+  .langbtn{background:none;border:none;color:var(--muted);font-family:inherit;font-size:12px;font-weight:800;letter-spacing:.05em;padding:6px 11px;border-radius:999px;cursor:pointer;}
+  .langbtn.active{background:var(--gold);color:#0f1320;}
+  /* Menú de cuenta */
+  .acct-menu{position:fixed;top:calc(64px + env(safe-area-inset-top));right:14px;z-index:95;width:min(86vw,290px);background:var(--surface);border:1px solid var(--border-strong);border-radius:18px;box-shadow:var(--shadow);padding:14px;animation:lmgDrop .16s ease;}
+  @keyframes lmgDrop{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
+  .acct-head{display:flex;align-items:center;gap:11px;margin-bottom:12px;}
+  .acct-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 2px;font-size:14px;color:var(--muted);}
+  .acct-row b{color:var(--text);font-variant-numeric:tabular-nums;}
+  .acct-sep{height:1px;background:var(--border);margin:6px 0;}
+  .acct-signout{width:100%;margin-top:10px;background:var(--red-soft);color:#ff8a80;border:1px solid rgba(255,69,58,0.3);border-radius:12px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="screen-login" class="center">
+  <div class="langsel">
+    <button id="lang-es" class="langbtn" onclick="setLang('es')">ES</button>
+    <button id="lang-en" class="langbtn" onclick="setLang('en')">EN</button>
+  </div>
+
+  <img src="legacy-logo.png?v=3" alt="Legacy Motors Garage" style="width:210px;max-width:72%;height:auto;display:block;margin-bottom:4px;">
+  <div class="logo" style="font-size:20px;letter-spacing:0.2em;font-weight:800;margin-bottom:5px;">PIT CREW</div>
+  <div class="muted" data-i18n="tagline" style="font-size:14px;margin-bottom:28px;">🏁 El equipo de Legacy</div>
+
+  <div class="card" style="width:100%;max-width:380px;">
+    <div id="step-phone">
+      <h3 data-i18n="signinTitle" style="font-size:17px;margin-bottom:4px;">Entra con tu teléfono</h3>
+      <div class="faint" data-i18n="signinSub" style="font-size:13px;margin-bottom:16px;">Te mandamos un código por mensaje.</div>
+      <input id="l-phone" class="field" type="tel" inputmode="numeric" placeholder="559 123 4567" autocomplete="tel">
+      <div id="l-err" class="err"></div>
+      <button id="send-code-btn" class="btn btn-gold" onclick="sendCode()" data-i18n="sendBtn" style="margin-top:6px;">Enviar código</button>
+    </div>
+    <div id="step-code" class="hide">
+      <h3 data-i18n="codeTitle" style="font-size:17px;margin-bottom:4px;">Escribe el código</h3>
+      <div class="faint" data-i18n="codeSub" style="font-size:13px;margin-bottom:16px;">Te llegó por mensaje de texto.</div>
+      <input id="l-code" class="field" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="______" maxlength="6" style="letter-spacing:.5em;">
+      <div id="l-err2" class="err"></div>
+      <button id="verify-code-btn" class="btn btn-gold" onclick="verifyCode()" data-i18n="enterBtn" style="margin-top:6px;">Entrar</button>
+      <button class="linkbtn" onclick="backToPhone()" data-i18n="changeNum" style="width:100%;margin-top:4px;">← Cambiar número</button>
+    </div>
+  </div>
+  <div id="recaptcha-container"></div>
+</div>
+
+<!-- ===== LOADING ===== -->
+<div id="screen-loading" class="center hide">
+  <div class="spin"></div>
+  <div class="muted" style="margin-top:16px;font-size:14px;">Cargando…</div>
+</div>
+
+<!-- ===== NOT REGISTERED ===== -->
+<div id="screen-noreg" class="center hide">
+  <div style="font-size:48px;margin-bottom:10px;">🔒</div>
+  <h2 style="font-size:20px;text-align:center;">Todavía no estás registrado</h2>
+  <p class="muted" style="text-align:center;font-size:15px;line-height:1.5;margin:12px 0 22px;max-width:320px;">
+    Tu número <b id="noreg-phone" style="color:var(--text);"></b> no está en el sistema. Pídele a Legacy que te dé de alta con este mismo número.
+  </p>
+  <a class="btn btn-gold" href="tel:5595405145" style="max-width:320px;text-decoration:none;">📞 Llamar a Legacy</a>
+  <button class="linkbtn" onclick="doSignOut()" style="margin-top:14px;">Cerrar sesión</button>
+</div>
+
+<!-- ===== INACTIVE ===== -->
+<div id="screen-inactive" class="center hide">
+  <div style="font-size:48px;margin-bottom:10px;">⏸️</div>
+  <h2 style="font-size:20px;text-align:center;">Cuenta inactiva</h2>
+  <p class="muted" style="text-align:center;font-size:15px;line-height:1.5;margin:12px 0 22px;max-width:320px;">
+    Tu cuenta está pausada. Si crees que es un error, habla con Legacy.
+  </p>
+  <a class="btn btn-gold" href="tel:5595405145" style="max-width:320px;text-decoration:none;">📞 Llamar a Legacy</a>
+  <button class="linkbtn" onclick="doSignOut()" style="margin-top:14px;">Cerrar sesión</button>
+</div>
+
+<!-- ===== HOME ===== -->
+<div id="screen-home" class="wrap hide">
+  <div class="topbar" data-legacy-bar>
+    <div style="flex:1;min-width:0;">
+      <div class="faint" style="font-size:13px;" id="home-greet">Hola</div>
+      <h2 style="font-size:20px;line-height:1.1;" id="home-name">—</h2>
+    </div>
+    <button id="acct-btn" class="avatar" onclick="toggleAcct(event)" style="cursor:pointer;flex:0 0 auto;border:none;">?</button>
+  </div>
+
+  <!-- Menú de cuenta (perfil / idioma / cerrar sesión) -->
+  <div id="acct-catch" class="hide" onclick="closeAcct()" style="position:fixed;inset:0;z-index:90;"></div>
+  <div id="acct-menu" class="acct-menu hide">
+    <div class="acct-head">
+      <div id="acct-ava" class="avatar" style="width:44px;height:44px;font-size:17px;">?</div>
+      <div style="min-width:0;"><div id="acct-name" style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div><div id="acct-roles" class="faint" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div></div>
+    </div>
+    <div class="acct-row"><span data-i18n="profHours">Horas esta semana</span><b id="acct-hours">0 h</b></div>
+    <div class="acct-row"><span data-i18n="profPay">Próximo pago</span><b id="acct-pay" style="color:var(--gold);">$0</b></div>
+    <div class="acct-sep"></div>
+    <div class="acct-row"><span>🌐 <span data-i18n="profLang">Idioma</span></span><span style="display:flex;gap:4px;"><button class="langbtn" id="acct-es" onclick="setLang('es')">ES</button><button class="langbtn" id="acct-en" onclick="setLang('en')">EN</button></span></div>
+    <button class="acct-signout" onclick="doSignOut()">🚪 <span data-i18n="signOut">Cerrar sesión</span></button>
+  </div>
+
+  <!-- Reloj (SOLO empleados; sin el contador grande de horas — el detalle vive en el menú de cuenta) -->
+  <div class="clock-card">
+    <div id="clk-status" class="clock-status muted">Fuera</div>
+    <div id="clk-hours" class="clock-hours" style="display:none;">0.00 h</div>
+    <div class="faint" data-i18n="thisWeek" style="font-size:12px;margin-bottom:16px;display:none;">esta semana</div>
+    <button id="clk-btn" class="btn btn-green" onclick="punch()">🟢 Registrar entrada</button>
+    <div id="clk-note" class="faint" style="font-size:11px;margin-top:10px;"></div>
+  </div>
+
+  <!-- Panel de operación (SOLO dueños; va en el lugar del reloj) -->
+  <div id="owner-panel" class="hide">
+    <div id="op-summary" style="display:flex;gap:8px;margin-bottom:12px;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div class="sec-title" style="margin:0;">📋 Pendientes (Pit)</div>
+      <button class="btn btn-gold" onclick="jobAddOpen()" style="width:auto;padding:7px 13px;font-size:13px;">➕ Agregar</button>
+    </div>
+    <div id="op-tasks" style="max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:4px 10px;">
+      <div class="faint" style="text-align:center;padding:16px;">Cargando…</div>
+    </div>
+  </div>
+
+  <!-- Admin (solo dueños) -->
+  <button id="home-admin-btn" class="btn btn-ghost hide" onclick="openAdmin()" data-i18n="adminBtn" style="margin-bottom:18px;">👑 Equipo (admin)</button>
+
+  <!-- Antes de check-in: invita a marcar entrada -->
+  <div id="home-checkin-hint" class="card hide" style="text-align:center;color:var(--muted);font-size:15px;line-height:1.55;">
+    👆 Marca tu <b style="color:var(--gold);">entrada</b> arriba para empezar tu día y ver tus tareas.
+  </div>
+
+  <!-- Después de check-in: tareas del día -->
+  <div id="home-tasks-wrap" class="hide">
+    <button class="btn btn-gold" onclick="openJourney()" style="margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:8px;">📋 Mi jornada<span id="journey-count" style="display:none;background:rgba(0,0,0,.25);border-radius:999px;padding:1px 9px;font-size:13px;font-weight:800;"></span></button>
+    <div class="sec-title">Tus funciones</div>
+    <div id="home-tiles" class="tiles"></div>
+    <div id="home-noroles" class="card hide" style="text-align:center;color:var(--muted);font-size:14px;line-height:1.5;">
+      Todavía no tienes tareas asignadas.<br>Legacy te las va a asignar pronto.
+    </div>
+    <div class="reminder">
+      <div style="font-size:18px;">🔔</div>
+      <div>
+        <b>Antes de salir:</b> regresa tus herramientas, pon las pilas a cargar y limpia tu área.
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button class="linkbtn" onclick="loadHome()">↻ Actualizar</button>
+  </div>
+</div>
+
+<!-- ===== DETALLADOR (SOP guiado) ===== -->
+<div id="screen-detail" class="wrap hide">
+  <div class="topbar">
+    <button class="linkbtn" onclick="detailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <div style="flex:1;min-width:0;">
+      <div class="faint" style="font-size:13px;">🧽 Detallador</div>
+      <h2 id="detail-h" style="font-size:20px;">Carros de hoy</h2>
+    </div>
+  </div>
+
+  <!-- HOME -->
+  <div id="detail-home">
+    <button class="btn btn-gold" onclick="detailStart()">➕ Empezar un carro</button>
+    <div class="sec-title">Hoy</div>
+    <div id="detail-list"></div>
+  </div>
+
+  <!-- PICK (carros en prep) -->
+  <div id="detail-pick" class="hide">
+    <div class="faint" style="font-size:13px;margin-bottom:12px;line-height:1.45;">Elige el carro que vas a detallar. Son los que están <b style="color:#ff9800;">🔧 En prep</b> en el inventario.</div>
+    <div id="pick-list"></div>
+    <button class="linkbtn" onclick="detailManual()" style="width:100%;margin-top:10px;">¿No está en la lista? Escribirlo a mano</button>
+  </div>
+
+  <!-- TRIAGE (checklist previo ~5 min) -->
+  <div id="detail-triage" class="hide">
+    <div id="triage-car" class="faint" style="font-size:14px;margin-bottom:6px;font-weight:700;color:var(--text);"></div>
+    <div class="faint" style="font-size:13px;margin-bottom:14px;line-height:1.45;">Revisa rápido el carro y marca cómo está cada cosa. Toma ~5 min y nos ayuda a calcular el tiempo.</div>
+    <div id="triage-body"></div>
+    <div class="clock-card" style="margin:16px 0 0;padding:16px;">
+      <div class="clock-status muted">Tiempo estimado</div>
+      <div class="clock-hours" id="triage-est" style="font-size:32px;">—</div>
+    </div>
+    <button class="btn btn-gold" id="triage-go" onclick="triageDone()" style="margin-top:14px;" disabled>Empezar a detallar</button>
+  </div>
+
+  <!-- RUNNER -->
+  <div id="detail-run" class="hide">
+    <div id="run-car" class="faint" style="font-size:14px;margin-bottom:10px;font-weight:700;color:var(--text);"></div>
+    <div style="display:flex;gap:4px;margin-bottom:16px;" id="run-prog"></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="faint" style="font-size:12px;font-weight:700;" id="run-count">Paso 1 de 8</div>
+        <div class="pill" style="background:var(--surface2);color:var(--muted);" id="run-sug">~15 min</div>
+      </div>
+      <h2 id="run-title" style="font-size:25px;margin:11px 0 2px;">—</h2>
+      <div id="run-timer" style="font-size:36px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);margin-bottom:16px;letter-spacing:-0.02em;">0:00</div>
+      <div style="font-size:15px;line-height:1.55;margin-bottom:14px;" id="run-steps"></div>
+      <div class="reminder" style="margin:0;align-items:flex-start;"><div style="font-size:17px;">⚠️</div><div><b style="color:var(--gold);">Cuidado:</b> <span id="run-care"></span></div></div>
+    </div>
+    <button class="btn btn-green" onclick="runNext()" style="margin-top:16px;" id="run-next">✓ Terminé este paso</button>
+    <button class="linkbtn" onclick="runSkip()" id="run-skip" style="width:100%;margin-top:4px;">Este carro no lo necesita →</button>
+  </div>
+
+  <!-- DONE -->
+  <div id="detail-done" class="hide">
+    <div style="text-align:center;padding:14px 0 4px;">
+      <div style="font-size:52px;">✅</div>
+      <h2 style="font-size:23px;margin-top:6px;">¡Carro terminado!</h2>
+      <div class="faint" id="done-car" style="margin-top:4px;font-size:15px;"></div>
+    </div>
+    <div class="clock-card" style="margin-top:16px;">
+      <div class="clock-status muted">Tiempo total</div>
+      <div class="clock-hours" id="done-total">0:00</div>
+    </div>
+    <div class="sec-title">Desglose por paso</div>
+    <div id="done-break" class="card" style="padding:4px 16px;"></div>
+    <button class="btn btn-gold" onclick="detailBack()" style="margin-top:18px;">Listo</button>
+  </div>
+</div>
+
+<!-- ===== MECÁNICO: taller (carros por inspeccionar + órdenes de servicio) ===== -->
+<div id="screen-service" class="wrap hide">
+  <div class="topbar">
+    <button class="linkbtn" onclick="svcBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <div style="flex:1;min-width:0;">
+      <div class="faint" style="font-size:13px;">🔧 Mecánico</div>
+      <h2 style="font-size:20px;">Mi taller</h2>
+    </div>
+    <button class="linkbtn" onclick="loadMyService()" style="font-size:20px;padding:0 6px;" title="Actualizar">⟳</button>
+  </div>
+  <button id="mech-addtask-btn" class="btn btn-ghost hide" onclick="mechOpenAddTask()" style="margin-bottom:14px;">➕ Agregar trabajo a un carro</button>
+  <div class="sec-title">🏁 Carros por inspeccionar</div>
+  <div id="mech-cars-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
+  <div class="sec-title" style="margin-top:20px;">🔧 Trabajos en cola</div>
+  <div id="mech-tasks-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
+  <div class="sec-title" style="margin-top:20px;">🔧 Órdenes de servicio (clientes)</div>
+  <div id="svc-emp-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
+</div>
+
+<!-- Panel de recepción del carro (intake del mecánico) -->
+<div id="mech-intake" class="hide" style="position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)mechCloseIntake()">
+  <div style="background:var(--card,#141924);border:1px solid var(--line,#232a3a);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));">
+    <div id="mech-intake-body"></div>
+  </div>
+</div>
+
+<!-- Panel del dueño: agregar trabajo (tarea) a un carro -->
+<div id="mech-addtask" class="hide" style="position:fixed;inset:0;z-index:121;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)mechCloseAddTask()">
+  <div style="background:var(--card,#141924);border:1px solid var(--line,#232a3a);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));">
+    <div id="mech-addtask-body"></div>
+  </div>
+</div>
+
+<style>
+  .jline{font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;text-transform:uppercase;white-space:nowrap;}
+  @keyframes lmgPop{0%{transform:scale(.4);opacity:0}45%{transform:scale(1.12);opacity:1}100%{transform:scale(1)}}
+  #task-gold .gold-card{animation:lmgPop .5s cubic-bezier(.2,.9,.3,1.2);}
+  @media (prefers-reduced-motion:reduce){#task-gold .gold-card{animation:none;}}
+  .stepitem{display:flex;gap:11px;align-items:flex-start;padding:13px 2px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;}
+  .stepitem:last-child{border-bottom:none;}
+  .stepbox{width:26px;height:26px;border-radius:8px;border:2px solid rgba(255,255,255,.25);flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;transition:background .15s,border-color .15s;}
+  .stepitem.on .stepbox{background:var(--gold,#c9a84c);border-color:var(--gold,#c9a84c);color:#0b0e14;}
+  .stepitem.on .steptext{color:var(--muted,#8a8fa8);text-decoration:line-through;}
+  /* Compu: aprovechar el ancho sin romper el móvil */
+  @media (min-width:820px){
+    .wrap{max-width:760px;}
+    .tiles{grid-template-columns:repeat(3,1fr);}
+    #op-tasks{max-height:52vh;}
+  }
+  @media (min-width:1120px){
+    .wrap{max-width:940px;}
+    .tiles{grid-template-columns:repeat(4,1fr);}
+  }
+</style>
+
+<!-- ===== JORNADA GUIADA (tareas con checklist) ===== -->
+<div id="screen-journey" class="wrap hide">
+  <div class="topbar">
+    <button class="linkbtn" onclick="journeyBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;">📋 Jornada</div><h2 style="font-size:20px;">Mi jornada</h2></div>
+    <button class="linkbtn" onclick="loadJourney()" style="font-size:20px;padding:0 6px;" title="Actualizar">⟳</button>
+  </div>
+  <button id="job-add-btn" class="btn btn-ghost hide" onclick="jobAddOpen()" style="margin-bottom:14px;">➕ Nueva tarea</button>
+  <div id="journey-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
+</div>
+
+<!-- Detalle de tarea (checklist) -->
+<div id="task-detail" class="hide" style="position:fixed;inset:0;z-index:130;background:var(--bg,#0e131d);overflow-y:auto;"><div class="wrap"><div id="task-detail-body"></div></div></div>
+
+<!-- Confirmación dorada -->
+<div id="task-gold" class="hide" style="position:fixed;inset:0;z-index:140;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;">
+  <div class="gold-card" style="text-align:center;padding:30px;">
+    <div style="width:110px;height:110px;border-radius:50%;background:linear-gradient(135deg,#e8c97a,#c9a84c);display:flex;align-items:center;justify-content:center;font-size:58px;color:#0b0e14;margin:0 auto 16px;box-shadow:0 10px 40px rgba(201,168,76,.5);">✓</div>
+    <div style="font-size:26px;font-weight:800;color:#e8c97a;">¡Completada!</div>
+    <div id="task-gold-sub" class="faint" style="margin-top:6px;"></div>
+  </div>
+</div>
+
+<!-- Owner: nueva tarea -->
+<div id="job-add" class="hide" style="position:fixed;inset:0;z-index:135;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)jobAddClose()">
+  <div style="background:var(--card,#141924);border:1px solid var(--line,#232a3a);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));">
+    <div id="job-add-body"></div>
+  </div>
+</div>
+
+<!-- ===== ADMIN (dueños): gestión del equipo ===== -->
+<div id="screen-admin" class="wrap hide">
+  <div class="topbar">
+    <button class="linkbtn" onclick="adminBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <div style="flex:1;min-width:0;">
+      <div class="faint" style="font-size:13px;">👑 Admin</div>
+      <h2 id="admin-h" style="font-size:20px;">Equipo</h2>
+    </div>
+  </div>
+
+  <div id="admin-list-view">
+    <button class="btn btn-gold" onclick="adminNew()">➕ Nuevo empleado</button>
+    <div id="admin-list" style="margin-top:16px;"></div>
+  </div>
+
+  <div id="admin-form-view" class="hide">
+    <div class="card" style="display:flex;flex-direction:column;gap:13px;">
+      <div><label class="alabel">Nombre</label><input id="adm-name" class="afield" type="text" autocapitalize="words" placeholder="Nombre completo" style="text-transform:capitalize;"></div>
+      <div><label class="alabel">Teléfono (su login)</label><input id="adm-phone" class="afield" type="tel" inputmode="numeric" placeholder="559 123 4567"></div>
+      <div><label class="alabel">Tarifa $/hora</label><input id="adm-rate" class="afield" type="number" inputmode="decimal" placeholder="0.00"></div>
+      <div><label class="alabel">Funciones (puede tener varias)</label><div id="adm-roles" style="display:flex;flex-wrap:wrap;gap:8px;"></div></div>
+      <label style="display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer;"><input type="checkbox" id="adm-active" checked style="width:19px;height:19px;"> Activo</label>
+      <label style="display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer;"><input type="checkbox" id="adm-owner" style="width:19px;height:19px;"> 👑 Dueño / admin</label>
+    </div>
+    <button class="btn btn-gold" id="adm-save" onclick="adminSave()" style="margin-top:14px;">💾 Guardar</button>
+    <button class="linkbtn" onclick="adminCancel()" style="width:100%;margin-top:4px;">Cancelar</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
+  authDomain: "legacy-motors-garage.firebaseapp.com",
+  projectId: "legacy-motors-garage",
+  storageBucket: "legacy-motors-garage.firebasestorage.app",
+  messagingSenderId: "783567672493",
+  appId: "1:783567672493:web:3a825f2f59ec1c25e9a224"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const functions = getFunctions(app);
+
+let confirmationResult = null;
+let ME = null;          // { name, roles, empId, photoURL, isOwner }
+let CLK = null;         // estado del reloj { open, hours }
+
+// Catálogo de roles → tile. 'ready' = ya construido; si no, muestra "Pronto".
+const ROLE_TILES = {
+  'Detallador':        { ico:'🧽', sub:'Lavado y detallado', ready:true },
+  'Fotos':             { ico:'📸', sub:'Fotos del carro', ready:false },
+  'Limpieza':          { ico:'🧹', sub:'Oficina, baño, basura, blow', ready:false },
+  'Mecánico':          { ico:'🔧', sub:'Órdenes de servicio', ready:true },
+  'Empaque':           { ico:'📦', sub:'Empacar pedidos', ready:false },
+  'Captura':           { ico:'📸', sub:'Fotos de partes', ready:false },
+  'Listado':           { ico:'🏷️', sub:'Publicar en eBay', ready:false },
+  'Desmantelador':     { ico:'🚗', sub:'Desarmar carros', ready:false },
+  'Ayudante general':  { ico:'🛠️', sub:'Apoyo general', ready:false },
+  'Oficina':           { ico:'🗂️', sub:'Oficina', ready:false },
+  'Ventas':            { ico:'🤝', sub:'Ventas', ready:false },
+};
+
+function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail','screen-service','screen-journey','screen-admin'].forEach(s=>{ const el=document.getElementById(s); if(el) el.classList.toggle('hide', s!==id); }); }
+function toast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); clearTimeout(window._tt); window._tt=setTimeout(()=>{t.className='toast'+(isErr?' err':'');},3200); }
+
+// ---------- Bilingüe (ES / EN) ----------
+let LANG = (function(){ try{ return localStorage.getItem('pc_lang')||''; }catch(e){ return ''; } })();
+if(LANG!=='en'&&LANG!=='es') LANG=((navigator.language||'es').slice(0,2).toLowerCase()==='en')?'en':'es';
+const T = {
+  es:{ tagline:'🏁 El equipo de Legacy', signinTitle:'Entra con tu teléfono', signinSub:'Te mandamos un código por mensaje.', sendBtn:'Enviar código', sending:'Enviando…', codeTitle:'Escribe el código', codeSub:'Te llegó por mensaje de texto.', enterBtn:'Entrar', entering:'Entrando…', changeNum:'← Cambiar número',
+    adminBtn:'👑 Equipo (admin)', thisWeek:'esta semana', tasksTitle:'Tus tareas de hoy', refresh:'↻ Actualizar',
+    checkinHint:'👆 Marca tu <b style="color:var(--gold);">entrada</b> arriba para empezar tu día y ver tus tareas.',
+    noRoles:'Todavía no tienes tareas asignadas.<br>Legacy te las va a asignar pronto.',
+    reminder:'<div style="font-size:18px;">🔔</div><div><b>Antes de salir:</b> regresa tus herramientas, pon las pilas a cargar y limpia tu área.</div>',
+    morning:'Buenos días', afternoon:'Buenas tardes', evening:'Buenas noches', hello:'Hola', team:'Equipo',
+    checkIn:'🟢 Registrar entrada', checkOut:'🔴 Registrar salida', out:'Fuera',
+    profHours:'Horas esta semana', profPay:'Próximo pago', profLang:'Idioma', signOut:'Cerrar sesión' },
+  en:{ tagline:'🏁 The Legacy crew', signinTitle:'Sign in with your phone', signinSub:'We will text you a code.', sendBtn:'Send code', sending:'Sending…', codeTitle:'Enter the code', codeSub:'We texted it to you.', enterBtn:'Enter', entering:'Entering…', changeNum:'← Change number',
+    adminBtn:'👑 Team (admin)', thisWeek:'this week', tasksTitle:"Today's tasks", refresh:'↻ Refresh',
+    checkinHint:'👆 Clock <b style="color:var(--gold);">in</b> above to start your day and see your tasks.',
+    noRoles:'No tasks assigned yet.<br>Legacy will assign them soon.',
+    reminder:'<div style="font-size:18px;">🔔</div><div><b>Before you leave:</b> return your tools, put batteries to charge, and clean your area.</div>',
+    morning:'Good morning', afternoon:'Good afternoon', evening:'Good evening', hello:'Hi', team:'Team',
+    checkIn:'🟢 Clock in', checkOut:'🔴 Clock out', out:'Out',
+    profHours:'Hours this week', profPay:'Next pay', profLang:'Language', signOut:'Sign out' }
+};
+function t(k){ return (T[LANG]&&T[LANG][k]!=null)?T[LANG][k]:(T.es[k]!=null?T.es[k]:k); }
+window.setLang = function(l){ LANG=(l==='en')?'en':'es'; try{ localStorage.setItem('pc_lang',LANG); }catch(e){} applyI18n(); };
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML=t(el.getAttribute('data-i18n-html')); });
+  const es=document.getElementById('lang-es'), en=document.getElementById('lang-en');
+  if(es) es.classList.toggle('active', LANG==='es'); if(en) en.classList.toggle('active', LANG==='en');
+  const aes=document.getElementById('acct-es'), aen=document.getElementById('acct-en');
+  if(aes) aes.classList.toggle('active', LANG==='es'); if(aen) aen.classList.toggle('active', LANG==='en');
+  if(ME){ try{ renderHome(); }catch(e){} try{ renderClock(); }catch(e){} }
+}
+
+// ---------- Login ----------
+window.sendCode = async function(){
+  const digits=String(document.getElementById('l-phone').value||'').replace(/\D/g,'');
+  const err=document.getElementById('l-err'); err.textContent='';
+  let e164='';
+  if(digits.length===10) e164='+1'+digits;
+  else if(digits.length===11 && digits[0]==='1') e164='+'+digits;
+  else { err.textContent='Escribe tu número a 10 dígitos.'; return; }
+  const btn=document.getElementById('send-code-btn'); btn.disabled=true; btn.textContent=t('sending');
+  try{
+    await setPersistence(auth, browserLocalPersistence);
+    if(!window._recaptcha){ window._recaptcha = new RecaptchaVerifier(auth, 'recaptcha-container', {size:'invisible'}); }
+    confirmationResult = await signInWithPhoneNumber(auth, e164, window._recaptcha);
+    document.getElementById('step-phone').classList.add('hide');
+    document.getElementById('step-code').classList.remove('hide');
+    const cf=document.getElementById('l-code'); if(cf) cf.focus();
+  }catch(e){
+    const code=(e&&e.code)||'';
+    err.textContent = code==='auth/too-many-requests' ? 'Demasiados intentos, espera un momento.'
+      : code==='auth/invalid-phone-number' ? 'Ese número no es válido.'
+      : 'No se pudo enviar el código. Intenta de nuevo.';
+    try{ if(window._recaptcha){ window._recaptcha.clear(); window._recaptcha=null; } }catch(_){}
+  }
+  btn.disabled=false; btn.textContent=t('sendBtn');
+};
+window.verifyCode = async function(){
+  const code=String(document.getElementById('l-code').value||'').trim();
+  const err=document.getElementById('l-err2'); err.textContent='';
+  if(!code || !confirmationResult){ err.textContent='Escribe el código.'; return; }
+  const btn=document.getElementById('verify-code-btn'); btn.disabled=true; btn.textContent=t('entering');
+  try{ await confirmationResult.confirm(code); /* onAuthStateChanged sigue */ }
+  catch(e){ err.textContent='Código incorrecto. Vuelve a intentar.'; }
+  btn.disabled=false; btn.textContent=t('enterBtn');
+};
+window.backToPhone = function(){
+  document.getElementById('step-code').classList.add('hide');
+  document.getElementById('step-phone').classList.remove('hide');
+  document.getElementById('l-code').value=''; document.getElementById('l-err2').textContent='';
+};
+window.doSignOut = async function(){ try{ await signOut(auth); }catch(_){} location.reload(); };
+
+// ---------- Sesión ----------
+onAuthStateChanged(auth, async (user)=>{
+  if(!user){ show('screen-login'); return; }
+  show('screen-loading');
+  try{
+    const r = await httpsCallable(functions,'empMe')({});
+    const d = (r&&r.data)||{};
+    if(!d.found){
+      document.getElementById('noreg-phone').textContent = d.phone || (user.phoneNumber||'');
+      show('screen-noreg'); return;
+    }
+    if(d.active===false){ show('screen-inactive'); return; }
+    ME = d;
+    renderHome();
+    show('screen-home');
+    loadClock();
+  }catch(e){
+    toast('No se pudo cargar: '+((e&&e.message)||e), true);
+    show('screen-login');
+  }
+});
+
+// ---------- Home ----------
+function initials(name){ const p=String(name||'').trim().split(/\s+/); return ((p[0]||'')[0]||'?').toUpperCase()+((p[1]||'')[0]||'').toUpperCase(); }
+function setAva(el){ if(!el) return; if(ME.photoURL){ el.innerHTML='<img src="'+ME.photoURL+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'; } else { el.textContent=initials(ME.name); } }
+function renderHome(){
+  setAva(document.getElementById('acct-btn'));
+  setAva(document.getElementById('acct-ava'));
+  const h=new Date().getHours();
+  document.getElementById('home-greet').textContent = h<12?t('morning'):h<19?t('afternoon'):t('evening');
+  document.getElementById('home-name').textContent = ME.name || t('team');
+  document.getElementById('acct-name').textContent = ME.name || t('team');
+  document.getElementById('acct-roles').textContent = (Array.isArray(ME.roles)&&ME.roles.length)?ME.roles.join(' · '):(ME.isOwner?'👑':'');
+  document.getElementById('home-admin-btn').classList.toggle('hide', !ME.isOwner);
+  // Los dueños NO fichan: en el lugar del reloj va el PANEL DE OPERACIÓN (pendientes del Pit).
+  const _ck=document.querySelector('.clock-card'); if(_ck) _ck.style.display = ME.isOwner ? 'none' : '';
+  const _op=document.getElementById('owner-panel'); if(_op) _op.classList.toggle('hide', !ME.isOwner);
+  if(ME.isOwner){ try{ loadOwnerPanel(); }catch(e){} }
+  const roles = Array.isArray(ME.roles)?ME.roles:[];
+  const box=document.getElementById('home-tiles'); const none=document.getElementById('home-noroles');
+  if(!roles.length){ box.classList.add('hide'); none.classList.remove('hide'); return; }
+  box.classList.remove('hide'); none.classList.add('hide');
+  box.innerHTML = roles.map(role=>{
+    const t = ROLE_TILES[role] || { ico:'•', sub:'', ready:false };
+    const soon = t.ready ? '' : '<div class="soon">PRONTO</div>';
+    const bid = 'tilebadge-'+role.replace(/[^a-zA-Z]/g,'');
+    const badge = '<div id="'+bid+'" style="display:none;position:absolute;top:8px;left:8px;min-width:22px;height:22px;line-height:22px;padding:0 6px;border-radius:999px;background:#ff453a;color:#fff;font-size:12px;font-weight:800;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.35);z-index:2;"></div>';
+    return '<div class="tile" style="position:relative;" onclick="openRole(\''+role.replace(/'/g,"\\'")+'\')">'+soon+badge
+      +'<div class="ico">'+t.ico+'</div>'
+      +'<div class="nm">'+role+'</div>'
+      +'<div class="sub">'+(t.sub||'')+'</div></div>';
+  }).join('');
+  loadTileCounts();
+}
+// Cola de tareas: pinta el # de pendientes en cada mosaico (por ahora Mecánico = sus órdenes de servicio abiertas).
+async function loadTileCounts(){
+  const roles = Array.isArray(ME.roles)?ME.roles:[];
+  if(roles.indexOf('Mecánico')>=0){
+    try{
+      const [so,mc,mt]=await Promise.all([
+        httpsCallable(functions,'svcMyOrders')({}),
+        httpsCallable(functions,'mechCars')({}),
+        httpsCallable(functions,'mechTasks')({})
+      ]);
+      const n=(((so&&so.data)||{}).orders||[]).length + (((mc&&mc.data)||{}).cars||[]).length + (((mt&&mt.data)||{}).tasks||[]).length;
+      const b=document.getElementById('tilebadge-'+('Mecánico'.replace(/[^a-zA-Z]/g,'')));
+      if(b){ if(n>0){ b.textContent=n; b.style.display='block'; } else { b.style.display='none'; } }
+    }catch(e){}
+  }
+}
+window.openRole = function(role){
+  if(role==='Detallador'){ openDetailer(); return; }
+  if(role==='Mecánico'){ openService(); return; }
+  const t = ROLE_TILES[role] || {};
+  if(t.ready && t.href){ location.href=t.href; return; }
+  if(t.href){ // existe en warehouse aunque no sea el flujo guiado nuevo
+    if(confirm(role+': por ahora se hace en la app del Almacén. ¿Abrir Almacén?')) location.href=t.href;
+    return;
+  }
+  toast('🚧 '+role+': lo estamos armando. Muy pronto aquí mismo.');
+};
+
+// ---------- Reloj ----------
+async function loadClock(){
+  try{ const r=await httpsCallable(functions,'clockMine')({}); CLK=(r&&r.data)||{}; }
+  catch(e){ CLK={}; }
+  renderClock();
+}
+function renderClock(){
+  const open = CLK && CLK.open;
+  const hrs = (CLK && CLK.hours!=null) ? Number(CLK.hours) : 0;
+  const st=document.getElementById('clk-status'); const hb=document.getElementById('clk-hours'); const btn=document.getElementById('clk-btn'); const note=document.getElementById('clk-note');
+  hb.textContent = hrs.toFixed(2)+' h';
+  const ah=document.getElementById('acct-hours'); if(ah) ah.textContent=hrs.toFixed(2)+' h';
+  const ap=document.getElementById('acct-pay'); if(ap){ const pay=(ME&&ME.rate)?hrs*Number(ME.rate):0; ap.textContent='$'+pay.toFixed(2); }
+  if(open){
+    st.innerHTML='<span class="dot" style="background:var(--green);"></span>ADENTRO · '+(open.location==='yonke'?'Yonke':open.location==='dealer'?'Dealer':'trabajando');
+    st.style.color='var(--green)';
+    btn.className='btn btn-red'; btn.textContent=t('checkOut');
+    const since=open.inAt?new Date(open.inAt):null;
+    note.textContent = since ? ('Entraste a las '+since.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})) : '';
+  } else {
+    st.innerHTML=t('out'); st.style.color='var(--muted)';
+    btn.className='btn btn-green'; btn.textContent=t('checkIn');
+    note.textContent='Debes estar en el Dealer o el Yonke para marcar.';
+  }
+  // Las tareas aparecen SOLO después de hacer check-in (dueños las ven siempre, para probar).
+  const showTasks = (ME && ME.isOwner) || !!open;
+  const tw=document.getElementById('home-tasks-wrap'); if(tw) tw.classList.toggle('hide', !showTasks);
+  if(showTasks){ try{ refreshJourneyCount(); }catch(e){} }
+  const hint=document.getElementById('home-checkin-hint'); if(hint) hint.classList.toggle('hide', showTasks);
+}
+window.punch = function(){
+  const btn=document.getElementById('clk-btn'); const wasOpen = CLK && CLK.open;
+  btn.disabled=true; const prev=btn.textContent; btn.textContent='Ubicando…';
+  if(!navigator.geolocation){ toast('Tu teléfono no da ubicación.', true); btn.disabled=false; btn.textContent=prev; return; }
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    try{
+      const r=await httpsCallable(functions,'clockPunch')({ action: wasOpen?'out':'in', lat:pos.coords.latitude, lng:pos.coords.longitude });
+      const d=(r&&r.data)||{};
+      if(d.action==='in') toast('✅ Entrada registrada · '+(d.location==='yonke'?'Yonke':'Dealer'));
+      else toast('✅ Salida · +'+Number(d.hours||0).toFixed(2)+' h');
+      await loadClock();
+    }catch(e){ toast((e&&e.message)||'No se pudo registrar.', true); }
+    btn.disabled=false;
+  }, (err)=>{
+    toast('Activa la ubicación (GPS) para marcar.', true);
+    btn.disabled=false; btn.textContent=prev;
+  }, { enableHighAccuracy:true, timeout:12000, maximumAge:0 });
+};
+
+window.loadHome = function(){ if(ME){ loadClock(); } };
+window.toggleAcct = function(e){ if(e) e.stopPropagation(); const m=document.getElementById('acct-menu'); if(m.classList.contains('hide')){ m.classList.remove('hide'); document.getElementById('acct-catch').classList.remove('hide'); } else { closeAcct(); } };
+window.closeAcct = function(){ document.getElementById('acct-menu').classList.add('hide'); document.getElementById('acct-catch').classList.add('hide'); };
+
+// ========================= DETALLADOR (SOP guiado) =========================
+// SOP de detallado tal cual lo pidió Enrique, con instrucciones, cuidados y tiempo sugerido.
+const DETAIL_SOP = [
+  { id:'faros', tri:'faros', title:'Faros', min:15, skippable:true,
+    steps:'Revisa los faros. Si están opacos o quemados, haz la restauración: lija (grano fino → más fino), pule y sella. Si ya están claros, salta este paso.',
+    care:'Cubre con cinta la pintura y los bordes antes de lijar — no toques el vidrio ni la pintura. No dejes el sellador secando al rayo del sol.' },
+  { id:'asientos', tri:'asientos', title:'Interior — asientos', min:25, skippable:true,
+    steps:'Según la revisión: si son de tela y están manchados, restáuralos/lávalos; si son de piel, límpiala y acondiciónala. Si están bien, solo límpialos en su lugar.',
+    care:'Al quitar asientos, desconecta la batería si tienen airbag/sensores y cuida los conectores. Guarda los tornillos marcados. No mojes módulos eléctricos debajo del asiento. La piel NO se talla duro ni se encharca.' },
+  { id:'aspirar', tri:'carpeta', title:'Aspirada / carpeta', min:20, skippable:false,
+    steps:'Saca los tapetes y aspira todo el interior y la cajuela. Si la carpeta está sucia o manchada, lávala y pon los pods de secado para que seque rápido.',
+    care:'No encharques la carpeta encima de los módulos del piso. Usa SIEMPRE los drying pods para que no quede humedad (si no, huele a moho).' },
+  { id:'interior-rapido', title:'Interior rápido', min:20, skippable:false,
+    steps:'Detalla el interior con brocha y fórmula MUY rebajada: cupholders, botones, rejillas de aire, costuras y tablero. Deja todo limpio y parejo.',
+    care:'Rocía la brocha, NO el tablero ni la pantalla. Fórmula muy rebajada para no dejar manchas blancas ni que quede grasoso/brilloso de más.' },
+  { id:'cielo', title:'Cielo y sun visors', min:15, skippable:false,
+    steps:'Limpia el cielo (techo por dentro), los sun visors y cualquier mancha que haya quedado.',
+    care:'El cielo es delicado: toques suaves, no frotes duro ni lo encharques — se despega la tela.' },
+  { id:'motor', tri:'motor', title:'Lavar el motor', min:20, skippable:true,
+    steps:'Con el motor FRÍO: cubre las partes eléctricas, aplica desengrasante, talla, enjuaga suave y sopla/seca al final.',
+    care:'Cubre bien: caja de fusibles, computadora, alternador, bobinas y toma de aire. NUNCA agua a presión directo a los conectores. Motor frío. Al terminar, sopla el agua para que no queden charcos.' },
+  { id:'rines', tri:'rines', title:'Rines y tolvas', min:12, skippable:false,
+    steps:'Lava bien los rines y las tolvas (guardafangos interiores). Quita el polvo de freno y la tierra pegada.',
+    care:'Usa producto adecuado para el tipo de rin (no ácido en rines delicados). Enjuaga bien para que no quede producto que manche.' },
+  { id:'clay', title:'Clay mitt (guante)', min:25, skippable:false,
+    steps:'Pasa el clay mitt con jabón a TODO el carro, duro y en todas direcciones, hasta que la pintura se sienta lisa.',
+    care:'La superficie siempre con jabón/lubricante — nunca en seco porque raya. Enjuaga el mitt seguido. Si se cae al piso, ya no lo uses (recoge tierra y raya).' },
+  { id:'encerar', tri:'acabado', title:'Pulir / encerar', min:30, skippable:true,
+    steps:'Según la revisión: pule para rescatar la pintura si lo necesita, luego encera para dar brillo y protección. Si solo pide guante, salta esto.',
+    care:'Poca cera, capa delgada. No enceres sobre plásticos ni gomas (quedan blancos). La pulidora con cuidado en filos y orillas (no quemar la pintura).' },
+  { id:'ventanas', title:'Ventanas', min:12, skippable:false,
+    steps:'Limpia TODAS las ventanas y espejos, por dentro y por fuera, hasta que queden sin rayas.',
+    care:'Microfibra limpia y seca. Hazlo a la sombra (al sol se seca y deja marcas).' },
+  { id:'tireshine', title:'Tire shine', min:8, skippable:false,
+    steps:'Justo ANTES de las fotos: pon tire shine a las llantas y a los plásticos exteriores para que se vean negros y como nuevos.',
+    care:'Que no escurra ni salpique la pintura ni los rines. Aplica parejo. Hazlo al último, justo antes de las fotos, para que luzca fresco.' },
+  { id:'placas-fotos', title:'Placas Legacy y fotos', min:12, skippable:false,
+    steps:'Coloca las placas de Legacy en el carro y toma las fotos del vehículo: todos los ángulos por fuera, el interior y el motor. Buena luz, fondo limpio.',
+    care:'Placas derechas y bien puestas. Carro ya con el tire shine fresco. Fotos parejas, sin basura, mangueras ni herramientas en el fondo.' },
+];
+// Checklist PREVIO (triage ~5 min): el detallador marca el estado → estimamos el tiempo del carro.
+const TRIAGE=[
+  { id:'faros', q:'Faros', opts:[ {v:'ok',label:'Bien',min:0}, {v:'opacos',label:'Opacos',min:12}, {v:'quemados',label:'Muy quemados',min:22} ] },
+  { id:'asientos', q:'Asientos', opts:[ {v:'tela',label:'Tela',min:15}, {v:'piel',label:'Piel',min:12}, {v:'tela-rest',label:'Tela — restaurar',min:35}, {v:'piel-rest',label:'Piel — restaurar',min:35} ] },
+  { id:'carpeta', q:'Carpeta (alfombra)', opts:[ {v:'aspirar',label:'Solo aspirar',min:10}, {v:'lavar',label:'Lavar',min:20}, {v:'muy',label:'Manchada / muy sucia',min:30} ] },
+  { id:'cajuela', q:'Cajuela', opts:[ {v:'aspirar',label:'Solo aspirar',min:5}, {v:'lavar',label:'Lavar',min:15} ] },
+  { id:'ventanas', q:'Ventanas', opts:[ {v:'si',label:'Limpiar',min:12} ] },
+  { id:'rines', q:'Rines y tolvas', opts:[ {v:'normal',label:'Normal',min:8}, {v:'sucio',label:'Muy sucio',min:16} ] },
+  { id:'motor', q:'Motor', opts:[ {v:'polvo',label:'Solo polvoso',min:10}, {v:'aceite',label:'Aceite tirado',min:22} ] },
+  { id:'acabado', q:'Acabado de pintura (puede ser varios)', multi:true, opts:[ {v:'guante',label:'Guante (clay)',min:20}, {v:'encerar',label:'Encerada',min:20}, {v:'pulir',label:'Pulida',min:35}, {v:'rescate',label:'Pulir para rescatar pintura',min:60} ] },
+];
+const TRI_BASE_MIN=40;   // interior rápido + cielo + tire shine + placas/fotos (fijos)
+let JOB=null, runIdx=0, stepStart=0, tickHandle=null, TRI={};
+
+window.openDetailer = function(){ show('screen-detail'); detailView('home'); loadMyJobs(); };
+
+// ========================= MECÁNICO / SERVICIO (órdenes asignadas) — Fase 2 =========================
+const SVC_ST = {
+  agendado:{l:'📅 Agendado',c:'#0a84ff'}, por_recibir:{l:'🕐 Por recibir',c:'#c9a84c'},
+  recibido:{l:'📋 Recibido',c:'#c9a84c'}, en_proceso:{l:'🔧 En proceso',c:'#32d74b'},
+  pausado_partes:{l:'⏸️ Esperando partes',c:'#ff9800'}, listo:{l:'✅ Listo',c:'#32d74b'}, entregado:{l:'🏁 Entregado',c:'#8a8fa8'}
+};
+let SVC_MY=[], MECH_CARS=[], MECH_CUR=null, MECH_TASKS=[], MECH_PREP=[], MECH_ADDCAR=null;
+function svcEscE(s){ return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+window.openService=function(){ show('screen-service'); const b=document.getElementById('mech-addtask-btn'); if(b) b.classList.toggle('hide', !(ME&&ME.isOwner)); loadMyService(); };
+window.svcBack=function(){ show('screen-home'); };
+window.loadMyService=async function(){
+  loadMechCars(); loadMechTasks();
+  const box=document.getElementById('svc-emp-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'svcMyOrders')({}); SVC_MY=((r&&r.data)||{}).orders||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudieron cargar. Toca ⟳ para reintentar.</div>'; return; }
+  renderMyService();
+};
+// 🏁 Carros de dealer esperando inspección inicial (auto-encolado desde el inventario).
+async function loadMechCars(){
+  const box=document.getElementById('mech-cars-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'mechCars')({}); MECH_CARS=((r&&r.data)||{}).cars||[]; }
+  catch(e){ MECH_CARS=[]; if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudieron cargar.</div>'; return; }
+  renderMechCars();
+}
+function renderMechCars(){
+  const box=document.getElementById('mech-cars-list'); if(!box) return;
+  if(!MECH_CARS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:16px;line-height:1.5;">No hay carros esperando inspección.<br>Cuando se registra un carro, aparece aquí solo.</div>'; return; }
+  box.innerHTML=MECH_CARS.map(c=>{
+    const when=c.createdAt?('Recibido '+new Date(c.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'})):'';
+    const photo=c.photo?('<img src="'+c.photo+'" alt="" style="width:54px;height:54px;border-radius:10px;object-fit:cover;flex:0 0 auto;">'):'<div style="width:54px;height:54px;border-radius:10px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:24px;flex:0 0 auto;">🚗</div>';
+    return '<div class="card" style="padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:center;">'+photo
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:15px;">'+svcEscE(c.label)+'</div>'
+      +'<div class="faint" style="font-size:12px;">'+(c.inventoryNum?('#'+svcEscE(c.inventoryNum)+' · '):'')+when+'</div>'
+      +(c.inspStarted?'<div style="font-size:11px;color:var(--gold,#c9a84c);margin-top:2px;">● Inspección iniciada</div>':'')+'</div>'
+      +'<button class="btn btn-gold" style="width:auto;padding:9px 13px;font-size:13px;flex:0 0 auto;" onclick="mechOpenIntake(\''+c.id+'\')">'+(c.inspStarted?'Seguir':'🔍 Inspeccionar')+'</button></div>';
+  }).join('');
+}
+window.mechOpenIntake=function(carId){
+  const c=MECH_CARS.find(x=>x.id===carId); if(!c) return; MECH_CUR=c;
+  const when=c.createdAt?new Date(c.createdAt).toLocaleString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—';
+  document.getElementById('mech-intake-body').innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2 style="font-size:19px;margin:0;">Recepción del vehículo</h2>'
+    +'<button class="linkbtn" onclick="mechCloseIntake()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>'
+    +'<div class="card" style="padding:12px;margin-bottom:14px;"><div style="font-weight:800;font-size:16px;">'+svcEscE(c.label)+'</div>'
+    +'<div class="faint" style="font-size:12.5px;margin-top:4px;line-height:1.6;">'+(c.inventoryNum?('Inventario #'+svcEscE(c.inventoryNum)+'<br>'):'')
+    +(c.vin?('VIN '+svcEscE(c.vin)+'<br>'):'')+'Fecha de recepción: '+when+'</div></div>'
+    +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Millas con las que recibes el carro</label>'
+    +'<input id="mech-miles" type="number" inputmode="numeric" value="'+svcEscE(c.receivedMiles||'')+'" placeholder="Ej. 84250" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:16px;margin-bottom:16px;">'
+    +'<button class="btn btn-gold" style="width:100%;" onclick="mechStartInspection()">▶️ '+(c.inspStarted?'Continuar inspección':'Empezar inspección')+'</button>'
+    +'<div class="faint" style="font-size:11.5px;text-align:center;margin-top:10px;line-height:1.5;">La certificación paso a paso (DVI) se abre al registrar las millas.<br>(La construimos en el siguiente paso.)</div>';
+  document.getElementById('mech-intake').classList.remove('hide');
+};
+window.mechCloseIntake=function(){ document.getElementById('mech-intake').classList.add('hide'); };
+window.mechStartInspection=async function(){
+  if(!MECH_CUR) return;
+  const miles=(document.getElementById('mech-miles').value||'').trim();
+  if(!miles){ toast('Pon las millas con las que lo recibes.',true); return; }
+  try{
+    await httpsCallable(functions,'mechCarIntake')({ carId:MECH_CUR.id, receivedMiles:miles });
+    toast('✅ Millas registradas · inspección iniciada');
+    mechCloseIntake(); loadMechCars();
+  }catch(e){ toast((e&&e.message)||'No se pudo guardar',true); }
+};
+
+// 🔧 TRABAJOS EN COLA (car_tasks) — tareas que el dueño pone a cada carro.
+const MECH_TASK_ST={ cola:{l:'🕐 En cola',c:'#c9a84c'}, en_proceso:{l:'🔧 En proceso',c:'#32d74b'}, hecho:{l:'✅ Hecho',c:'#8a8fa8'} };
+async function loadMechTasks(){
+  const box=document.getElementById('mech-tasks-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'mechTasks')({}); MECH_TASKS=((r&&r.data)||{}).tasks||[]; }
+  catch(e){ MECH_TASKS=[]; if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudieron cargar.</div>'; return; }
+  renderMechTasks();
+}
+function renderMechTasks(){
+  const box=document.getElementById('mech-tasks-list'); if(!box) return;
+  if(!MECH_TASKS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:16px;line-height:1.5;">No hay trabajos en cola.'+((ME&&ME.isOwner)?'<br>Toca <b>➕ Agregar trabajo a un carro</b>.':'')+'</div>'; return; }
+  // agrupa por carro
+  const byCar={}; MECH_TASKS.forEach(t=>{ (byCar[t.carId]=byCar[t.carId]||{label:t.carLabel,inv:t.inventoryNum,carId:t.carId,items:[]}).items.push(t); });
+  box.innerHTML=Object.values(byCar).map(g=>{
+    const rows=g.items.map(t=>{
+      const s=MECH_TASK_ST[t.status]||{l:t.status,c:'#8a8fa8'};
+      const opts=Object.keys(MECH_TASK_ST).map(k=>'<option value="'+k+'" '+(k===t.status?'selected':'')+'>'+MECH_TASK_ST[k].l+'</option>').join('');
+      return '<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);">'
+        +'<span style="flex:1;min-width:0;font-size:14px;">'+svcEscE(t.title)+'</span>'
+        +'<select onchange="carTaskSetStatus(\''+t.id+'\',this.value)" style="padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:12px;">'+opts+'</select></div>';
+    }).join('');
+    const addBtn=(ME&&ME.isOwner)?'<button class="linkbtn" onclick="mechOpenAddTask(\''+g.carId+'\')" style="font-size:12px;color:var(--gold,#c9a84c);margin-top:6px;">➕ otra tarea a este carro</button>':'';
+    return '<div class="card" style="padding:12px 14px;margin-bottom:10px;"><div style="font-weight:800;font-size:15px;">'+(g.inv?('#'+svcEscE(g.inv)+' · '):'')+svcEscE(g.label)+'</div>'+rows+addBtn+'</div>';
+  }).join('');
+}
+window.carTaskSetStatus=async function(taskId,status){
+  try{ await httpsCallable(functions,'carTaskStatus')({taskId:taskId,status:status}); toast('✅ Actualizado'); loadMechTasks(); }
+  catch(e){ toast((e&&e.message)||'No se pudo',true); }
+};
+// Dueño: agregar trabajo a un carro (carId opcional = precargar ese carro).
+window.mechOpenAddTask=async function(carId){
+  if(!(ME&&ME.isOwner)) return;
+  MECH_ADDCAR = carId || null;
+  const body=document.getElementById('mech-addtask-body');
+  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2 style="font-size:19px;margin:0;">Agregar trabajo</h2>'
+    +'<button class="linkbtn" onclick="mechCloseAddTask()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>'
+    +'<div id="mech-addtask-inner"><div class="faint" style="text-align:center;padding:14px;">Cargando carros…</div></div>';
+  document.getElementById('mech-addtask').classList.remove('hide');
+  if(!MECH_PREP.length){ try{ const r=await httpsCallable(functions,'invPrepList')({}); MECH_PREP=((r&&r.data)||{}).cars||[]; }catch(e){ MECH_PREP=[]; } }
+  renderAddTaskForm();
+};
+function renderAddTaskForm(){
+  const inner=document.getElementById('mech-addtask-inner'); if(!inner) return;
+  const sel = MECH_ADDCAR ? (MECH_PREP.find(c=>c.id===MECH_ADDCAR)) : null;
+  let carUI;
+  if(sel){ carUI='<div class="card" style="padding:11px 13px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:700;">'+(sel.inventoryNum?('#'+svcEscE(sel.inventoryNum)+' · '):'')+svcEscE(sel.label)+'</span><button class="linkbtn" onclick="MECH_ADDCAR=null;renderAddTaskForm()" style="font-size:12px;color:var(--muted,#8a8fa8);">cambiar</button></div>'; }
+  else {
+    const opts='<option value="">— Elige el carro —</option>'+MECH_PREP.map(c=>'<option value="'+c.id+'">'+(c.inventoryNum?('#'+svcEscE(c.inventoryNum)+' · '):'')+svcEscE(c.label)+'</option>').join('');
+    carUI='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Carro</label><select id="mech-addtask-car" onchange="MECH_ADDCAR=this.value;renderAddTaskForm()" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:15px;margin-bottom:14px;">'+opts+'</select>';
+  }
+  inner.innerHTML=carUI
+    +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">¿Qué se le va a hacer? (el paso)</label>'
+    +'<input id="mech-task-title" autocapitalize="sentences" placeholder="Ej. Reemplazar motor" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:16px;margin-bottom:16px;">'
+    +'<button class="btn btn-gold" style="width:100%;" onclick="mechAddTaskSave()">➕ Agregar a la cola</button>';
+}
+window.mechCloseAddTask=function(){ document.getElementById('mech-addtask').classList.add('hide'); };
+window.mechAddTaskSave=async function(){
+  const carId=MECH_ADDCAR||'';
+  const title=(document.getElementById('mech-task-title').value||'').trim();
+  if(!carId){ toast('Elige el carro.',true); return; }
+  if(!title){ toast('Escribe qué se le va a hacer.',true); return; }
+  try{
+    await httpsCallable(functions,'carTaskAdd')({ carId:carId, title:title });
+    toast('✅ Trabajo agregado a la cola');
+    mechCloseAddTask(); loadMechTasks();
+  }catch(e){ toast((e&&e.message)||'No se pudo agregar',true); }
+};
+
+// ===================== JORNADA GUIADA (tareas con checklist + línea) — F1 =====================
+const JOB_LINES={ dealer:{l:'Dealer',c:'#c9a84c'}, service:{l:'Service',c:'#0a84ff'}, desmantle:{l:'Desmantle',c:'#a855f7'}, general:{l:'General',c:'#8a8fa8'} };
+let JOURNEY=[], JOB_CUR=null, JOB_ROSTER=[];
+function lineBadge(line){ const L=JOB_LINES[line]||JOB_LINES.general; return '<span class="jline" style="background:'+L.c+'22;color:'+L.c+';">'+L.l+'</span>'; }
+async function refreshJourneyCount(){
+  try{ const r=await httpsCallable(functions,'myTasks')({}); const n=(((r&&r.data)||{}).tasks||[]).length;
+    const jc=document.getElementById('journey-count'); if(jc){ if(n){ jc.textContent=n; jc.style.display='inline-block'; } else jc.style.display='none'; }
+  }catch(e){}
+}
+window.openJourney=function(){ show('screen-journey'); const b=document.getElementById('job-add-btn'); if(b) b.classList.toggle('hide', !(ME&&ME.isOwner)); loadJourney(); };
+window.journeyBack=function(){ show('screen-home'); };
+window.loadJourney=async function(){
+  const box=document.getElementById('journey-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'myTasks')({}); JOURNEY=((r&&r.data)||{}).tasks||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudo cargar. Toca ⟳.</div>'; return; }
+  renderJourney();
+  const jc=document.getElementById('journey-count'); if(jc){ if(JOURNEY.length){ jc.textContent=JOURNEY.length; jc.style.display='inline-block'; } else jc.style.display='none'; }
+};
+function renderJourney(){
+  const box=document.getElementById('journey-list'); if(!box) return;
+  if(!JOURNEY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:40px 18px;line-height:1.6;">🎉 No tienes tareas pendientes.<br>Cuando te asignen trabajo, aparece aquí.</div>'; return; }
+  box.innerHTML=JOURNEY.map((t,i)=>{
+    const total=(t.checklist||[]).length, done=(t.checklist||[]).filter(c=>c.done).length;
+    const prog=total?(' · '+done+'/'+total):'';
+    const next=(i===0)?'<div style="font-size:11px;color:var(--gold,#c9a84c);font-weight:800;letter-spacing:.04em;margin-bottom:6px;">▶ SIGUIENTE</div>':'';
+    return '<div class="card" style="padding:14px;margin-bottom:11px;cursor:pointer;" onclick="openTaskDetail(\''+t.id+'\')">'+next
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:800;font-size:16px;min-width:0;">'+svcEscE(t.title)+'</span>'+lineBadge(t.line)+'</div>'
+      +'<div class="faint" style="font-size:12.5px;">'+(t.status==='en_proceso'?'🔧 En proceso':'🕐 Por empezar')+prog+'</div></div>';
+  }).join('');
+}
+window.openTaskDetail=function(taskId){ const t=JOURNEY.find(x=>x.id===taskId); if(!t) return; JOB_CUR=JSON.parse(JSON.stringify(t)); renderTaskDetail(); document.getElementById('task-detail').classList.remove('hide'); };
+window.taskDetailBack=function(){ document.getElementById('task-detail').classList.add('hide'); JOB_CUR=null; loadJourney(); };
+function renderTaskDetail(){
+  const t=JOB_CUR; if(!t) return; const body=document.getElementById('task-detail-body'); const cl=t.checklist||[];
+  const done=cl.filter(c=>c.done).length; const pend=cl.length>0 && done<cl.length;
+  const btnCls=pend?'btn-ghost':'btn-gold', btnDis=pend?'disabled':'';
+  const btnLabel=pend?('Marca los pasos ('+done+'/'+cl.length+')'):'✅ Completar tarea';
+  body.innerHTML='<div class="topbar"><button class="linkbtn" onclick="taskDetailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+lineBadge(t.line)+'</div><h2 style="font-size:20px;">'+svcEscE(t.title)+'</h2></div></div>'
+    +(cl.length?('<div class="faint" style="font-size:13px;margin-bottom:8px;">Marca cada paso conforme lo haces ('+done+'/'+cl.length+'):</div>'
+      +'<div class="card" style="padding:2px 14px;margin-bottom:18px;">'+cl.map((c,i)=>'<div class="stepitem '+(c.done?'on':'')+'" onclick="taskToggleStep('+i+')"><div class="stepbox">'+(c.done?'✓':'')+'</div><div class="steptext" style="flex:1;min-width:0;font-size:15px;padding-top:2px;line-height:1.4;">'+svcEscE(c.text)+'</div></div>').join('')+'</div>')
+      :'<div class="faint" style="margin:14px 0 18px;">Esta tarea no tiene pasos. Márcala como completada cuando termines.</div>')
+    +'<button class="btn '+btnCls+'" style="width:100%;" '+btnDis+' onclick="taskDoComplete()">'+btnLabel+'</button>';
+}
+window.taskToggleStep=async function(idx){
+  if(!JOB_CUR) return; const cl=JOB_CUR.checklist||[]; if(idx<0||idx>=cl.length) return;
+  const nv=!cl[idx].done; cl[idx].done=nv; renderTaskDetail();
+  try{ await httpsCallable(functions,'taskStep')({taskId:JOB_CUR.id, idx:idx, done:nv}); }
+  catch(e){ cl[idx].done=!nv; renderTaskDetail(); toast('No se pudo guardar el paso',true); }
+};
+window.taskDoComplete=async function(){
+  if(!JOB_CUR) return; const t=JOB_CUR;
+  try{ await httpsCallable(functions,'taskComplete')({taskId:t.id}); }
+  catch(e){ toast((e&&e.message)||'No se pudo completar',true); return; }
+  document.getElementById('task-detail').classList.add('hide');
+  const sub=document.getElementById('task-gold-sub'); if(sub) sub.textContent=t.title;
+  const g=document.getElementById('task-gold'); g.classList.remove('hide');
+  setTimeout(function(){ g.classList.add('hide'); JOB_CUR=null; loadJourney(); }, 1500);
+};
+window.jobAddOpen=async function(){
+  if(!(ME&&ME.isOwner)) return;
+  if(!JOB_ROSTER.length){ try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); JOB_ROSTER=((r&&r.data)||{}).emps||[]; }catch(e){ JOB_ROSTER=[]; } }
+  const IN='width:100%;box-sizing:border-box;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:15px;margin-bottom:12px;';
+  const empOpts='<option value="">— Cualquiera con la función —</option>'+JOB_ROSTER.map(e=>'<option value="'+e.id+'">'+svcEscE(e.name)+'</option>').join('');
+  const lineOpts=Object.keys(JOB_LINES).map(k=>'<option value="'+k+'"'+(k==='general'?' selected':'')+'>'+JOB_LINES[k].l+'</option>').join('');
+  const roleOpts=['','Mecánico','Detallador','Fotos','Limpieza','Empaque','Captura','Listado','Desmantelador','Ayudante general','Oficina','Ventas'].map(r=>'<option value="'+r+'">'+(r||'— Función (opcional) —')+'</option>').join('');
+  document.getElementById('job-add-body').innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2 style="font-size:19px;margin:0;">Nueva tarea</h2><button class="linkbtn" onclick="jobAddClose()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>'
+    +'<input id="job-title" autocapitalize="sentences" placeholder="Título (ej. Preparar oficina)" style="'+IN+'">'
+    +'<div style="display:flex;gap:8px;"><select id="job-line" style="'+IN+'">'+lineOpts+'</select><select id="job-role" style="'+IN+'">'+roleOpts+'</select></div>'
+    +'<select id="job-emp" style="'+IN+'">'+empOpts+'</select>'
+    +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Pasos (uno por renglón)</label>'
+    +'<textarea id="job-steps" placeholder="Sacar la basura&#10;Poner bolsas nuevas&#10;Trapear el baño" style="'+IN+';min-height:120px;resize:vertical;"></textarea>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;margin-bottom:16px;"><input type="checkbox" id="job-daily" style="width:19px;height:19px;"> Repetir cada día (plantilla diaria)</label>'
+    +'<button class="btn btn-gold" style="width:100%;" onclick="jobAddSave()">➕ Crear tarea</button>'
+    +'<div class="faint" style="font-size:11.5px;text-align:center;margin-top:10px;">La tarea diaria necesita un empleado específico.</div>';
+  document.getElementById('job-add').classList.remove('hide');
+};
+window.jobAddClose=function(){ document.getElementById('job-add').classList.add('hide'); };
+window.jobAddSave=async function(){
+  const title=(document.getElementById('job-title').value||'').trim();
+  const line=document.getElementById('job-line').value;
+  const role=document.getElementById('job-role').value;
+  const emp=document.getElementById('job-emp').value;
+  const daily=document.getElementById('job-daily').checked;
+  const steps=(document.getElementById('job-steps').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!title){ toast('Pon el título.',true); return; }
+  if(daily && !emp){ toast('La tarea diaria necesita un empleado específico.',true); return; }
+  try{
+    await httpsCallable(functions,'taskAdd')({ title:title, line:line, checklist:steps, assignEmpId:emp, assignRole:emp?'':role, recurring:daily?'daily':'none' });
+    toast('✅ Tarea creada'); jobAddClose();
+    try{ loadJourney(); }catch(e){}
+    if(ME&&ME.isOwner){ try{ loadOwnerPanel(); }catch(e){} }
+  }catch(e){ toast((e&&e.message)||'No se pudo crear',true); }
+};
+
+// 👑 Panel de operación del dueño (en el lugar del reloj) — pendientes del Pit con scroll + resumen.
+let OP_TASKS=[];
+window.loadOwnerPanel=async function(){
+  const box=document.getElementById('op-tasks'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'allTasks')({}); OP_TASKS=((r&&r.data)||{}).tasks||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudo cargar.</div>'; return; }
+  renderOwnerPanel();
+};
+function renderOwnerPanel(){
+  const sum=document.getElementById('op-summary');
+  const open=OP_TASKS.length, prog=OP_TASKS.filter(t=>t.status==='en_proceso').length;
+  if(sum) sum.innerHTML=[['📋',open,'pendientes'],['🔧',prog,'en proceso']].map(x=>'<div style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:800;">'+x[1]+'</div><div class="faint" style="font-size:11px;">'+x[2]+'</div></div>').join('');
+  const box=document.getElementById('op-tasks'); if(!box) return;
+  if(!OP_TASKS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:18px;line-height:1.5;">Sin pendientes todavía.<br>Toca <b>➕ Agregar</b>.</div>'; return; }
+  box.innerHTML=OP_TASKS.map(t=>{
+    const total=t.steps||0, done=t.done||0, pr=total?(' · '+done+'/'+total):'';
+    const who=t.assignName?('👤 '+svcEscE(t.assignName)):(t.assignRole?('👥 '+svcEscE(t.assignRole)):'— sin asignar');
+    return '<div style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+svcEscE(t.title)+'</span>'+lineBadge(t.line)+'</div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+' · '+(t.status==='en_proceso'?'en proceso':'por empezar')+pr+'</div></div>';
+  }).join('');
+}
+function renderMyService(){
+  const box=document.getElementById('svc-emp-list'); if(!box) return;
+  if(!SVC_MY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:40px 20px;line-height:1.6;">No tienes órdenes de servicio ahora.<br>Cuando te asignen un carro, aquí aparece.</div>'; return; }
+  box.innerHTML=SVC_MY.map(o=>{
+    const s=SVC_ST[o.status]||{l:o.status,c:'#8a8fa8'};
+    const when=o.scheduledAt?('📅 '+new Date(o.scheduledAt).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})):'🕐 Ahora';
+    const car=svcEscE(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
+    const idbits=[o.plate?('🪪 '+svcEscE(o.plate)):'', o.vin?('VIN …'+svcEscE((o.vin||'').slice(-6))):''].filter(Boolean).join(' · ');
+    const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
+    let actions='';
+    if(o.status==='por_recibir'||o.status==='agendado') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'recibido\')">📋 Recibir carro</button>';
+    else if(o.status==='recibido') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">🔧 Empezar trabajo</button>';
+    else if(o.status==='en_proceso') actions='<div style="display:flex;gap:8px;"><button class="btn btn-ghost" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'pausado_partes\')">⏸️ Esperar partes</button><button class="btn btn-green" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'listo\')">✅ Listo</button></div>';
+    else if(o.status==='pausado_partes') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">▶️ Reanudar</button>';
+    return '<div class="card" style="padding:14px;margin-bottom:12px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-weight:800;font-size:16px;">'+svcEscE(o.clientName||'Cliente')+'</span>'
+      +'<span style="font-size:11px;font-weight:800;color:'+s.c+';background:'+s.c+'22;padding:3px 9px;border-radius:999px;white-space:nowrap;">'+s.l+'</span></div>'
+      +'<div style="font-size:14px;margin-bottom:3px;">🚗 '+car+'</div>'
+      +(idbits?'<div class="faint" style="font-size:12px;margin-bottom:6px;">'+idbits+'</div>':'')
+      +'<div style="font-size:14px;background:var(--surface2,#1a1f2c);border-radius:9px;padding:8px 10px;line-height:1.4;margin-bottom:8px;">🔧 '+svcEscE(o.reason||'')+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-bottom:10px;">'+when+(phone?(' · <a href="sms:'+phone+'" style="color:var(--gold,#c9a84c);text-decoration:none;">💬 Mensaje</a>'):'')+'</div>'
+      +actions+'</div>';
+  }).join('');
+}
+window.svcAdvance=async function(orderId,status){
+  try{ await httpsCallable(functions,'svcOrderStatus')({orderId:orderId,status:status}); toast('✅ Actualizado'); loadMyService(); }
+  catch(e){ toast((e&&e.message)||'No se pudo actualizar', true); }
+};
+function detailView(v){
+  document.getElementById('detail-home').classList.toggle('hide', v!=='home');
+  document.getElementById('detail-pick').classList.toggle('hide', v!=='pick');
+  document.getElementById('detail-triage').classList.toggle('hide', v!=='triage');
+  document.getElementById('detail-run').classList.toggle('hide', v!=='run');
+  document.getElementById('detail-done').classList.toggle('hide', v!=='done');
+  document.getElementById('detail-h').textContent = v==='run'?'Detallando':v==='done'?'Terminado':v==='triage'?'Revisión del carro':v==='pick'?'Elige el carro':'Carros de hoy';
+}
+window.detailBack = function(){
+  if(!document.getElementById('detail-run').classList.contains('hide')){
+    if(!confirm('¿Salir de este carro? Se guarda como empezado y puedes seguir después.')) return;
+    stopTick(); saveJob();
+  } else if(!document.getElementById('detail-triage').classList.contains('hide')){
+    detailView('pick'); return;   // de la revisión regresa a elegir carro
+  } else if(!document.getElementById('detail-pick').classList.contains('hide')){
+    detailView('home'); return;   // del picker regresa al home del detallador
+  }
+  JOB=null; show('screen-home'); loadClock();
+};
+// Abre el selector de carros en prep (del inventario real).
+window.detailStart = function(){ detailView('pick'); loadPrepCars(); };
+async function loadPrepCars(){
+  const box=document.getElementById('pick-list');
+  box.innerHTML='<div class="faint" style="padding:16px 2px;font-size:13px;">Cargando carros en prep…</div>';
+  let cars=[];
+  try{ const r=await httpsCallable(functions,'prepCars')({}); cars=((r&&r.data)||{}).cars||[]; }
+  catch(e){ box.innerHTML='<div style="color:#ff6b6b;padding:14px 2px;font-size:14px;">No se pudo cargar el inventario: '+esc((e&&e.message)||e)+'</div>'; return; }
+  window._prepCars=cars;
+  if(!cars.length){ box.innerHTML='<div class="faint" style="padding:16px 2px;font-size:14px;line-height:1.5;">No hay carros marcados <b style="color:#ff9800;">🔧 En prep</b> ahorita.<br>Legacy los marca al agregarlos al inventario.</div>'; return; }
+  box.innerHTML=cars.map((c,i)=>{
+    const thumb = c.photo
+      ? '<img src="'+esc(c.photo)+'" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex:0 0 auto;background:var(--surface2);">'
+      : '<div style="width:52px;height:52px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto;">🚗</div>';
+    return '<div class="card" style="padding:12px;margin-bottom:9px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="pickPrep('+i+')">'
+      +thumb
+      +'<div style="min-width:0;flex:1;"><div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.label||'Carro')+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+(c.vin?('VIN …'+esc(String(c.vin).slice(-6))):'sin VIN')+'</div></div>'
+      +'<div style="color:var(--gold);font-size:20px;flex:0 0 auto;">›</div></div>';
+  }).join('');
+}
+window.pickPrep = function(i){
+  const c=(window._prepCars||[])[i]; if(!c){ toast('No se encontró el carro.',true); return; }
+  startDetailJob({ car:c.label, vin:c.vin||'', inventoryId:c.id, inventoryNum:c.inventoryNum||'' });
+};
+window.detailManual = function(){
+  const car=prompt('¿Qué carro vas a detallar?\n(marca / modelo / año, o VIN)');
+  if(car===null) return;
+  if(!String(car).trim()){ toast('Escribe cuál carro.', true); return; }
+  startDetailJob({ car:String(car).trim(), vin:'', inventoryId:'', inventoryNum:'' });
+};
+function startDetailJob(info){
+  JOB={ id:'dj_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), car:info.car, vin:info.vin||'', inventoryId:info.inventoryId||'', inventoryNum:info.inventoryNum||'',
+        startedAt:new Date().toISOString(), status:'active', triage:{}, estMin:0,
+        steps:DETAIL_SOP.map(s=>({id:s.id,title:s.title,seconds:0,done:false,skipped:false})) };
+  TRI={}; detailView('triage'); renderTriage();
+}
+// ---------- Checklist previo (triage) ----------
+function renderTriage(){
+  document.getElementById('triage-car').textContent='🚗 '+(JOB.car||'Carro');
+  const box=document.getElementById('triage-body');
+  box.innerHTML=TRIAGE.map(t=>{
+    const chips=t.opts.map(o=>{
+      const sel = t.multi ? (Array.isArray(TRI[t.id])&&TRI[t.id].indexOf(o.v)>=0) : (TRI[t.id]===o.v);
+      return '<button type="button" onclick="triagePick(\''+t.id+'\',\''+o.v+'\','+(t.multi?'true':'false')+')" '
+        +'style="border:1px solid '+(sel?'var(--gold)':'var(--border-strong)')+';background:'+(sel?'var(--gold-soft)':'var(--surface2)')+';color:'+(sel?'var(--gold)':'var(--text)')+';border-radius:999px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">'+o.label+'</button>';
+    }).join('');
+    return '<div style="margin-bottom:16px;"><div style="font-weight:800;font-size:15px;margin-bottom:9px;">'+t.q+(t.multi?' <span class="faint" style="font-size:11px;font-weight:600;">(varios)</span>':'')+'</div><div style="display:flex;flex-wrap:wrap;gap:8px;">'+chips+'</div></div>';
+  }).join('');
+  triageRecalc();
+}
+window.triagePick = function(id,v,multi){
+  if(multi){ if(!Array.isArray(TRI[id])) TRI[id]=[]; const i=TRI[id].indexOf(v); if(i>=0) TRI[id].splice(i,1); else TRI[id].push(v); }
+  else { TRI[id]= (TRI[id]===v? null : v); }
+  renderTriage();
+};
+function triageEstMin(){
+  let m=TRI_BASE_MIN;
+  TRIAGE.forEach(t=>{
+    const val=TRI[t.id];
+    if(t.multi){ (val||[]).forEach(v=>{ const o=t.opts.find(o=>o.v===v); if(o) m+=o.min; }); }
+    else if(val){ const o=t.opts.find(o=>o.v===val); if(o) m+=o.min; }
+  });
+  return m;
+}
+function triageAnswered(){
+  // requiere al menos las preguntas de una sola opción contestadas
+  return TRIAGE.filter(t=>!t.multi).every(t=>!!TRI[t.id]);
+}
+function triageRecalc(){
+  const est=triageEstMin();
+  const el=document.getElementById('triage-est'); const go=document.getElementById('triage-go');
+  const ready=triageAnswered();
+  el.textContent = ready ? ('~'+est+' min') : '—';
+  go.disabled=!ready;
+}
+window.triageDone = function(){
+  if(!triageAnswered()){ toast('Contesta todas las revisiones.', true); return; }
+  JOB.triage=JSON.parse(JSON.stringify(TRI)); JOB.estMin=triageEstMin();
+  runIdx=0; detailView('run'); renderRunner(); saveJob();
+};
+// etiqueta corta de lo que se marcó para un paso (para el hint en el runner)
+function triageHint(triId){
+  const t=TRIAGE.find(x=>x.id===triId); if(!t||!JOB||!JOB.triage) return '';
+  const val=JOB.triage[triId];
+  if(t.multi){ const arr=(val||[]).map(v=>(t.opts.find(o=>o.v===v)||{}).label).filter(Boolean); return arr.join(' + '); }
+  const o=t.opts.find(o=>o.v===val); return o?o.label:'';
+}
+function fmtT(sec){ sec=Math.max(0,Math.round(sec)); const m=Math.floor(sec/60), s=sec%60; if(m>=60){const h=Math.floor(m/60);return h+':'+String(m%60).padStart(2,'0')+':'+String(s).padStart(2,'0');} return m+':'+String(s).padStart(2,'0'); }
+function renderRunner(){
+  const sop=DETAIL_SOP[runIdx];
+  document.getElementById('run-car').textContent='🚗 '+(JOB.car||'Carro');
+  document.getElementById('run-count').textContent='Paso '+(runIdx+1)+' de '+DETAIL_SOP.length;
+  document.getElementById('run-sug').textContent='~'+sop.min+' min';
+  document.getElementById('run-title').textContent=sop.title;
+  const hint = sop.tri ? triageHint(sop.tri) : '';
+  const hintHtml = hint ? '<div style="display:inline-block;background:var(--gold-soft);color:var(--gold);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800;margin-bottom:10px;">🔎 Revisión: '+esc(hint)+'</div><br>' : '';
+  document.getElementById('run-steps').innerHTML = hintHtml + esc(sop.steps);
+  document.getElementById('run-care').textContent=sop.care;
+  document.getElementById('run-skip').style.display = sop.skippable ? 'block':'none';
+  document.getElementById('run-prog').innerHTML = DETAIL_SOP.map((s,i)=>'<div style="flex:1;height:5px;border-radius:3px;background:'+(i<runIdx?'var(--gold)':i===runIdx?'var(--green)':'var(--surface2)')+';"></div>').join('');
+  stepStart=Date.now(); startTick();
+}
+function startTick(){ stopTick(); const el=document.getElementById('run-timer'); el.textContent='0:00'; tickHandle=setInterval(()=>{ el.textContent=fmtT((Date.now()-stepStart)/1000); },1000); }
+function stopTick(){ if(tickHandle){ clearInterval(tickHandle); tickHandle=null; } }
+function recordStep(skipped){ const sec=(Date.now()-stepStart)/1000; JOB.steps[runIdx].seconds=(Number(JOB.steps[runIdx].seconds)||0)+Math.max(0,Math.round(sec)); JOB.steps[runIdx].done=!skipped; JOB.steps[runIdx].skipped=!!skipped; }
+window.runNext = function(){ recordStep(false); advance(); };
+window.runSkip = function(){ recordStep(true); advance(); };
+function advance(){ stopTick(); if(runIdx<DETAIL_SOP.length-1){ runIdx++; renderRunner(); saveJob(); } else finishJob(); }
+function finishJob(){
+  JOB.status='done'; JOB.finishedAt=new Date().toISOString();
+  JOB.totalSeconds=JOB.steps.reduce((a,s)=>a+(Number(s.seconds)||0),0);
+  saveJob();
+  document.getElementById('done-car').textContent='🚗 '+(JOB.car||'');
+  document.getElementById('done-total').textContent=fmtT(JOB.totalSeconds);
+  const est=JOB.estMin||0; const realMin=Math.round(JOB.totalSeconds/60);
+  const cmp = est ? '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;"><span class="faint">Estimado vs real</span><span class="faint" style="font-variant-numeric:tabular-nums;">~'+est+' min · real '+realMin+' min</span></div>' : '';
+  document.getElementById('done-break').innerHTML=cmp+JOB.steps.map(s=>'<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span>'+(s.skipped?'<span style="color:var(--faint)">⤼ </span>':'<span style="color:var(--green)">✓ </span>')+s.title+'</span><span style="color:'+(s.skipped?'var(--faint)':'var(--muted)')+';font-variant-numeric:tabular-nums;">'+(s.skipped?'no aplicó':fmtT(s.seconds))+'</span></div>').join('');
+  detailView('done');
+}
+async function saveJob(){ if(!JOB) return; try{ const r=await httpsCallable(functions,'detailJob')({op:'save',job:JOB}); if(r&&r.data&&r.data.id) JOB.id=r.data.id; }catch(e){ /* sigue en local */ } }
+async function loadMyJobs(){
+  const box=document.getElementById('detail-list');
+  box.innerHTML='<div class="faint" style="padding:12px 2px;font-size:13px;">Cargando…</div>';
+  let jobs=[];
+  try{ const r=await httpsCallable(functions,'detailJob')({op:'mine'}); jobs=((r&&r.data)||{}).jobs||[]; }catch(e){}
+  window._myJobs=jobs;
+  const today=new Date().toISOString().slice(0,10);
+  const todays=jobs.filter(j=>String(j.startedAt||'').slice(0,10)===today);
+  if(!todays.length){ box.innerHTML='<div class="faint" style="padding:12px 2px;font-size:14px;line-height:1.5;">Todavía no has detallado ningún carro hoy.<br>Toca <b>➕ Empezar un carro</b>.</div>'; return; }
+  box.innerHTML=todays.map(j=>{
+    const done=j.status==='done';
+    return '<div class="card" style="padding:14px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+      +'<div style="min-width:0;"><div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚗 '+esc(j.car||'Carro')+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:3px;">'+(done?('✅ '+fmtT(j.totalSeconds||0)):'🟡 empezado')+'</div></div>'
+      +(done?'':'<button onclick="resumeJob(\''+j.id+'\')" style="flex:0 0 auto;background:var(--gold-soft);color:var(--gold);border:1px solid rgba(232,182,74,0.3);padding:9px 15px;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">Seguir</button>')
+      +'</div>';
+  }).join('');
+}
+window.resumeJob = function(id){
+  const j=(window._myJobs||[]).find(x=>x.id===id); if(!j){ toast('No se encontró el carro.',true); return; }
+  JOB={ id:j.id, car:j.car, vin:j.vin||'', inventoryId:j.inventoryId||'', inventoryNum:j.inventoryNum||'', triage:j.triage||{}, estMin:Number(j.estMin)||0, startedAt:j.startedAt, status:'active',
+        steps:DETAIL_SOP.map(s=>{ const p=(j.steps||[]).find(x=>x.id===s.id)||{}; return {id:s.id,title:s.title,seconds:Number(p.seconds)||0,done:!!p.done,skipped:!!p.skipped}; }) };
+  runIdx=JOB.steps.findIndex(s=>!s.done && !s.skipped); if(runIdx<0) runIdx=0;
+  detailView('run'); renderRunner();
+};
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ========================= ADMIN (dueños): gestión del equipo =========================
+let ADM_EMPS=[], ADM_ROLES=[], admEditId=null, admSel=[];
+window.openAdmin=function(){ if(!ME||!ME.isOwner){ toast('Solo dueños.',true); return; } show('screen-admin'); adminListView(); loadAdmin(); };
+window.adminBack=function(){ if(!document.getElementById('admin-form-view').classList.contains('hide')){ adminListView(); return; } show('screen-home'); loadClock(); };
+function adminListView(){ document.getElementById('admin-list-view').classList.remove('hide'); document.getElementById('admin-form-view').classList.add('hide'); document.getElementById('admin-h').textContent='Equipo'; }
+function adminFormView(){ document.getElementById('admin-list-view').classList.add('hide'); document.getElementById('admin-form-view').classList.remove('hide'); document.getElementById('admin-h').textContent= admEditId?'Editar empleado':'Nuevo empleado'; }
+async function loadAdmin(){
+  const box=document.getElementById('admin-list'); box.innerHTML='<div class="faint" style="padding:14px 2px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); const d=(r&&r.data)||{}; ADM_EMPS=d.emps||[]; ADM_ROLES=d.roles||[]; }
+  catch(e){ box.innerHTML='<div style="color:#ff6b6b;padding:14px 2px;">No se pudo cargar: '+esc((e&&e.message)||e)+'</div>'; return; }
+  renderAdminList();
+}
+function renderAdminList(){
+  const box=document.getElementById('admin-list');
+  if(!ADM_EMPS.length){ box.innerHTML='<div class="faint" style="padding:14px 2px;line-height:1.5;">Todavía no hay empleados.<br>Toca <b>➕ Nuevo empleado</b>.</div>'; return; }
+  box.innerHTML=ADM_EMPS.map(e=>{
+    const fns=(e.roles||[]).length?('<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;">'+e.roles.map(r=>'<span style="background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px 9px;font-size:11px;">'+esc(r)+'</span>').join('')+'</div>'):'<div class="faint" style="font-size:12px;margin-top:7px;">Sin funciones</div>';
+    return '<div class="card" style="padding:14px;margin-bottom:9px;'+(e.active?'':'opacity:.55;')+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
+      +'<div style="min-width:0;"><div style="font-weight:800;">'+(e.owner?'👑 ':'')+esc(e.name||'—')+(e.active?'':' <span class="faint" style="font-size:11px;">(inactivo)</span>')+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">'+esc(e.phone||'sin teléfono')+(e.rate?(' · $'+e.rate+'/h'):'')+'</div>'+fns+'</div>'
+      +'<button onclick="adminEdit(\''+e.id+'\')" style="flex:0 0 auto;background:var(--gold-soft);color:var(--gold);border:1px solid rgba(232,182,74,0.3);padding:8px 13px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;">Editar</button>'
+      +'</div></div>';
+  }).join('');
+}
+function admFillRoles(){
+  const box=document.getElementById('adm-roles');
+  const list = ADM_ROLES.length?ADM_ROLES:['Detallador','Fotos','Limpieza','Mecánico','Empaque','Captura','Listado','Desmantelador','Ayudante general','Oficina','Ventas'];
+  box.innerHTML=list.map(r=>{
+    const on=admSel.indexOf(r)>=0;
+    return '<button type="button" onclick="admToggleRole(\''+r.replace(/'/g,"\\'")+'\')" style="border:1px solid '+(on?'var(--gold)':'var(--border-strong)')+';background:'+(on?'var(--gold-soft)':'var(--surface2)')+';color:'+(on?'var(--gold)':'var(--text)')+';border-radius:999px;padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">'+esc(r)+'</button>';
+  }).join('');
+}
+window.admToggleRole=function(r){ const i=admSel.indexOf(r); if(i>=0) admSel.splice(i,1); else admSel.push(r); admFillRoles(); };
+window.adminNew=function(){ admEditId=null; admSel=[]; document.getElementById('adm-name').value=''; document.getElementById('adm-phone').value=''; document.getElementById('adm-rate').value=''; document.getElementById('adm-active').checked=true; document.getElementById('adm-owner').checked=false; admFillRoles(); adminFormView(); };
+window.adminEdit=function(id){ const e=ADM_EMPS.find(x=>x.id===id); if(!e) return; admEditId=id; admSel=(e.roles||[]).slice(); document.getElementById('adm-name').value=e.name||''; document.getElementById('adm-phone').value=e.phone||''; document.getElementById('adm-rate').value=e.rate||''; document.getElementById('adm-active').checked=e.active!==false; document.getElementById('adm-owner').checked=e.owner===true; admFillRoles(); adminFormView(); };
+window.adminCancel=function(){ adminListView(); };
+window.adminSave=async function(){
+  const name=document.getElementById('adm-name').value.trim().replace(/\b\w/g,c=>c.toUpperCase()); if(!name){ toast('Pon el nombre.',true); return; }
+  const btn=document.getElementById('adm-save'); btn.disabled=true; const prev=btn.textContent; btn.textContent='Guardando…';
+  try{
+    const payload={ op:'save', name, phone:document.getElementById('adm-phone').value.trim(), rate:Number(document.getElementById('adm-rate').value)||0, active:document.getElementById('adm-active').checked, owner:document.getElementById('adm-owner').checked, roles:admSel };
+    if(admEditId) payload.id=admEditId;
+    await httpsCallable(functions,'empAdmin')(payload);
+    toast('✅ Guardado'); adminListView(); loadAdmin();
+  }catch(e){ toast((e&&e.message)||'No se pudo guardar.',true); }
+  btn.disabled=false; btn.textContent=prev;
+};
+
+// Aplica el idioma al cargar (login en ES/EN según elección guardada o el teléfono).
+applyI18n();
+</script>
+<!-- Menús del logo de Pit Crew (solo dueños; reemplaza la navegación genérica vieja). Más opciones (Nómina, Carros/partes) se agregan al construirlas. -->
+<script>
+  window.LEGACY_ACTIONS = [
+    { label:'Equipo', ico:'👑', fn:'openAdmin' },
+    { label:'Nueva tarea / pendiente', ico:'➕', fn:'jobAddOpen' }
+  ];
+</script>
+<script type="module" src="launcher.js"></script>
+</body>
+</html>
