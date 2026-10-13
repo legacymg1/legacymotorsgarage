@@ -145,6 +145,8 @@
       <button class="btn green" id="clock-in-btn" onclick="clockPunch('in')">🟢 Entrada</button>
       <button class="btn" id="clock-out-btn" onclick="clockPunch('out')" style="background:#b45309;color:#fff;">🔴 Salida</button>
     </div>
+    <!-- ☕ Descanso (solo empleado por teléfono, cuando tiene entrada abierta) -->
+    <button class="btn ghost" id="clock-break-btn" onclick="punchBreak()" style="display:none;width:100%;margin-top:10px;" data-i18n="clkStartBreak">☕ Iniciar descanso</button>
     <div id="clock-msg" class="sub" style="margin-top:6px;"></div>
     <div id="clock-owner" style="display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;">
       <div class="sub" style="margin-bottom:6px;">📍 Ubicaciones para el GPS (solo dueño) — párate en el lugar y toca:</div>
@@ -369,6 +371,7 @@ const T={
     jPaused:'⏸️ Pausada', jPause:'⏸️ Pausar', jResume:'▶️ Reanudar', jProblem:'⚠️ Reportar problema',
     jPauseReason:'¿Por qué pausas? (motivo)', jProblemReason:'¿Qué problema hay?', jReported:'✅ Reportado — avisamos al dueño',
     jLoadingTxt:'Cargando…', jCouldnt:'No se pudo.', jStepErr:'No se pudo guardar el paso',
+    clkStartBreak:'☕ Iniciar descanso', clkEndBreak:'▶️ Terminar descanso', clkOnBreak:'🟠 En descanso desde', clkBreakReg:'Registrando descanso…',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Número de estampa o nombre…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte', reprintBtnQA:'🖨️ Reimprimir número de estampa', reprintTitle:'Reimprimir número', reprintHint:'Escribe el número de la estampa y dale imprimir — por si la de la parte ya está borrosa o no se ve.', reprintPh:'Número (ej. 0042)', reprintBtn:'🖨️ Imprimir', reprintAnother:'🔁 Otro número', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería', fromFile:'📁 Archivo', photoStarHint:'⭐ mándala al frente · 🤖 el bot lee las 3 primeras', photoToFront:'Mandar al frente', delPhotos:'Eliminar fotos', delSelected:'Eliminar', cancelBtn:'Cancelar', delSelectHint:'Toca las fotos que quieras borrar y confirma.', delConfirm:'¿Eliminar N foto(s)? No se puede deshacer.', airbagBtn:'Marcar como Airbag', airbagOn:'Airbag ✓ (bin AIRBAGS)', secAirbags:'Airbags', airbagNote:'Restringidos en eBay — no se listan por ahora. Guardados en inventario (bin AIRBAGS).',
@@ -398,6 +401,7 @@ const T={
     jPaused:'⏸️ Paused', jPause:'⏸️ Pause', jResume:'▶️ Resume', jProblem:'⚠️ Report problem',
     jPauseReason:'Why are you pausing? (reason)', jProblemReason:'What is the problem?', jReported:'✅ Reported — owner notified',
     jLoadingTxt:'Loading…', jCouldnt:'Could not.', jStepErr:'Could not save the step',
+    clkStartBreak:'☕ Start break', clkEndBreak:'▶️ End break', clkOnBreak:'🟠 On break since', clkBreakReg:'Logging break…',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Sticker number or name…',
     addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part', reprintBtnQA:'🖨️ Reprint sticker number', reprintTitle:'Reprint number', reprintHint:'Type the sticker number and print it — in case the one on the part is worn out or unreadable.', reprintPh:'Number (e.g. 0042)', reprintBtn:'🖨️ Print', reprintAnother:'🔁 Another number', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery', fromFile:'📁 File', photoStarHint:'⭐ send to front · 🤖 bot reads the first 3', photoToFront:'Send to front', delPhotos:'Delete photos', delSelected:'Delete', cancelBtn:'Cancel', delSelectHint:'Tap the photos you want to delete, then confirm.', delConfirm:'Delete N photo(s)? This can\'t be undone.', airbagBtn:'Mark as Airbag', airbagOn:'Airbag ✓ (AIRBAGS bin)', secAirbags:'Airbags', airbagNote:'Restricted on eBay — not listed for now. Kept in inventory (AIRBAGS bin).',
@@ -429,6 +433,7 @@ function setLang(l){
   buildTabs();
   if(_homeMode){ const vh=document.getElementById('view-home'); if(vh && vh.style.display!=='none'){ renderHomeTiles(); try{ renderJourney(); }catch(e){} } }
   try{ if(JOB_CUR && !document.getElementById('task-detail').classList.contains('hide')) renderTaskDetail(); }catch(e){}
+  try{ if(typeof myEmail!=='undefined' && (myEmail||_homeMode)) refreshClock(); }catch(e){}
   if(_carView) renderCarDetail();
   else if(_view==='yard') renderVehicles();
   if(_view==='lister') renderLister();
@@ -536,23 +541,48 @@ window.clockPunch = async function(action){
   }catch(e){ if(msg){ msg.style.color='#ff6b6b'; msg.textContent='⚠️ '+_clockErr(e); } }
   if(inB) inB.disabled=false; if(outB) outB.disabled=false;
 };
+let _whClkOpen=null;   // estado del turno abierto (para el botón de descanso)
 window.refreshClock = async function(){
   const st=document.getElementById('clock-status'), wk=document.getElementById('clock-week');
   const inB=document.getElementById('clock-in-btn'), outB=document.getElementById('clock-out-btn');
+  const bk=document.getElementById('clock-break-btn');
+  const _loc=(L==='en')?'en-US':'es-MX';
   try{
     const r=await httpsCallable(functions,'clockMine')({});
     const d=(r&&r.data)||{};
-    if(wk) wk.textContent='Semana: '+Number(d.hours||0).toFixed(2)+' h';
+    _whClkOpen=d.open||null;
+    if(wk) wk.textContent=(L==='en'?'Week: ':'Semana: ')+Number(d.hours||0).toFixed(2)+' h';
     if(d.open){
       const since=new Date(d.open.inAt);
       const loc=d.open.location&&d.open.location!=='(sin ubicación)'?(d.open.location==='dealer'?'Dealer':'Yonke'):'';
-      if(st){ st.style.color='#3ecf8e'; st.textContent='🟢 Entrada abierta desde '+since.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})+(loc?(' · '+loc):''); }
+      if(d.open.onBreak){
+        const bs=d.open.onBreakSince?new Date(d.open.onBreakSince):since;
+        if(st){ st.style.color='#f0a030'; st.textContent=t('clkOnBreak')+' '+bs.toLocaleTimeString(_loc,{hour:'2-digit',minute:'2-digit'}); }
+      } else {
+        if(st){ st.style.color='#3ecf8e'; st.textContent=(L==='en'?'🟢 Clocked in since ':'🟢 Entrada abierta desde ')+since.toLocaleTimeString(_loc,{hour:'2-digit',minute:'2-digit'})+(loc?(' · '+loc):''); }
+      }
       if(inB) inB.style.opacity='0.45'; if(outB) outB.style.opacity='1';
+      // Botón de descanso: SOLO empleado por teléfono (no cambiar el reloj de correos/Sunmi)
+      if(bk){ if(_homeMode){ bk.style.display='block'; bk.textContent=t(d.open.onBreak?'clkEndBreak':'clkStartBreak'); } else bk.style.display='none'; }
     } else {
-      if(st){ st.style.color=''; st.textContent='⚪ Sin entrada abierta. Toca "Entrada" al llegar.'; }
+      if(st){ st.style.color=''; st.textContent=(L==='en'?'⚪ Not clocked in. Tap "Clock in" when you arrive.':'⚪ Sin entrada abierta. Toca "Entrada" al llegar.'); }
       if(inB) inB.style.opacity='1'; if(outB) outB.style.opacity='0.45';
+      if(bk) bk.style.display='none';
     }
   }catch(e){ if(st){ st.textContent='(No se pudo cargar el reloj)'; } }
+};
+// ☕ Descanso (sin GPS). El backend decide; aquí togglamos según el estado actual.
+window.punchBreak = async function(){
+  const bk=document.getElementById('clock-break-btn'); const msg=document.getElementById('clock-msg');
+  const onBreak = !!(_whClkOpen && _whClkOpen.onBreak);
+  if(bk) bk.disabled=true;
+  if(msg){ msg.style.color=''; msg.textContent=t('clkBreakReg'); }
+  try{
+    await httpsCallable(functions,'clockPunch')({ action: onBreak?'break_end':'break_start' });
+    if(msg){ msg.style.color='#3ecf8e'; msg.textContent='✅'; }
+    refreshClock();
+  }catch(e){ if(msg){ msg.style.color='#ff6b6b'; msg.textContent='⚠️ '+((e&&e.message)||t('jCouldnt')); } }
+  if(bk) bk.disabled=false;
 };
 window.captureLoc = async function(which){
   const msg=document.getElementById('clock-loc-msg');
