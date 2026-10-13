@@ -1504,7 +1504,8 @@ exports.invCarsLite = onCall({ timeoutSeconds: 30 }, async (request) => {
     snap.forEach((d) => {
       const c = d.data() || {};
       const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
-      inv.push({ id: "inv:" + d.id, kind: "inventario", label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), status: String(c.status || "") });
+      const photo = (Array.isArray(c.photos) && c.photos[0]) || c.img || "";
+      inv.push({ id: "inv:" + d.id, kind: "inventario", label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), status: String(c.status || "") });
     });
     inv.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
   } catch (e) {}
@@ -1514,11 +1515,36 @@ exports.invCarsLite = onCall({ timeoutSeconds: 30 }, async (request) => {
     snap.forEach((d) => {
       const c = d.data() || {};
       const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || ("VIN " + (c.vin || "").slice(-6));
-      dis.push({ id: "dis:" + d.id, kind: "desmantelar", label, inventoryNum: "", vin: String(c.vin || ""), status: String(c.status || "") });
+      const photo = (Array.isArray(c.photoURLs) && c.photoURLs[0]) || "";
+      dis.push({ id: "dis:" + d.id, kind: "desmantelar", label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), status: String(c.status || "") });
     });
-    dis.sort((a, b) => a.label.localeCompare(b.label));
+    dis.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
   } catch (e) {}
   return { ok: true, cars: inv.concat(dis), inventory: inv, dismantle: dis };
+});
+
+// 🔢 Numera los carros del YONKE (dismantle_vehicles) con formato D-00001. Idempotente: solo asigna a los que NO tienen número.
+// Numera por orden de creación (createdAt). Solo dueños.
+exports.yonkeEnsureNums = onCall({ timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  let snap; try { snap = await db.collection("dismantle_vehicles").get(); } catch (e) { return { ok: true, assigned: 0, total: 0 }; }
+  const all = snap.docs.map((d) => ({ id: d.id, data: d.data() || {} }));
+  // Mayor número ya usado (de los que ya tienen D-####)
+  let maxN = 0;
+  all.forEach((x) => { const m = String(x.data.inventoryNum || "").match(/(\d+)/); if (m) { const n = parseInt(m[1], 10); if (n > maxN) maxN = n; } });
+  // Los que faltan, en orden de creación
+  const missing = all.filter((x) => !String(x.data.inventoryNum || "").trim())
+    .sort((a, b) => String(a.data.createdAt || "").localeCompare(String(b.data.createdAt || "")));
+  let assigned = 0;
+  for (const x of missing) {
+    maxN += 1;
+    const num = "D-" + String(maxN).padStart(5, "0");
+    try { await db.collection("dismantle_vehicles").doc(x.id).set({ inventoryNum: num }, { merge: true }); assigned += 1; } catch (e) {}
+  }
+  return { ok: true, assigned, total: all.length };
 });
 
 // Índice de empleados por TELÉFONO (emp_phones/{phoneE164}) → lo usan las reglas de Firestore
