@@ -324,6 +324,16 @@
   .stepbox{width:26px;height:26px;border-radius:8px;border:2px solid rgba(255,255,255,.25);flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;transition:background .15s,border-color .15s;}
   .stepitem.on .stepbox{background:var(--gold,#c9a84c);border-color:var(--gold,#c9a84c);color:#0b0e14;}
   .stepitem.on .steptext{color:var(--muted,#8a8fa8);text-decoration:line-through;}
+  /* Compu: aprovechar el ancho sin romper el móvil */
+  @media (min-width:820px){
+    .wrap{max-width:760px;}
+    .tiles{grid-template-columns:repeat(3,1fr);}
+    #op-tasks{max-height:52vh;}
+  }
+  @media (min-width:1120px){
+    .wrap{max-width:940px;}
+    .tiles{grid-template-columns:repeat(4,1fr);}
+  }
 </style>
 
 <!-- ===== JORNADA GUIADA (tareas con checklist) ===== -->
@@ -1184,6 +1194,13 @@ window.adminSave=async function(){
 
 // Aplica el idioma al cargar (login en ES/EN según elección guardada o el teléfono).
 applyI18n();
+</script>
+<!-- Menús del logo de Pit Crew (solo dueños; reemplaza la navegación genérica vieja). Más opciones (Nómina, Carros/partes) se agregan al construirlas. -->
+<script>
+  window.LEGACY_ACTIONS = [
+    { label:'Equipo', ico:'👑', fn:'openAdmin' },
+    { label:'Nueva tarea / pendiente', ico:'➕', fn:'jobAddOpen' }
+  ];
 </script>
 <script type="module" src="launcher.js"></script>
 </body>
