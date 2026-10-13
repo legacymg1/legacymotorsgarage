@@ -147,6 +147,30 @@
     <div id="cars-proc-list"></div>
   </div></div>
 
+  <!-- 🔧 MECÁNICO: Mi taller (overlay) -->
+  <div id="view-service" class="hide" style="position:fixed;inset:0;z-index:6300;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;"><div class="wrap" style="padding:16px;">
+    <div class="topbar">
+      <button class="linkbtn" onclick="svcBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+      <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;" data-i18n="mechKicker">🔧 Mecánico</div><h2 style="font-size:20px;margin:0;" data-i18n="taller">Mi taller</h2></div>
+      <button class="linkbtn" onclick="loadMyService()" style="font-size:20px;padding:0 6px;">⟳</button>
+    </div>
+    <button id="mech-addtask-btn" class="btn ghost hide" onclick="mechOpenAddTask()" style="margin-bottom:14px;" data-i18n="addJob">➕ Agregar trabajo a un carro</button>
+    <div class="sub" style="font-weight:800;font-size:15px;margin:2px 0 8px;" data-i18n="carsToInspect">🏁 Carros por inspeccionar</div>
+    <div id="mech-cars-list"></div>
+    <div class="sub" style="font-weight:800;font-size:15px;margin:20px 0 8px;" data-i18n="jobsQueue">🔧 Trabajos en cola</div>
+    <div id="mech-tasks-list"></div>
+    <div class="sub" style="font-weight:800;font-size:15px;margin:20px 0 8px;" data-i18n="svcOrdersClients">🔧 Órdenes de servicio (clientes)</div>
+    <div id="svc-emp-list"></div>
+  </div></div>
+  <!-- Recepción del carro (intake) -->
+  <div id="mech-intake" class="hide" style="position:fixed;inset:0;z-index:6500;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)mechCloseIntake()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));"><div id="mech-intake-body"></div></div>
+  </div>
+  <!-- Dueño: agregar trabajo a un carro -->
+  <div id="mech-addtask" class="hide" style="position:fixed;inset:0;z-index:6500;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)mechCloseAddTask()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));"><div id="mech-addtask-body"></div></div>
+  </div>
+
   <!-- ===================== 👑 PANEL DE OPERACIÓN (solo dueño) ===================== -->
   <div class="card" id="owner-op-card" style="display:none;margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -407,6 +431,16 @@ const T={
     jStepsOpt:'Pasos (opcional, uno por renglón)', jStepsPh:'Drenar fluidos\nDesconectar arnés\nSacar el motor', jDaily:'Repetir cada día (plantilla diaria)', jCreate:'➕ Crear tarea', jDailyHint:'La tarea diaria necesita un empleado específico.',
     jEditH:'✏️ Editar tarea', jSave:'💾 Guardar cambios', jDelete:'🗑️ Eliminar', jDelConfirm:'¿Eliminar esta tarea? No se puede deshacer.', jSaved:'✅ Guardado', jDeleted:'🗑️ Eliminada',
     jCarSearch:'🔎 Buscar carro (año, marca, # o VIN)…', jCarChange:'cambiar', jCarNoMatch:'Sin resultados.',
+    taller:'Mi taller', mechKicker:'🔧 Mecánico', carsToInspect:'🏁 Carros por inspeccionar', jobsQueue:'🔧 Trabajos en cola', svcOrdersClients:'🔧 Órdenes de servicio (clientes)',
+    addJob:'➕ Agregar trabajo a un carro', noCars:'No hay carros esperando inspección.<br>Cuando se registra un carro, aparece aquí solo.',
+    received:'Recibido', inspectBtn:'🔍 Inspeccionar', continueBtn:'Seguir', inspStarted:'● Inspección iniciada',
+    vehReception:'Recepción del vehículo', milesReceive:'Millas con las que recibes el carro', milesPh:'Ej. 84250',
+    startInsp:'▶️ Empezar inspección', contInsp:'▶️ Continuar inspección', dviNote:'La certificación paso a paso (DVI) se abre al registrar las millas.<br>(La construimos en el siguiente paso.)',
+    invNumLbl:'Inventario #', recDate:'Fecha de recepción:', noJobs:'No hay trabajos en cola.', noJobsOwner:'<br>Toca <b>➕ Agregar trabajo a un carro</b>.',
+    otherJob:'➕ otra tarea a este carro', whatToDo:'¿Qué se le va a hacer? (el paso)', whatToDoPh:'Ej. Reemplazar motor', addToQueue:'➕ Agregar a la cola', chooseCar:'— Elige el carro —', svcCar:'Carro',
+    stCola:'🕐 En cola', stProc:'🔧 En proceso', stDone:'✅ Hecho',
+    svcAgendado:'📅 Agendado', svcPorRecibir:'🕐 Por recibir', svcRecibido:'📋 Recibido', svcEnProceso:'🔧 En proceso', svcPausado:'⏸️ Esperando partes', svcListo:'✅ Listo', svcEntregado:'🏁 Entregado',
+    svcReceiveCar:'📋 Recibir carro', svcStartWork:'🔧 Empezar trabajo', svcWaitParts:'⏸️ Esperar partes', svcReady:'✅ Listo', svcResume:'▶️ Reanudar', svcMsg:'💬 Mensaje', svcNow:'🕐 Ahora', svcNoOrders:'No tienes órdenes de servicio ahora.<br>Cuando te asignen un carro, aquí aparece.', updated:'✅ Actualizado',
     carsProcH:'🚗 Carros en proceso', inProcNone:'No hay carros en proceso ahora.', jobsN:'trabajos', inspPending:'Inspección pendiente', stMecanico:'Mecánico', stPintura:'Pintura', stDetalle:'Detalle', stListo:'Listo',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Número de estampa o nombre…',
@@ -446,6 +480,16 @@ const T={
     jStepsOpt:'Steps (optional, one per line)', jStepsPh:'Drain fluids\nDisconnect harness\nPull the engine', jDaily:'Repeat every day (daily template)', jCreate:'➕ Create task', jDailyHint:'A daily task needs a specific employee.',
     jEditH:'✏️ Edit task', jSave:'💾 Save changes', jDelete:'🗑️ Delete', jDelConfirm:'Delete this task? This cannot be undone.', jSaved:'✅ Saved', jDeleted:'🗑️ Deleted',
     jCarSearch:'🔎 Search car (year, make, # or VIN)…', jCarChange:'change', jCarNoMatch:'No match.',
+    taller:'My shop', mechKicker:'🔧 Mechanic', carsToInspect:'🏁 Cars to inspect', jobsQueue:'🔧 Jobs in queue', svcOrdersClients:'🔧 Service orders (customers)',
+    addJob:'➕ Add a job to a car', noCars:'No cars waiting for inspection.<br>When a car is registered, it shows here automatically.',
+    received:'Received', inspectBtn:'🔍 Inspect', continueBtn:'Continue', inspStarted:'● Inspection started',
+    vehReception:'Vehicle reception', milesReceive:'Miles you receive the car with', milesPh:'e.g. 84250',
+    startInsp:'▶️ Start inspection', contInsp:'▶️ Continue inspection', dviNote:'The step-by-step certification (DVI) opens after you log the miles.<br>(We build it in the next step.)',
+    invNumLbl:'Inventory #', recDate:'Received on:', noJobs:'No jobs in queue.', noJobsOwner:'<br>Tap <b>➕ Add a job to a car</b>.',
+    otherJob:'➕ another job for this car', whatToDo:'What needs to be done? (the step)', whatToDoPh:'e.g. Replace engine', addToQueue:'➕ Add to queue', chooseCar:'— Choose the car —', svcCar:'Car',
+    stCola:'🕐 Queued', stProc:'🔧 In progress', stDone:'✅ Done',
+    svcAgendado:'📅 Scheduled', svcPorRecibir:'🕐 To receive', svcRecibido:'📋 Received', svcEnProceso:'🔧 In progress', svcPausado:'⏸️ Waiting for parts', svcListo:'✅ Ready', svcEntregado:'🏁 Delivered',
+    svcReceiveCar:'📋 Receive car', svcStartWork:'🔧 Start work', svcWaitParts:'⏸️ Wait for parts', svcReady:'✅ Ready', svcResume:'▶️ Resume', svcMsg:'💬 Message', svcNow:'🕐 Now', svcNoOrders:'No service orders right now.<br>When a car is assigned to you, it shows here.', updated:'✅ Updated',
     carsProcH:'🚗 Cars in process', inProcNone:'No cars in process right now.', jobsN:'jobs', inspPending:'Inspection pending', stMecanico:'Mechanic', stPintura:'Paint', stDetalle:'Detail', stListo:'Ready',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Sticker number or name…',
@@ -480,6 +524,7 @@ function setLang(l){
   try{ if(JOB_CUR && !document.getElementById('task-detail').classList.contains('hide')) renderTaskDetail(); }catch(e){}
   try{ if(typeof myEmail!=='undefined' && (myEmail||_homeMode)) refreshClock(); }catch(e){}
   try{ const opc=document.getElementById('owner-op-card'); if(opc && opc.style.display!=='none') renderOwnerPanel(); }catch(e){}
+  try{ const vs=document.getElementById('view-service'); if(vs && !vs.classList.contains('hide')) loadMyService(); }catch(e){}
   if(_carView) renderCarDetail();
   else if(_view==='yard') renderVehicles();
   if(_view==='lister') renderLister();
@@ -531,7 +576,7 @@ const ROLE_BY_EMAIL={
   'mechanic@legacymotorsgarage.com':'mechanic',   // Mecánico (crear la cuenta en Firebase Auth cuando lo actives)
   'mecanico@legacymotorsgarage.com':'mechanic'
 };
-let role='', myEmail='', myEmpId='', myName='', _allowedTabs=null;
+let role='', myEmail='', myEmpId='', myName='', _allowedTabs=null, _myRoles=[];
 // Empleado por TELÉFONO (Pit Crew): sus funciones → pestañas de la herramienta de Warehouse.
 function _whTabsFromRoles(roles){
   roles = Array.isArray(roles)?roles:[];
@@ -644,7 +689,7 @@ onAuthStateChanged(auth, async (user)=>{
   const email=((user&&user.email)||'').toLowerCase();
   const phone=(user&&user.phoneNumber)||'';
   role = user ? (ROLE_BY_EMAIL[email]||'') : '';
-  myEmail = email; myEmpId=''; myName=''; _allowedTabs=null; _homeMode=false;
+  myEmail = email; myEmpId=''; myName=''; _allowedTabs=null; _homeMode=false; _myRoles=[];
   // Empleado por TELÉFONO (Pit Crew) sin correo: reconocer sus FUNCIONES y mapear a las herramientas de la yarda.
   // El acceso por CORREO queda IGUAL (los de arriba ya traen role por ROLE_BY_EMAIL).
   if(user && phone && !email && !role){
@@ -654,11 +699,11 @@ onAuthStateChanged(auth, async (user)=>{
       if(d && d.found && d.active!==false){
         myEmpId=d.empId||''; myName=d.name||'';
         if(d.isOwner){ role='owner'; }
-        else { const tabs=_whTabsFromRoles(d.roles); if(tabs.length){ _allowedTabs=tabs; } }
+        else { _myRoles = Array.isArray(d.roles)?d.roles:[]; const tabs=_whTabsFromRoles(d.roles); if(tabs.length){ _allowedTabs=tabs; } }
       }
     }catch(e){}
   }
-  const entered = !!(user && (role || (_allowedTabs && _allowedTabs.length)));
+  const entered = !!(user && (role || (_allowedTabs && _allowedTabs.length) || _myRoles.length));
   if(entered){
     document.getElementById('login').style.display='none';
     document.getElementById('app').style.display='block';
@@ -677,7 +722,7 @@ onAuthStateChanged(auth, async (user)=>{
     const def = allowed[0]||'yard';
     // 🏁 Empleado por TELÉFONO (identidad Pit Crew) → cae en el HOME de funciones (no directo en la herramienta).
     // Correos (capture@/listing@/empaque@/Sunmi) y dueño → EXACTAMENTE como hoy.
-    _homeMode = !!(_allowedTabs && _allowedTabs.length) && role!=='owner';
+    _homeMode = (_myRoles.length>0 || !!(_allowedTabs && _allowedTabs.length)) && role!=='owner';
     if(_homeMode){ _view=def; whGoHome(); }
     else { let saved=''; try{ saved=localStorage.getItem('lmg_wh_view')||''; }catch(e){} setView(allowed.indexOf(saved)>=0?saved:def); }
     // 🕐 Reloj: muestra config de ubicaciones al dueño y refresca el estado/horas de la semana.
@@ -741,10 +786,19 @@ window.setView=function(k){
 };
 
 // 🏁 HOME del empleado (Pit Crew dentro de Warehouse): rejilla de funciones.
-const WH_FN_TILES = {
-  yard:   { ico:'📸', label:()=>t('roleYard'),   sub:()=>t('fnYardSub')   },
-  lister: { ico:'🏷️', label:()=>t('roleLister'), sub:()=>t('fnListerSub') },
-  pack:   { ico:'📦', label:()=>t('rolePack'),   sub:()=>t('fnPackSub')   }
+// Catálogo de FUNCIONES del empleado (por rol). act = qué abre; soon = aún no construida.
+const WH_ROLE_TILES = {
+  'Captura':      { ico:'📸', es:'Captura',          en:'Capture',        subEs:'Fotos de partes',        subEn:'Part photos',    act:function(){ whOpenTool('yard'); } },
+  'Listado':      { ico:'🏷️', es:'Listado',          en:'Listing',        subEs:'Publicar en eBay',       subEn:'List on eBay',   act:function(){ whOpenTool('lister'); } },
+  'Empaque':      { ico:'📦', es:'Empaque',          en:'Packing',        subEs:'Empacar pedidos',        subEn:'Pack orders',    act:function(){ whOpenTool('pack'); } },
+  'Desmantelador':{ ico:'🚗', es:'Desmantelador',    en:'Dismantler',     subEs:'Desarmar carros',        subEn:'Dismantle cars', act:function(){ whOpenTool('yard'); } },
+  'Mecánico':     { ico:'🔧', es:'Mecánico',         en:'Mechanic',       subEs:'Mi taller',              subEn:'My shop',        act:function(){ openService(); } },
+  'Detallador':   { ico:'🧽', es:'Detallador',       en:'Detailer',       subEs:'Lavado y detallado',     subEn:'Wash & detail',  act:function(){ location.href='crew.html'; } },
+  'Fotos':        { ico:'📷', es:'Fotos',            en:'Photos',         subEs:'Fotos del carro',        subEn:'Car photos',     soon:true },
+  'Limpieza':     { ico:'🧹', es:'Limpieza',         en:'Cleaning',       subEs:'Oficina, baño, basura',  subEn:'Office, restroom, trash', soon:true },
+  'Ayudante general':{ ico:'🛠️', es:'Ayudante general', en:'General helper', subEs:'Apoyo general',       subEn:'General support', soon:true },
+  'Oficina':      { ico:'🗂️', es:'Oficina',          en:'Office',         subEs:'Oficina',                subEn:'Office',         soon:true },
+  'Ventas':       { ico:'🤝', es:'Ventas',           en:'Sales',          subEs:'Ventas',                 subEn:'Sales',          soon:true }
 };
 window.whGoHome=function(){
   _carView='';
@@ -758,14 +812,20 @@ window.whGoHome=function(){
 };
 function renderHomeTiles(){
   const box=document.getElementById('home-tiles'); if(!box) return;
-  const tabs=(_allowedTabs&&_allowedTabs.length)?_allowedTabs:['yard'];
-  box.innerHTML=tabs.map(k=>{ const m=WH_FN_TILES[k]||{ico:'•',label:()=>k,sub:()=>''};
-    return '<div onclick="whOpenTool(\''+k+'\')" style="cursor:pointer;background:var(--card,#141922);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px 14px;text-align:center;">'
+  const seen={}; const list=(_myRoles&&_myRoles.length?_myRoles:[]).filter(r=>{ if(seen[r])return false; seen[r]=1; return WH_ROLE_TILES[r]; });
+  const emptyEl=document.getElementById('home-empty');
+  if(!list.length){ box.innerHTML=''; if(emptyEl) emptyEl.style.display='block'; return; }
+  if(emptyEl) emptyEl.style.display='none';
+  box.innerHTML=list.map(r=>{ const m=WH_ROLE_TILES[r]; const label=(L==='en'?m.en:m.es); const sub=(L==='en'?m.subEn:m.subEs);
+    const rid=r.replace(/[^a-zA-ZÀ-ÿ ]/g,'');
+    const soon=m.soon?('<div class="faint" style="position:absolute;top:8px;right:10px;font-size:9px;font-weight:800;letter-spacing:.06em;">'+(L==='en'?'SOON':'PRONTO')+'</div>'):'';
+    return '<div onclick="whRoleTap(\''+rid+'\')" style="position:relative;cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 14px;text-align:center;'+(m.soon?'opacity:.6;':'')+'">'+soon
       +'<div style="font-size:34px;line-height:1;margin-bottom:8px;">'+m.ico+'</div>'
-      +'<div style="font-weight:800;font-size:15px;">'+m.label()+'</div>'
-      +'<div class="sub" style="font-size:12px;margin-top:2px;">'+m.sub()+'</div></div>';
+      +'<div style="font-weight:800;font-size:15px;">'+label+'</div>'
+      +'<div class="sub" style="font-size:12px;margin-top:2px;">'+sub+'</div></div>';
   }).join('');
 }
+window.whRoleTap=function(rid){ const key=Object.keys(WH_ROLE_TILES).find(k=>k.replace(/[^a-zA-ZÀ-ÿ ]/g,'')===rid); const m=key?WH_ROLE_TILES[key]:null; if(!m) return; if(m.soon){ whToast((L==='en'?'🚧 Coming soon: ':'🚧 Muy pronto: ')+(L==='en'?m.en:m.es)); return; } try{ m.act(); }catch(e){} };
 window.whOpenTool=function(k){ document.body.classList.remove('wh-home'); setView(k); try{ window.scrollTo(0,0); }catch(e){} };
 
 // ===================== 📋 MI JORNADA (tareas guiadas, portado de crew) =====================
@@ -997,6 +1057,141 @@ window.loadCarsProc=async function(){
       +'<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:15px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+esc(c.label)+'</div>'
       +'<div class="faint" style="font-size:12px;margin-top:2px;">📍 '+stage+(bits.length?(' · '+bits.join(' · ')):'')+'</div></div></div>';
   }).join('');
+};
+
+// ===================== 🔧 MECÁNICO: Mi taller (portado de crew) =====================
+const SVC_ST={ agendado:{k:'svcAgendado',c:'#0a84ff'}, por_recibir:{k:'svcPorRecibir',c:'#c9a84c'}, recibido:{k:'svcRecibido',c:'#c9a84c'}, en_proceso:{k:'svcEnProceso',c:'#32d74b'}, pausado_partes:{k:'svcPausado',c:'#ff9800'}, listo:{k:'svcListo',c:'#32d74b'}, entregado:{k:'svcEntregado',c:'#8a8fa8'} };
+function svcStLabel(st){ const s=SVC_ST[st]; return s?t(s.k):st; }
+const MECH_TASK_ST={ cola:{k:'stCola',c:'#c9a84c'}, en_proceso:{k:'stProc',c:'#32d74b'}, hecho:{k:'stDone',c:'#8a8fa8'} };
+let SVC_MY=[], MECH_CARS=[], MECH_CUR=null, MECH_TASKS=[], MECH_PREP=[], MECH_ADDCAR=null;
+window.openService=function(){ document.getElementById('view-service').classList.remove('hide'); const b=document.getElementById('mech-addtask-btn'); if(b) b.classList.toggle('hide', role!=='owner'); loadMyService(); try{window.scrollTo(0,0);}catch(e){} };
+window.svcBack=function(){ document.getElementById('view-service').classList.add('hide'); };
+window.loadMyService=async function(){
+  loadMechCars(); loadMechTasks();
+  const box=document.getElementById('svc-emp-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
+  try{ const r=await httpsCallable(functions,'svcMyOrders')({}); SVC_MY=((r&&r.data)||{}).orders||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadErr')+'</div>'; return; }
+  renderMyService();
+};
+async function loadMechCars(){
+  const box=document.getElementById('mech-cars-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
+  try{ const r=await httpsCallable(functions,'mechCars')({}); MECH_CARS=((r&&r.data)||{}).cars||[]; }
+  catch(e){ MECH_CARS=[]; if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jCouldnt')+'</div>'; return; }
+  renderMechCars();
+}
+function renderMechCars(){
+  const box=document.getElementById('mech-cars-list'); if(!box) return;
+  if(!MECH_CARS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:16px;line-height:1.5;">'+t('noCars')+'</div>'; return; }
+  box.innerHTML=MECH_CARS.map(c=>{
+    const when=c.createdAt?(t('received')+' '+new Date(c.createdAt).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'2-digit',month:'short'})):'';
+    const photo=c.photo?('<img src="'+c.photo+'" alt="" style="width:54px;height:54px;border-radius:10px;object-fit:cover;flex:0 0 auto;">'):'<div style="width:54px;height:54px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px;flex:0 0 auto;">🚗</div>';
+    return '<div class="card" style="padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:center;">'+photo
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:15px;">'+esc(c.label)+'</div>'
+      +'<div class="faint" style="font-size:12px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+when+'</div>'
+      +(c.inspStarted?'<div style="font-size:11px;color:var(--gold);margin-top:2px;">'+t('inspStarted')+'</div>':'')+'</div>'
+      +'<button class="btn-gold" style="width:auto;padding:9px 13px;font-size:13px;flex:0 0 auto;" onclick="mechOpenIntake(\''+c.id+'\')">'+(c.inspStarted?t('continueBtn'):t('inspectBtn'))+'</button></div>';
+  }).join('');
+}
+window.mechOpenIntake=function(carId){
+  const c=MECH_CARS.find(x=>x.id===carId); if(!c) return; MECH_CUR=c;
+  const when=c.createdAt?new Date(c.createdAt).toLocaleString(L==='en'?'en-US':'es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—';
+  document.getElementById('mech-intake-body').innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2 style="font-size:19px;margin:0;">'+t('vehReception')+'</h2><button class="linkbtn" onclick="mechCloseIntake()" style="font-size:26px;color:var(--muted);line-height:1;">×</button></div>'
+    +'<div class="card" style="padding:12px;margin-bottom:14px;"><div style="font-weight:800;font-size:16px;">'+esc(c.label)+'</div>'
+    +'<div class="faint" style="font-size:12.5px;margin-top:4px;line-height:1.6;">'+(c.inventoryNum?(t('invNumLbl')+' '+esc(c.inventoryNum)+'<br>'):'')+(c.vin?('VIN '+esc(c.vin)+'<br>'):'')+t('recDate')+' '+when+'</div></div>'
+    +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">'+t('milesReceive')+'</label>'
+    +'<input id="mech-miles" type="number" inputmode="numeric" value="'+esc(c.receivedMiles||'')+'" placeholder="'+t('milesPh')+'" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:16px;">'
+    +'<button class="btn-gold" style="width:100%;" onclick="mechStartInspection()">'+(c.inspStarted?t('contInsp'):t('startInsp'))+'</button>'
+    +'<div class="faint" style="font-size:11.5px;text-align:center;margin-top:10px;line-height:1.5;">'+t('dviNote')+'</div>';
+  document.getElementById('mech-intake').classList.remove('hide');
+};
+window.mechCloseIntake=function(){ document.getElementById('mech-intake').classList.add('hide'); };
+window.mechStartInspection=async function(){
+  if(!MECH_CUR) return;
+  const miles=(document.getElementById('mech-miles').value||'').trim();
+  if(!miles){ whToast(L==='en'?'Enter the miles.':'Pon las millas.',true); return; }
+  try{ await httpsCallable(functions,'mechCarIntake')({ carId:MECH_CUR.id, receivedMiles:miles });
+    whToast(L==='en'?'✅ Miles saved · inspection started':'✅ Millas registradas · inspección iniciada');
+    mechCloseIntake(); loadMechCars();
+  }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+async function loadMechTasks(){
+  const box=document.getElementById('mech-tasks-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
+  try{ const r=await httpsCallable(functions,'mechTasks')({}); MECH_TASKS=((r&&r.data)||{}).tasks||[]; }
+  catch(e){ MECH_TASKS=[]; if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jCouldnt')+'</div>'; return; }
+  renderMechTasks();
+}
+function renderMechTasks(){
+  const box=document.getElementById('mech-tasks-list'); if(!box) return;
+  if(!MECH_TASKS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:16px;line-height:1.5;">'+t('noJobs')+((role==='owner')?t('noJobsOwner'):'')+'</div>'; return; }
+  const byCar={}; MECH_TASKS.forEach(x=>{ (byCar[x.carId]=byCar[x.carId]||{label:x.carLabel,inv:x.inventoryNum,carId:x.carId,items:[]}).items.push(x); });
+  box.innerHTML=Object.values(byCar).map(g=>{
+    const rows=g.items.map(x=>{
+      const opts=Object.keys(MECH_TASK_ST).map(k=>'<option value="'+k+'" '+(k===x.status?'selected':'')+'>'+t(MECH_TASK_ST[k].k)+'</option>').join('');
+      return '<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);"><span style="flex:1;min-width:0;font-size:14px;">'+esc(x.title)+'</span>'
+        +'<select onchange="carTaskSetStatus(\''+x.id+'\',this.value)" style="padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;">'+opts+'</select></div>';
+    }).join('');
+    const addBtn=(role==='owner')?'<button class="linkbtn" onclick="mechOpenAddTask(\''+g.carId+'\')" style="font-size:12px;color:var(--gold);margin-top:6px;">'+t('otherJob')+'</button>':'';
+    return '<div class="card" style="padding:12px 14px;margin-bottom:10px;"><div style="font-weight:800;font-size:15px;">'+(g.inv?('#'+esc(g.inv)+' · '):'')+esc(g.label)+'</div>'+rows+addBtn+'</div>';
+  }).join('');
+}
+window.carTaskSetStatus=async function(taskId,status){
+  try{ await httpsCallable(functions,'carTaskStatus')({taskId:taskId,status:status}); whToast(t('updated')||'✅'); loadMechTasks(); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+window.mechOpenAddTask=async function(carId){
+  if(role!=='owner') return;
+  MECH_ADDCAR = (typeof carId==='string'&&carId) ? carId : null;
+  document.getElementById('mech-addtask-body').innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2 style="font-size:19px;margin:0;">'+(L==='en'?'Add a job':'Agregar trabajo')+'</h2><button class="linkbtn" onclick="mechCloseAddTask()" style="font-size:26px;color:var(--muted);line-height:1;">×</button></div><div id="mech-addtask-inner"><div class="faint" style="text-align:center;padding:14px;">'+t('jLoadingTxt')+'</div></div>';
+  document.getElementById('mech-addtask').classList.remove('hide');
+  if(!MECH_PREP.length){ try{ const r=await httpsCallable(functions,'invPrepList')({}); MECH_PREP=((r&&r.data)||{}).cars||[]; }catch(e){ MECH_PREP=[]; } }
+  renderAddTaskForm();
+};
+function renderAddTaskForm(){
+  const inner=document.getElementById('mech-addtask-inner'); if(!inner) return;
+  const sel = MECH_ADDCAR ? (MECH_PREP.find(c=>c.id===MECH_ADDCAR)) : null;
+  const FLD='width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;margin-bottom:14px;';
+  let carUI;
+  if(sel){ carUI='<div class="card" style="padding:11px 13px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:700;">'+(sel.inventoryNum?('#'+esc(sel.inventoryNum)+' · '):'')+esc(sel.label)+'</span><button class="linkbtn" onclick="MECH_ADDCAR=null;renderAddTaskForm()" style="font-size:12px;color:var(--muted);">'+(L==='en'?'change':'cambiar')+'</button></div>'; }
+  else { const opts='<option value="">'+t('chooseCar')+'</option>'+MECH_PREP.map(c=>'<option value="'+c.id+'">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+esc(c.label)+'</option>').join('');
+    carUI='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">'+t('svcCar')+'</label><select id="mech-addtask-car" onchange="MECH_ADDCAR=this.value;renderAddTaskForm()" style="'+FLD+'">'+opts+'</select>'; }
+  inner.innerHTML=carUI
+    +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">'+t('whatToDo')+'</label>'
+    +'<input id="mech-task-title" autocapitalize="sentences" placeholder="'+t('whatToDoPh')+'" style="'+FLD+'">'
+    +'<button class="btn-gold" style="width:100%;" onclick="mechAddTaskSave()">'+t('addToQueue')+'</button>';
+}
+window.mechCloseAddTask=function(){ document.getElementById('mech-addtask').classList.add('hide'); };
+window.mechAddTaskSave=async function(){
+  const carId=MECH_ADDCAR||''; const title=(document.getElementById('mech-task-title').value||'').trim();
+  if(!carId){ whToast(L==='en'?'Choose the car.':'Elige el carro.',true); return; }
+  if(!title){ whToast(L==='en'?'Write what needs to be done.':'Escribe qué se le va a hacer.',true); return; }
+  try{ await httpsCallable(functions,'carTaskAdd')({ carId:carId, title:title }); whToast(L==='en'?'✅ Job added':'✅ Trabajo agregado'); mechCloseAddTask(); loadMechTasks(); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+function renderMyService(){
+  const box=document.getElementById('svc-emp-list'); if(!box) return;
+  if(!SVC_MY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:30px 20px;line-height:1.6;" data-i18n-html="svcNoOrders">'+t('svcNoOrders')+'</div>'; return; }
+  box.innerHTML=SVC_MY.map(o=>{
+    const s=SVC_ST[o.status]||{c:'#8a8fa8'};
+    const when=o.scheduledAt?('📅 '+new Date(o.scheduledAt).toLocaleString(L==='en'?'en-US':'es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})):t('svcNow');
+    const car=esc(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
+    const idbits=[o.plate?('🪪 '+esc(o.plate)):'', o.vin?('VIN …'+esc((o.vin||'').slice(-6))):''].filter(Boolean).join(' · ');
+    const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
+    let actions='';
+    if(o.status==='por_recibir'||o.status==='agendado') actions='<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'recibido\')">'+t('svcReceiveCar')+'</button>';
+    else if(o.status==='recibido') actions='<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcStartWork')+'</button>';
+    else if(o.status==='en_proceso') actions='<div style="display:flex;gap:8px;"><button class="btn-ghost" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'pausado_partes\')">'+t('svcWaitParts')+'</button><button class="btn-gold" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'listo\')">'+t('svcReady')+'</button></div>';
+    else if(o.status==='pausado_partes') actions='<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcResume')+'</button>';
+    return '<div class="card" style="padding:14px;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-weight:800;font-size:16px;">'+esc(o.clientName||'')+'</span><span style="font-size:11px;font-weight:800;color:'+s.c+';background:'+s.c+'22;padding:3px 9px;border-radius:999px;white-space:nowrap;">'+svcStLabel(o.status)+'</span></div>'
+      +'<div style="font-size:14px;margin-bottom:3px;">🚗 '+car+'</div>'
+      +(idbits?'<div class="faint" style="font-size:12px;margin-bottom:6px;">'+idbits+'</div>':'')
+      +'<div style="font-size:14px;background:var(--surface2);border-radius:9px;padding:8px 10px;line-height:1.4;margin-bottom:8px;">🔧 '+esc(o.reason||'')+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-bottom:10px;">'+when+(phone?(' · <a href="sms:'+phone+'" style="color:var(--gold);text-decoration:none;">'+t('svcMsg')+'</a>'):'')+'</div>'+actions+'</div>';
+  }).join('');
+}
+window.svcAdvance=async function(orderId,status){
+  try{ await httpsCallable(functions,'svcOrderStatus')({orderId:orderId,status:status}); whToast(t('updated')||'✅'); loadMyService(); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 
 // ---- 💬 CHAT INTERNO multi-canal (tiempo real) ----
