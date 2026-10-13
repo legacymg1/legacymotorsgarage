@@ -1388,6 +1388,19 @@ exports.taskComplete = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true };
 });
 
+// 👑 PANEL DEL DUEÑO — todas las tareas abiertas (Pit) para el centro de operación. Solo dueños.
+exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  let snap; try { snap = await db.collection("tasks").get(); } catch (e) { return { ok: true, tasks: [] }; }
+  const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.isTemplate && t.status !== "hecho");
+  list.sort((a, b) => (a.order || 0) - (b.order || 0));
+  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length }; });
+  return { ok: true, tasks: out };
+});
+
 // 👑 Panel del dueño en Pit Crew: listar y gestionar el equipo desde el teléfono. Solo dueños.
 exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");

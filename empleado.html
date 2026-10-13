@@ -160,13 +160,25 @@
     <button class="acct-signout" onclick="doSignOut()">🚪 <span data-i18n="signOut">Cerrar sesión</span></button>
   </div>
 
-  <!-- Reloj -->
+  <!-- Reloj (SOLO empleados; sin el contador grande de horas — el detalle vive en el menú de cuenta) -->
   <div class="clock-card">
     <div id="clk-status" class="clock-status muted">Fuera</div>
-    <div id="clk-hours" class="clock-hours">0.00 h</div>
-    <div class="faint" data-i18n="thisWeek" style="font-size:12px;margin-bottom:16px;">esta semana</div>
+    <div id="clk-hours" class="clock-hours" style="display:none;">0.00 h</div>
+    <div class="faint" data-i18n="thisWeek" style="font-size:12px;margin-bottom:16px;display:none;">esta semana</div>
     <button id="clk-btn" class="btn btn-green" onclick="punch()">🟢 Registrar entrada</button>
     <div id="clk-note" class="faint" style="font-size:11px;margin-top:10px;"></div>
+  </div>
+
+  <!-- Panel de operación (SOLO dueños; va en el lugar del reloj) -->
+  <div id="owner-panel" class="hide">
+    <div id="op-summary" style="display:flex;gap:8px;margin-bottom:12px;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div class="sec-title" style="margin:0;">📋 Pendientes (Pit)</div>
+      <button class="btn btn-gold" onclick="jobAddOpen()" style="width:auto;padding:7px 13px;font-size:13px;">➕ Agregar</button>
+    </div>
+    <div id="op-tasks" style="max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:4px 10px;">
+      <div class="faint" style="text-align:center;padding:16px;">Cargando…</div>
+    </div>
   </div>
 
   <!-- Admin (solo dueños) -->
@@ -522,6 +534,10 @@ function renderHome(){
   document.getElementById('acct-name').textContent = ME.name || t('team');
   document.getElementById('acct-roles').textContent = (Array.isArray(ME.roles)&&ME.roles.length)?ME.roles.join(' · '):(ME.isOwner?'👑':'');
   document.getElementById('home-admin-btn').classList.toggle('hide', !ME.isOwner);
+  // Los dueños NO fichan: en el lugar del reloj va el PANEL DE OPERACIÓN (pendientes del Pit).
+  const _ck=document.querySelector('.clock-card'); if(_ck) _ck.style.display = ME.isOwner ? 'none' : '';
+  const _op=document.getElementById('owner-panel'); if(_op) _op.classList.toggle('hide', !ME.isOwner);
+  if(ME.isOwner){ try{ loadOwnerPanel(); }catch(e){} }
   const roles = Array.isArray(ME.roles)?ME.roles:[];
   const box=document.getElementById('home-tiles'); const none=document.getElementById('home-noroles');
   if(!roles.length){ box.classList.add('hide'); none.classList.remove('hide'); return; }
@@ -896,9 +912,32 @@ window.jobAddSave=async function(){
   if(daily && !emp){ toast('La tarea diaria necesita un empleado específico.',true); return; }
   try{
     await httpsCallable(functions,'taskAdd')({ title:title, line:line, checklist:steps, assignEmpId:emp, assignRole:emp?'':role, recurring:daily?'daily':'none' });
-    toast('✅ Tarea creada'); jobAddClose(); loadJourney();
+    toast('✅ Tarea creada'); jobAddClose();
+    try{ loadJourney(); }catch(e){}
+    if(ME&&ME.isOwner){ try{ loadOwnerPanel(); }catch(e){} }
   }catch(e){ toast((e&&e.message)||'No se pudo crear',true); }
 };
+
+// 👑 Panel de operación del dueño (en el lugar del reloj) — pendientes del Pit con scroll + resumen.
+let OP_TASKS=[];
+window.loadOwnerPanel=async function(){
+  const box=document.getElementById('op-tasks'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'allTasks')({}); OP_TASKS=((r&&r.data)||{}).tasks||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudo cargar.</div>'; return; }
+  renderOwnerPanel();
+};
+function renderOwnerPanel(){
+  const sum=document.getElementById('op-summary');
+  const open=OP_TASKS.length, prog=OP_TASKS.filter(t=>t.status==='en_proceso').length;
+  if(sum) sum.innerHTML=[['📋',open,'pendientes'],['🔧',prog,'en proceso']].map(x=>'<div style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:800;">'+x[1]+'</div><div class="faint" style="font-size:11px;">'+x[2]+'</div></div>').join('');
+  const box=document.getElementById('op-tasks'); if(!box) return;
+  if(!OP_TASKS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:18px;line-height:1.5;">Sin pendientes todavía.<br>Toca <b>➕ Agregar</b>.</div>'; return; }
+  box.innerHTML=OP_TASKS.map(t=>{
+    const total=t.steps||0, done=t.done||0, pr=total?(' · '+done+'/'+total):'';
+    const who=t.assignName?('👤 '+svcEscE(t.assignName)):(t.assignRole?('👥 '+svcEscE(t.assignRole)):'— sin asignar');
+    return '<div style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+svcEscE(t.title)+'</span>'+lineBadge(t.line)+'</div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+' · '+(t.status==='en_proceso'?'en proceso':'por empezar')+pr+'</div></div>';
+  }).join('');
+}
 function renderMyService(){
   const box=document.getElementById('svc-emp-list'); if(!box) return;
   if(!SVC_MY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:40px 20px;line-height:1.6;">No tienes órdenes de servicio ahora.<br>Cuando te asignen un carro, aquí aparece.</div>'; return; }
