@@ -365,6 +365,29 @@
   </div>
 </div>
 
+<!-- ===== NÓMINA DE LA SEMANA (dueños) ===== -->
+<div id="screen-payroll" class="wrap hide">
+  <div class="topbar">
+    <button class="linkbtn" onclick="show('screen-home');loadClock();" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;">👑 Admin</div><h2 style="font-size:20px;" data-i18n="payrollH">Nómina de la semana</h2></div>
+    <button class="linkbtn" onclick="loadPayroll()" style="font-size:20px;padding:0 6px;" title="⟳">⟳</button>
+  </div>
+  <div class="faint" style="font-size:12.5px;margin-bottom:12px;" data-i18n="payrollNote">Estimado hasta hoy — no es el pago final.</div>
+  <div id="payroll-total" class="clock-card" style="margin:0 0 14px;padding:16px;"></div>
+  <div id="payroll-list"></div>
+  <button class="btn btn-ghost" onclick="openAdmin()" style="margin-top:16px;" data-i18n="openTeam">👑 Administrar equipo</button>
+</div>
+
+<!-- ===== CARROS EN PROCESO (dueños) ===== -->
+<div id="screen-cars" class="wrap hide">
+  <div class="topbar">
+    <button class="linkbtn" onclick="show('screen-home');loadClock();" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;">👑 Admin</div><h2 style="font-size:20px;" data-i18n="carsProcH">Carros en proceso</h2></div>
+    <button class="linkbtn" onclick="loadCarsProc()" style="font-size:20px;padding:0 6px;" title="⟳">⟳</button>
+  </div>
+  <div id="cars-list"><div class="faint" style="text-align:center;padding:16px;">…</div></div>
+</div>
+
 <!-- ===== ADMIN (dueños): gestión del equipo ===== -->
 <div id="screen-admin" class="wrap hide">
   <div class="topbar">
@@ -433,7 +456,7 @@ const ROLE_TILES = {
   'Ventas':            { ico:'🤝', sub:'Ventas', ready:false },
 };
 
-function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail','screen-service','screen-journey','screen-admin'].forEach(s=>{ const el=document.getElementById(s); if(el) el.classList.toggle('hide', s!==id); }); }
+function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail','screen-service','screen-journey','screen-payroll','screen-cars','screen-admin'].forEach(s=>{ const el=document.getElementById(s); if(el) el.classList.toggle('hide', s!==id); }); }
 function toast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); clearTimeout(window._tt); window._tt=setTimeout(()=>{t.className='toast'+(isErr?' err':'');},3200); }
 
 // ---------- Bilingüe (ES / EN) ----------
@@ -507,6 +530,12 @@ Object.assign(T.en, {
   clkEnteredAt:'Clocked in at', clkBreakSince:'Break since', clkMustSite:'You must be at the Dealer or the Yard to clock in.', clkWorking:'working',
   updated:'✅ Updated', loading:'Loading…', couldntLoad:'Could not load.'
 });
+Object.assign(T.es, { navTeamPay:'Equipo y nómina', navCarsProc:'Carros en proceso', navNewTask:'Nueva tarea / pendiente',
+  payrollH:'Nómina de la semana', payrollNote:'Estimado hasta hoy — no es el pago final.', payTotal:'Total estimado', hoursW:'horas', openTeam:'👑 Administrar equipo',
+  carsProcH:'Carros en proceso', stMecanico:'Mecánico', stPintura:'Pintura', stDetalle:'Detalle', stListo:'Listo', jobsN:'trabajos', inspPending:'Inspección pendiente', inProcNone:'No hay carros en proceso ahora.', onShift:'en turno', nobodyIn:'Nadie marcó entrada esta semana.' });
+Object.assign(T.en, { navTeamPay:'Team & payroll', navCarsProc:'Cars in process', navNewTask:'New task / to-do',
+  payrollH:"This week's payroll", payrollNote:'Estimate so far — not the final pay.', payTotal:'Estimated total', hoursW:'hours', openTeam:'👑 Manage team',
+  carsProcH:'Cars in process', stMecanico:'Mechanic', stPintura:'Paint', stDetalle:'Detail', stListo:'Ready', jobsN:'jobs', inspPending:'Inspection pending', inProcNone:'No cars in process right now.', onShift:'on shift', nobodyIn:'Nobody clocked in this week.' });
 Object.assign(T.es, { journeyH:'Mi jornada', journeyKicker:'📋 Jornada', mechKicker:'🔧 Mecánico',
   detKicker:'🧽 Detallador', detStart:'➕ Empezar un carro', detToday:'Hoy',
   detPickHint:'Elige el carro que vas a detallar. Son los que están <b style="color:#ff9800;">🔧 En prep</b> en el inventario.',
@@ -547,6 +576,7 @@ function applyI18n(){
   if(es) es.classList.toggle('active', LANG==='es'); if(en) en.classList.toggle('active', LANG==='en');
   const aes=document.getElementById('acct-es'), aen=document.getElementById('acct-en');
   if(aes) aes.classList.toggle('active', LANG==='es'); if(aen) aen.classList.toggle('active', LANG==='en');
+  try{ setLegacyActions(); }catch(e){}
   if(ME){ try{ renderHome(); }catch(e){} try{ renderClock(); }catch(e){} }
 }
 
@@ -1275,6 +1305,51 @@ window.resumeJob = function(id){
 };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+// 👑 F6 — NÓMINA de la semana + CARROS en proceso =========================
+const STAGE_KEY={ mecanico:'stMecanico', pintura:'stPintura', detalle:'stDetalle', listo:'stListo' };
+window.openPayroll=function(){ if(!(ME&&ME.isOwner)) return; show('screen-payroll'); loadPayroll(); };
+window.loadPayroll=async function(){
+  const tot=document.getElementById('payroll-total'), box=document.getElementById('payroll-list');
+  if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('loading')+'</div>';
+  let d={};
+  try{ const r=await httpsCallable(functions,'clockWeek')({}); d=(r&&r.data)||{}; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('couldntLoad')+'</div>'; return; }
+  const list=d.list||[];
+  if(tot) tot.innerHTML='<div class="clock-status muted">'+t('payTotal')+'</div><div class="clock-hours" style="color:var(--gold);">$'+(Number(d.totalPay)||0).toFixed(2)+'</div>';
+  if(!list.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:24px;">'+t('nobodyIn')+'</div>'; return; }
+  box.innerHTML=list.map(e=>{
+    const pay=Number(e.pay)||0, hrs=Number(e.hours)||0;
+    return '<div class="card" style="padding:13px 14px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+      +'<div style="min-width:0;"><div style="font-weight:800;">'+svcEscE(e.name||'')+(e.open?' <span style="color:var(--green);font-size:11px;">● '+t('onShift')+'</span>':'')+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">'+hrs.toFixed(2)+' '+t('hoursW')+(e.rate?(' · $'+Number(e.rate).toFixed(2)+'/h'):'')+'</div></div>'
+      +'<div style="font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;">$'+pay.toFixed(2)+'</div></div>';
+  }).join('');
+};
+window.openCarsProc=function(){ if(!(ME&&ME.isOwner)) return; show('screen-cars'); loadCarsProc(); };
+window.loadCarsProc=async function(){
+  const box=document.getElementById('cars-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('loading')+'</div>';
+  let cars=[];
+  try{ const r=await httpsCallable(functions,'carsInProcess')({}); cars=((r&&r.data)||{}).cars||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('couldntLoad')+'</div>'; return; }
+  if(!cars.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:24px;">'+t('inProcNone')+'</div>'; return; }
+  box.innerHTML=cars.map(c=>{
+    const photo=c.photo?('<img src="'+c.photo+'" alt="" style="width:50px;height:50px;border-radius:10px;object-fit:cover;flex:0 0 auto;">'):'<div style="width:50px;height:50px;border-radius:10px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto;">🚗</div>';
+    const stage=t(STAGE_KEY[c.reconStage]||'stMecanico');
+    const bits=[]; if(c.tasks) bits.push('🔧 '+c.tasks+' '+t('jobsN')); if(c.reconStage==='mecanico' && !c.inspStarted) bits.push(t('inspPending'));
+    return '<div class="card" style="padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:center;">'+photo
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:15px;">'+(c.inventoryNum?('#'+svcEscE(c.inventoryNum)+' · '):'')+svcEscE(c.label)+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">📍 '+stage+(bits.length?(' · '+bits.join(' · ')):'')+'</div></div></div>';
+  }).join('');
+};
+// Menús del logo de Pit Crew (solo dueños), bilingües. Se re-arman al cambiar idioma.
+function setLegacyActions(){
+  window.LEGACY_ACTIONS = [
+    { label:t('navTeamPay'), ico:'👑', fn:'openPayroll' },
+    { label:t('navCarsProc'), ico:'🚗', fn:'openCarsProc' },
+    { label:t('navNewTask'), ico:'➕', fn:'jobAddOpen' }
+  ];
+}
+
 // ========================= ADMIN (dueños): gestión del equipo =========================
 let ADM_EMPS=[], ADM_ROLES=[], admEditId=null, admSel=[];
 window.openAdmin=function(){ if(!ME||!ME.isOwner){ toast('Solo dueños.',true); return; } show('screen-admin'); adminListView(); loadAdmin(); };
@@ -1326,13 +1401,6 @@ window.adminSave=async function(){
 
 // Aplica el idioma al cargar (login en ES/EN según elección guardada o el teléfono).
 applyI18n();
-</script>
-<!-- Menús del logo de Pit Crew (solo dueños; reemplaza la navegación genérica vieja). Más opciones (Nómina, Carros/partes) se agregan al construirlas. -->
-<script>
-  window.LEGACY_ACTIONS = [
-    { label:'Equipo', ico:'👑', fn:'openAdmin' },
-    { label:'Nueva tarea / pendiente', ico:'➕', fn:'jobAddOpen' }
-  ];
 </script>
 <script type="module" src="launcher.js"></script>
 </body>

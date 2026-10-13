@@ -1401,6 +1401,27 @@ exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   return { ok: true, tasks: out };
 });
 
+// 👑 CARROS Y PARTES EN PROCESO (dueño): inventario en prep con su etapa, inspección y # de trabajos pendientes.
+exports.carsInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  let snap; try { snap = await db.collection("inventory").where("status", "==", "prep").get(); } catch (e) { return { ok: true, cars: [] }; }
+  const taskCount = {};
+  try { const ts = await db.collection("car_tasks").get(); ts.forEach((d) => { const x = d.data() || {}; if (x.status !== "hecho" && x.carId) taskCount[x.carId] = (taskCount[x.carId] || 0) + 1; }); } catch (e) {}
+  const cars = [];
+  snap.forEach((d) => {
+    const c = d.data() || {};
+    const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
+    const photo = (Array.isArray(c.photos) && c.photos[0]) || c.img || "";
+    const insp = c.inspection || {};
+    cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), reconStage: c.reconStage || "mecanico", receivedMiles: String(c.receivedMiles || ""), inspStarted: !!insp.startedAt, tasks: taskCount[d.id] || 0 });
+  });
+  cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
+  return { ok: true, cars };
+});
+
 // Índice de empleados por TELÉFONO (emp_phones/{phoneE164}) → lo usan las reglas de Firestore
 // para reconocer al empleado (por teléfono) en las herramientas de la yarda, sin darle acceso de dueño.
 async function _syncEmpPhone(db, empId) {
@@ -1574,8 +1595,8 @@ exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
 // Panel del dueño (Finanzas): horas + pago de la semana por persona (correo o teléfono).
 exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
-  const email = ((request.auth.token && request.auth.token.email) || "").toLowerCase();
-  if (!OWNER_EMAILS.includes(email)) throw new HttpsError("permission-denied", "Solo dueños.");
+  const _wid = await _actorIdentity(request);
+  if (!_wid || !_wid.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");   // dueño por correo O por teléfono (flag owner)
   const db = admin.firestore();
   const cfg = await _tcConfig();
   const rates = cfg.rates || {};
