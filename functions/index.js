@@ -1350,7 +1350,7 @@ exports.myTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   }
   const list = all.filter((t) => !t.isTemplate && t.status !== "hecho" && _taskMine(t, id));
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], status: t.status || "cola", assignName: t.assignName || "" }));
+  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], status: t.status || "cola", assignName: t.assignName || "", pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }));
   return { ok: true, tasks: out, today };
 });
 exports.taskStep = onCall({ timeoutSeconds: 20 }, async (request) => {
@@ -1388,6 +1388,36 @@ exports.taskComplete = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true };
 });
 
+// 🔧 F4 — Ejecución de tareas: pausar (con motivo) / reanudar / reportar problema.
+exports.taskAction = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const d = request.data || {};
+  const taskId = String(d.taskId || ""); const op = String(d.op || "");
+  if (!taskId) throw new HttpsError("invalid-argument", "Falta la tarea.");
+  const db = admin.firestore(); const ref = db.collection("tasks").doc(taskId);
+  const snap = await ref.get(); if (!snap.exists) throw new HttpsError("not-found", "No existe.");
+  const tsk = snap.data() || {};
+  if (!_taskMine(tsk, id)) throw new HttpsError("permission-denied", "No es tu tarea.");
+  const nowIso = new Date().toISOString();
+  if (op === "pause") {
+    const reason = String(d.reason || "").trim().slice(0, 200);
+    await ref.set({ status: "pausada", pausedReason: reason, pausedAt: nowIso, updatedAt: nowIso }, { merge: true });
+    return { ok: true };
+  }
+  if (op === "resume") {
+    await ref.set({ status: "en_proceso", pausedReason: "", updatedAt: nowIso }, { merge: true });
+    return { ok: true };
+  }
+  if (op === "problem") {
+    const text = String(d.text || "").trim().slice(0, 300); if (!text) throw new HttpsError("invalid-argument", "Falta el detalle.");
+    await ref.set({ problems: admin.firestore.FieldValue.arrayUnion({ text: text, by: id.name || id.email || id.empId || "", at: nowIso }), needsHelp: true, updatedAt: nowIso }, { merge: true });
+    return { ok: true };
+  }
+  throw new HttpsError("invalid-argument", "Operación inválida.");
+});
+
 // 👑 PANEL DEL DUEÑO — todas las tareas abiertas (Pit) para el centro de operación. Solo dueños.
 exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
@@ -1397,7 +1427,7 @@ exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   let snap; try { snap = await db.collection("tasks").get(); } catch (e) { return { ok: true, tasks: [] }; }
   const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.isTemplate && t.status !== "hecho");
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length }; });
+  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length, pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }; });
   return { ok: true, tasks: out };
 });
 

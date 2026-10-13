@@ -536,6 +536,10 @@ Object.assign(T.es, { navTeamPay:'Equipo y nómina', navCarsProc:'Carros en proc
 Object.assign(T.en, { navTeamPay:'Team & payroll', navCarsProc:'Cars in process', navNewTask:'New task / to-do',
   payrollH:"This week's payroll", payrollNote:'Estimate so far — not the final pay.', payTotal:'Estimated total', hoursW:'hours', openTeam:'👑 Manage team',
   carsProcH:'Cars in process', stMecanico:'Mechanic', stPintura:'Paint', stDetalle:'Detail', stListo:'Ready', jobsN:'jobs', inspPending:'Inspection pending', inProcNone:'No cars in process right now.', onShift:'on shift', nobodyIn:'Nobody clocked in this week.' });
+Object.assign(T.es, { jPause:'⏸️ Pausar', jResume:'▶️ Reanudar', jProblem:'⚠️ Reportar problema', jPaused:'⏸️ Pausada',
+  jPauseReason:'¿Por qué pausas? (motivo)', jProblemReason:'¿Qué problema hay?', jReported:'✅ Reportado — avisamos al dueño' });
+Object.assign(T.en, { jPause:'⏸️ Pause', jResume:'▶️ Resume', jProblem:'⚠️ Report problem', jPaused:'⏸️ Paused',
+  jPauseReason:'Why are you pausing? (reason)', jProblemReason:'What is the problem?', jReported:'✅ Reported — owner notified' });
 Object.assign(T.es, { journeyH:'Mi jornada', journeyKicker:'📋 Jornada', mechKicker:'🔧 Mecánico',
   detKicker:'🧽 Detallador', detStart:'➕ Empezar un carro', detToday:'Hoy',
   detPickHint:'Elige el carro que vas a detallar. Son los que están <b style="color:#ff9800;">🔧 En prep</b> en el inventario.',
@@ -1022,7 +1026,7 @@ function renderJourney(){
     const next=(i===0)?'<div style="font-size:11px;color:var(--gold,#c9a84c);font-weight:800;letter-spacing:.04em;margin-bottom:6px;">'+t('jNext')+'</div>':'';
     return '<div class="card" style="padding:14px;margin-bottom:11px;cursor:pointer;" onclick="openTaskDetail(\''+o.id+'\')">'+next
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:800;font-size:16px;min-width:0;">'+svcEscE(o.title)+'</span>'+lineBadge(o.line)+'</div>'
-      +'<div class="faint" style="font-size:12.5px;">'+(o.status==='en_proceso'?t('jInProc'):t('jToStart'))+prog+'</div></div>';
+      +'<div class="faint" style="font-size:12.5px;">'+(o.status==='pausada'?t('jPaused'):(o.status==='en_proceso'?t('jInProc'):t('jToStart')))+prog+(o.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
 window.openTaskDetail=function(taskId){ const o=JOURNEY.find(x=>x.id===taskId); if(!o) return; JOB_CUR=JSON.parse(JSON.stringify(o)); renderTaskDetail(); document.getElementById('task-detail').classList.remove('hide'); };
@@ -1032,13 +1036,38 @@ function renderTaskDetail(){
   const done=cl.filter(c=>c.done).length; const pend=cl.length>0 && done<cl.length;
   const btnCls=pend?'btn-ghost':'btn-gold', btnDis=pend?'disabled':'';
   const btnLabel=pend?(t('jMark')+' ('+done+'/'+cl.length+')'):t('jComplete');
+  const paused=cur.status==='pausada';
+  const pausedBanner = paused ? '<div style="background:rgba(255,152,0,.12);border:1px solid rgba(255,152,0,.4);border-radius:12px;padding:11px 13px;margin-bottom:14px;font-size:13px;color:#ffb74d;line-height:1.4;">'+t('jPaused')+(cur.pausedReason?(': '+svcEscE(cur.pausedReason)):'')+'</div>' : '';
+  const actionRow = paused
+    ? '<button class="btn btn-gold" style="width:100%;margin-bottom:10px;" onclick="taskResume()">'+t('jResume')+'</button>'
+    : '<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn btn-ghost" style="flex:1;" onclick="taskPause()">'+t('jPause')+'</button><button class="btn btn-ghost" style="flex:1;" onclick="taskReportProblem()">'+t('jProblem')+'</button></div>';
   body.innerHTML='<div class="topbar"><button class="linkbtn" onclick="taskDetailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>'
     +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+lineBadge(cur.line)+'</div><h2 style="font-size:20px;">'+svcEscE(cur.title)+'</h2></div></div>'
+    +pausedBanner
     +(cl.length?('<div class="faint" style="font-size:13px;margin-bottom:8px;">'+t('jMarkSteps')+' ('+done+'/'+cl.length+'):</div>'
       +'<div class="card" style="padding:2px 14px;margin-bottom:18px;">'+cl.map((c,i)=>'<div class="stepitem '+(c.done?'on':'')+'" onclick="taskToggleStep('+i+')"><div class="stepbox">'+(c.done?'✓':'')+'</div><div class="steptext" style="flex:1;min-width:0;font-size:15px;padding-top:2px;line-height:1.4;">'+svcEscE(c.text)+'</div></div>').join('')+'</div>')
       :'<div class="faint" style="margin:14px 0 18px;">'+t('jNoSteps')+'</div>')
+    +actionRow
     +'<button class="btn '+btnCls+'" style="width:100%;" '+btnDis+' onclick="taskDoComplete()">'+btnLabel+'</button>';
 }
+window.taskPause=async function(){
+  if(!JOB_CUR) return;
+  const reason=prompt(t('jPauseReason')); if(reason===null) return;
+  try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'pause', reason:String(reason||'').trim()}); JOB_CUR.status='pausada'; JOB_CUR.pausedReason=String(reason||'').trim(); renderTaskDetail(); }
+  catch(e){ toast((e&&e.message)||t('couldntLoad'),true); }
+};
+window.taskResume=async function(){
+  if(!JOB_CUR) return;
+  try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'resume'}); JOB_CUR.status='en_proceso'; JOB_CUR.pausedReason=''; renderTaskDetail(); }
+  catch(e){ toast((e&&e.message)||t('couldntLoad'),true); }
+};
+window.taskReportProblem=async function(){
+  if(!JOB_CUR) return;
+  const text=prompt(t('jProblemReason')); if(text===null) return;
+  if(!String(text).trim()){ return; }
+  try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'problem', text:String(text).trim()}); toast(t('jReported')); }
+  catch(e){ toast((e&&e.message)||t('couldntLoad'),true); }
+};
 window.taskToggleStep=async function(idx){
   if(!JOB_CUR) return; const cl=JOB_CUR.checklist||[]; if(idx<0||idx>=cl.length) return;
   const nv=!cl[idx].done; cl[idx].done=nv; renderTaskDetail();
@@ -1107,7 +1136,8 @@ function renderOwnerPanel(){
   box.innerHTML=OP_TASKS.map(x=>{
     const total=x.steps||0, done=x.done||0, pr=total?(' · '+done+'/'+total):'';
     const who=x.assignName?('👤 '+svcEscE(x.assignName)):(x.assignRole?('👥 '+svcEscE(roleLabel(x.assignRole))):t('unassigned'));
-    return '<div style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+svcEscE(x.title)+'</span>'+lineBadge(x.line)+'</div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+' · '+(x.status==='en_proceso'?t('opInProc'):t('jToStart').replace('🕐 ',''))+pr+'</div></div>';
+    const stLabel = x.status==='pausada'?t('jPaused'):(x.status==='en_proceso'?t('opInProc'):t('jToStart').replace('🕐 ',''));
+    return '<div style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+svcEscE(x.title)+'</span>'+lineBadge(x.line)+'</div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+' · '+stLabel+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
 function renderMyService(){
