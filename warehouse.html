@@ -134,6 +134,16 @@
     </div>
   </div>
 
+  <!-- ===================== 👑 PANEL DE OPERACIÓN (solo dueño) ===================== -->
+  <div class="card" id="owner-op-card" style="display:none;margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-weight:800;" data-i18n="opPanelTitle">📋 Panel de operación</span>
+      <button class="linkbtn" onclick="loadOwnerPanel()" style="font-size:18px;" title="↻">↻</button>
+    </div>
+    <div id="op-summary" style="display:flex;gap:8px;margin-bottom:10px;"></div>
+    <div id="op-tasks" style="max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
+  </div>
+
   <!-- ===================== 🕐 RELOJ (todos) ===================== -->
   <div class="card" id="clock-card" style="margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -372,6 +382,7 @@ const T={
     jPauseReason:'¿Por qué pausas? (motivo)', jProblemReason:'¿Qué problema hay?', jReported:'✅ Reportado — avisamos al dueño',
     jLoadingTxt:'Cargando…', jCouldnt:'No se pudo.', jStepErr:'No se pudo guardar el paso',
     clkStartBreak:'☕ Iniciar descanso', clkEndBreak:'▶️ Terminar descanso', clkOnBreak:'🟠 En descanso desde', clkBreakReg:'Registrando descanso…',
+    opPanelTitle:'📋 Panel de operación', opPendingWord:'pendientes', opInProc:'en proceso', unassigned:'— sin asignar', opEmpty:'Sin pendientes ahora.', opToStart:'Por empezar', opRefresh:'↻',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Número de estampa o nombre…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte', reprintBtnQA:'🖨️ Reimprimir número de estampa', reprintTitle:'Reimprimir número', reprintHint:'Escribe el número de la estampa y dale imprimir — por si la de la parte ya está borrosa o no se ve.', reprintPh:'Número (ej. 0042)', reprintBtn:'🖨️ Imprimir', reprintAnother:'🔁 Otro número', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería', fromFile:'📁 Archivo', photoStarHint:'⭐ mándala al frente · 🤖 el bot lee las 3 primeras', photoToFront:'Mandar al frente', delPhotos:'Eliminar fotos', delSelected:'Eliminar', cancelBtn:'Cancelar', delSelectHint:'Toca las fotos que quieras borrar y confirma.', delConfirm:'¿Eliminar N foto(s)? No se puede deshacer.', airbagBtn:'Marcar como Airbag', airbagOn:'Airbag ✓ (bin AIRBAGS)', secAirbags:'Airbags', airbagNote:'Restringidos en eBay — no se listan por ahora. Guardados en inventario (bin AIRBAGS).',
@@ -402,6 +413,7 @@ const T={
     jPauseReason:'Why are you pausing? (reason)', jProblemReason:'What is the problem?', jReported:'✅ Reported — owner notified',
     jLoadingTxt:'Loading…', jCouldnt:'Could not.', jStepErr:'Could not save the step',
     clkStartBreak:'☕ Start break', clkEndBreak:'▶️ End break', clkOnBreak:'🟠 On break since', clkBreakReg:'Logging break…',
+    opPanelTitle:'📋 Operations panel', opPendingWord:'to-do', opInProc:'in progress', unassigned:'— unassigned', opEmpty:'Nothing pending now.', opToStart:'To start', opRefresh:'↻',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Sticker number or name…',
     addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part', reprintBtnQA:'🖨️ Reprint sticker number', reprintTitle:'Reprint number', reprintHint:'Type the sticker number and print it — in case the one on the part is worn out or unreadable.', reprintPh:'Number (e.g. 0042)', reprintBtn:'🖨️ Print', reprintAnother:'🔁 Another number', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery', fromFile:'📁 File', photoStarHint:'⭐ send to front · 🤖 bot reads the first 3', photoToFront:'Send to front', delPhotos:'Delete photos', delSelected:'Delete', cancelBtn:'Cancel', delSelectHint:'Tap the photos you want to delete, then confirm.', delConfirm:'Delete N photo(s)? This can\'t be undone.', airbagBtn:'Mark as Airbag', airbagOn:'Airbag ✓ (AIRBAGS bin)', secAirbags:'Airbags', airbagNote:'Restricted on eBay — not listed for now. Kept in inventory (AIRBAGS bin).',
@@ -434,6 +446,7 @@ function setLang(l){
   if(_homeMode){ const vh=document.getElementById('view-home'); if(vh && vh.style.display!=='none'){ renderHomeTiles(); try{ renderJourney(); }catch(e){} } }
   try{ if(JOB_CUR && !document.getElementById('task-detail').classList.contains('hide')) renderTaskDetail(); }catch(e){}
   try{ if(typeof myEmail!=='undefined' && (myEmail||_homeMode)) refreshClock(); }catch(e){}
+  try{ const opc=document.getElementById('owner-op-card'); if(opc && opc.style.display!=='none') renderOwnerPanel(); }catch(e){}
   if(_carView) renderCarDetail();
   else if(_view==='yard') renderVehicles();
   if(_view==='lister') renderLister();
@@ -637,6 +650,9 @@ onAuthStateChanged(auth, async (user)=>{
     // 🕐 Reloj: muestra config de ubicaciones al dueño y refresca el estado/horas de la semana.
     const _co=document.getElementById('clock-owner'); if(_co) _co.style.display = (role==='owner')?'block':'none';
     refreshClock();
+    // 👑 Panel de operación: solo dueño.
+    const _opc=document.getElementById('owner-op-card');
+    if(_opc){ if(role==='owner'){ _opc.style.display='block'; try{ loadOwnerPanel(); }catch(e){} } else _opc.style.display='none'; }
   } else {
     _carView=''; document.body.classList.remove('owner-nav'); const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
     const fc=document.getElementById('fab-chat'); if(fc) fc.style.display='none'; closeChat();
@@ -803,6 +819,29 @@ window.taskDoComplete=async function(){
   const g=document.getElementById('task-gold'); g.classList.remove('hide');
   setTimeout(function(){ g.classList.add('hide'); JOB_CUR=null; loadJourney(); }, 1500);
 };
+
+// 👑 Panel de operación del dueño — todas las tareas abiertas (allTasks) con resumen + scroll.
+let OP_TASKS=[];
+window.loadOwnerPanel=async function(){
+  const box=document.getElementById('op-tasks'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
+  try{ const r=await httpsCallable(functions,'allTasks')({}); OP_TASKS=((r&&r.data)||{}).tasks||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jCouldnt')+'</div>'; return; }
+  renderOwnerPanel();
+};
+function renderOwnerPanel(){
+  const sum=document.getElementById('op-summary');
+  const open=OP_TASKS.length, prog=OP_TASKS.filter(x=>x.status==='en_proceso').length;
+  if(sum) sum.innerHTML=[['📋',open,t('opPendingWord')],['🔧',prog,t('opInProc')]].map(x=>'<div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center;"><div style="font-size:22px;font-weight:800;">'+x[1]+'</div><div class="faint" style="font-size:11px;">'+x[2]+'</div></div>').join('');
+  const box=document.getElementById('op-tasks'); if(!box) return;
+  if(!OP_TASKS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:18px;line-height:1.5;">'+t('opEmpty')+'</div>'; return; }
+  box.innerHTML=OP_TASKS.map(x=>{
+    const total=x.steps||0, done=x.done||0, pr=total?(' · '+done+'/'+total):'';
+    const who=x.assignName?('👤 '+esc(x.assignName)):(x.assignRole?('👥 '+esc(x.assignRole)):t('unassigned'));
+    const stLabel = x.status==='pausada'?t('jPaused'):(x.status==='en_proceso'?t('opInProc'):t('opToStart'));
+    const car=x.carLabel?(' · 🚗 '+esc(x.carLabel)):'';
+    return '<div style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(x.title)+'</span>'+lineBadge(x.line)+'</div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+stLabel+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
+  }).join('');
+}
 
 // ---- 💬 CHAT INTERNO multi-canal (tiempo real) ----
 // 3 canales. Cada rol ve solo los suyos; los dueños ven los 3.
