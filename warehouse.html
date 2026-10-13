@@ -1497,7 +1497,7 @@ function renderVehicles(){
     return `<div class="card" style="margin-bottom:8px;display:flex;gap:12px;align-items:center;cursor:pointer;" onclick="openCar('${v.id}')">
       ${carThumb(v,64)}
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:800;">${vehLabel(v)}</div>
+        <div style="font-weight:800;">${v.inventoryNum?'<span class="gold">'+esc(v.inventoryNum)+'</span> · ':''}${vehLabel(v)}</div>
         <div class="sub">${v.color||''}${v.miles?' · '+Number(v.miles).toLocaleString()+' mi':''}${v.vin?' · VIN '+v.vin.slice(-6):''} · ${vp.length} ${t('part')}</div>
         <div class="sub" style="margin-top:1px;">${carStatusLabel(v.status)}</div>
       </div>
@@ -1584,6 +1584,7 @@ function renderCarDetail(){
     <div class="card" style="display:flex;gap:14px;align-items:flex-start;">
       ${photoEl}
       <div style="flex:1;min-width:0;${canEditCar?'cursor:pointer;':''}" ${canEditCar?`onclick="openCarEdit('${v.id}')"`:''}>
+        ${v.inventoryNum?`<div class="gold" style="font-size:13px;font-weight:800;letter-spacing:.03em;">${esc(v.inventoryNum)}</div>`:''}
         <div class="title" style="font-size:20px;margin-bottom:4px;">${vehLabel(v)} ${canEditCar?'<span style="font-size:13px;color:var(--faint);font-weight:600;">✏️</span>':''}</div>
         <div style="margin:2px 0 6px;"><span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;">${carStatusLabel(v.status)}</span></div>
         ${info}
