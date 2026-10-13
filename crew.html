@@ -368,7 +368,7 @@
 <!-- ===== NÓMINA DE LA SEMANA (dueños) ===== -->
 <div id="screen-payroll" class="wrap hide">
   <div class="topbar">
-    <button class="linkbtn" onclick="show('screen-home');loadClock();" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <button class="linkbtn" onclick="ownerBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
     <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;">👑 Admin</div><h2 style="font-size:20px;" data-i18n="payrollH">Nómina de la semana</h2></div>
     <button class="linkbtn" onclick="loadPayroll()" style="font-size:20px;padding:0 6px;" title="⟳">⟳</button>
   </div>
@@ -381,7 +381,7 @@
 <!-- ===== CARROS EN PROCESO (dueños) ===== -->
 <div id="screen-cars" class="wrap hide">
   <div class="topbar">
-    <button class="linkbtn" onclick="show('screen-home');loadClock();" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <button class="linkbtn" onclick="ownerBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
     <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;">👑 Admin</div><h2 style="font-size:20px;" data-i18n="carsProcH">Carros en proceso</h2></div>
     <button class="linkbtn" onclick="loadCarsProc()" style="font-size:20px;padding:0 6px;" title="⟳">⟳</button>
   </div>
@@ -1337,6 +1337,7 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;',
 
 // 👑 F6 — NÓMINA de la semana + CARROS en proceso =========================
 const STAGE_KEY={ mecanico:'stMecanico', pintura:'stPintura', detalle:'stDetalle', listo:'stListo' };
+window.ownerBack=function(){ show('screen-home'); try{ loadClock(); }catch(e){} };
 window.openPayroll=function(){ if(!(ME&&ME.isOwner)) return; show('screen-payroll'); loadPayroll(); };
 window.loadPayroll=async function(){
   const tot=document.getElementById('payroll-total'), box=document.getElementById('payroll-list');
