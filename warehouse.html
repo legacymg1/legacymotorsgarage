@@ -52,6 +52,21 @@
   .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
   #quick-item-btn{display:none;} body.owner-nav #quick-item-btn, body.yard-quick #quick-item-btn{display:flex;}   /* Artículo rápido: dueños + captura (rol yard) */
   body.wh-home #quick-item-btn{display:none !important;}   /* en el HOME de Pit Crew no se muestra el FAB de artículo rápido */
+  /* === Mi jornada (tareas guiadas, portado de crew) === */
+  .hide{display:none !important;}
+  .faint{color:var(--muted);}
+  .btn-gold{background:linear-gradient(135deg,#d9b85a,#9a7420);color:#0f1320;border:none;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:800;cursor:pointer;width:100%;}
+  .btn-gold[disabled]{opacity:.5;cursor:default;}
+  .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer;}
+  .linkbtn{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-family:inherit;padding:8px;}
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .jline{font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;text-transform:uppercase;white-space:nowrap;}
+  .stepitem{display:flex;gap:11px;align-items:flex-start;padding:13px 2px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;}
+  .stepitem:last-child{border-bottom:none;}
+  .stepbox{width:26px;height:26px;border-radius:8px;border:2px solid rgba(255,255,255,.25);flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;transition:background .15s,border-color .15s;}
+  .stepitem.on .stepbox{background:var(--gold);border-color:var(--gold);color:#0b0e14;}
+  .stepitem.on .steptext{color:var(--muted);text-decoration:line-through;}
+  .jcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:11px;cursor:pointer;}
   #ebay-test-btn,#ebay-setup-btn{display:none;} body.owner-nav #ebay-test-btn,body.owner-nav #ebay-setup-btn{display:inline-block;}   /* Prueba/Config eBay: SOLO dueños */
   a{color:var(--gold);}
   #print-area{display:none;}
@@ -98,9 +113,25 @@
 
   <!-- ===================== 🏁 HOME DE EMPLEADO (Pit Crew) ===================== -->
   <div id="view-home" style="display:none;">
-    <div class="sub" style="font-weight:800;font-size:15px;margin:2px 0 10px;" data-i18n="homeTitle">Tus funciones</div>
+    <!-- 📋 Mi jornada (tareas guiadas) -->
+    <div id="journey-wrap">
+      <div class="sub" style="font-weight:800;font-size:15px;margin:2px 0 10px;" data-i18n="jMyJourney">📋 Mi jornada</div>
+      <div id="journey-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
+    </div>
+    <div class="sub" style="font-weight:800;font-size:15px;margin:20px 0 10px;" data-i18n="homeTitle">Tus funciones</div>
     <div id="home-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
     <div id="home-empty" class="sub" style="display:none;margin-top:10px;" data-i18n="homeTapFn">Toca una función para empezar.</div>
+  </div>
+
+  <!-- 📋 Detalle de tarea (overlay) -->
+  <div id="task-detail" class="hide" style="position:fixed;inset:0;z-index:6300;background:var(--bg,#0b0e14);overflow-y:auto;-webkit-overflow-scrolling:touch;"><div class="wrap" style="padding:16px;"><div id="task-detail-body"></div></div></div>
+  <!-- ✅ Confirmación dorada -->
+  <div id="task-gold" class="hide" style="position:fixed;inset:0;z-index:6400;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;">
+    <div style="text-align:center;padding:30px;">
+      <div style="width:110px;height:110px;border-radius:50%;background:linear-gradient(135deg,#e8c97a,#c9a84c);display:flex;align-items:center;justify-content:center;font-size:58px;color:#0b0e14;margin:0 auto 16px;box-shadow:0 10px 40px rgba(201,168,76,.5);">✓</div>
+      <div style="font-size:26px;font-weight:800;color:#e8c97a;" data-i18n="jDone">¡Completada!</div>
+      <div id="task-gold-sub" class="faint" style="margin-top:6px;"></div>
+    </div>
   </div>
 
   <!-- ===================== 🕐 RELOJ (todos) ===================== -->
@@ -331,6 +362,13 @@ const T={
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
     homeTitle:'Tus funciones', homeBack:'‹ Mi jornada', homeHi:'Hola', homeTapFn:'Toca una función para empezar.',
     fnYardSub:'Fotos de partes', fnListerSub:'Publicar en eBay', fnPackSub:'Empacar pedidos',
+    jMyJourney:'📋 Mi jornada', jNext:'▶ SIGUIENTE', jToStart:'🕐 Por empezar', jInProc:'🔧 En proceso',
+    jEmpty:'🎉 No tienes tareas pendientes.<br>Cuando te asignen trabajo, aparece aquí.',
+    jMarkSteps:'Marca cada paso conforme lo haces', jNoSteps:'Esta tarea no tiene pasos. Márcala como completada cuando termines.',
+    jComplete:'✅ Completar tarea', jMark:'Marca los pasos', jDone:'¡Completada!', jLoadErr:'No se pudo cargar. Toca ⟳.',
+    jPaused:'⏸️ Pausada', jPause:'⏸️ Pausar', jResume:'▶️ Reanudar', jProblem:'⚠️ Reportar problema',
+    jPauseReason:'¿Por qué pausas? (motivo)', jProblemReason:'¿Qué problema hay?', jReported:'✅ Reportado — avisamos al dueño',
+    jLoadingTxt:'Cargando…', jCouldnt:'No se pudo.', jStepErr:'No se pudo guardar el paso',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Número de estampa o nombre…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte', reprintBtnQA:'🖨️ Reimprimir número de estampa', reprintTitle:'Reimprimir número', reprintHint:'Escribe el número de la estampa y dale imprimir — por si la de la parte ya está borrosa o no se ve.', reprintPh:'Número (ej. 0042)', reprintBtn:'🖨️ Imprimir', reprintAnother:'🔁 Otro número', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería', fromFile:'📁 Archivo', photoStarHint:'⭐ mándala al frente · 🤖 el bot lee las 3 primeras', photoToFront:'Mandar al frente', delPhotos:'Eliminar fotos', delSelected:'Eliminar', cancelBtn:'Cancelar', delSelectHint:'Toca las fotos que quieras borrar y confirma.', delConfirm:'¿Eliminar N foto(s)? No se puede deshacer.', airbagBtn:'Marcar como Airbag', airbagOn:'Airbag ✓ (bin AIRBAGS)', secAirbags:'Airbags', airbagNote:'Restringidos en eBay — no se listan por ahora. Guardados en inventario (bin AIRBAGS).',
@@ -353,6 +391,13 @@ const T={
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
     homeTitle:'Your functions', homeBack:'‹ My day', homeHi:'Hi', homeTapFn:'Tap a function to start.',
     fnYardSub:'Part photos', fnListerSub:'List on eBay', fnPackSub:'Pack orders',
+    jMyJourney:'📋 My day', jNext:'▶ NEXT', jToStart:'🕐 To start', jInProc:'🔧 In progress',
+    jEmpty:'🎉 No pending tasks.<br>When work is assigned, it shows here.',
+    jMarkSteps:'Check off each step as you do it', jNoSteps:'This task has no steps. Mark it complete when done.',
+    jComplete:'✅ Complete task', jMark:'Check the steps', jDone:'Completed!', jLoadErr:'Could not load. Tap ⟳.',
+    jPaused:'⏸️ Paused', jPause:'⏸️ Pause', jResume:'▶️ Resume', jProblem:'⚠️ Report problem',
+    jPauseReason:'Why are you pausing? (reason)', jProblemReason:'What is the problem?', jReported:'✅ Reported — owner notified',
+    jLoadingTxt:'Loading…', jCouldnt:'Could not.', jStepErr:'Could not save the step',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Sticker number or name…',
     addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part', reprintBtnQA:'🖨️ Reprint sticker number', reprintTitle:'Reprint number', reprintHint:'Type the sticker number and print it — in case the one on the part is worn out or unreadable.', reprintPh:'Number (e.g. 0042)', reprintBtn:'🖨️ Print', reprintAnother:'🔁 Another number', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery', fromFile:'📁 File', photoStarHint:'⭐ send to front · 🤖 bot reads the first 3', photoToFront:'Send to front', delPhotos:'Delete photos', delSelected:'Delete', cancelBtn:'Cancel', delSelectHint:'Tap the photos you want to delete, then confirm.', delConfirm:'Delete N photo(s)? This can\'t be undone.', airbagBtn:'Mark as Airbag', airbagOn:'Airbag ✓ (AIRBAGS bin)', secAirbags:'Airbags', airbagNote:'Restricted on eBay — not listed for now. Kept in inventory (AIRBAGS bin).',
@@ -382,7 +427,8 @@ function setLang(l){
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
   if(document.getElementById('who') && myEmail) document.getElementById('who').textContent = whoLabel(myEmail,role);
   buildTabs();
-  if(_homeMode){ const vh=document.getElementById('view-home'); if(vh && vh.style.display!=='none') renderHomeTiles(); }
+  if(_homeMode){ const vh=document.getElementById('view-home'); if(vh && vh.style.display!=='none'){ renderHomeTiles(); try{ renderJourney(); }catch(e){} } }
+  try{ if(JOB_CUR && !document.getElementById('task-detail').classList.contains('hide')) renderTaskDetail(); }catch(e){}
   if(_carView) renderCarDetail();
   else if(_view==='yard') renderVehicles();
   if(_view==='lister') renderLister();
@@ -629,6 +675,7 @@ window.whGoHome=function(){
   const box=document.getElementById('tabs'); if(box) box.style.display='none';
   document.body.classList.add('wh-home');
   renderHomeTiles();
+  try{ loadJourney(); }catch(e){}
 };
 function renderHomeTiles(){
   const box=document.getElementById('home-tiles'); if(!box) return;
@@ -641,6 +688,91 @@ function renderHomeTiles(){
   }).join('');
 }
 window.whOpenTool=function(k){ document.body.classList.remove('wh-home'); setView(k); try{ window.scrollTo(0,0); }catch(e){} };
+
+// ===================== 📋 MI JORNADA (tareas guiadas, portado de crew) =====================
+function whToast(m, isErr){
+  let el=document.getElementById('wh-toast');
+  if(!el){ el=document.createElement('div'); el.id='wh-toast'; el.style.cssText='position:fixed;left:14px;right:14px;bottom:calc(20px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;z-index:9900;border-radius:12px;padding:12px 15px;font-size:14px;font-weight:700;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;'; document.body.appendChild(el); }
+  el.style.background=isErr?'#7f1d1d':'var(--surface)'; el.style.color=isErr?'#fff':'var(--text)'; el.style.border='1px solid '+(isErr?'#ef4444':'var(--gold)');
+  el.textContent=m; el.style.display='block';
+  clearTimeout(whToast._t); whToast._t=setTimeout(()=>{ if(el) el.style.display='none'; }, 2600);
+}
+const JOB_LINES={ dealer:{l:'Dealer',c:'#c9a84c'}, service:{l:'Service',c:'#0a84ff'}, desmantle:{l:'Desmantle',c:'#a855f7'}, general:{l:'General',c:'#8a8fa8'} };
+function lineBadge(line){ const L=JOB_LINES[line]||JOB_LINES.general; return '<span class="jline" style="background:'+L.c+'22;color:'+L.c+';">'+L.l+'</span>'; }
+let JOURNEY=[], JOB_CUR=null;
+window.loadJourney=async function(){
+  const box=document.getElementById('journey-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
+  try{ const r=await httpsCallable(functions,'myTasks')({}); JOURNEY=((r&&r.data)||{}).tasks||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadErr')+'</div>'; return; }
+  renderJourney();
+};
+function renderJourney(){
+  const box=document.getElementById('journey-list'); if(!box) return;
+  if(!JOURNEY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:26px 18px;line-height:1.6;">'+t('jEmpty')+'</div>'; return; }
+  box.innerHTML=JOURNEY.map((o,i)=>{
+    const total=(o.checklist||[]).length, done=(o.checklist||[]).filter(c=>c.done).length;
+    const prog=total?(' · '+done+'/'+total):'';
+    const next=(i===0)?'<div style="font-size:11px;color:var(--gold);font-weight:800;letter-spacing:.04em;margin-bottom:6px;">'+t('jNext')+'</div>':'';
+    return '<div class="jcard" onclick="openTaskDetail(\''+o.id+'\')">'+next
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:800;font-size:16px;min-width:0;">'+esc(o.title)+'</span>'+lineBadge(o.line)+'</div>'
+      +(o.carLabel?'<div style="font-size:12.5px;font-weight:600;margin-bottom:3px;">🚗 '+esc(o.carLabel)+'</div>':'')
+      +'<div class="faint" style="font-size:12.5px;">'+(o.status==='pausada'?t('jPaused'):(o.status==='en_proceso'?t('jInProc'):t('jToStart')))+prog+(o.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
+  }).join('');
+}
+window.openTaskDetail=function(taskId){ const o=JOURNEY.find(x=>x.id===taskId); if(!o) return; JOB_CUR=JSON.parse(JSON.stringify(o)); renderTaskDetail(); document.getElementById('task-detail').classList.remove('hide'); };
+window.taskDetailBack=function(){ document.getElementById('task-detail').classList.add('hide'); JOB_CUR=null; loadJourney(); };
+function renderTaskDetail(){
+  const cur=JOB_CUR; if(!cur) return; const body=document.getElementById('task-detail-body'); const cl=cur.checklist||[];
+  const done=cl.filter(c=>c.done).length; const pend=cl.length>0 && done<cl.length;
+  const btnCls=pend?'btn-ghost':'btn-gold', btnDis=pend?'disabled':'';
+  const btnLabel=pend?(t('jMark')+' ('+done+'/'+cl.length+')'):t('jComplete');
+  const paused=cur.status==='pausada';
+  const pausedBanner = paused ? '<div style="background:rgba(255,152,0,.12);border:1px solid rgba(255,152,0,.4);border-radius:12px;padding:11px 13px;margin-bottom:14px;font-size:13px;color:#ffb74d;line-height:1.4;">'+t('jPaused')+(cur.pausedReason?(': '+esc(cur.pausedReason)):'')+'</div>' : '';
+  const actionRow = paused
+    ? '<button class="btn-gold" style="margin-bottom:10px;" onclick="taskResume()">'+t('jResume')+'</button>'
+    : '<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn-ghost" style="flex:1;" onclick="taskPause()">'+t('jPause')+'</button><button class="btn-ghost" style="flex:1;" onclick="taskReportProblem()">'+t('jProblem')+'</button></div>';
+  body.innerHTML='<div class="topbar"><button class="linkbtn" onclick="taskDetailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+lineBadge(cur.line)+'</div><h2 style="font-size:20px;margin:0;">'+esc(cur.title)+'</h2>'+(cur.carLabel?'<div style="font-size:13.5px;font-weight:600;margin-top:2px;">🚗 '+esc(cur.carLabel)+'</div>':'')+'</div></div>'
+    +pausedBanner
+    +(cl.length?('<div class="faint" style="font-size:13px;margin-bottom:8px;">'+t('jMarkSteps')+' ('+done+'/'+cl.length+'):</div>'
+      +'<div class="card" style="padding:2px 14px;margin-bottom:18px;">'+cl.map((c,i)=>'<div class="stepitem '+(c.done?'on':'')+'" onclick="taskToggleStep('+i+')"><div class="stepbox">'+(c.done?'✓':'')+'</div><div class="steptext" style="flex:1;min-width:0;font-size:15px;padding-top:2px;line-height:1.4;">'+esc(c.text)+'</div></div>').join('')+'</div>')
+      :'<div class="faint" style="margin:14px 0 18px;">'+t('jNoSteps')+'</div>')
+    +actionRow
+    +'<button class="'+btnCls+'" style="width:100%;" '+btnDis+' onclick="taskDoComplete()">'+btnLabel+'</button>';
+}
+window.taskPause=async function(){
+  if(!JOB_CUR) return;
+  const reason=prompt(t('jPauseReason')); if(reason===null) return;
+  try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'pause', reason:String(reason||'').trim()}); JOB_CUR.status='pausada'; JOB_CUR.pausedReason=String(reason||'').trim(); renderTaskDetail(); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+window.taskResume=async function(){
+  if(!JOB_CUR) return;
+  try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'resume'}); JOB_CUR.status='en_proceso'; JOB_CUR.pausedReason=''; renderTaskDetail(); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+window.taskReportProblem=async function(){
+  if(!JOB_CUR) return;
+  const text=prompt(t('jProblemReason')); if(text===null) return;
+  if(!String(text).trim()){ return; }
+  try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'problem', text:String(text).trim()}); whToast(t('jReported')); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+window.taskToggleStep=async function(idx){
+  if(!JOB_CUR) return; const cl=JOB_CUR.checklist||[]; if(idx<0||idx>=cl.length) return;
+  const nv=!cl[idx].done; cl[idx].done=nv; renderTaskDetail();
+  try{ await httpsCallable(functions,'taskStep')({taskId:JOB_CUR.id, idx:idx, done:nv}); }
+  catch(e){ cl[idx].done=!nv; renderTaskDetail(); whToast(t('jStepErr'),true); }
+};
+window.taskDoComplete=async function(){
+  if(!JOB_CUR) return; const cur=JOB_CUR;
+  try{ await httpsCallable(functions,'taskComplete')({taskId:cur.id}); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); return; }
+  document.getElementById('task-detail').classList.add('hide');
+  const sub=document.getElementById('task-gold-sub'); if(sub) sub.textContent=cur.title;
+  const g=document.getElementById('task-gold'); g.classList.remove('hide');
+  setTimeout(function(){ g.classList.add('hide'); JOB_CUR=null; loadJourney(); }, 1500);
+};
 
 // ---- 💬 CHAT INTERNO multi-canal (tiempo real) ----
 // 3 canales. Cada rol ve solo los suyos; los dueños ven los 3.
