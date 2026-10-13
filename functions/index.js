@@ -1401,6 +1401,22 @@ exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   return { ok: true, tasks: out };
 });
 
+// Índice de empleados por TELÉFONO (emp_phones/{phoneE164}) → lo usan las reglas de Firestore
+// para reconocer al empleado (por teléfono) en las herramientas de la yarda, sin darle acceso de dueño.
+async function _syncEmpPhone(db, empId) {
+  try {
+    const s = await db.collection("employees").doc(empId).get();
+    if (!s.exists) return;
+    const x = s.data() || {};
+    const ph = x.phoneE164 || _toE164(x.phone || "");
+    if (!ph) return;
+    await db.collection("emp_phones").doc(ph).set({
+      empId: empId, roles: Array.isArray(x.roles) ? x.roles : [], active: x.active !== false,
+      owner: x.owner === true, name: x.name || "", updatedAt: new Date().toISOString(),
+    });
+  } catch (e) {}
+}
+
 // 👑 Panel del dueño en Pit Crew: listar y gestionar el equipo desde el teléfono. Solo dueños.
 exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
@@ -1417,6 +1433,7 @@ exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
       emps.push({ id: doc.id, name: x.name || "", phone: x.phone || "", phoneE164: x.phoneE164 || "", roles: Array.isArray(x.roles) ? x.roles : [], rate: Number(x.rate) || 0, active: x.active !== false, owner: x.owner === true, photoURL: x.photoURL || "" });
     });
     emps.sort((a, b) => (Number(b.active) - Number(a.active)) || a.name.localeCompare(b.name));
+    try { await Promise.all(emps.map((e) => _syncEmpPhone(db, e.id))); } catch (e) {}   // mantiene el índice emp_phones al día
     return { ok: true, emps, roles: ALL_EMP_ROLES };
   }
   if (op === "save") {
@@ -1430,12 +1447,14 @@ exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
     const exists = (await ref.get()).exists;
     if (!exists) base.createdAt = new Date().toISOString();
     await ref.set(base, { merge: true });
+    await _syncEmpPhone(db, empId);
     return { ok: true, id: empId };
   }
   if (op === "setActive") {
     const empId = String(d.id || "");
     if (!empId) throw new HttpsError("invalid-argument", "Falta el empleado.");
     await db.collection("employees").doc(empId).set({ active: d.active !== false, updatedAt: new Date().toISOString() }, { merge: true });
+    await _syncEmpPhone(db, empId);
     return { ok: true };
   }
   if (op === "toggleRole") {
@@ -1452,6 +1471,7 @@ exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
       if (on) { if (!roles.includes(role)) roles.push(role); } else { roles = roles.filter((r) => r !== role); }
       tx.set(ref, { roles, updatedAt: new Date().toISOString() }, { merge: true });
     });
+    await _syncEmpPhone(db, empId);
     return { ok: true };
   }
   throw new HttpsError("invalid-argument", "Operación inválida.");
