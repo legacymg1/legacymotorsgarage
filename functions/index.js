@@ -1332,6 +1332,44 @@ exports.taskAdd = onCall({ timeoutSeconds: 20 }, async (request) => {
   else await ref.set(Object.assign(base, { isTemplate: false, recurring: "none", status: "cola" }));
   return { ok: true, id: ref.id };
 });
+// ✏️ Editar una tarea (solo dueño). Preserva el progreso de los pasos cuyo texto no cambió.
+exports.taskEdit = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const d = request.data || {};
+  const taskId = String(d.taskId || ""); if (!taskId) throw new HttpsError("invalid-argument", "Falta la tarea.");
+  const db = admin.firestore();
+  const ref = db.collection("tasks").doc(taskId);
+  const snap = await ref.get(); if (!snap.exists) throw new HttpsError("not-found", "No existe.");
+  const cur = snap.data() || {};
+  const upd = {};
+  if (d.title != null) { const title = String(d.title).trim().slice(0, 140); if (!title) throw new HttpsError("invalid-argument", "Falta el título."); upd.title = title; }
+  if (d.assignEmpId != null || d.assignRole != null) {
+    const assignEmpId = String(d.assignEmpId || "");
+    upd.assignEmpId = assignEmpId;
+    upd.assignRole = assignEmpId ? "" : String(d.assignRole || "");
+    upd.assignName = "";
+    if (assignEmpId) { try { const es = await db.collection("employees").doc(assignEmpId).get(); if (es.exists) upd.assignName = (es.data() || {}).name || ""; } catch (e) {} }
+  }
+  if (d.carId != null) upd.carId = String(d.carId || "");
+  if (d.carLabel != null) upd.carLabel = String(d.carLabel || "").slice(0, 80);
+  if (Array.isArray(d.checklist)) {
+    const oldDone = {}; (Array.isArray(cur.checklist) ? cur.checklist : []).forEach((c) => { if (c && c.text) oldDone[c.text] = !!c.done; });
+    upd.checklist = d.checklist.map((s) => String(s || "").trim()).filter(Boolean).slice(0, 40).map((text) => ({ text, done: !!oldDone[text] }));
+  }
+  await ref.set(upd, { merge: true });
+  return { ok: true };
+});
+// 🗑️ Eliminar una tarea (solo dueño).
+exports.taskDelete = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const taskId = String((request.data && request.data.taskId) || ""); if (!taskId) throw new HttpsError("invalid-argument", "Falta la tarea.");
+  await admin.firestore().collection("tasks").doc(taskId).delete();
+  return { ok: true };
+});
 exports.myTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const id = await _actorIdentity(request);
@@ -1429,7 +1467,7 @@ exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   let snap; try { snap = await db.collection("tasks").get(); } catch (e) { return { ok: true, tasks: [] }; }
   const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.isTemplate && t.status !== "hecho");
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", carLabel: t.carLabel || "", status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length, pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }; });
+  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", assignEmpId: t.assignEmpId || "", carId: t.carId || "", carLabel: t.carLabel || "", checklist: cl.map((c) => ({ text: c.text, done: !!c.done })), status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length, pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }; });
   return { ok: true, tasks: out };
 });
 

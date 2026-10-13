@@ -405,6 +405,7 @@ const T={
     jWhatLbl:'¿Qué se le va a hacer?', jTitle:'Título (ej. Cambiar el motor)', jFuncLbl:'1) Función (a qué área pertenece)', jFunc:'— Función (opcional) —',
     jExecLbl:'2) Ejecutor (quién la hace)', jAnyEmp:'— Cualquiera con la función —', jCarLbl:'Carro (opcional)', jNoCar:'— Sin carro / general —', jGrpInv:'🚗 Inventario (dealer)', jGrpDis:'🔧 Para desmantelar (yarda)',
     jStepsOpt:'Pasos (opcional, uno por renglón)', jStepsPh:'Drenar fluidos\nDesconectar arnés\nSacar el motor', jDaily:'Repetir cada día (plantilla diaria)', jCreate:'➕ Crear tarea', jDailyHint:'La tarea diaria necesita un empleado específico.',
+    jEditH:'✏️ Editar tarea', jSave:'💾 Guardar cambios', jDelete:'🗑️ Eliminar', jDelConfirm:'¿Eliminar esta tarea? No se puede deshacer.', jSaved:'✅ Guardado', jDeleted:'🗑️ Eliminada',
     carsProcH:'🚗 Carros en proceso', inProcNone:'No hay carros en proceso ahora.', jobsN:'trabajos', inspPending:'Inspección pendiente', stMecanico:'Mecánico', stPintura:'Pintura', stDetalle:'Detalle', stListo:'Listo',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Número de estampa o nombre…',
@@ -442,6 +443,7 @@ const T={
     jWhatLbl:'What needs to be done?', jTitle:'Title (e.g. Replace the engine)', jFuncLbl:'1) Function (which area it belongs to)', jFunc:'— Function (optional) —',
     jExecLbl:'2) Doer (who does it)', jAnyEmp:'— Anyone with the function —', jCarLbl:'Car (optional)', jNoCar:'— No car / general —', jGrpInv:'🚗 Inventory (dealer)', jGrpDis:'🔧 To dismantle (yard)',
     jStepsOpt:'Steps (optional, one per line)', jStepsPh:'Drain fluids\nDisconnect harness\nPull the engine', jDaily:'Repeat every day (daily template)', jCreate:'➕ Create task', jDailyHint:'A daily task needs a specific employee.',
+    jEditH:'✏️ Edit task', jSave:'💾 Save changes', jDelete:'🗑️ Delete', jDelConfirm:'Delete this task? This cannot be undone.', jSaved:'✅ Saved', jDeleted:'🗑️ Deleted',
     carsProcH:'🚗 Cars in process', inProcNone:'No cars in process right now.', jobsN:'jobs', inspPending:'Inspection pending', stMecanico:'Mechanic', stPintura:'Paint', stDetalle:'Detail', stListo:'Ready',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Sticker number or name…',
@@ -868,14 +870,17 @@ function renderOwnerPanel(){
     const who=x.assignName?('👤 '+esc(x.assignName)):(x.assignRole?('👥 '+esc(x.assignRole)):t('unassigned'));
     const stLabel = x.status==='pausada'?t('jPaused'):(x.status==='en_proceso'?t('opInProc'):t('opToStart'));
     const car=x.carLabel?(' · 🚗 '+esc(x.carLabel)):'';
-    return '<div style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(x.title)+'</span>'+lineBadge(x.line)+'</div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+stLabel+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
+    return '<div onclick="jobEditOpen(\''+x.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(x.title)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+lineBadge(x.line)+'<span class="faint" style="font-size:13px;">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+stLabel+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
 
-// ➕ Dueño crea una TAREA SUELTA (Pit): qué → función → ejecutor → carro (inventario/desmantelar) → pasos.
-let JOB_ROSTER=[], JOB_CARS=[];
-window.jobAddOpen=async function(){
+// ➕ Dueño crea / ✏️ edita una TAREA SUELTA (Pit): qué → función → ejecutor → carro (inventario/desmantelar) → pasos.
+let JOB_ROSTER=[], JOB_CARS=[], JOB_EDIT_ID='';
+window.jobEditOpen=function(id){ jobAddOpen(id); };
+window.jobAddOpen=async function(editId){
   if(role!=='owner') return;
+  const ed = editId ? (OP_TASKS.find(x=>x.id===editId)||null) : null;
+  JOB_EDIT_ID = ed ? ed.id : '';
   if(!JOB_ROSTER.length){ try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); JOB_ROSTER=((r&&r.data)||{}).emps||[]; }catch(e){ JOB_ROSTER=[]; } }
   let JC_INV=[], JC_DIS=[];
   if(!JOB_CARS.length){ try{ const rc=await httpsCallable(functions,'invCarsLite')({}); const dd=(rc&&rc.data)||{}; JOB_CARS=dd.cars||[]; JC_INV=dd.inventory||[]; JC_DIS=dd.dismantle||[]; }catch(e){ JOB_CARS=[]; } }
@@ -888,17 +893,35 @@ window.jobAddOpen=async function(){
   const carOpts='<option value="">'+t('jNoCar')+'</option>'
     +(JC_INV.length?('<optgroup label="'+t('jGrpInv')+'">'+JC_INV.map(carOpt).join('')+'</optgroup>'):'')
     +(JC_DIS.length?('<optgroup label="'+t('jGrpDis')+'">'+JC_DIS.map(carOpt).join('')+'</optgroup>'):'');
-  document.getElementById('job-add-body').innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><h2 style="font-size:19px;margin:0;">'+t('jPitH')+'</h2><button class="linkbtn" onclick="jobAddClose()" style="font-size:26px;color:var(--muted);line-height:1;">×</button></div>'
-    +'<div class="faint" style="font-size:12px;margin-bottom:14px;line-height:1.35;">'+t('jPitSub')+'</div>'
+  const footer = ed
+    ? '<button class="btn" style="width:100%;" onclick="jobAddSave()">'+t('jSave')+'</button>'
+      +'<button class="btn-ghost" style="width:100%;margin-top:10px;color:#ff6b6b;border-color:rgba(255,107,107,.4);" onclick="jobDelete()">'+t('jDelete')+'</button>'
+    : '<button class="btn" style="width:100%;" onclick="jobAddSave()">'+t('jCreate')+'</button>'
+      +'<div class="faint" style="font-size:11.5px;text-align:center;margin-top:10px;">'+t('jDailyHint')+'</div>';
+  document.getElementById('job-add-body').innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><h2 style="font-size:19px;margin:0;">'+(ed?t('jEditH'):t('jPitH'))+'</h2><button class="linkbtn" onclick="jobAddClose()" style="font-size:26px;color:var(--muted);line-height:1;">×</button></div>'
+    +(ed?'':'<div class="faint" style="font-size:12px;margin-bottom:14px;line-height:1.35;">'+t('jPitSub')+'</div>')
     +'<label style="'+LBL+'">'+t('jWhatLbl')+'</label><input id="job-title" autocapitalize="sentences" placeholder="'+t('jTitle')+'" style="'+IN+'">'
     +'<label style="'+LBL+'">'+t('jFuncLbl')+'</label><select id="job-role" style="'+IN+'">'+roleOpts+'</select>'
     +'<label style="'+LBL+'">'+t('jExecLbl')+'</label><select id="job-emp" style="'+IN+'">'+empOpts+'</select>'
     +'<label style="'+LBL+'">'+t('jCarLbl')+'</label><select id="job-car" style="'+IN+'">'+carOpts+'</select>'
     +'<label style="'+LBL+'">'+t('jStepsOpt')+'</label><textarea id="job-steps" placeholder="'+t('jStepsPh')+'" style="'+IN+';min-height:100px;resize:vertical;"></textarea>'
-    +'<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;margin-bottom:16px;"><input type="checkbox" id="job-daily" style="width:19px;height:19px;"> '+t('jDaily')+'</label>'
-    +'<button class="btn" style="width:100%;" onclick="jobAddSave()">'+t('jCreate')+'</button>'
-    +'<div class="faint" style="font-size:11.5px;text-align:center;margin-top:10px;">'+t('jDailyHint')+'</div>';
+    +(ed?'':'<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;margin-bottom:16px;"><input type="checkbox" id="job-daily" style="width:19px;height:19px;"> '+t('jDaily')+'</label>')
+    +footer;
+  // Prefijar si es edición
+  if(ed){
+    const gt=document.getElementById('job-title'); if(gt) gt.value=ed.title||'';
+    const gr=document.getElementById('job-role'); if(gr) gr.value=ed.assignRole||'';
+    const ge=document.getElementById('job-emp'); if(ge) ge.value=ed.assignEmpId||'';
+    const gc=document.getElementById('job-car'); if(gc) gc.value=ed.carId||'';
+    const gs=document.getElementById('job-steps'); if(gs) gs.value=((ed.checklist||[]).map(c=>c.text)).join('\n');
+  }
   document.getElementById('job-add').classList.remove('hide');
+};
+window.jobDelete=async function(){
+  if(!JOB_EDIT_ID) return;
+  if(!confirm(t('jDelConfirm'))) return;
+  try{ await httpsCallable(functions,'taskDelete')({ taskId:JOB_EDIT_ID }); whToast(t('jDeleted')); jobAddClose(); try{ loadOwnerPanel(); }catch(e){} }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 window.jobAddClose=function(){ document.getElementById('job-add').classList.add('hide'); };
 window.jobAddSave=async function(){
@@ -907,15 +930,21 @@ window.jobAddSave=async function(){
   const emp=document.getElementById('job-emp').value;
   const carSel=document.getElementById('job-car'); const carId=carSel?carSel.value:'';
   const carLabel=(carId&&carSel.selectedOptions[0])?(carSel.selectedOptions[0].getAttribute('data-lbl')||''):'';
-  const daily=document.getElementById('job-daily').checked;
+  const dailyEl=document.getElementById('job-daily'); const daily=!!(dailyEl&&dailyEl.checked);
   const steps=(document.getElementById('job-steps').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
   if(!title){ whToast(L==='en'?'Say what needs to be done.':'Di qué se le va a hacer.',true); return; }
   if(daily && !emp){ whToast(t('jDailyHint'),true); return; }
   try{
-    await httpsCallable(functions,'taskAdd')({ title:title, line:'general', checklist:steps, assignEmpId:emp, assignRole:emp?'':role2, carId:carId, carLabel:carLabel, recurring:daily?'daily':'none' });
-    whToast(L==='en'?'✅ Task created':'✅ Tarea creada'); jobAddClose();
+    if(JOB_EDIT_ID){
+      await httpsCallable(functions,'taskEdit')({ taskId:JOB_EDIT_ID, title:title, checklist:steps, assignEmpId:emp, assignRole:emp?'':role2, carId:carId, carLabel:carLabel });
+      whToast(t('jSaved'));
+    } else {
+      await httpsCallable(functions,'taskAdd')({ title:title, line:'general', checklist:steps, assignEmpId:emp, assignRole:emp?'':role2, carId:carId, carLabel:carLabel, recurring:daily?'daily':'none' });
+      whToast(L==='en'?'✅ Task created':'✅ Tarea creada');
+    }
+    jobAddClose();
     try{ loadOwnerPanel(); }catch(e){}
-  }catch(e){ whToast((e&&e.message)||(L==='en'?'Could not create':'No se pudo crear'),true); }
+  }catch(e){ whToast((e&&e.message)||(L==='en'?'Could not save':'No se pudo guardar'),true); }
 };
 
 // 🚗 Carros en proceso (inventario en prep): etapa, # trabajos, inspección pendiente.
