@@ -540,6 +540,10 @@ Object.assign(T.es, { jPause:'⏸️ Pausar', jResume:'▶️ Reanudar', jProble
   jPauseReason:'¿Por qué pausas? (motivo)', jProblemReason:'¿Qué problema hay?', jReported:'✅ Reportado — avisamos al dueño' });
 Object.assign(T.en, { jPause:'⏸️ Pause', jResume:'▶️ Resume', jProblem:'⚠️ Report problem', jPaused:'⏸️ Paused',
   jPauseReason:'Why are you pausing? (reason)', jProblemReason:'What is the problem?', jReported:'✅ Reported — owner notified' });
+Object.assign(T.es, { jPitH:'Tarea suelta (Pit)', jPitSub:'Algo que NO es de la línea del dealer ni de un cliente. Ej. «cambiar el motor» a un carro, o «pintar el shop».',
+  jFuncLbl:'1) Función (a qué área pertenece)', jExecLbl:'2) Ejecutor (quién la hace)', jCarLbl:'Carro (opcional)', jNoCar:'— Sin carro / general —', jWhatLbl:'¿Qué se le va a hacer?', jStepsOpt:'Pasos (opcional, uno por renglón)', jGrpInv:'🚗 Inventario (dealer)', jGrpDis:'🔧 Para desmantelar (yarda)' });
+Object.assign(T.en, { jPitH:'One-off task (Pit)', jPitSub:'Something that is NOT on the dealer line or a customer. E.g. “replace the engine” on a car, or “paint the shop”.',
+  jFuncLbl:'1) Function (which area it belongs to)', jExecLbl:'2) Doer (who does it)', jCarLbl:'Car (optional)', jNoCar:'— No car / general —', jWhatLbl:'What needs to be done?', jStepsOpt:'Steps (optional, one per line)', jGrpInv:'🚗 Inventory (dealer)', jGrpDis:'🔧 To dismantle (yard)' });
 Object.assign(T.es, { journeyH:'Mi jornada', journeyKicker:'📋 Jornada', mechKicker:'🔧 Mecánico',
   detKicker:'🧽 Detallador', detStart:'➕ Empezar un carro', detToday:'Hoy',
   detPickHint:'Elige el carro que vas a detallar. Son los que están <b style="color:#ff9800;">🔧 En prep</b> en el inventario.',
@@ -1026,6 +1030,7 @@ function renderJourney(){
     const next=(i===0)?'<div style="font-size:11px;color:var(--gold,#c9a84c);font-weight:800;letter-spacing:.04em;margin-bottom:6px;">'+t('jNext')+'</div>':'';
     return '<div class="card" style="padding:14px;margin-bottom:11px;cursor:pointer;" onclick="openTaskDetail(\''+o.id+'\')">'+next
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:800;font-size:16px;min-width:0;">'+svcEscE(o.title)+'</span>'+lineBadge(o.line)+'</div>'
+      +(o.carLabel?'<div style="font-size:12.5px;font-weight:600;margin-bottom:3px;">🚗 '+svcEscE(o.carLabel)+'</div>':'')
       +'<div class="faint" style="font-size:12.5px;">'+(o.status==='pausada'?t('jPaused'):(o.status==='en_proceso'?t('jInProc'):t('jToStart')))+prog+(o.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
@@ -1042,7 +1047,7 @@ function renderTaskDetail(){
     ? '<button class="btn btn-gold" style="width:100%;margin-bottom:10px;" onclick="taskResume()">'+t('jResume')+'</button>'
     : '<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn btn-ghost" style="flex:1;" onclick="taskPause()">'+t('jPause')+'</button><button class="btn btn-ghost" style="flex:1;" onclick="taskReportProblem()">'+t('jProblem')+'</button></div>';
   body.innerHTML='<div class="topbar"><button class="linkbtn" onclick="taskDetailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>'
-    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+lineBadge(cur.line)+'</div><h2 style="font-size:20px;">'+svcEscE(cur.title)+'</h2></div></div>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+lineBadge(cur.line)+'</div><h2 style="font-size:20px;">'+svcEscE(cur.title)+'</h2>'+(cur.carLabel?'<div style="font-size:13.5px;font-weight:600;margin-top:2px;">🚗 '+svcEscE(cur.carLabel)+'</div>':'')+'</div></div>'
     +pausedBanner
     +(cl.length?('<div class="faint" style="font-size:13px;margin-bottom:8px;">'+t('jMarkSteps')+' ('+done+'/'+cl.length+'):</div>'
       +'<div class="card" style="padding:2px 14px;margin-bottom:18px;">'+cl.map((c,i)=>'<div class="stepitem '+(c.done?'on':'')+'" onclick="taskToggleStep('+i+')"><div class="stepbox">'+(c.done?'✓':'')+'</div><div class="steptext" style="flex:1;min-width:0;font-size:15px;padding-top:2px;line-height:1.4;">'+svcEscE(c.text)+'</div></div>').join('')+'</div>')
@@ -1083,19 +1088,33 @@ window.taskDoComplete=async function(){
   const g=document.getElementById('task-gold'); g.classList.remove('hide');
   setTimeout(function(){ g.classList.add('hide'); JOB_CUR=null; loadJourney(); }, 1500);
 };
+let JOB_CARS=[];
 window.jobAddOpen=async function(){
   if(!(ME&&ME.isOwner)) return;
   if(!JOB_ROSTER.length){ try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); JOB_ROSTER=((r&&r.data)||{}).emps||[]; }catch(e){ JOB_ROSTER=[]; } }
+  let JC_INV=[], JC_DIS=[];
+  if(!JOB_CARS.length){ try{ const rc=await httpsCallable(functions,'invCarsLite')({}); const dd=(rc&&rc.data)||{}; JOB_CARS=dd.cars||[]; JC_INV=dd.inventory||[]; JC_DIS=dd.dismantle||[]; }catch(e){ JOB_CARS=[]; } }
+  else { JC_INV=JOB_CARS.filter(c=>c.kind==='inventario'); JC_DIS=JOB_CARS.filter(c=>c.kind==='desmantelar'); }
   const IN='width:100%;box-sizing:border-box;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:15px;margin-bottom:12px;';
+  const LBL='font-size:13px;font-weight:700;display:block;margin-bottom:5px;';
   const empOpts='<option value="">'+t('jAnyEmp')+'</option>'+JOB_ROSTER.map(e=>'<option value="'+e.id+'">'+svcEscE(e.name)+'</option>').join('');
-  const lineOpts=Object.keys(JOB_LINES).map(k=>'<option value="'+k+'"'+(k==='general'?' selected':'')+'>'+JOB_LINES[k].l+'</option>').join('');
   const roleOpts=['','Mecánico','Detallador','Fotos','Limpieza','Empaque','Captura','Listado','Desmantelador','Ayudante general','Oficina','Ventas'].map(r=>'<option value="'+r+'">'+(r?roleLabel(r):t('jFunc'))+'</option>').join('');
-  document.getElementById('job-add-body').innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2 style="font-size:19px;margin:0;">'+t('jNewTaskH')+'</h2><button class="linkbtn" onclick="jobAddClose()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>'
+  const carOpt=c=>'<option value="'+c.id+'" data-lbl="'+svcEscE(c.label)+'">'+svcEscE((c.inventoryNum?('#'+c.inventoryNum+' '):'')+c.label)+'</option>';
+  const carOpts='<option value="">'+t('jNoCar')+'</option>'
+    +(JC_INV.length?('<optgroup label="'+t('jGrpInv')+'">'+JC_INV.map(carOpt).join('')+'</optgroup>'):'')
+    +(JC_DIS.length?('<optgroup label="'+t('jGrpDis')+'">'+JC_DIS.map(carOpt).join('')+'</optgroup>'):'');
+  document.getElementById('job-add-body').innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><h2 style="font-size:19px;margin:0;">'+t('jPitH')+'</h2><button class="linkbtn" onclick="jobAddClose()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>'
+    +'<div class="faint" style="font-size:12px;margin-bottom:14px;line-height:1.35;">'+t('jPitSub')+'</div>'
+    +'<label style="'+LBL+'">'+t('jWhatLbl')+'</label>'
     +'<input id="job-title" autocapitalize="sentences" placeholder="'+t('jTitle')+'" style="'+IN+'">'
-    +'<div style="display:flex;gap:8px;"><select id="job-line" style="'+IN+'">'+lineOpts+'</select><select id="job-role" style="'+IN+'">'+roleOpts+'</select></div>'
+    +'<label style="'+LBL+'">'+t('jFuncLbl')+'</label>'
+    +'<select id="job-role" style="'+IN+'">'+roleOpts+'</select>'
+    +'<label style="'+LBL+'">'+t('jExecLbl')+'</label>'
     +'<select id="job-emp" style="'+IN+'">'+empOpts+'</select>'
-    +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">'+t('jSteps')+'</label>'
-    +'<textarea id="job-steps" placeholder="'+t('jStepsPh')+'" style="'+IN+';min-height:120px;resize:vertical;"></textarea>'
+    +'<label style="'+LBL+'">'+t('jCarLbl')+'</label>'
+    +'<select id="job-car" style="'+IN+'">'+carOpts+'</select>'
+    +'<label style="'+LBL+'">'+t('jStepsOpt')+'</label>'
+    +'<textarea id="job-steps" placeholder="'+t('jStepsPh')+'" style="'+IN+';min-height:100px;resize:vertical;"></textarea>'
     +'<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;margin-bottom:16px;"><input type="checkbox" id="job-daily" style="width:19px;height:19px;"> '+t('jDaily')+'</label>'
     +'<button class="btn btn-gold" style="width:100%;" onclick="jobAddSave()">'+t('jCreate')+'</button>'
     +'<div class="faint" style="font-size:11.5px;text-align:center;margin-top:10px;">'+t('jDailyHint')+'</div>';
@@ -1104,15 +1123,17 @@ window.jobAddOpen=async function(){
 window.jobAddClose=function(){ document.getElementById('job-add').classList.add('hide'); };
 window.jobAddSave=async function(){
   const title=(document.getElementById('job-title').value||'').trim();
-  const line=document.getElementById('job-line').value;
   const role=document.getElementById('job-role').value;
   const emp=document.getElementById('job-emp').value;
+  const carSel=document.getElementById('job-car');
+  const carId=carSel?carSel.value:'';
+  const carLabel=(carId&&carSel.selectedOptions[0])?(carSel.selectedOptions[0].getAttribute('data-lbl')||''):'';
   const daily=document.getElementById('job-daily').checked;
   const steps=(document.getElementById('job-steps').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
-  if(!title){ toast(LANG==='en'?'Enter a title.':'Pon el título.',true); return; }
+  if(!title){ toast(LANG==='en'?'Say what needs to be done.':'Di qué se le va a hacer.',true); return; }
   if(daily && !emp){ toast(t('jDailyHint'),true); return; }
   try{
-    await httpsCallable(functions,'taskAdd')({ title:title, line:line, checklist:steps, assignEmpId:emp, assignRole:emp?'':role, recurring:daily?'daily':'none' });
+    await httpsCallable(functions,'taskAdd')({ title:title, line:'general', checklist:steps, assignEmpId:emp, assignRole:emp?'':role, carId:carId, carLabel:carLabel, recurring:daily?'daily':'none' });
     toast(LANG==='en'?'✅ Task created':'✅ Tarea creada'); jobAddClose();
     try{ loadJourney(); }catch(e){}
     if(ME&&ME.isOwner){ try{ loadOwnerPanel(); }catch(e){} }
@@ -1137,7 +1158,8 @@ function renderOwnerPanel(){
     const total=x.steps||0, done=x.done||0, pr=total?(' · '+done+'/'+total):'';
     const who=x.assignName?('👤 '+svcEscE(x.assignName)):(x.assignRole?('👥 '+svcEscE(roleLabel(x.assignRole))):t('unassigned'));
     const stLabel = x.status==='pausada'?t('jPaused'):(x.status==='en_proceso'?t('opInProc'):t('jToStart').replace('🕐 ',''));
-    return '<div style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+svcEscE(x.title)+'</span>'+lineBadge(x.line)+'</div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+' · '+stLabel+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
+    const car=x.carLabel?(' · 🚗 '+svcEscE(x.carLabel)):'';
+    return '<div style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+svcEscE(x.title)+'</span>'+lineBadge(x.line)+'</div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+stLabel+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
 function renderMyService(){

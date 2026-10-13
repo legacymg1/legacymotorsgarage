@@ -1321,11 +1321,13 @@ exports.taskAdd = onCall({ timeoutSeconds: 20 }, async (request) => {
   const assignRole = String(d.assignRole || "");
   const recurring = (d.recurring === "daily") ? "daily" : "none";
   if (recurring === "daily" && !assignEmpId) throw new HttpsError("invalid-argument", "Una tarea diaria debe asignarse a un empleado.");
+  const carId = String(d.carId || "");
+  const carLabel = String(d.carLabel || "").slice(0, 80);
   const db = admin.firestore();
   let assignName = "";
   if (assignEmpId) { try { const es = await db.collection("employees").doc(assignEmpId).get(); if (es.exists) assignName = (es.data() || {}).name || ""; } catch (e) {} }
   const ref = db.collection("tasks").doc();
-  const base = { title, line, checklist, assignEmpId, assignRole, assignName, createdBy: id.name || id.email || "", createdAt: new Date().toISOString(), order: Date.now() };
+  const base = { title, line, checklist, assignEmpId, assignRole, assignName, carId, carLabel, createdBy: id.name || id.email || "", createdAt: new Date().toISOString(), order: Date.now() };
   if (recurring === "daily") await ref.set(Object.assign(base, { isTemplate: true, recurring: "daily", status: "template" }));
   else await ref.set(Object.assign(base, { isTemplate: false, recurring: "none", status: "cola" }));
   return { ok: true, id: ref.id };
@@ -1344,13 +1346,13 @@ exports.myTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
     const has = execs.find((e) => e.templateId === tpl.id && e.dateKey === today && e.assignEmpId === tpl.assignEmpId);
     if (!has) {
       const ref = db.collection("tasks").doc();
-      const exec = { title: tpl.title, line: tpl.line, checklist: (tpl.checklist || []).map((c) => ({ text: c.text, done: false })), assignEmpId: tpl.assignEmpId, assignRole: tpl.assignRole || "", assignName: tpl.assignName || "", isTemplate: false, recurring: "none", templateId: tpl.id, dateKey: today, status: "cola", createdBy: "auto", createdAt: new Date().toISOString(), order: tpl.order || Date.now() };
+      const exec = { title: tpl.title, line: tpl.line, checklist: (tpl.checklist || []).map((c) => ({ text: c.text, done: false })), assignEmpId: tpl.assignEmpId, assignRole: tpl.assignRole || "", assignName: tpl.assignName || "", carId: tpl.carId || "", carLabel: tpl.carLabel || "", isTemplate: false, recurring: "none", templateId: tpl.id, dateKey: today, status: "cola", createdBy: "auto", createdAt: new Date().toISOString(), order: tpl.order || Date.now() };
       try { await ref.set(exec); all.push(Object.assign({ id: ref.id }, exec)); } catch (e) {}
     }
   }
   const list = all.filter((t) => !t.isTemplate && t.status !== "hecho" && _taskMine(t, id));
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], status: t.status || "cola", assignName: t.assignName || "", pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }));
+  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], status: t.status || "cola", assignName: t.assignName || "", carLabel: t.carLabel || "", pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }));
   return { ok: true, tasks: out, today };
 });
 exports.taskStep = onCall({ timeoutSeconds: 20 }, async (request) => {
@@ -1427,7 +1429,7 @@ exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   let snap; try { snap = await db.collection("tasks").get(); } catch (e) { return { ok: true, tasks: [] }; }
   const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.isTemplate && t.status !== "hecho");
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length, pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }; });
+  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", carLabel: t.carLabel || "", status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length, pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }; });
   return { ok: true, tasks: out };
 });
 
@@ -1450,6 +1452,35 @@ exports.carsInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
   });
   cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
   return { ok: true, cars };
+});
+
+// 🚗 Lista ligera de carros para apuntar una tarea suelta del Pit: inventario del dealer + carros para desmantelar (yarda). Solo dueños.
+exports.invCarsLite = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  const inv = [];
+  try {
+    const snap = await db.collection("inventory").get();
+    snap.forEach((d) => {
+      const c = d.data() || {};
+      const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
+      inv.push({ id: "inv:" + d.id, kind: "inventario", label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), status: String(c.status || "") });
+    });
+    inv.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
+  } catch (e) {}
+  const dis = [];
+  try {
+    const snap = await db.collection("dismantle_vehicles").get();
+    snap.forEach((d) => {
+      const c = d.data() || {};
+      const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || ("VIN " + (c.vin || "").slice(-6));
+      dis.push({ id: "dis:" + d.id, kind: "desmantelar", label, inventoryNum: "", vin: String(c.vin || ""), status: String(c.status || "") });
+    });
+    dis.sort((a, b) => a.label.localeCompare(b.label));
+  } catch (e) {}
+  return { ok: true, cars: inv.concat(dis), inventory: inv, dismantle: dis };
 });
 
 // Índice de empleados por TELÉFONO (emp_phones/{phoneE164}) → lo usan las reglas de Firestore
