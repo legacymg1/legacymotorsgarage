@@ -213,35 +213,35 @@
   <div class="topbar">
     <button class="linkbtn" onclick="detailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
     <div style="flex:1;min-width:0;">
-      <div class="faint" style="font-size:13px;">🧽 Detallador</div>
+      <div class="faint" style="font-size:13px;" data-i18n="detKicker">🧽 Detallador</div>
       <h2 id="detail-h" style="font-size:20px;">Carros de hoy</h2>
     </div>
   </div>
 
   <!-- HOME -->
   <div id="detail-home">
-    <button class="btn btn-gold" onclick="detailStart()">➕ Empezar un carro</button>
-    <div class="sec-title">Hoy</div>
+    <button class="btn btn-gold" onclick="detailStart()" data-i18n="detStart">➕ Empezar un carro</button>
+    <div class="sec-title" data-i18n="detToday">Hoy</div>
     <div id="detail-list"></div>
   </div>
 
   <!-- PICK (carros en prep) -->
   <div id="detail-pick" class="hide">
-    <div class="faint" style="font-size:13px;margin-bottom:12px;line-height:1.45;">Elige el carro que vas a detallar. Son los que están <b style="color:#ff9800;">🔧 En prep</b> en el inventario.</div>
+    <div class="faint" style="font-size:13px;margin-bottom:12px;line-height:1.45;" data-i18n-html="detPickHint">Elige el carro que vas a detallar. Son los que están <b style="color:#ff9800;">🔧 En prep</b> en el inventario.</div>
     <div id="pick-list"></div>
-    <button class="linkbtn" onclick="detailManual()" style="width:100%;margin-top:10px;">¿No está en la lista? Escribirlo a mano</button>
+    <button class="linkbtn" onclick="detailManual()" style="width:100%;margin-top:10px;" data-i18n="detManual">¿No está en la lista? Escribirlo a mano</button>
   </div>
 
   <!-- TRIAGE (checklist previo ~5 min) -->
   <div id="detail-triage" class="hide">
     <div id="triage-car" class="faint" style="font-size:14px;margin-bottom:6px;font-weight:700;color:var(--text);"></div>
-    <div class="faint" style="font-size:13px;margin-bottom:14px;line-height:1.45;">Revisa rápido el carro y marca cómo está cada cosa. Toma ~5 min y nos ayuda a calcular el tiempo.</div>
+    <div class="faint" style="font-size:13px;margin-bottom:14px;line-height:1.45;" data-i18n="detTriageHint">Revisa rápido el carro y marca cómo está cada cosa. Toma ~5 min y nos ayuda a calcular el tiempo.</div>
     <div id="triage-body"></div>
     <div class="clock-card" style="margin:16px 0 0;padding:16px;">
-      <div class="clock-status muted">Tiempo estimado</div>
+      <div class="clock-status muted" data-i18n="detEstTime">Tiempo estimado</div>
       <div class="clock-hours" id="triage-est" style="font-size:32px;">—</div>
     </div>
-    <button class="btn btn-gold" id="triage-go" onclick="triageDone()" style="margin-top:14px;" disabled>Empezar a detallar</button>
+    <button class="btn btn-gold" id="triage-go" onclick="triageDone()" style="margin-top:14px;" disabled data-i18n="detStartDet">Empezar a detallar</button>
   </div>
 
   <!-- RUNNER -->
@@ -256,26 +256,26 @@
       <h2 id="run-title" style="font-size:25px;margin:11px 0 2px;">—</h2>
       <div id="run-timer" style="font-size:36px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);margin-bottom:16px;letter-spacing:-0.02em;">0:00</div>
       <div style="font-size:15px;line-height:1.55;margin-bottom:14px;" id="run-steps"></div>
-      <div class="reminder" style="margin:0;align-items:flex-start;"><div style="font-size:17px;">⚠️</div><div><b style="color:var(--gold);">Cuidado:</b> <span id="run-care"></span></div></div>
+      <div class="reminder" style="margin:0;align-items:flex-start;"><div style="font-size:17px;">⚠️</div><div><b style="color:var(--gold);" data-i18n="detCare">Cuidado:</b> <span id="run-care"></span></div></div>
     </div>
-    <button class="btn btn-green" onclick="runNext()" style="margin-top:16px;" id="run-next">✓ Terminé este paso</button>
-    <button class="linkbtn" onclick="runSkip()" id="run-skip" style="width:100%;margin-top:4px;">Este carro no lo necesita →</button>
+    <button class="btn btn-green" onclick="runNext()" style="margin-top:16px;" id="run-next" data-i18n="detStepDone">✓ Terminé este paso</button>
+    <button class="linkbtn" onclick="runSkip()" id="run-skip" style="width:100%;margin-top:4px;" data-i18n="detSkip">Este carro no lo necesita →</button>
   </div>
 
   <!-- DONE -->
   <div id="detail-done" class="hide">
     <div style="text-align:center;padding:14px 0 4px;">
       <div style="font-size:52px;">✅</div>
-      <h2 style="font-size:23px;margin-top:6px;">¡Carro terminado!</h2>
+      <h2 style="font-size:23px;margin-top:6px;" data-i18n="detCarDone">¡Carro terminado!</h2>
       <div class="faint" id="done-car" style="margin-top:4px;font-size:15px;"></div>
     </div>
     <div class="clock-card" style="margin-top:16px;">
-      <div class="clock-status muted">Tiempo total</div>
+      <div class="clock-status muted" data-i18n="detTotalTime">Tiempo total</div>
       <div class="clock-hours" id="done-total">0:00</div>
     </div>
-    <div class="sec-title">Desglose por paso</div>
+    <div class="sec-title" data-i18n="detBreakdown">Desglose por paso</div>
     <div id="done-break" class="card" style="padding:4px 16px;"></div>
-    <button class="btn btn-gold" onclick="detailBack()" style="margin-top:18px;">Listo</button>
+    <button class="btn btn-gold" onclick="detailBack()" style="margin-top:18px;" data-i18n="detReady">Listo</button>
   </div>
 </div>
 
@@ -506,8 +506,20 @@ Object.assign(T.en, {
   clkEnteredAt:'Clocked in at', clkBreakSince:'Break since', clkMustSite:'You must be at the Dealer or the Yard to clock in.', clkWorking:'working',
   updated:'✅ Updated', loading:'Loading…', couldntLoad:'Could not load.'
 });
-Object.assign(T.es, { journeyH:'Mi jornada', journeyKicker:'📋 Jornada', mechKicker:'🔧 Mecánico' });
-Object.assign(T.en, { journeyH:'My day', journeyKicker:'📋 Day', mechKicker:'🔧 Mechanic' });
+Object.assign(T.es, { journeyH:'Mi jornada', journeyKicker:'📋 Jornada', mechKicker:'🔧 Mecánico',
+  detKicker:'🧽 Detallador', detStart:'➕ Empezar un carro', detToday:'Hoy',
+  detPickHint:'Elige el carro que vas a detallar. Son los que están <b style="color:#ff9800;">🔧 En prep</b> en el inventario.',
+  detManual:'¿No está en la lista? Escribirlo a mano',
+  detTriageHint:'Revisa rápido el carro y marca cómo está cada cosa. Toma ~5 min y nos ayuda a calcular el tiempo.',
+  detEstTime:'Tiempo estimado', detStartDet:'Empezar a detallar', detCare:'Cuidado:', detStepDone:'✓ Terminé este paso',
+  detSkip:'Este carro no lo necesita →', detCarDone:'¡Carro terminado!', detTotalTime:'Tiempo total', detBreakdown:'Desglose por paso', detReady:'Listo' });
+Object.assign(T.en, { journeyH:'My day', journeyKicker:'📋 Day', mechKicker:'🔧 Mechanic',
+  detKicker:'🧽 Detailer', detStart:'➕ Start a car', detToday:'Today',
+  detPickHint:'Choose the car you will detail. They are the ones <b style="color:#ff9800;">🔧 In prep</b> in inventory.',
+  detManual:'Not on the list? Type it in',
+  detTriageHint:'Quickly check the car and mark how each thing is. Takes ~5 min and helps us estimate the time.',
+  detEstTime:'Estimated time', detStartDet:'Start detailing', detCare:'Care:', detStepDone:'✓ Finished this step',
+  detSkip:"This car doesn't need it →", detCarDone:'Car finished!', detTotalTime:'Total time', detBreakdown:'Breakdown by step', detReady:'Done' });
 // Nombres y subtítulos de las FUNCIONES, bilingües.
 const ROLE_I18N = {
   'Detallador':{en:'Detailer', es:['Lavado y detallado'], ens:['Wash & detailing']},
@@ -525,6 +537,7 @@ const ROLE_I18N = {
 function roleLabel(r){ return (LANG==='en' && ROLE_I18N[r]) ? ROLE_I18N[r].en : r; }
 function roleSub(r){ const x=ROLE_I18N[r]; if(!x) return ''; return LANG==='en'?x.ens[0]:x.es[0]; }
 function t(k){ return (T[LANG]&&T[LANG][k]!=null)?T[LANG][k]:(T.es[k]!=null?T.es[k]:k); }
+function L2(es,en){ return LANG==='en'?en:es; }
 window.setLang = function(l){ LANG=(l==='en')?'en':'es'; try{ localStorage.setItem('pc_lang',LANG); }catch(e){} applyI18n(); };
 function applyI18n(){
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
@@ -719,54 +732,81 @@ window.closeAcct = function(){ document.getElementById('acct-menu').classList.ad
 // ========================= DETALLADOR (SOP guiado) =========================
 // SOP de detallado tal cual lo pidió Enrique, con instrucciones, cuidados y tiempo sugerido.
 const DETAIL_SOP = [
-  { id:'faros', tri:'faros', title:'Faros', min:15, skippable:true,
+  { id:'faros', tri:'faros', title:'Faros', titleEn:'Headlights', min:15, skippable:true,
     steps:'Revisa los faros. Si están opacos o quemados, haz la restauración: lija (grano fino → más fino), pule y sella. Si ya están claros, salta este paso.',
-    care:'Cubre con cinta la pintura y los bordes antes de lijar — no toques el vidrio ni la pintura. No dejes el sellador secando al rayo del sol.' },
-  { id:'asientos', tri:'asientos', title:'Interior — asientos', min:25, skippable:true,
+    stepsEn:'Check the headlights. If they are hazy or burnt, restore them: sand (fine grit → finer), polish and seal. If they are already clear, skip this step.',
+    care:'Cubre con cinta la pintura y los bordes antes de lijar — no toques el vidrio ni la pintura. No dejes el sellador secando al rayo del sol.',
+    careEn:'Tape off the paint and edges before sanding — do not touch the glass or the paint. Do not let the sealant cure in direct sunlight.' },
+  { id:'asientos', tri:'asientos', title:'Interior — asientos', titleEn:'Interior — seats', min:25, skippable:true,
     steps:'Según la revisión: si son de tela y están manchados, restáuralos/lávalos; si son de piel, límpiala y acondiciónala. Si están bien, solo límpialos en su lugar.',
-    care:'Al quitar asientos, desconecta la batería si tienen airbag/sensores y cuida los conectores. Guarda los tornillos marcados. No mojes módulos eléctricos debajo del asiento. La piel NO se talla duro ni se encharca.' },
-  { id:'aspirar', tri:'carpeta', title:'Aspirada / carpeta', min:20, skippable:false,
+    stepsEn:'Based on the check: if cloth and stained, restore/wash them; if leather, clean and condition it. If they are fine, just clean them in place.',
+    care:'Al quitar asientos, desconecta la batería si tienen airbag/sensores y cuida los conectores. Guarda los tornillos marcados. No mojes módulos eléctricos debajo del asiento. La piel NO se talla duro ni se encharca.',
+    careEn:'When removing seats, disconnect the battery if they have airbags/sensors and protect the connectors. Keep the marked bolts. Do not wet electrical modules under the seat. Leather is NOT scrubbed hard or soaked.' },
+  { id:'aspirar', tri:'carpeta', title:'Aspirada / carpeta', titleEn:'Vacuum / carpet', min:20, skippable:false,
     steps:'Saca los tapetes y aspira todo el interior y la cajuela. Si la carpeta está sucia o manchada, lávala y pon los pods de secado para que seque rápido.',
-    care:'No encharques la carpeta encima de los módulos del piso. Usa SIEMPRE los drying pods para que no quede humedad (si no, huele a moho).' },
-  { id:'interior-rapido', title:'Interior rápido', min:20, skippable:false,
+    stepsEn:'Take out the mats and vacuum the whole interior and trunk. If the carpet is dirty or stained, wash it and use the drying pods so it dries fast.',
+    care:'No encharques la carpeta encima de los módulos del piso. Usa SIEMPRE los drying pods para que no quede humedad (si no, huele a moho).',
+    careEn:'Do not soak the carpet over the floor modules. ALWAYS use the drying pods so no moisture is left (otherwise it smells like mold).' },
+  { id:'interior-rapido', title:'Interior rápido', titleEn:'Quick interior', min:20, skippable:false,
     steps:'Detalla el interior con brocha y fórmula MUY rebajada: cupholders, botones, rejillas de aire, costuras y tablero. Deja todo limpio y parejo.',
-    care:'Rocía la brocha, NO el tablero ni la pantalla. Fórmula muy rebajada para no dejar manchas blancas ni que quede grasoso/brilloso de más.' },
-  { id:'cielo', title:'Cielo y sun visors', min:15, skippable:false,
+    stepsEn:'Detail the interior with a brush and VERY diluted formula: cupholders, buttons, air vents, seams and dashboard. Leave everything clean and even.',
+    care:'Rocía la brocha, NO el tablero ni la pantalla. Fórmula muy rebajada para no dejar manchas blancas ni que quede grasoso/brilloso de más.',
+    careEn:'Spray the brush, NOT the dashboard or screen. Very diluted formula so it does not leave white marks or get greasy/too shiny.' },
+  { id:'cielo', title:'Cielo y sun visors', titleEn:'Headliner & sun visors', min:15, skippable:false,
     steps:'Limpia el cielo (techo por dentro), los sun visors y cualquier mancha que haya quedado.',
-    care:'El cielo es delicado: toques suaves, no frotes duro ni lo encharques — se despega la tela.' },
-  { id:'motor', tri:'motor', title:'Lavar el motor', min:20, skippable:true,
+    stepsEn:'Clean the headliner (inside roof), the sun visors and any remaining stains.',
+    care:'El cielo es delicado: toques suaves, no frotes duro ni lo encharques — se despega la tela.',
+    careEn:'The headliner is delicate: gentle touches, do not rub hard or soak it — the fabric comes loose.' },
+  { id:'motor', tri:'motor', title:'Lavar el motor', titleEn:'Wash the engine', min:20, skippable:true,
     steps:'Con el motor FRÍO: cubre las partes eléctricas, aplica desengrasante, talla, enjuaga suave y sopla/seca al final.',
-    care:'Cubre bien: caja de fusibles, computadora, alternador, bobinas y toma de aire. NUNCA agua a presión directo a los conectores. Motor frío. Al terminar, sopla el agua para que no queden charcos.' },
-  { id:'rines', tri:'rines', title:'Rines y tolvas', min:12, skippable:false,
+    stepsEn:'With the engine COLD: cover the electrical parts, apply degreaser, scrub, rinse gently and blow/dry at the end.',
+    care:'Cubre bien: caja de fusibles, computadora, alternador, bobinas y toma de aire. NUNCA agua a presión directo a los conectores. Motor frío. Al terminar, sopla el agua para que no queden charcos.',
+    careEn:'Cover well: fuse box, computer, alternator, coils and air intake. NEVER pressurized water directly on connectors. Cold engine. When done, blow the water out so no puddles are left.' },
+  { id:'rines', tri:'rines', title:'Rines y tolvas', titleEn:'Wheels & fender liners', min:12, skippable:false,
     steps:'Lava bien los rines y las tolvas (guardafangos interiores). Quita el polvo de freno y la tierra pegada.',
-    care:'Usa producto adecuado para el tipo de rin (no ácido en rines delicados). Enjuaga bien para que no quede producto que manche.' },
-  { id:'clay', title:'Clay mitt (guante)', min:25, skippable:false,
+    stepsEn:'Wash the wheels and fender liners well. Remove brake dust and caked dirt.',
+    care:'Usa producto adecuado para el tipo de rin (no ácido en rines delicados). Enjuaga bien para que no quede producto que manche.',
+    careEn:'Use the right product for the wheel type (no acid on delicate wheels). Rinse well so no product is left that could stain.' },
+  { id:'clay', title:'Clay mitt (guante)', titleEn:'Clay mitt', min:25, skippable:false,
     steps:'Pasa el clay mitt con jabón a TODO el carro, duro y en todas direcciones, hasta que la pintura se sienta lisa.',
-    care:'La superficie siempre con jabón/lubricante — nunca en seco porque raya. Enjuaga el mitt seguido. Si se cae al piso, ya no lo uses (recoge tierra y raya).' },
-  { id:'encerar', tri:'acabado', title:'Pulir / encerar', min:30, skippable:true,
+    stepsEn:'Go over the WHOLE car with the clay mitt and soap, firmly and in all directions, until the paint feels smooth.',
+    care:'La superficie siempre con jabón/lubricante — nunca en seco porque raya. Enjuaga el mitt seguido. Si se cae al piso, ya no lo uses (recoge tierra y raya).',
+    careEn:'The surface always with soap/lube — never dry because it scratches. Rinse the mitt often. If it falls on the floor, stop using it (it picks up dirt and scratches).' },
+  { id:'encerar', tri:'acabado', title:'Pulir / encerar', titleEn:'Polish / wax', min:30, skippable:true,
     steps:'Según la revisión: pule para rescatar la pintura si lo necesita, luego encera para dar brillo y protección. Si solo pide guante, salta esto.',
-    care:'Poca cera, capa delgada. No enceres sobre plásticos ni gomas (quedan blancos). La pulidora con cuidado en filos y orillas (no quemar la pintura).' },
-  { id:'ventanas', title:'Ventanas', min:12, skippable:false,
+    stepsEn:'Based on the check: polish to recover the paint if needed, then wax for shine and protection. If it only needs the mitt, skip this.',
+    care:'Poca cera, capa delgada. No enceres sobre plásticos ni gomas (quedan blancos). La pulidora con cuidado en filos y orillas (no quemar la pintura).',
+    careEn:'Little wax, thin coat. Do not wax over plastics or rubber (they turn white). Use the polisher carefully on edges (do not burn the paint).' },
+  { id:'ventanas', title:'Ventanas', titleEn:'Windows', min:12, skippable:false,
     steps:'Limpia TODAS las ventanas y espejos, por dentro y por fuera, hasta que queden sin rayas.',
-    care:'Microfibra limpia y seca. Hazlo a la sombra (al sol se seca y deja marcas).' },
-  { id:'tireshine', title:'Tire shine', min:8, skippable:false,
+    stepsEn:'Clean ALL the windows and mirrors, inside and out, until streak-free.',
+    care:'Microfibra limpia y seca. Hazlo a la sombra (al sol se seca y deja marcas).',
+    careEn:'Clean, dry microfiber. Do it in the shade (in the sun it dries and leaves marks).' },
+  { id:'tireshine', title:'Tire shine', titleEn:'Tire shine', min:8, skippable:false,
     steps:'Justo ANTES de las fotos: pon tire shine a las llantas y a los plásticos exteriores para que se vean negros y como nuevos.',
-    care:'Que no escurra ni salpique la pintura ni los rines. Aplica parejo. Hazlo al último, justo antes de las fotos, para que luzca fresco.' },
-  { id:'placas-fotos', title:'Placas Legacy y fotos', min:12, skippable:false,
+    stepsEn:'Right BEFORE the photos: apply tire shine to the tires and exterior plastics so they look black and like new.',
+    care:'Que no escurra ni salpique la pintura ni los rines. Aplica parejo. Hazlo al último, justo antes de las fotos, para que luzca fresco.',
+    careEn:'Do not let it run or splash the paint or wheels. Apply evenly. Do it last, right before the photos, so it looks fresh.' },
+  { id:'placas-fotos', title:'Placas Legacy y fotos', titleEn:'Legacy plates & photos', min:12, skippable:false,
     steps:'Coloca las placas de Legacy en el carro y toma las fotos del vehículo: todos los ángulos por fuera, el interior y el motor. Buena luz, fondo limpio.',
-    care:'Placas derechas y bien puestas. Carro ya con el tire shine fresco. Fotos parejas, sin basura, mangueras ni herramientas en el fondo.' },
+    stepsEn:'Put the Legacy plates on the car and take the vehicle photos: all exterior angles, the interior and the engine. Good light, clean background.',
+    care:'Placas derechas y bien puestas. Carro ya con el tire shine fresco. Fotos parejas, sin basura, mangueras ni herramientas en el fondo.',
+    careEn:'Plates straight and well placed. Car with fresh tire shine. Even photos, no trash, hoses or tools in the background.' },
 ];
+function sopField(sop,f){ return (LANG==='en' && sop[f+'En']!=null) ? sop[f+'En'] : sop[f]; }
 // Checklist PREVIO (triage ~5 min): el detallador marca el estado → estimamos el tiempo del carro.
 const TRIAGE=[
-  { id:'faros', q:'Faros', opts:[ {v:'ok',label:'Bien',min:0}, {v:'opacos',label:'Opacos',min:12}, {v:'quemados',label:'Muy quemados',min:22} ] },
-  { id:'asientos', q:'Asientos', opts:[ {v:'tela',label:'Tela',min:15}, {v:'piel',label:'Piel',min:12}, {v:'tela-rest',label:'Tela — restaurar',min:35}, {v:'piel-rest',label:'Piel — restaurar',min:35} ] },
-  { id:'carpeta', q:'Carpeta (alfombra)', opts:[ {v:'aspirar',label:'Solo aspirar',min:10}, {v:'lavar',label:'Lavar',min:20}, {v:'muy',label:'Manchada / muy sucia',min:30} ] },
-  { id:'cajuela', q:'Cajuela', opts:[ {v:'aspirar',label:'Solo aspirar',min:5}, {v:'lavar',label:'Lavar',min:15} ] },
-  { id:'ventanas', q:'Ventanas', opts:[ {v:'si',label:'Limpiar',min:12} ] },
-  { id:'rines', q:'Rines y tolvas', opts:[ {v:'normal',label:'Normal',min:8}, {v:'sucio',label:'Muy sucio',min:16} ] },
-  { id:'motor', q:'Motor', opts:[ {v:'polvo',label:'Solo polvoso',min:10}, {v:'aceite',label:'Aceite tirado',min:22} ] },
-  { id:'acabado', q:'Acabado de pintura (puede ser varios)', multi:true, opts:[ {v:'guante',label:'Guante (clay)',min:20}, {v:'encerar',label:'Encerada',min:20}, {v:'pulir',label:'Pulida',min:35}, {v:'rescate',label:'Pulir para rescatar pintura',min:60} ] },
+  { id:'faros', q:'Faros', qEn:'Headlights', opts:[ {v:'ok',label:'Bien',en:'Good',min:0}, {v:'opacos',label:'Opacos',en:'Hazy',min:12}, {v:'quemados',label:'Muy quemados',en:'Very burnt',min:22} ] },
+  { id:'asientos', q:'Asientos', qEn:'Seats', opts:[ {v:'tela',label:'Tela',en:'Cloth',min:15}, {v:'piel',label:'Piel',en:'Leather',min:12}, {v:'tela-rest',label:'Tela — restaurar',en:'Cloth — restore',min:35}, {v:'piel-rest',label:'Piel — restaurar',en:'Leather — restore',min:35} ] },
+  { id:'carpeta', q:'Carpeta (alfombra)', qEn:'Carpet', opts:[ {v:'aspirar',label:'Solo aspirar',en:'Vacuum only',min:10}, {v:'lavar',label:'Lavar',en:'Wash',min:20}, {v:'muy',label:'Manchada / muy sucia',en:'Stained / very dirty',min:30} ] },
+  { id:'cajuela', q:'Cajuela', qEn:'Trunk', opts:[ {v:'aspirar',label:'Solo aspirar',en:'Vacuum only',min:5}, {v:'lavar',label:'Lavar',en:'Wash',min:15} ] },
+  { id:'ventanas', q:'Ventanas', qEn:'Windows', opts:[ {v:'si',label:'Limpiar',en:'Clean',min:12} ] },
+  { id:'rines', q:'Rines y tolvas', qEn:'Wheels & liners', opts:[ {v:'normal',label:'Normal',en:'Normal',min:8}, {v:'sucio',label:'Muy sucio',en:'Very dirty',min:16} ] },
+  { id:'motor', q:'Motor', qEn:'Engine', opts:[ {v:'polvo',label:'Solo polvoso',en:'Just dusty',min:10}, {v:'aceite',label:'Aceite tirado',en:'Oil spilled',min:22} ] },
+  { id:'acabado', q:'Acabado de pintura (puede ser varios)', qEn:'Paint finish (can be several)', multi:true, opts:[ {v:'guante',label:'Guante (clay)',en:'Clay mitt',min:20}, {v:'encerar',label:'Encerada',en:'Wax',min:20}, {v:'pulir',label:'Pulida',en:'Polish',min:35}, {v:'rescate',label:'Pulir para rescatar pintura',en:'Polish to recover paint',min:60} ] },
 ];
+function triLabel(o){ return (LANG==='en' && o.en) ? o.en : o.label; }
+function triQ(tr){ return (LANG==='en' && tr.qEn) ? tr.qEn : tr.q; }
 const TRI_BASE_MIN=40;   // interior rápido + cielo + tire shine + placas/fotos (fijos)
 let JOB=null, runIdx=0, stepStart=0, tickHandle=null, TRI={};
 
@@ -1053,11 +1093,11 @@ function detailView(v){
   document.getElementById('detail-triage').classList.toggle('hide', v!=='triage');
   document.getElementById('detail-run').classList.toggle('hide', v!=='run');
   document.getElementById('detail-done').classList.toggle('hide', v!=='done');
-  document.getElementById('detail-h').textContent = v==='run'?'Detallando':v==='done'?'Terminado':v==='triage'?'Revisión del carro':v==='pick'?'Elige el carro':'Carros de hoy';
+  document.getElementById('detail-h').textContent = v==='run'?L2('Detallando','Detailing'):v==='done'?L2('Terminado','Done'):v==='triage'?L2('Revisión del carro','Car check'):v==='pick'?L2('Elige el carro','Choose the car'):L2('Carros de hoy',"Today's cars");
 }
 window.detailBack = function(){
   if(!document.getElementById('detail-run').classList.contains('hide')){
-    if(!confirm('¿Salir de este carro? Se guarda como empezado y puedes seguir después.')) return;
+    if(!confirm(L2('¿Salir de este carro? Se guarda como empezado y puedes seguir después.','Leave this car? It saves as started and you can continue later.'))) return;
     stopTick(); saveJob();
   } else if(!document.getElementById('detail-triage').classList.contains('hide')){
     detailView('pick'); return;   // de la revisión regresa a elegir carro
@@ -1070,31 +1110,31 @@ window.detailBack = function(){
 window.detailStart = function(){ detailView('pick'); loadPrepCars(); };
 async function loadPrepCars(){
   const box=document.getElementById('pick-list');
-  box.innerHTML='<div class="faint" style="padding:16px 2px;font-size:13px;">Cargando carros en prep…</div>';
+  box.innerHTML='<div class="faint" style="padding:16px 2px;font-size:13px;">'+L2('Cargando carros en prep…','Loading cars in prep…')+'</div>';
   let cars=[];
   try{ const r=await httpsCallable(functions,'prepCars')({}); cars=((r&&r.data)||{}).cars||[]; }
-  catch(e){ box.innerHTML='<div style="color:#ff6b6b;padding:14px 2px;font-size:14px;">No se pudo cargar el inventario: '+esc((e&&e.message)||e)+'</div>'; return; }
+  catch(e){ box.innerHTML='<div style="color:#ff6b6b;padding:14px 2px;font-size:14px;">'+L2('No se pudo cargar el inventario: ','Could not load the inventory: ')+esc((e&&e.message)||e)+'</div>'; return; }
   window._prepCars=cars;
-  if(!cars.length){ box.innerHTML='<div class="faint" style="padding:16px 2px;font-size:14px;line-height:1.5;">No hay carros marcados <b style="color:#ff9800;">🔧 En prep</b> ahorita.<br>Legacy los marca al agregarlos al inventario.</div>'; return; }
+  if(!cars.length){ box.innerHTML='<div class="faint" style="padding:16px 2px;font-size:14px;line-height:1.5;">'+L2('No hay carros marcados <b style="color:#ff9800;">🔧 En prep</b> ahorita.','No cars marked <b style="color:#ff9800;">🔧 In prep</b> right now.')+'<br>'+L2('Legacy los marca al agregarlos al inventario.','Legacy marks them when adding to inventory.')+'</div>'; return; }
   box.innerHTML=cars.map((c,i)=>{
     const thumb = c.photo
       ? '<img src="'+esc(c.photo)+'" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex:0 0 auto;background:var(--surface2);">'
       : '<div style="width:52px;height:52px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto;">🚗</div>';
     return '<div class="card" style="padding:12px;margin-bottom:9px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="pickPrep('+i+')">'
       +thumb
-      +'<div style="min-width:0;flex:1;"><div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.label||'Carro')+'</div>'
-      +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+(c.vin?('VIN …'+esc(String(c.vin).slice(-6))):'sin VIN')+'</div></div>'
+      +'<div style="min-width:0;flex:1;"><div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.label||L2('Carro','Car'))+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+(c.vin?('VIN …'+esc(String(c.vin).slice(-6))):L2('sin VIN','no VIN'))+'</div></div>'
       +'<div style="color:var(--gold);font-size:20px;flex:0 0 auto;">›</div></div>';
   }).join('');
 }
 window.pickPrep = function(i){
-  const c=(window._prepCars||[])[i]; if(!c){ toast('No se encontró el carro.',true); return; }
+  const c=(window._prepCars||[])[i]; if(!c){ toast(L2('No se encontró el carro.','Car not found.'),true); return; }
   startDetailJob({ car:c.label, vin:c.vin||'', inventoryId:c.id, inventoryNum:c.inventoryNum||'' });
 };
 window.detailManual = function(){
-  const car=prompt('¿Qué carro vas a detallar?\n(marca / modelo / año, o VIN)');
+  const car=prompt(L2('¿Qué carro vas a detallar?\n(marca / modelo / año, o VIN)','Which car will you detail?\n(make / model / year, or VIN)'));
   if(car===null) return;
-  if(!String(car).trim()){ toast('Escribe cuál carro.', true); return; }
+  if(!String(car).trim()){ toast(L2('Escribe cuál carro.','Type which car.'), true); return; }
   startDetailJob({ car:String(car).trim(), vin:'', inventoryId:'', inventoryNum:'' });
 };
 function startDetailJob(info){
@@ -1105,15 +1145,15 @@ function startDetailJob(info){
 }
 // ---------- Checklist previo (triage) ----------
 function renderTriage(){
-  document.getElementById('triage-car').textContent='🚗 '+(JOB.car||'Carro');
+  document.getElementById('triage-car').textContent='🚗 '+(JOB.car||L2('Carro','Car'));
   const box=document.getElementById('triage-body');
-  box.innerHTML=TRIAGE.map(t=>{
-    const chips=t.opts.map(o=>{
-      const sel = t.multi ? (Array.isArray(TRI[t.id])&&TRI[t.id].indexOf(o.v)>=0) : (TRI[t.id]===o.v);
-      return '<button type="button" onclick="triagePick(\''+t.id+'\',\''+o.v+'\','+(t.multi?'true':'false')+')" '
-        +'style="border:1px solid '+(sel?'var(--gold)':'var(--border-strong)')+';background:'+(sel?'var(--gold-soft)':'var(--surface2)')+';color:'+(sel?'var(--gold)':'var(--text)')+';border-radius:999px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">'+o.label+'</button>';
+  box.innerHTML=TRIAGE.map(tr=>{
+    const chips=tr.opts.map(o=>{
+      const sel = tr.multi ? (Array.isArray(TRI[tr.id])&&TRI[tr.id].indexOf(o.v)>=0) : (TRI[tr.id]===o.v);
+      return '<button type="button" onclick="triagePick(\''+tr.id+'\',\''+o.v+'\','+(tr.multi?'true':'false')+')" '
+        +'style="border:1px solid '+(sel?'var(--gold)':'var(--border-strong)')+';background:'+(sel?'var(--gold-soft)':'var(--surface2)')+';color:'+(sel?'var(--gold)':'var(--text)')+';border-radius:999px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">'+triLabel(o)+'</button>';
     }).join('');
-    return '<div style="margin-bottom:16px;"><div style="font-weight:800;font-size:15px;margin-bottom:9px;">'+t.q+(t.multi?' <span class="faint" style="font-size:11px;font-weight:600;">(varios)</span>':'')+'</div><div style="display:flex;flex-wrap:wrap;gap:8px;">'+chips+'</div></div>';
+    return '<div style="margin-bottom:16px;"><div style="font-weight:800;font-size:15px;margin-bottom:9px;">'+triQ(tr)+(tr.multi?' <span class="faint" style="font-size:11px;font-weight:600;">'+L2('(varios)','(several)')+'</span>':'')+'</div><div style="display:flex;flex-wrap:wrap;gap:8px;">'+chips+'</div></div>';
   }).join('');
   triageRecalc();
 }
@@ -1143,28 +1183,28 @@ function triageRecalc(){
   go.disabled=!ready;
 }
 window.triageDone = function(){
-  if(!triageAnswered()){ toast('Contesta todas las revisiones.', true); return; }
+  if(!triageAnswered()){ toast(L2('Contesta todas las revisiones.','Answer all the checks.'), true); return; }
   JOB.triage=JSON.parse(JSON.stringify(TRI)); JOB.estMin=triageEstMin();
   runIdx=0; detailView('run'); renderRunner(); saveJob();
 };
 // etiqueta corta de lo que se marcó para un paso (para el hint en el runner)
 function triageHint(triId){
-  const t=TRIAGE.find(x=>x.id===triId); if(!t||!JOB||!JOB.triage) return '';
+  const tr=TRIAGE.find(x=>x.id===triId); if(!tr||!JOB||!JOB.triage) return '';
   const val=JOB.triage[triId];
-  if(t.multi){ const arr=(val||[]).map(v=>(t.opts.find(o=>o.v===v)||{}).label).filter(Boolean); return arr.join(' + '); }
-  const o=t.opts.find(o=>o.v===val); return o?o.label:'';
+  if(tr.multi){ const arr=(val||[]).map(v=>{ const o=tr.opts.find(o=>o.v===v); return o?triLabel(o):''; }).filter(Boolean); return arr.join(' + '); }
+  const o=tr.opts.find(o=>o.v===val); return o?triLabel(o):'';
 }
 function fmtT(sec){ sec=Math.max(0,Math.round(sec)); const m=Math.floor(sec/60), s=sec%60; if(m>=60){const h=Math.floor(m/60);return h+':'+String(m%60).padStart(2,'0')+':'+String(s).padStart(2,'0');} return m+':'+String(s).padStart(2,'0'); }
 function renderRunner(){
   const sop=DETAIL_SOP[runIdx];
-  document.getElementById('run-car').textContent='🚗 '+(JOB.car||'Carro');
-  document.getElementById('run-count').textContent='Paso '+(runIdx+1)+' de '+DETAIL_SOP.length;
+  document.getElementById('run-car').textContent='🚗 '+(JOB.car||L2('Carro','Car'));
+  document.getElementById('run-count').textContent=L2('Paso ','Step ')+(runIdx+1)+L2(' de ',' of ')+DETAIL_SOP.length;
   document.getElementById('run-sug').textContent='~'+sop.min+' min';
-  document.getElementById('run-title').textContent=sop.title;
+  document.getElementById('run-title').textContent=sopField(sop,'title');
   const hint = sop.tri ? triageHint(sop.tri) : '';
-  const hintHtml = hint ? '<div style="display:inline-block;background:var(--gold-soft);color:var(--gold);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800;margin-bottom:10px;">🔎 Revisión: '+esc(hint)+'</div><br>' : '';
-  document.getElementById('run-steps').innerHTML = hintHtml + esc(sop.steps);
-  document.getElementById('run-care').textContent=sop.care;
+  const hintHtml = hint ? '<div style="display:inline-block;background:var(--gold-soft);color:var(--gold);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800;margin-bottom:10px;">🔎 '+L2('Revisión','Check')+': '+esc(hint)+'</div><br>' : '';
+  document.getElementById('run-steps').innerHTML = hintHtml + esc(sopField(sop,'steps'));
+  document.getElementById('run-care').textContent=sopField(sop,'care');
   document.getElementById('run-skip').style.display = sop.skippable ? 'block':'none';
   document.getElementById('run-prog').innerHTML = DETAIL_SOP.map((s,i)=>'<div style="flex:1;height:5px;border-radius:3px;background:'+(i<runIdx?'var(--gold)':i===runIdx?'var(--green)':'var(--surface2)')+';"></div>').join('');
   stepStart=Date.now(); startTick();
@@ -1182,31 +1222,31 @@ function finishJob(){
   document.getElementById('done-car').textContent='🚗 '+(JOB.car||'');
   document.getElementById('done-total').textContent=fmtT(JOB.totalSeconds);
   const est=JOB.estMin||0; const realMin=Math.round(JOB.totalSeconds/60);
-  const cmp = est ? '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;"><span class="faint">Estimado vs real</span><span class="faint" style="font-variant-numeric:tabular-nums;">~'+est+' min · real '+realMin+' min</span></div>' : '';
-  document.getElementById('done-break').innerHTML=cmp+JOB.steps.map(s=>'<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span>'+(s.skipped?'<span style="color:var(--faint)">⤼ </span>':'<span style="color:var(--green)">✓ </span>')+s.title+'</span><span style="color:'+(s.skipped?'var(--faint)':'var(--muted)')+';font-variant-numeric:tabular-nums;">'+(s.skipped?'no aplicó':fmtT(s.seconds))+'</span></div>').join('');
+  const cmp = est ? '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;"><span class="faint">'+L2('Estimado vs real','Estimated vs real')+'</span><span class="faint" style="font-variant-numeric:tabular-nums;">~'+est+' min · '+L2('real','actual')+' '+realMin+' min</span></div>' : '';
+  document.getElementById('done-break').innerHTML=cmp+JOB.steps.map(s=>{ const sop=DETAIL_SOP.find(x=>x.id===s.id); const title=sop?sopField(sop,'title'):s.title; return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span>'+(s.skipped?'<span style="color:var(--faint)">⤼ </span>':'<span style="color:var(--green)">✓ </span>')+title+'</span><span style="color:'+(s.skipped?'var(--faint)':'var(--muted)')+';font-variant-numeric:tabular-nums;">'+(s.skipped?L2('no aplicó','n/a'):fmtT(s.seconds))+'</span></div>'; }).join('');
   detailView('done');
 }
 async function saveJob(){ if(!JOB) return; try{ const r=await httpsCallable(functions,'detailJob')({op:'save',job:JOB}); if(r&&r.data&&r.data.id) JOB.id=r.data.id; }catch(e){ /* sigue en local */ } }
 async function loadMyJobs(){
   const box=document.getElementById('detail-list');
-  box.innerHTML='<div class="faint" style="padding:12px 2px;font-size:13px;">Cargando…</div>';
+  box.innerHTML='<div class="faint" style="padding:12px 2px;font-size:13px;">'+t('loading')+'</div>';
   let jobs=[];
   try{ const r=await httpsCallable(functions,'detailJob')({op:'mine'}); jobs=((r&&r.data)||{}).jobs||[]; }catch(e){}
   window._myJobs=jobs;
   const today=new Date().toISOString().slice(0,10);
   const todays=jobs.filter(j=>String(j.startedAt||'').slice(0,10)===today);
-  if(!todays.length){ box.innerHTML='<div class="faint" style="padding:12px 2px;font-size:14px;line-height:1.5;">Todavía no has detallado ningún carro hoy.<br>Toca <b>➕ Empezar un carro</b>.</div>'; return; }
+  if(!todays.length){ box.innerHTML='<div class="faint" style="padding:12px 2px;font-size:14px;line-height:1.5;">'+L2('Todavía no has detallado ningún carro hoy.','You have not detailed any car today yet.')+'<br>'+L2('Toca <b>➕ Empezar un carro</b>.','Tap <b>➕ Start a car</b>.')+'</div>'; return; }
   box.innerHTML=todays.map(j=>{
     const done=j.status==='done';
     return '<div class="card" style="padding:14px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
-      +'<div style="min-width:0;"><div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚗 '+esc(j.car||'Carro')+'</div>'
-      +'<div class="faint" style="font-size:12px;margin-top:3px;">'+(done?('✅ '+fmtT(j.totalSeconds||0)):'🟡 empezado')+'</div></div>'
-      +(done?'':'<button onclick="resumeJob(\''+j.id+'\')" style="flex:0 0 auto;background:var(--gold-soft);color:var(--gold);border:1px solid rgba(232,182,74,0.3);padding:9px 15px;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">Seguir</button>')
+      +'<div style="min-width:0;"><div style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚗 '+esc(j.car||L2('Carro','Car'))+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:3px;">'+(done?('✅ '+fmtT(j.totalSeconds||0)):('🟡 '+L2('empezado','started')))+'</div></div>'
+      +(done?'':'<button onclick="resumeJob(\''+j.id+'\')" style="flex:0 0 auto;background:var(--gold-soft);color:var(--gold);border:1px solid rgba(232,182,74,0.3);padding:9px 15px;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">'+t('continueBtn')+'</button>')
       +'</div>';
   }).join('');
 }
 window.resumeJob = function(id){
-  const j=(window._myJobs||[]).find(x=>x.id===id); if(!j){ toast('No se encontró el carro.',true); return; }
+  const j=(window._myJobs||[]).find(x=>x.id===id); if(!j){ toast(L2('No se encontró el carro.','Car not found.'),true); return; }
   JOB={ id:j.id, car:j.car, vin:j.vin||'', inventoryId:j.inventoryId||'', inventoryNum:j.inventoryNum||'', triage:j.triage||{}, estMin:Number(j.estMin)||0, startedAt:j.startedAt, status:'active',
         steps:DETAIL_SOP.map(s=>{ const p=(j.steps||[]).find(x=>x.id===s.id)||{}; return {id:s.id,title:s.title,seconds:Number(p.seconds)||0,done:!!p.done,skipped:!!p.skipped}; }) };
   runIdx=JOB.steps.findIndex(s=>!s.done && !s.skipped); if(runIdx<0) runIdx=0;
