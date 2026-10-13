@@ -179,7 +179,8 @@
 
   <!-- Después de check-in: tareas del día -->
   <div id="home-tasks-wrap" class="hide">
-    <div class="sec-title">Tus tareas de hoy</div>
+    <button class="btn btn-gold" onclick="openJourney()" style="margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:8px;">📋 Mi jornada<span id="journey-count" style="display:none;background:rgba(0,0,0,.25);border-radius:999px;padding:1px 9px;font-size:13px;font-weight:800;"></span></button>
+    <div class="sec-title">Tus funciones</div>
     <div id="home-tiles" class="tiles"></div>
     <div id="home-noroles" class="card hide" style="text-align:center;color:var(--muted);font-size:14px;line-height:1.5;">
       Todavía no tienes tareas asignadas.<br>Legacy te las va a asignar pronto.
@@ -301,6 +302,48 @@
   </div>
 </div>
 
+<style>
+  .jline{font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;text-transform:uppercase;white-space:nowrap;}
+  @keyframes lmgPop{0%{transform:scale(.4);opacity:0}45%{transform:scale(1.12);opacity:1}100%{transform:scale(1)}}
+  #task-gold .gold-card{animation:lmgPop .5s cubic-bezier(.2,.9,.3,1.2);}
+  @media (prefers-reduced-motion:reduce){#task-gold .gold-card{animation:none;}}
+  .stepitem{display:flex;gap:11px;align-items:flex-start;padding:13px 2px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;}
+  .stepitem:last-child{border-bottom:none;}
+  .stepbox{width:26px;height:26px;border-radius:8px;border:2px solid rgba(255,255,255,.25);flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;transition:background .15s,border-color .15s;}
+  .stepitem.on .stepbox{background:var(--gold,#c9a84c);border-color:var(--gold,#c9a84c);color:#0b0e14;}
+  .stepitem.on .steptext{color:var(--muted,#8a8fa8);text-decoration:line-through;}
+</style>
+
+<!-- ===== JORNADA GUIADA (tareas con checklist) ===== -->
+<div id="screen-journey" class="wrap hide">
+  <div class="topbar">
+    <button class="linkbtn" onclick="journeyBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+    <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;">📋 Jornada</div><h2 style="font-size:20px;">Mi jornada</h2></div>
+    <button class="linkbtn" onclick="loadJourney()" style="font-size:20px;padding:0 6px;" title="Actualizar">⟳</button>
+  </div>
+  <button id="job-add-btn" class="btn btn-ghost hide" onclick="jobAddOpen()" style="margin-bottom:14px;">➕ Nueva tarea</button>
+  <div id="journey-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
+</div>
+
+<!-- Detalle de tarea (checklist) -->
+<div id="task-detail" class="hide" style="position:fixed;inset:0;z-index:130;background:var(--bg,#0e131d);overflow-y:auto;"><div class="wrap"><div id="task-detail-body"></div></div></div>
+
+<!-- Confirmación dorada -->
+<div id="task-gold" class="hide" style="position:fixed;inset:0;z-index:140;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;">
+  <div class="gold-card" style="text-align:center;padding:30px;">
+    <div style="width:110px;height:110px;border-radius:50%;background:linear-gradient(135deg,#e8c97a,#c9a84c);display:flex;align-items:center;justify-content:center;font-size:58px;color:#0b0e14;margin:0 auto 16px;box-shadow:0 10px 40px rgba(201,168,76,.5);">✓</div>
+    <div style="font-size:26px;font-weight:800;color:#e8c97a;">¡Completada!</div>
+    <div id="task-gold-sub" class="faint" style="margin-top:6px;"></div>
+  </div>
+</div>
+
+<!-- Owner: nueva tarea -->
+<div id="job-add" class="hide" style="position:fixed;inset:0;z-index:135;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)jobAddClose()">
+  <div style="background:var(--card,#141924);border:1px solid var(--line,#232a3a);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));">
+    <div id="job-add-body"></div>
+  </div>
+</div>
+
 <!-- ===== ADMIN (dueños): gestión del equipo ===== -->
 <div id="screen-admin" class="wrap hide">
   <div class="topbar">
@@ -368,7 +411,7 @@ const ROLE_TILES = {
   'Ventas':            { ico:'🤝', sub:'Ventas', ready:false },
 };
 
-function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail','screen-service','screen-admin'].forEach(s=>{ const el=document.getElementById(s); if(el) el.classList.toggle('hide', s!==id); }); }
+function show(id){ ['screen-login','screen-loading','screen-noreg','screen-inactive','screen-home','screen-detail','screen-service','screen-journey','screen-admin'].forEach(s=>{ const el=document.getElementById(s); if(el) el.classList.toggle('hide', s!==id); }); }
 function toast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); clearTimeout(window._tt); window._tt=setTimeout(()=>{t.className='toast'+(isErr?' err':'');},3200); }
 
 // ---------- Bilingüe (ES / EN) ----------
@@ -550,6 +593,7 @@ function renderClock(){
   // Las tareas aparecen SOLO después de hacer check-in (dueños las ven siempre, para probar).
   const showTasks = (ME && ME.isOwner) || !!open;
   const tw=document.getElementById('home-tasks-wrap'); if(tw) tw.classList.toggle('hide', !showTasks);
+  if(showTasks){ try{ refreshJourneyCount(); }catch(e){} }
   const hint=document.getElementById('home-checkin-hint'); if(hint) hint.classList.toggle('hide', showTasks);
 }
 window.punch = function(){
@@ -761,6 +805,99 @@ window.mechAddTaskSave=async function(){
     toast('✅ Trabajo agregado a la cola');
     mechCloseAddTask(); loadMechTasks();
   }catch(e){ toast((e&&e.message)||'No se pudo agregar',true); }
+};
+
+// ===================== JORNADA GUIADA (tareas con checklist + línea) — F1 =====================
+const JOB_LINES={ dealer:{l:'Dealer',c:'#c9a84c'}, service:{l:'Service',c:'#0a84ff'}, desmantle:{l:'Desmantle',c:'#a855f7'}, general:{l:'General',c:'#8a8fa8'} };
+let JOURNEY=[], JOB_CUR=null, JOB_ROSTER=[];
+function lineBadge(line){ const L=JOB_LINES[line]||JOB_LINES.general; return '<span class="jline" style="background:'+L.c+'22;color:'+L.c+';">'+L.l+'</span>'; }
+async function refreshJourneyCount(){
+  try{ const r=await httpsCallable(functions,'myTasks')({}); const n=(((r&&r.data)||{}).tasks||[]).length;
+    const jc=document.getElementById('journey-count'); if(jc){ if(n){ jc.textContent=n; jc.style.display='inline-block'; } else jc.style.display='none'; }
+  }catch(e){}
+}
+window.openJourney=function(){ show('screen-journey'); const b=document.getElementById('job-add-btn'); if(b) b.classList.toggle('hide', !(ME&&ME.isOwner)); loadJourney(); };
+window.journeyBack=function(){ show('screen-home'); };
+window.loadJourney=async function(){
+  const box=document.getElementById('journey-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">Cargando…</div>';
+  try{ const r=await httpsCallable(functions,'myTasks')({}); JOURNEY=((r&&r.data)||{}).tasks||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">No se pudo cargar. Toca ⟳.</div>'; return; }
+  renderJourney();
+  const jc=document.getElementById('journey-count'); if(jc){ if(JOURNEY.length){ jc.textContent=JOURNEY.length; jc.style.display='inline-block'; } else jc.style.display='none'; }
+};
+function renderJourney(){
+  const box=document.getElementById('journey-list'); if(!box) return;
+  if(!JOURNEY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:40px 18px;line-height:1.6;">🎉 No tienes tareas pendientes.<br>Cuando te asignen trabajo, aparece aquí.</div>'; return; }
+  box.innerHTML=JOURNEY.map((t,i)=>{
+    const total=(t.checklist||[]).length, done=(t.checklist||[]).filter(c=>c.done).length;
+    const prog=total?(' · '+done+'/'+total):'';
+    const next=(i===0)?'<div style="font-size:11px;color:var(--gold,#c9a84c);font-weight:800;letter-spacing:.04em;margin-bottom:6px;">▶ SIGUIENTE</div>':'';
+    return '<div class="card" style="padding:14px;margin-bottom:11px;cursor:pointer;" onclick="openTaskDetail(\''+t.id+'\')">'+next
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:800;font-size:16px;min-width:0;">'+svcEscE(t.title)+'</span>'+lineBadge(t.line)+'</div>'
+      +'<div class="faint" style="font-size:12.5px;">'+(t.status==='en_proceso'?'🔧 En proceso':'🕐 Por empezar')+prog+'</div></div>';
+  }).join('');
+}
+window.openTaskDetail=function(taskId){ const t=JOURNEY.find(x=>x.id===taskId); if(!t) return; JOB_CUR=JSON.parse(JSON.stringify(t)); renderTaskDetail(); document.getElementById('task-detail').classList.remove('hide'); };
+window.taskDetailBack=function(){ document.getElementById('task-detail').classList.add('hide'); JOB_CUR=null; loadJourney(); };
+function renderTaskDetail(){
+  const t=JOB_CUR; if(!t) return; const body=document.getElementById('task-detail-body'); const cl=t.checklist||[];
+  const done=cl.filter(c=>c.done).length; const pend=cl.length>0 && done<cl.length;
+  const btnCls=pend?'btn-ghost':'btn-gold', btnDis=pend?'disabled':'';
+  const btnLabel=pend?('Marca los pasos ('+done+'/'+cl.length+')'):'✅ Completar tarea';
+  body.innerHTML='<div class="topbar"><button class="linkbtn" onclick="taskDetailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+lineBadge(t.line)+'</div><h2 style="font-size:20px;">'+svcEscE(t.title)+'</h2></div></div>'
+    +(cl.length?('<div class="faint" style="font-size:13px;margin-bottom:8px;">Marca cada paso conforme lo haces ('+done+'/'+cl.length+'):</div>'
+      +'<div class="card" style="padding:2px 14px;margin-bottom:18px;">'+cl.map((c,i)=>'<div class="stepitem '+(c.done?'on':'')+'" onclick="taskToggleStep('+i+')"><div class="stepbox">'+(c.done?'✓':'')+'</div><div class="steptext" style="flex:1;min-width:0;font-size:15px;padding-top:2px;line-height:1.4;">'+svcEscE(c.text)+'</div></div>').join('')+'</div>')
+      :'<div class="faint" style="margin:14px 0 18px;">Esta tarea no tiene pasos. Márcala como completada cuando termines.</div>')
+    +'<button class="btn '+btnCls+'" style="width:100%;" '+btnDis+' onclick="taskDoComplete()">'+btnLabel+'</button>';
+}
+window.taskToggleStep=async function(idx){
+  if(!JOB_CUR) return; const cl=JOB_CUR.checklist||[]; if(idx<0||idx>=cl.length) return;
+  const nv=!cl[idx].done; cl[idx].done=nv; renderTaskDetail();
+  try{ await httpsCallable(functions,'taskStep')({taskId:JOB_CUR.id, idx:idx, done:nv}); }
+  catch(e){ cl[idx].done=!nv; renderTaskDetail(); toast('No se pudo guardar el paso',true); }
+};
+window.taskDoComplete=async function(){
+  if(!JOB_CUR) return; const t=JOB_CUR;
+  try{ await httpsCallable(functions,'taskComplete')({taskId:t.id}); }
+  catch(e){ toast((e&&e.message)||'No se pudo completar',true); return; }
+  document.getElementById('task-detail').classList.add('hide');
+  const sub=document.getElementById('task-gold-sub'); if(sub) sub.textContent=t.title;
+  const g=document.getElementById('task-gold'); g.classList.remove('hide');
+  setTimeout(function(){ g.classList.add('hide'); JOB_CUR=null; loadJourney(); }, 1500);
+};
+window.jobAddOpen=async function(){
+  if(!(ME&&ME.isOwner)) return;
+  if(!JOB_ROSTER.length){ try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); JOB_ROSTER=((r&&r.data)||{}).emps||[]; }catch(e){ JOB_ROSTER=[]; } }
+  const IN='width:100%;box-sizing:border-box;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:15px;margin-bottom:12px;';
+  const empOpts='<option value="">— Cualquiera con la función —</option>'+JOB_ROSTER.map(e=>'<option value="'+e.id+'">'+svcEscE(e.name)+'</option>').join('');
+  const lineOpts=Object.keys(JOB_LINES).map(k=>'<option value="'+k+'"'+(k==='general'?' selected':'')+'>'+JOB_LINES[k].l+'</option>').join('');
+  const roleOpts=['','Mecánico','Detallador','Fotos','Limpieza','Empaque','Captura','Listado','Desmantelador','Ayudante general','Oficina','Ventas'].map(r=>'<option value="'+r+'">'+(r||'— Función (opcional) —')+'</option>').join('');
+  document.getElementById('job-add-body').innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2 style="font-size:19px;margin:0;">Nueva tarea</h2><button class="linkbtn" onclick="jobAddClose()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>'
+    +'<input id="job-title" autocapitalize="sentences" placeholder="Título (ej. Preparar oficina)" style="'+IN+'">'
+    +'<div style="display:flex;gap:8px;"><select id="job-line" style="'+IN+'">'+lineOpts+'</select><select id="job-role" style="'+IN+'">'+roleOpts+'</select></div>'
+    +'<select id="job-emp" style="'+IN+'">'+empOpts+'</select>'
+    +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">Pasos (uno por renglón)</label>'
+    +'<textarea id="job-steps" placeholder="Sacar la basura&#10;Poner bolsas nuevas&#10;Trapear el baño" style="'+IN+';min-height:120px;resize:vertical;"></textarea>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;margin-bottom:16px;"><input type="checkbox" id="job-daily" style="width:19px;height:19px;"> Repetir cada día (plantilla diaria)</label>'
+    +'<button class="btn btn-gold" style="width:100%;" onclick="jobAddSave()">➕ Crear tarea</button>'
+    +'<div class="faint" style="font-size:11.5px;text-align:center;margin-top:10px;">La tarea diaria necesita un empleado específico.</div>';
+  document.getElementById('job-add').classList.remove('hide');
+};
+window.jobAddClose=function(){ document.getElementById('job-add').classList.add('hide'); };
+window.jobAddSave=async function(){
+  const title=(document.getElementById('job-title').value||'').trim();
+  const line=document.getElementById('job-line').value;
+  const role=document.getElementById('job-role').value;
+  const emp=document.getElementById('job-emp').value;
+  const daily=document.getElementById('job-daily').checked;
+  const steps=(document.getElementById('job-steps').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!title){ toast('Pon el título.',true); return; }
+  if(daily && !emp){ toast('La tarea diaria necesita un empleado específico.',true); return; }
+  try{
+    await httpsCallable(functions,'taskAdd')({ title:title, line:line, checklist:steps, assignEmpId:emp, assignRole:emp?'':role, recurring:daily?'daily':'none' });
+    toast('✅ Tarea creada'); jobAddClose(); loadJourney();
+  }catch(e){ toast((e&&e.message)||'No se pudo crear',true); }
 };
 function renderMyService(){
   const box=document.getElementById('svc-emp-list'); if(!box) return;

@@ -1301,6 +1301,93 @@ exports.carTaskStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true };
 });
 
+// 📋 TAREAS GUIADAS (jornada del empleado) — colección `tasks` con checklist, LÍNEA (dealer/service/desmantle/general)
+// y plantilla diaria. Solo por callables (admin SDK). NO toca Warehouse.
+const TASK_LINES = ["dealer", "service", "desmantle", "general"];
+function _laDateKey() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }); }
+function _taskMine(t, id) {
+  const roles = Array.isArray(id.roles) ? id.roles : [];
+  return (t.assignEmpId && t.assignEmpId === id.empId) || (!t.assignEmpId && t.assignRole && roles.indexOf(t.assignRole) >= 0) || id.isOwner || !!id.email;
+}
+exports.taskAdd = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const d = request.data || {};
+  const title = String(d.title || "").trim().slice(0, 140); if (!title) throw new HttpsError("invalid-argument", "Falta el título.");
+  const line = TASK_LINES.indexOf(String(d.line || "general")) >= 0 ? String(d.line) : "general";
+  const checklist = (Array.isArray(d.checklist) ? d.checklist : []).map((s) => String(s || "").trim()).filter(Boolean).slice(0, 40).map((text) => ({ text, done: false }));
+  const assignEmpId = String(d.assignEmpId || "");
+  const assignRole = String(d.assignRole || "");
+  const recurring = (d.recurring === "daily") ? "daily" : "none";
+  if (recurring === "daily" && !assignEmpId) throw new HttpsError("invalid-argument", "Una tarea diaria debe asignarse a un empleado.");
+  const db = admin.firestore();
+  let assignName = "";
+  if (assignEmpId) { try { const es = await db.collection("employees").doc(assignEmpId).get(); if (es.exists) assignName = (es.data() || {}).name || ""; } catch (e) {} }
+  const ref = db.collection("tasks").doc();
+  const base = { title, line, checklist, assignEmpId, assignRole, assignName, createdBy: id.name || id.email || "", createdAt: new Date().toISOString(), order: Date.now() };
+  if (recurring === "daily") await ref.set(Object.assign(base, { isTemplate: true, recurring: "daily", status: "template" }));
+  else await ref.set(Object.assign(base, { isTemplate: false, recurring: "none", status: "cola" }));
+  return { ok: true, id: ref.id };
+});
+exports.myTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const db = admin.firestore();
+  const today = _laDateKey();
+  let snap; try { snap = await db.collection("tasks").get(); } catch (e) { return { ok: true, tasks: [] }; }
+  const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const execs = all.filter((t) => !t.isTemplate && t.templateId);
+  const templates = all.filter((t) => t.isTemplate && t.recurring === "daily" && _taskMine(t, id) && t.assignEmpId);
+  for (const tpl of templates) {
+    const has = execs.find((e) => e.templateId === tpl.id && e.dateKey === today && e.assignEmpId === tpl.assignEmpId);
+    if (!has) {
+      const ref = db.collection("tasks").doc();
+      const exec = { title: tpl.title, line: tpl.line, checklist: (tpl.checklist || []).map((c) => ({ text: c.text, done: false })), assignEmpId: tpl.assignEmpId, assignRole: tpl.assignRole || "", assignName: tpl.assignName || "", isTemplate: false, recurring: "none", templateId: tpl.id, dateKey: today, status: "cola", createdBy: "auto", createdAt: new Date().toISOString(), order: tpl.order || Date.now() };
+      try { await ref.set(exec); all.push(Object.assign({ id: ref.id }, exec)); } catch (e) {}
+    }
+  }
+  const list = all.filter((t) => !t.isTemplate && t.status !== "hecho" && _taskMine(t, id));
+  list.sort((a, b) => (a.order || 0) - (b.order || 0));
+  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], status: t.status || "cola", assignName: t.assignName || "" }));
+  return { ok: true, tasks: out, today };
+});
+exports.taskStep = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const d = request.data || {};
+  const taskId = String(d.taskId || ""); const idx = parseInt(d.idx, 10); const done = !!d.done;
+  if (!taskId || isNaN(idx)) throw new HttpsError("invalid-argument", "Datos inválidos.");
+  const db = admin.firestore(); const ref = db.collection("tasks").doc(taskId);
+  const snap = await ref.get(); if (!snap.exists) throw new HttpsError("not-found", "No existe.");
+  const t = snap.data() || {};
+  if (!_taskMine(t, id)) throw new HttpsError("permission-denied", "No es tu tarea.");
+  const cl = Array.isArray(t.checklist) ? t.checklist.slice() : [];
+  if (idx < 0 || idx >= cl.length) throw new HttpsError("invalid-argument", "Paso inválido.");
+  cl[idx] = { text: cl[idx].text, done: done };
+  const patch = { checklist: cl, updatedAt: new Date().toISOString() };
+  if (t.status === "cola") { patch.status = "en_proceso"; patch.startedAt = new Date().toISOString(); }
+  await ref.set(patch, { merge: true });
+  return { ok: true };
+});
+exports.taskComplete = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const d = request.data || {};
+  const taskId = String(d.taskId || ""); if (!taskId) throw new HttpsError("invalid-argument", "Falta la tarea.");
+  const db = admin.firestore(); const ref = db.collection("tasks").doc(taskId);
+  const snap = await ref.get(); if (!snap.exists) throw new HttpsError("not-found", "No existe.");
+  const t = snap.data() || {};
+  if (!_taskMine(t, id)) throw new HttpsError("permission-denied", "No es tu tarea.");
+  const cl = Array.isArray(t.checklist) ? t.checklist : [];
+  if (cl.length && cl.some((c) => !c.done)) throw new HttpsError("failed-precondition", "Faltan pasos por marcar.");
+  await ref.set({ status: "hecho", finishedAt: new Date().toISOString(), finishedBy: id.name || id.email || id.empId || "" }, { merge: true });
+  return { ok: true };
+});
+
 // 👑 Panel del dueño en Pit Crew: listar y gestionar el equipo desde el teléfono. Solo dueños.
 exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
