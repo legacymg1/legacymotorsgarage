@@ -134,11 +134,28 @@
     </div>
   </div>
 
+  <!-- 👑 Dueño: nueva tarea suelta (Pit) -->
+  <div id="job-add" class="hide" style="position:fixed;inset:0;z-index:6500;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)jobAddClose()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));">
+      <div id="job-add-body"></div>
+    </div>
+  </div>
+
+  <!-- 👑 Dueño: carros en proceso -->
+  <div id="cars-proc" class="hide" style="position:fixed;inset:0;z-index:6500;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;"><div class="wrap" style="padding:16px;">
+    <div class="topbar"><button class="linkbtn" onclick="document.getElementById('cars-proc').classList.add('hide')" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button><h2 style="font-size:20px;margin:0;" data-i18n="carsProcH">🚗 Carros en proceso</h2></div>
+    <div id="cars-proc-list"></div>
+  </div></div>
+
   <!-- ===================== 👑 PANEL DE OPERACIÓN (solo dueño) ===================== -->
   <div class="card" id="owner-op-card" style="display:none;margin-bottom:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <span style="font-weight:800;" data-i18n="opPanelTitle">📋 Panel de operación</span>
       <button class="linkbtn" onclick="loadOwnerPanel()" style="font-size:18px;" title="↻">↻</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="btn sm" onclick="jobAddOpen()" style="flex:1;" data-i18n="opAddTask">➕ Tarea</button>
+      <button class="btn ghost sm" onclick="openCarsProc()" style="flex:1;" data-i18n="opCarsProc">🚗 Carros en proceso</button>
     </div>
     <div id="op-summary" style="display:flex;gap:8px;margin-bottom:10px;"></div>
     <div id="op-tasks" style="max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
@@ -383,6 +400,12 @@ const T={
     jLoadingTxt:'Cargando…', jCouldnt:'No se pudo.', jStepErr:'No se pudo guardar el paso',
     clkStartBreak:'☕ Iniciar descanso', clkEndBreak:'▶️ Terminar descanso', clkOnBreak:'🟠 En descanso desde', clkBreakReg:'Registrando descanso…',
     opPanelTitle:'📋 Panel de operación', opPendingWord:'pendientes', opInProc:'en proceso', unassigned:'— sin asignar', opEmpty:'Sin pendientes ahora.', opToStart:'Por empezar', opRefresh:'↻',
+    opAddTask:'➕ Tarea', opCarsProc:'🚗 Carros en proceso',
+    jPitH:'Tarea suelta (Pit)', jPitSub:'Algo que NO es de la línea del dealer ni de un cliente. Ej. «cambiar el motor» a un carro, o «pintar el shop».',
+    jWhatLbl:'¿Qué se le va a hacer?', jTitle:'Título (ej. Cambiar el motor)', jFuncLbl:'1) Función (a qué área pertenece)', jFunc:'— Función (opcional) —',
+    jExecLbl:'2) Ejecutor (quién la hace)', jAnyEmp:'— Cualquiera con la función —', jCarLbl:'Carro (opcional)', jNoCar:'— Sin carro / general —', jGrpInv:'🚗 Inventario (dealer)', jGrpDis:'🔧 Para desmantelar (yarda)',
+    jStepsOpt:'Pasos (opcional, uno por renglón)', jStepsPh:'Drenar fluidos\nDesconectar arnés\nSacar el motor', jDaily:'Repetir cada día (plantilla diaria)', jCreate:'➕ Crear tarea', jDailyHint:'La tarea diaria necesita un empleado específico.',
+    carsProcH:'🚗 Carros en proceso', inProcNone:'No hay carros en proceso ahora.', jobsN:'trabajos', inspPending:'Inspección pendiente', stMecanico:'Mecánico', stPintura:'Pintura', stDetalle:'Detalle', stListo:'Listo',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
     vinPh:'1FT... (17 dígitos)', colorPh:'Ej. Blanco', whichPartPh:'Ej. Manija delantera izquierda', oemPh:'OEM #', rackPh:'Ej. A3', toperPh:'Ej. 14', searchPartPh:'🔎 Buscar parte / carro…', scanPh:'Número de estampa o nombre…',
     addPart:'➕ Agregar parte', whichPart:'¿Qué parte es? (lo más detallado posible)', condition:'Condición', partNum:'# de parte (opc.)', rack:'Rack', toper:'Toper #', photos:'📷 Fotos de la parte (las más que puedas)', savePart:'Guardar parte', reprintBtnQA:'🖨️ Reimprimir número de estampa', reprintTitle:'Reimprimir número', reprintHint:'Escribe el número de la estampa y dale imprimir — por si la de la parte ya está borrosa o no se ve.', reprintPh:'Número (ej. 0042)', reprintBtn:'🖨️ Imprimir', reprintAnother:'🔁 Otro número', savingPart:'Guardando…', savingPhotos:'Subiendo fotos…', genQR:'Generando QR…', partsCount:'Partes', noPartsYet:'Sin partes todavía.', photosReady:'foto(s) lista(s)', takePhoto:'📷 Cámara', fromGallery:'🖼️ Galería', fromFile:'📁 Archivo', photoStarHint:'⭐ mándala al frente · 🤖 el bot lee las 3 primeras', photoToFront:'Mandar al frente', delPhotos:'Eliminar fotos', delSelected:'Eliminar', cancelBtn:'Cancelar', delSelectHint:'Toca las fotos que quieras borrar y confirma.', delConfirm:'¿Eliminar N foto(s)? No se puede deshacer.', airbagBtn:'Marcar como Airbag', airbagOn:'Airbag ✓ (bin AIRBAGS)', secAirbags:'Airbags', airbagNote:'Restringidos en eBay — no se listan por ahora. Guardados en inventario (bin AIRBAGS).',
@@ -414,6 +437,12 @@ const T={
     jLoadingTxt:'Loading…', jCouldnt:'Could not.', jStepErr:'Could not save the step',
     clkStartBreak:'☕ Start break', clkEndBreak:'▶️ End break', clkOnBreak:'🟠 On break since', clkBreakReg:'Logging break…',
     opPanelTitle:'📋 Operations panel', opPendingWord:'to-do', opInProc:'in progress', unassigned:'— unassigned', opEmpty:'Nothing pending now.', opToStart:'To start', opRefresh:'↻',
+    opAddTask:'➕ Task', opCarsProc:'🚗 Cars in process',
+    jPitH:'One-off task (Pit)', jPitSub:'Something that is NOT on the dealer line or a customer. E.g. “replace the engine” on a car, or “paint the shop”.',
+    jWhatLbl:'What needs to be done?', jTitle:'Title (e.g. Replace the engine)', jFuncLbl:'1) Function (which area it belongs to)', jFunc:'— Function (optional) —',
+    jExecLbl:'2) Doer (who does it)', jAnyEmp:'— Anyone with the function —', jCarLbl:'Car (optional)', jNoCar:'— No car / general —', jGrpInv:'🚗 Inventory (dealer)', jGrpDis:'🔧 To dismantle (yard)',
+    jStepsOpt:'Steps (optional, one per line)', jStepsPh:'Drain fluids\nDisconnect harness\nPull the engine', jDaily:'Repeat every day (daily template)', jCreate:'➕ Create task', jDailyHint:'A daily task needs a specific employee.',
+    carsProcH:'🚗 Cars in process', inProcNone:'No cars in process right now.', jobsN:'jobs', inspPending:'Inspection pending', stMecanico:'Mechanic', stPintura:'Paint', stDetalle:'Detail', stListo:'Ready',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
     vinPh:'1FT... (17 digits)', colorPh:'e.g. White', whichPartPh:'e.g. Front left door handle', oemPh:'OEM #', rackPh:'e.g. A3', toperPh:'e.g. 14', searchPartPh:'🔎 Search part / car…', scanPh:'Sticker number or name…',
     addPart:'➕ Add part', whichPart:'What part is it? (as detailed as possible)', condition:'Condition', partNum:'Part # (opt.)', rack:'Rack', toper:'Bin #', photos:'📷 Part photos (as many as you can)', savePart:'Save part', reprintBtnQA:'🖨️ Reprint sticker number', reprintTitle:'Reprint number', reprintHint:'Type the sticker number and print it — in case the one on the part is worn out or unreadable.', reprintPh:'Number (e.g. 0042)', reprintBtn:'🖨️ Print', reprintAnother:'🔁 Another number', savingPart:'Saving…', savingPhotos:'Uploading photos…', genQR:'Generating QR…', partsCount:'Parts', noPartsYet:'No parts yet.', photosReady:'photo(s) ready', takePhoto:'📷 Camera', fromGallery:'🖼️ Gallery', fromFile:'📁 File', photoStarHint:'⭐ send to front · 🤖 bot reads the first 3', photoToFront:'Send to front', delPhotos:'Delete photos', delSelected:'Delete', cancelBtn:'Cancel', delSelectHint:'Tap the photos you want to delete, then confirm.', delConfirm:'Delete N photo(s)? This can\'t be undone.', airbagBtn:'Mark as Airbag', airbagOn:'Airbag ✓ (AIRBAGS bin)', secAirbags:'Airbags', airbagNote:'Restricted on eBay — not listed for now. Kept in inventory (AIRBAGS bin).',
@@ -842,6 +871,71 @@ function renderOwnerPanel(){
     return '<div style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(x.title)+'</span>'+lineBadge(x.line)+'</div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+stLabel+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
+
+// ➕ Dueño crea una TAREA SUELTA (Pit): qué → función → ejecutor → carro (inventario/desmantelar) → pasos.
+let JOB_ROSTER=[], JOB_CARS=[];
+window.jobAddOpen=async function(){
+  if(role!=='owner') return;
+  if(!JOB_ROSTER.length){ try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); JOB_ROSTER=((r&&r.data)||{}).emps||[]; }catch(e){ JOB_ROSTER=[]; } }
+  let JC_INV=[], JC_DIS=[];
+  if(!JOB_CARS.length){ try{ const rc=await httpsCallable(functions,'invCarsLite')({}); const dd=(rc&&rc.data)||{}; JOB_CARS=dd.cars||[]; JC_INV=dd.inventory||[]; JC_DIS=dd.dismantle||[]; }catch(e){ JOB_CARS=[]; } }
+  else { JC_INV=JOB_CARS.filter(c=>c.kind==='inventario'); JC_DIS=JOB_CARS.filter(c=>c.kind==='desmantelar'); }
+  const IN='width:100%;box-sizing:border-box;padding:11px;border-radius:11px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;margin-bottom:12px;';
+  const LBL='font-size:13px;font-weight:700;display:block;margin-bottom:5px;';
+  const empOpts='<option value="">'+t('jAnyEmp')+'</option>'+JOB_ROSTER.map(e=>'<option value="'+e.id+'">'+esc(e.name)+'</option>').join('');
+  const roleOpts=['','Mecánico','Detallador','Fotos','Limpieza','Empaque','Captura','Listado','Desmantelador','Ayudante general','Oficina','Ventas'].map(r=>'<option value="'+r+'">'+(r?esc(r):t('jFunc'))+'</option>').join('');
+  const carOpt=c=>'<option value="'+c.id+'" data-lbl="'+esc(c.label)+'">'+esc((c.inventoryNum?('#'+c.inventoryNum+' '):'')+c.label)+'</option>';
+  const carOpts='<option value="">'+t('jNoCar')+'</option>'
+    +(JC_INV.length?('<optgroup label="'+t('jGrpInv')+'">'+JC_INV.map(carOpt).join('')+'</optgroup>'):'')
+    +(JC_DIS.length?('<optgroup label="'+t('jGrpDis')+'">'+JC_DIS.map(carOpt).join('')+'</optgroup>'):'');
+  document.getElementById('job-add-body').innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><h2 style="font-size:19px;margin:0;">'+t('jPitH')+'</h2><button class="linkbtn" onclick="jobAddClose()" style="font-size:26px;color:var(--muted);line-height:1;">×</button></div>'
+    +'<div class="faint" style="font-size:12px;margin-bottom:14px;line-height:1.35;">'+t('jPitSub')+'</div>'
+    +'<label style="'+LBL+'">'+t('jWhatLbl')+'</label><input id="job-title" autocapitalize="sentences" placeholder="'+t('jTitle')+'" style="'+IN+'">'
+    +'<label style="'+LBL+'">'+t('jFuncLbl')+'</label><select id="job-role" style="'+IN+'">'+roleOpts+'</select>'
+    +'<label style="'+LBL+'">'+t('jExecLbl')+'</label><select id="job-emp" style="'+IN+'">'+empOpts+'</select>'
+    +'<label style="'+LBL+'">'+t('jCarLbl')+'</label><select id="job-car" style="'+IN+'">'+carOpts+'</select>'
+    +'<label style="'+LBL+'">'+t('jStepsOpt')+'</label><textarea id="job-steps" placeholder="'+t('jStepsPh')+'" style="'+IN+';min-height:100px;resize:vertical;"></textarea>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;margin-bottom:16px;"><input type="checkbox" id="job-daily" style="width:19px;height:19px;"> '+t('jDaily')+'</label>'
+    +'<button class="btn" style="width:100%;" onclick="jobAddSave()">'+t('jCreate')+'</button>'
+    +'<div class="faint" style="font-size:11.5px;text-align:center;margin-top:10px;">'+t('jDailyHint')+'</div>';
+  document.getElementById('job-add').classList.remove('hide');
+};
+window.jobAddClose=function(){ document.getElementById('job-add').classList.add('hide'); };
+window.jobAddSave=async function(){
+  const title=(document.getElementById('job-title').value||'').trim();
+  const role2=document.getElementById('job-role').value;
+  const emp=document.getElementById('job-emp').value;
+  const carSel=document.getElementById('job-car'); const carId=carSel?carSel.value:'';
+  const carLabel=(carId&&carSel.selectedOptions[0])?(carSel.selectedOptions[0].getAttribute('data-lbl')||''):'';
+  const daily=document.getElementById('job-daily').checked;
+  const steps=(document.getElementById('job-steps').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!title){ whToast(L==='en'?'Say what needs to be done.':'Di qué se le va a hacer.',true); return; }
+  if(daily && !emp){ whToast(t('jDailyHint'),true); return; }
+  try{
+    await httpsCallable(functions,'taskAdd')({ title:title, line:'general', checklist:steps, assignEmpId:emp, assignRole:emp?'':role2, carId:carId, carLabel:carLabel, recurring:daily?'daily':'none' });
+    whToast(L==='en'?'✅ Task created':'✅ Tarea creada'); jobAddClose();
+    try{ loadOwnerPanel(); }catch(e){}
+  }catch(e){ whToast((e&&e.message)||(L==='en'?'Could not create':'No se pudo crear'),true); }
+};
+
+// 🚗 Carros en proceso (inventario en prep): etapa, # trabajos, inspección pendiente.
+const STAGE_KEY={ mecanico:'stMecanico', pintura:'stPintura', detalle:'stDetalle', listo:'stListo' };
+window.openCarsProc=function(){ if(role!=='owner') return; document.getElementById('cars-proc').classList.remove('hide'); loadCarsProc(); };
+window.loadCarsProc=async function(){
+  const box=document.getElementById('cars-proc-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
+  let cars=[];
+  try{ const r=await httpsCallable(functions,'carsInProcess')({}); cars=((r&&r.data)||{}).cars||[]; }
+  catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jCouldnt')+'</div>'; return; }
+  if(!cars.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:24px;">'+t('inProcNone')+'</div>'; return; }
+  box.innerHTML=cars.map(c=>{
+    const photo=c.photo?('<img src="'+c.photo+'" alt="" style="width:50px;height:50px;border-radius:10px;object-fit:cover;flex:0 0 auto;">'):'<div style="width:50px;height:50px;border-radius:10px;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto;">🚗</div>';
+    const stage=t(STAGE_KEY[c.reconStage]||'stMecanico');
+    const bits=[]; if(c.tasks) bits.push('🔧 '+c.tasks+' '+t('jobsN')); if(c.reconStage==='mecanico' && !c.inspStarted) bits.push(t('inspPending'));
+    return '<div class="card" style="padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:center;">'+photo
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:15px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+esc(c.label)+'</div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">📍 '+stage+(bits.length?(' · '+bits.join(' · ')):'')+'</div></div></div>';
+  }).join('');
+};
 
 // ---- 💬 CHAT INTERNO multi-canal (tiempo real) ----
 // 3 canales. Cada rol ve solo los suyos; los dueños ven los 3.
