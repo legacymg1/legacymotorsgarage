@@ -1488,31 +1488,61 @@ exports.clockPunch = onCall({ timeoutSeconds: 30 }, async (request) => {
   const action = String((request.data && request.data.action) || "").trim();
   const lat = request.data && request.data.lat != null ? Number(request.data.lat) : null;
   const lng = request.data && request.data.lng != null ? Number(request.data.lng) : null;
-  if (action !== "in" && action !== "out") throw new HttpsError("invalid-argument", "Acción inválida.");
+  if (["in", "out", "break_start", "break_end"].indexOf(action) < 0) throw new HttpsError("invalid-argument", "Acción inválida.");
   const db = admin.firestore();
-  const cfg = await _tcConfig();
-  const geo = _checkGeofence(cfg, lat, lng);
-  if (geo.noGps) throw new HttpsError("failed-precondition", "No pudimos leer tu ubicación (GPS). Activa la ubicación e inténtalo de nuevo.");
   const openRef = db.collection("timeclock_open").doc(id.key);
   const openSnap = await openRef.get();
   const nowIso = new Date().toISOString();
+  const now = Date.now();
+
+  // DESCANSOS (no requieren GPS). El tiempo de descanso NO cuenta en las horas trabajadas.
+  if (action === "break_start" || action === "break_end") {
+    if (!openSnap.exists) throw new HttpsError("failed-precondition", "No tienes una entrada abierta.");
+    const d = openSnap.data();
+    const breaks = Array.isArray(d.breaks) ? d.breaks.slice() : [];
+    if (action === "break_start") {
+      if (d.onBreakSince) throw new HttpsError("failed-precondition", "Ya estás en un descanso.");
+      breaks.push({ start: nowIso, end: null });
+      await openRef.set({ onBreakSince: nowIso, breaks: breaks }, { merge: true });
+      return { ok: true, action: "break_start", at: nowIso };
+    } else {
+      if (!d.onBreakSince) throw new HttpsError("failed-precondition", "No tienes un descanso abierto.");
+      const bms = Math.max(0, now - new Date(d.onBreakSince).getTime());
+      for (let i = breaks.length - 1; i >= 0; i--) { if (!breaks[i].end) { breaks[i].end = nowIso; break; } }
+      await openRef.set({ onBreakSince: null, breaks: breaks, breakMs: (Number(d.breakMs) || 0) + bms }, { merge: true });
+      return { ok: true, action: "break_end", breakMin: Math.round(bms / 60000), at: nowIso };
+    }
+  }
+
+  // ENTRADA / SALIDA (requieren GPS)
+  const cfg = await _tcConfig();
+  const geo = _checkGeofence(cfg, lat, lng);
+  if (geo.noGps) throw new HttpsError("failed-precondition", "No pudimos leer tu ubicación (GPS). Activa la ubicación e inténtalo de nuevo.");
   if (action === "in") {
     if (openSnap.exists) throw new HttpsError("failed-precondition", "Ya tienes una ENTRADA abierta. Haz Salida primero.");
     if (!geo.ok) throw new HttpsError("failed-precondition", "No estás en el Dealer ni en el Yonke (estás a " + geo.distM + " m). Acércate para registrar tu entrada.");
-    await openRef.set({ actorKey: id.key, email: id.email, phone: id.phone, empId: id.empId, name: id.name, location: geo.location, inAt: nowIso, inLat: lat, inLng: lng, weekKey: _laMondayKey(new Date()) });
+    await openRef.set({ actorKey: id.key, email: id.email, phone: id.phone, empId: id.empId, name: id.name, location: geo.location, inAt: nowIso, inLat: lat, inLng: lng, weekKey: _laMondayKey(new Date()), breaks: [], onBreakSince: null, breakMs: 0 });
     return { ok: true, action: "in", location: geo.location, at: nowIso };
   } else {
     if (!openSnap.exists) throw new HttpsError("failed-precondition", "No tienes una entrada abierta. Haz Entrada primero.");
     const d = openSnap.data();
-    const hours = Math.max(0, (new Date(nowIso) - new Date(d.inAt)) / 3600000);
+    let breakMs = Number(d.breakMs) || 0;
+    const breaks = Array.isArray(d.breaks) ? d.breaks.slice() : [];
+    // Si sale durante un descanso, se cierra también y ese tiempo no cuenta.
+    if (d.onBreakSince) { breakMs += Math.max(0, now - new Date(d.onBreakSince).getTime()); for (let i = breaks.length - 1; i >= 0; i--) { if (!breaks[i].end) { breaks[i].end = nowIso; break; } } }
+    const grossMs = Math.max(0, now - new Date(d.inAt).getTime());
+    const workedMs = Math.max(0, grossMs - breakMs);
+    const hours = workedMs / 3600000;
     await db.collection("timeclock").add({
       actorKey: id.key, email: id.email, phone: id.phone, empId: id.empId, name: id.name,
       location: d.location || geo.location, outLocation: geo.location,
       inAt: d.inAt, outAt: nowIso, inLat: d.inLat, inLng: d.inLng, outLat: lat, outLng: lng,
-      hours: Math.round(hours * 100) / 100, weekKey: d.weekKey || _laMondayKey(new Date()), createdAt: nowIso,
+      hours: Math.round(hours * 100) / 100, grossHours: Math.round((grossMs / 3600000) * 100) / 100,
+      breakHours: Math.round((breakMs / 3600000) * 100) / 100, breaks: breaks,
+      weekKey: d.weekKey || _laMondayKey(new Date()), createdAt: nowIso,
     });
     await openRef.delete();
-    return { ok: true, action: "out", hours: Math.round(hours * 100) / 100, at: nowIso };
+    return { ok: true, action: "out", hours: Math.round(hours * 100) / 100, breakMin: Math.round(breakMs / 60000), at: nowIso };
   }
 });
 // Estado + horas de la semana de quien llama. Para su tarjeta en la app.
@@ -1523,7 +1553,8 @@ exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
   const db = admin.firestore();
   const wk = _laMondayKey(new Date());
   const openSnap = await db.collection("timeclock_open").doc(id.key).get();
-  const open = openSnap.exists ? { inAt: openSnap.data().inAt, location: openSnap.data().location } : null;
+  const od = openSnap.exists ? (openSnap.data() || {}) : null;
+  const open = od ? { inAt: od.inAt, location: od.location, onBreak: !!od.onBreakSince, onBreakSince: od.onBreakSince || null } : null;
   const snap = await db.collection("timeclock").where("weekKey", "==", wk).get();
   const emailLc = (id.email || "").toLowerCase();
   let hours = 0;
@@ -1532,7 +1563,12 @@ exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
     const mine = (x.actorKey && x.actorKey === id.key) || (!x.actorKey && emailLc && (x.email || "").toLowerCase() === emailLc);
     if (mine) hours += Number(x.hours) || 0;
   });
-  if (open) hours += Math.max(0, (Date.now() - new Date(open.inAt)) / 3600000);
+  if (od) {
+    let el = Date.now() - new Date(od.inAt).getTime();
+    el -= (Number(od.breakMs) || 0);
+    if (od.onBreakSince) el -= Math.max(0, Date.now() - new Date(od.onBreakSince).getTime());
+    hours += Math.max(0, el / 3600000);
+  }
   return { ok: true, weekKey: wk, hours: Math.round(hours * 100) / 100, open };
 });
 // Panel del dueño (Finanzas): horas + pago de la semana por persona (correo o teléfono).
@@ -1559,7 +1595,7 @@ exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
   snap.forEach((d) => { const x = d.data(); const r = touch(x); r.hours += Number(x.hours) || 0; r.shifts += 1; });
   // turnos abiertos (entrada sin salida)
   const openSnap = await db.collection("timeclock_open").get();
-  openSnap.forEach((d) => { const x = d.data(); if ((x.weekKey || "") !== wk) return; const r = touch(x); r.open = true; r.hours += Math.max(0, (Date.now() - new Date(x.inAt)) / 3600000); });
+  openSnap.forEach((d) => { const x = d.data(); if ((x.weekKey || "") !== wk) return; const r = touch(x); r.open = true; let el = Date.now() - new Date(x.inAt).getTime(); el -= (Number(x.breakMs) || 0); if (x.onBreakSince) el -= Math.max(0, Date.now() - new Date(x.onBreakSince).getTime()); r.hours += Math.max(0, el / 3600000); });
   const list = Object.values(byKey).map((r) => {
     const rate = r.empId ? (empRateById[r.empId] || 0) : (Number(rates[r.email]) || 0);
     const hrs = Math.round(r.hours * 100) / 100;

@@ -164,6 +164,7 @@
     <div id="clk-hours" class="clock-hours" style="display:none;">0.00 h</div>
     <div class="faint" data-i18n="thisWeek" style="font-size:12px;margin-bottom:16px;display:none;">esta semana</div>
     <button id="clk-btn" class="btn btn-green" onclick="punch()">🟢 Registrar entrada</button>
+    <button id="clk-break-btn" class="btn btn-ghost" onclick="punchBreak()" style="display:none;margin-top:10px;">☕ Iniciar descanso</button>
     <div id="clk-note" class="faint" style="font-size:11px;margin-top:10px;"></div>
   </div>
 
@@ -689,16 +690,27 @@ function renderClock(){
   hb.textContent = hrs.toFixed(2)+' h';
   const ah=document.getElementById('acct-hours'); if(ah) ah.textContent=hrs.toFixed(2)+' h';
   const ap=document.getElementById('acct-pay'); if(ap){ const pay=(ME&&ME.rate)?hrs*Number(ME.rate):0; ap.textContent='$'+pay.toFixed(2); }
+  const bb=document.getElementById('clk-break-btn');
   if(open){
-    st.innerHTML='<span class="dot" style="background:var(--green);"></span>'+t('clkInside')+' · '+(open.location==='yonke'?'Yonke':open.location==='dealer'?'Dealer':t('clkWorking'));
-    st.style.color='var(--green)';
     btn.className='btn btn-red'; btn.textContent=t('checkOut');
-    const since=open.inAt?new Date(open.inAt):null;
-    note.textContent = since ? (t('clkEnteredAt')+' '+since.toLocaleTimeString(LANG==='en'?'en-US':'es-MX',{hour:'2-digit',minute:'2-digit'})) : '';
+    if(open.onBreak){
+      st.innerHTML='<span class="dot" style="background:#ff9800;"></span>'+t('clkOnBreak');
+      st.style.color='#ff9800';
+      const bs=open.onBreakSince?new Date(open.onBreakSince):null;
+      note.textContent = bs ? (t('clkBreakSince')+' '+bs.toLocaleTimeString(LANG==='en'?'en-US':'es-MX',{hour:'2-digit',minute:'2-digit'})) : '';
+      if(bb){ bb.style.display=''; bb.className='btn btn-gold'; bb.textContent=t('clkEndBreak'); }
+    } else {
+      st.innerHTML='<span class="dot" style="background:var(--green);"></span>'+t('clkInside')+' · '+(open.location==='yonke'?'Yonke':open.location==='dealer'?'Dealer':t('clkWorking'));
+      st.style.color='var(--green)';
+      const since=open.inAt?new Date(open.inAt):null;
+      note.textContent = since ? (t('clkEnteredAt')+' '+since.toLocaleTimeString(LANG==='en'?'en-US':'es-MX',{hour:'2-digit',minute:'2-digit'})) : '';
+      if(bb){ bb.style.display=''; bb.className='btn btn-ghost'; bb.textContent=t('clkStartBreak'); }
+    }
   } else {
     st.innerHTML=t('out'); st.style.color='var(--muted)';
     btn.className='btn btn-green'; btn.textContent=t('checkIn');
     note.textContent=t('clkMustSite');
+    if(bb) bb.style.display='none';
   }
   // Las tareas aparecen SOLO después de hacer check-in (dueños las ven siempre, para probar).
   const showTasks = (ME && ME.isOwner) || !!open;
@@ -708,21 +720,30 @@ function renderClock(){
 }
 window.punch = function(){
   const btn=document.getElementById('clk-btn'); const wasOpen = CLK && CLK.open;
-  btn.disabled=true; const prev=btn.textContent; btn.textContent='Ubicando…';
-  if(!navigator.geolocation){ toast('Tu teléfono no da ubicación.', true); btn.disabled=false; btn.textContent=prev; return; }
+  btn.disabled=true; const prev=btn.textContent; btn.textContent=L2('Ubicando…','Locating…');
+  if(!navigator.geolocation){ toast(L2('Tu teléfono no da ubicación.','Your phone has no location.'), true); btn.disabled=false; btn.textContent=prev; return; }
   navigator.geolocation.getCurrentPosition(async (pos)=>{
     try{
       const r=await httpsCallable(functions,'clockPunch')({ action: wasOpen?'out':'in', lat:pos.coords.latitude, lng:pos.coords.longitude });
       const d=(r&&r.data)||{};
-      if(d.action==='in') toast('✅ Entrada registrada · '+(d.location==='yonke'?'Yonke':'Dealer'));
-      else toast('✅ Salida · +'+Number(d.hours||0).toFixed(2)+' h');
+      if(d.action==='in') toast(L2('✅ Entrada registrada · ','✅ Clocked in · ')+(d.location==='yonke'?'Yonke':'Dealer'));
+      else toast(L2('✅ Salida · +','✅ Clocked out · +')+Number(d.hours||0).toFixed(2)+' h');
       await loadClock();
-    }catch(e){ toast((e&&e.message)||'No se pudo registrar.', true); }
+    }catch(e){ toast((e&&e.message)||L2('No se pudo registrar.','Could not record.'), true); }
     btn.disabled=false;
   }, (err)=>{
-    toast('Activa la ubicación (GPS) para marcar.', true);
+    toast(L2('Activa la ubicación (GPS) para marcar.','Turn on location (GPS) to clock in.'), true);
     btn.disabled=false; btn.textContent=prev;
   }, { enableHighAccuracy:true, timeout:12000, maximumAge:0 });
+};
+// Descanso: iniciar/terminar (no necesita GPS). El descanso NO cuenta en las horas.
+window.punchBreak = function(){
+  const onBreak = CLK && CLK.open && CLK.open.onBreak;
+  const bb=document.getElementById('clk-break-btn'); if(!bb) return;
+  bb.disabled=true; const prev=bb.textContent; bb.textContent='…';
+  httpsCallable(functions,'clockPunch')({ action: onBreak?'break_end':'break_start' })
+    .then(async ()=>{ toast(onBreak?L2('▶️ Descanso terminado','▶️ Break ended'):L2('☕ Descanso iniciado','☕ Break started')); await loadClock(); })
+    .catch((e)=>{ toast((e&&e.message)||L2('No se pudo','Could not'),true); bb.disabled=false; bb.textContent=prev; });
 };
 
 window.loadHome = function(){ if(ME){ loadClock(); } };
