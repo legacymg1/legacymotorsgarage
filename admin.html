@@ -2338,6 +2338,7 @@ window.cotShare=async function(){
   const lines=[en?('Legacy Motors Garage — Quote'+(cust?(' for '+cust):'')):('Legacy Motors Garage — Presupuesto'+(cust?(' para '+cust):''))];
   cotOpts.forEach((o,i)=>{ const r=cotCalc(o); const nm=o.car||('#'+(i+1));
     if(r.cash){ lines.push('• '+nm+': '+(en?'cash ':'de contado ')+formatMoney(r.price+r.tax+r.dmv)); }
+    else if(r.lendmark){ lines.push('• '+nm+': '+(en?'down ':'enganche ')+formatMoney(r.down)+(en?' today · financed through Lendmark ':' hoy · financiado por Lendmark ')+formatMoney(r.lendmarkFunds)); }
     else if(en){ lines.push('• '+nm+': pay today '+formatMoney(r.payToday)+' · '+r.numpay+' '+fq[r.freq]+' payments of '+formatMoney(r.payEven)); }
     else { lines.push('• '+nm+': paga hoy '+formatMoney(r.payToday)+' · '+r.numpay+' pagos '+fq[r.freq]+' de '+formatMoney(r.payEven)); }
   });
@@ -2735,10 +2736,12 @@ window.printCotizacion=function(){
     let rows;
     if(r.cash){
       rows=`<tr><td>${L.cashPrice}</td><td>${formatMoney(r.price)}</td></tr><tr><td>${L.taxDmv}</td><td>${formatMoney(r.tax+r.dmv)}</td></tr><tr class="tot"><td>${L.cashTotal}</td><td>${formatMoney(r.price+r.tax+r.dmv)}</td></tr>`;
+    } else if(r.lendmark){
+      rows=`<tr><td>${L.vprice}</td><td>${formatMoney(r.price)}</td></tr><tr><td>Doc + Smog</td><td>${formatMoney(r.docFee+r.smog)}</td></tr><tr><td>${L.taxDmv}</td><td>${formatMoney(r.tax+r.dmv)}</td></tr><tr class="tot"><td>${en?'Out-the-door total':'Total out the door'}</td><td>${formatMoney(r.totalAll)}</td></tr><tr class="hl"><td>${en?'Down payment (today)':'Enganche (hoy)'}</td><td>${formatMoney(r.down)}</td></tr><tr class="tot"><td>${en?'Financed by Lendmark':'Financiado por Lendmark'}</td><td>${formatMoney(r.lendmarkFunds)}</td></tr>`;
     } else {
       rows=`<tr><td>${L.vprice}</td><td>${formatMoney(r.price)}</td></tr><tr><td>${L.down}</td><td>${formatMoney(r.down)}</td></tr><tr><td>${L.taxDmv}</td><td>${formatMoney(r.tax+r.dmv)}</td></tr><tr class="hl"><td>${L.payToday}</td><td>${formatMoney(r.payToday)}</td></tr><tr><td>${L.financed}</td><td>${formatMoney(r.amountFinanced)}</td></tr><tr><td>${L.finCharge}</td><td>${formatMoney(r.financeCharge)}</td></tr><tr class="tot"><td>${L.totalFin}</td><td>${formatMoney(r.totalPayments)}</td></tr>`;
     }
-    const payLine = r.cash ? '' : `<div class="pay">${r.numpay} ${freqTxt[r.freq]} ${L.payWord} <b>${formatMoney(r.payEven)}</b>${Math.abs(r.lastPay-r.payEven)>0.01?` <span class="last">(${L.lastWord} ${formatMoney(r.lastPay)})</span>`:''}</div>`;
+    const payLine = (r.cash||r.lendmark) ? (r.lendmark?`<div class="pay" style="font-size:13px;">${en?'Monthly payment set by Lendmark upon approval.':'El pago mensual lo define Lendmark al aprobar.'}</div>`:'') : `<div class="pay">${r.numpay} ${freqTxt[r.freq]} ${L.payWord} <b>${formatMoney(r.payEven)}</b>${Math.abs(r.lastPay-r.payEven)>0.01?` <span class="last">(${L.lastWord} ${formatMoney(r.lastPay)})</span>`:''}</div>`;
     const vinBits=[o.vin?('VIN: '+o.vin):'', o.color?o.color:'', o.miles?(Number(o.miles).toLocaleString()+' mi'):''].filter(Boolean).join(' · ');
     cards+=`<div class="opt"><h3>${L.opt} ${i+1}${o.car?' — '+o.car:''}</h3>${vinBits?`<div class="vin">${vinBits}</div>`:''}<table>${rows}</table>${payLine}</div>`;
   });
