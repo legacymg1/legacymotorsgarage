@@ -52,6 +52,17 @@
   .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
   #quick-item-btn{display:none;} body.owner-nav #quick-item-btn, body.yard-quick #quick-item-btn{display:flex;}   /* Artículo rápido: dueños + captura (rol yard) */
   body.wh-home #quick-item-btn{display:none !important;}   /* en el HOME de Pit Crew no se muestra el FAB de artículo rápido */
+  /* === Barra superior: avatar + menú de cuenta === */
+  .wh-avatar{width:44px;height:44px;border-radius:50%;background:rgba(240,192,64,.16);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;flex:0 0 auto;border:1px solid var(--gold);cursor:pointer;overflow:hidden;}
+  .wh-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+  #acct-menu{position:fixed;z-index:7001;right:14px;top:70px;width:min(86vw,280px);background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 14px 40px rgba(0,0,0,.55);padding:16px;}
+  .acct-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:7px 0;}
+  .acct-sep{height:1px;background:var(--border);margin:8px 0;}
+  .langbtn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 9px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;}
+  .langbtn.on{background:var(--gold);color:#0b0e14;border-color:var(--gold);}
+  .acct-signout{width:100%;margin-top:10px;background:transparent;border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--red);font-weight:700;cursor:pointer;font-size:14px;}
+  #asemp-banner{position:fixed;left:0;right:0;bottom:0;z-index:6900;background:linear-gradient(135deg,#d9b85a,#9a7420);color:#0f1320;display:none;align-items:center;justify-content:center;gap:12px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));font-weight:800;font-size:13px;}
+  #asemp-banner button{background:#0f1320;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:13px;}
   /* === Mi jornada (tareas guiadas, portado de crew) === */
   .hide{display:none !important;}
   .faint{color:var(--muted);}
@@ -100,12 +111,29 @@
 
 <div id="app" class="wrap" style="display:none;">
   <div class="head" data-legacy-bar>
-    <div><div class="title" data-legacy-brand>🏭 Warehouse</div><div class="sub" id="who"></div></div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <button class="btn ghost sm" id="lang-toggle" onclick="toggleLang()">EN</button>
-      <button class="btn ghost sm" onclick="doLogout()" data-i18n="logout">Salir</button>
+    <div style="flex:1;min-width:0;">
+      <div class="sub" id="who-greet" style="font-size:12px;line-height:1.2;"></div>
+      <div id="who" style="font-size:21px;font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
     </div>
+    <button id="acct-btn" class="wh-avatar" onclick="toggleAcct(event)" aria-label="Perfil">?</button>
   </div>
+
+  <!-- Menú de cuenta (perfil / horas / idioma / cerrar sesión) -->
+  <div id="acct-catch" class="hide" onclick="closeAcct()" style="position:fixed;inset:0;z-index:7000;"></div>
+  <div id="acct-menu" class="hide">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;">
+      <div id="acct-ava" class="wh-avatar">?</div>
+      <div style="min-width:0;"><div id="acct-name" style="font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</div><div id="acct-roles" class="faint" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div></div>
+    </div>
+    <div class="acct-row"><span data-i18n="profHours">Horas esta semana</span><b id="acct-hours">0 h</b></div>
+    <div class="acct-sep"></div>
+    <div class="acct-row"><span>🌐 <span data-i18n="profLang">Idioma</span></span><span style="display:flex;gap:4px;"><button class="langbtn" id="acct-es" onclick="setLang('es')">ES</button><button class="langbtn" id="acct-en" onclick="setLang('en')">EN</button></span></div>
+    <button class="acct-signout" onclick="doLogout()">🚪 <span data-i18n="signOut">Cerrar sesión</span></button>
+  </div>
+
+  <!-- 👁️ Banner: dueño viendo como empleado -->
+  <div id="asemp-banner"><span>👁️ <span data-i18n="exitViewAsEmp">Viendo como empleado</span></span><button onclick="whExitAsEmployee()" data-i18n="exitBtn">Salir</button></div>
+
   <div class="tabs" id="tabs"></div>
 
   <!-- ‹ Volver a casa (solo empleado por teléfono en modo home) -->
@@ -414,6 +442,8 @@ const T={
     roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque', roleMech:'Mecánico',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
     homeTitle:'Tus funciones', homeBack:'‹ Mi jornada', homeHi:'Hola', homeTapFn:'Toca una función para empezar.',
+    morning:'Buenos días', afternoon:'Buenas tardes', evening:'Buenas noches', profHours:'Horas esta semana', profLang:'Idioma', signOut:'Cerrar sesión',
+    viewAsEmp:'Ver como empleado', exitViewAsEmp:'Viendo como empleado', exitBtn:'Salir',
     fnYardSub:'Fotos de partes', fnListerSub:'Publicar en eBay', fnPackSub:'Empacar pedidos',
     jMyJourney:'📋 Mi jornada', jNext:'▶ SIGUIENTE', jToStart:'🕐 Por empezar', jInProc:'🔧 En proceso',
     jEmpty:'🎉 No tienes tareas pendientes.<br>Cuando te asignen trabajo, aparece aquí.',
@@ -463,6 +493,8 @@ const T={
     roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing', roleMech:'Mechanic',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
     homeTitle:'Your functions', homeBack:'‹ My day', homeHi:'Hi', homeTapFn:'Tap a function to start.',
+    morning:'Good morning', afternoon:'Good afternoon', evening:'Good evening', profHours:'Hours this week', profLang:'Language', signOut:'Sign out',
+    viewAsEmp:'View as employee', exitViewAsEmp:'Viewing as employee', exitBtn:'Exit',
     fnYardSub:'Part photos', fnListerSub:'List on eBay', fnPackSub:'Pack orders',
     jMyJourney:'📋 My day', jNext:'▶ NEXT', jToStart:'🕐 To start', jInProc:'🔧 In progress',
     jEmpty:'🎉 No pending tasks.<br>When work is assigned, it shows here.',
@@ -518,7 +550,7 @@ function setLang(l){
   document.querySelectorAll('#lang-toggle,#login-lang-toggle').forEach(b=>{ if(b) b.textContent=(L==='es')?'EN':'ES'; });
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.getAttribute('data-i18n')); });
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
-  if(document.getElementById('who') && myEmail) document.getElementById('who').textContent = whoLabel(myEmail,role);
+  try{ setHeaderIdentity(); updateLangBtns(); if(role==='owner') setWhLegacyActions(); }catch(e){}
   buildTabs();
   if(_homeMode){ const vh=document.getElementById('view-home'); if(vh && vh.style.display!=='none'){ renderHomeTiles(); try{ renderJourney(); }catch(e){} } }
   try{ if(JOB_CUR && !document.getElementById('task-detail').classList.contains('hide')) renderTaskDetail(); }catch(e){}
@@ -643,6 +675,7 @@ window.refreshClock = async function(){
     const d=(r&&r.data)||{};
     _whClkOpen=d.open||null;
     if(wk) wk.textContent=(L==='en'?'Week: ':'Semana: ')+Number(d.hours||0).toFixed(2)+' h';
+    const ah=document.getElementById('acct-hours'); if(ah) ah.textContent=Number(d.hours||0).toFixed(2)+' h';
     if(d.open){
       const since=new Date(d.open.inAt);
       const loc=d.open.location&&d.open.location!=='(sin ubicación)'?(d.open.location==='dealer'?'Dealer':'Yonke'):'';
@@ -709,7 +742,7 @@ onAuthStateChanged(auth, async (user)=>{
     document.getElementById('app').style.display='block';
     // 🔒 Neutraliza el campo de contraseña del login mientras estás dentro → iOS deja de ofrecer "contraseña" en el chat.
     try{ const lp=document.getElementById('l-pass'); if(lp){ lp.value=''; lp.type='text'; lp.setAttribute('autocomplete','off'); lp.disabled=true; } }catch(e){}
-    document.getElementById('who').textContent = myName || whoLabel(email,role);
+    try{ setHeaderIdentity(); updateLangBtns(); if(role==='owner') setWhLegacyActions(); }catch(e){}
     document.body.classList.toggle('owner-nav', role==='owner');
     document.body.classList.toggle('yard-quick', role==='yard' || !!(_allowedTabs&&_allowedTabs.indexOf('yard')>=0));   // captura también ve "⚡ Artículo rápido"
     buildTabs();
@@ -758,6 +791,38 @@ const TITLE_BY_EMAIL={
 };
 function dispName(email){ email=(email||'').toLowerCase(); return NAME_BY_EMAIL[email]||(email.split('@')[0])||email; }
 function whoLabel(email,r){ email=(email||'').toLowerCase(); const ti=TITLE_BY_EMAIL[email]; if(ti) return dispName(email)+' · '+ti; return roleLabel(r); }
+
+// ===================== 👤 Barra superior: saludo + nombre + burbuja de perfil =====================
+let _asEmp=false;
+function whGreet(){ const h=new Date().getHours(); return h<12?t('morning'):(h<19?t('afternoon'):t('evening')); }
+function whInitials(name){ const p=String(name||'').trim().split(/\s+/).filter(Boolean); if(!p.length) return '?'; return ((p[0][0]||'')+(p.length>1?(p[p.length-1][0]||''):'')).toUpperCase(); }
+function setHeaderIdentity(){
+  const name = myName || whoLabel(myEmail,role) || '';
+  const g=document.getElementById('who-greet'); if(g) g.textContent=whGreet();
+  const w=document.getElementById('who'); if(w) w.textContent=name||'—';
+  const ini=whInitials(myName || (name.split(' ')[0]||''));
+  const ab=document.getElementById('acct-btn'); if(ab && !ab.querySelector('img')) ab.textContent=ini;
+  const av=document.getElementById('acct-ava'); if(av && !av.querySelector('img')) av.textContent=ini;
+  const an=document.getElementById('acct-name'); if(an) an.textContent=name||'—';
+  const ar=document.getElementById('acct-roles'); if(ar) ar.textContent = _asEmp ? t('exitViewAsEmp') : (role==='owner'?t('roleOwner'):((_myRoles&&_myRoles.length)?_myRoles.join(' · '):(role?roleLabel(role):'')));
+}
+function updateLangBtns(){ const es=document.getElementById('acct-es'),en=document.getElementById('acct-en'); if(es)es.classList.toggle('on',L==='es'); if(en)en.classList.toggle('on',L==='en'); }
+window.toggleAcct=function(e){ if(e&&e.stopPropagation)e.stopPropagation(); const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(!m)return; if(!m.classList.contains('hide')){ m.classList.add('hide'); c.classList.add('hide'); } else { setHeaderIdentity(); updateLangBtns(); m.classList.remove('hide'); c.classList.remove('hide'); } };
+window.closeAcct=function(){ const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(m)m.classList.add('hide'); if(c)c.classList.add('hide'); };
+// 👁️ Dueño: ver la página como empleado (todas las funciones activas), sin acceso fake por fuera.
+function setWhLegacyActions(){ window.LEGACY_ACTIONS=[{ label:t('viewAsEmp'), ico:'👁️', fn:'whViewAsEmployee' }]; }
+window.whViewAsEmployee=function(){
+  if(role!=='owner') return;
+  _asEmp=true; _homeMode=true;
+  _myRoles=['Captura','Listado','Empaque','Desmantelador','Mecánico','Detallador'];
+  _allowedTabs=['yard','lister','pack'];
+  const opc=document.getElementById('owner-op-card'); if(opc) opc.style.display='none';
+  const co=document.getElementById('clock-owner'); if(co) co.style.display='none';
+  const b=document.getElementById('asemp-banner'); if(b) b.style.display='flex';
+  closeAcct(); setHeaderIdentity(); whGoHome();
+  try{ window.scrollTo(0,0); }catch(e){}
+};
+window.whExitAsEmployee=function(){ try{ location.reload(); }catch(e){ _asEmp=false; } };
 
 // ---- TABS ----
 let _view='yard';
