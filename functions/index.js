@@ -1365,7 +1365,7 @@ exports.taskEdit = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (d.assignEmpId != null || d.assignRole != null) {
     const assignEmpId = String(d.assignEmpId || "");
     upd.assignEmpId = assignEmpId;
-    upd.assignRole = assignEmpId ? "" : String(d.assignRole || "");
+    upd.assignRole = String(d.assignRole || "");   // la FUNCIÓN se conserva aunque haya ejecutor
     upd.assignName = "";
     if (assignEmpId) { try { const es = await db.collection("employees").doc(assignEmpId).get(); if (es.exists) upd.assignName = (es.data() || {}).name || ""; } catch (e) {} }
   }
@@ -1407,7 +1407,7 @@ exports.myTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   }
   const list = all.filter((t) => !t.isTemplate && t.status !== "hecho" && _taskMine(t, id));
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], status: t.status || "cola", assignName: t.assignName || "", carLabel: t.carLabel || "", pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }));
+  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], status: t.status || "cola", assignName: t.assignName || "", assignRole: t.assignRole || "", carLabel: t.carLabel || "", pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }));
   return { ok: true, tasks: out, today };
 });
 exports.taskStep = onCall({ timeoutSeconds: 20 }, async (request) => {

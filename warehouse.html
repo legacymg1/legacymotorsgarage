@@ -905,6 +905,9 @@ function whToast(m, isErr){
 }
 const JOB_LINES={ dealer:{l:'Dealer',c:'#c9a84c'}, service:{l:'Service',c:'#0a84ff'}, desmantle:{l:'Desmantle',c:'#a855f7'}, general:{l:'General',c:'#8a8fa8'} };
 function lineBadge(line){ const L=JOB_LINES[line]||JOB_LINES.general; return '<span class="jline" style="background:'+L.c+'22;color:'+L.c+';">'+L.l+'</span>'; }
+function funcChip(role){ return role?('<span class="jline" style="background:rgba(240,192,64,.18);color:var(--gold);">'+esc(role)+'</span>'):''; }
+// Chip de la tarea: muestra la FUNCIÓN si tiene; si no, la línea.
+function taskChip(o){ return (o && o.assignRole) ? funcChip(o.assignRole) : lineBadge(o && o.line); }
 let JOURNEY=[], JOB_CUR=null;
 window.loadJourney=async function(){
   const box=document.getElementById('journey-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
@@ -920,7 +923,7 @@ function renderJourney(){
     const prog=total?(' · '+done+'/'+total):'';
     const next=(i===0)?'<div style="font-size:11px;color:var(--gold);font-weight:800;letter-spacing:.04em;margin-bottom:6px;">'+t('jNext')+'</div>':'';
     return '<div class="jcard" onclick="openTaskDetail(\''+o.id+'\')">'+next
-      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:800;font-size:16px;min-width:0;">'+esc(o.title)+'</span>'+lineBadge(o.line)+'</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:800;font-size:16px;min-width:0;">'+esc(o.title)+'</span>'+taskChip(o)+'</div>'
       +(o.carLabel?'<div style="font-size:12.5px;font-weight:600;margin-bottom:3px;">🚗 '+esc(o.carLabel)+'</div>':'')
       +'<div class="faint" style="font-size:12.5px;">'+(o.status==='pausada'?t('jPaused'):(o.status==='en_proceso'?t('jInProc'):t('jToStart')))+prog+(o.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
@@ -938,7 +941,7 @@ function renderTaskDetail(){
     ? '<button class="btn-gold" style="margin-bottom:10px;" onclick="taskResume()">'+t('jResume')+'</button>'
     : '<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn-ghost" style="flex:1;" onclick="taskPause()">'+t('jPause')+'</button><button class="btn-ghost" style="flex:1;" onclick="taskReportProblem()">'+t('jProblem')+'</button></div>';
   body.innerHTML='<div class="topbar"><button class="linkbtn" onclick="taskDetailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>'
-    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+lineBadge(cur.line)+'</div><h2 style="font-size:20px;margin:0;">'+esc(cur.title)+'</h2>'+(cur.carLabel?'<div style="font-size:13.5px;font-weight:600;margin-top:2px;">🚗 '+esc(cur.carLabel)+'</div>':'')+'</div></div>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+taskChip(cur)+'</div><h2 style="font-size:20px;margin:0;">'+esc(cur.title)+'</h2>'+(cur.carLabel?'<div style="font-size:13.5px;font-weight:600;margin-top:2px;">🚗 '+esc(cur.carLabel)+'</div>':'')+'</div></div>'
     +pausedBanner
     +(cl.length?('<div class="faint" style="font-size:13px;margin-bottom:8px;">'+t('jMarkSteps')+' ('+done+'/'+cl.length+'):</div>'
       +'<div class="card" style="padding:2px 14px;margin-bottom:18px;">'+cl.map((c,i)=>'<div class="stepitem '+(c.done?'on':'')+'" onclick="taskToggleStep('+i+')"><div class="stepbox">'+(c.done?'✓':'')+'</div><div class="steptext" style="flex:1;min-width:0;font-size:15px;padding-top:2px;line-height:1.4;">'+esc(c.text)+'</div></div>').join('')+'</div>')
@@ -996,10 +999,10 @@ function renderOwnerPanel(){
   if(!OP_TASKS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:18px;line-height:1.5;">'+t('opEmpty')+'</div>'; return; }
   box.innerHTML=OP_TASKS.map(x=>{
     const total=x.steps||0, done=x.done||0, pr=total?(' · '+done+'/'+total):'';
-    const who=x.assignName?('👤 '+esc(x.assignName)):(x.assignRole?('👥 '+esc(x.assignRole)):t('unassigned'));
+    const who=x.assignName?('👤 '+esc(x.assignName)):t('unassigned');
     const stLabel = x.status==='pausada'?t('jPaused'):(x.status==='en_proceso'?t('opInProc'):t('opToStart'));
     const car=x.carLabel?(' · 🚗 '+esc(x.carLabel)):'';
-    return '<div onclick="jobEditOpen(\''+x.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(x.title)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+lineBadge(x.line)+'<span class="faint" style="font-size:13px;">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+stLabel+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
+    return '<div onclick="jobEditOpen(\''+x.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(x.title)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+taskChip(x)+'<span class="faint" style="font-size:13px;">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+stLabel+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
 
@@ -1049,11 +1052,12 @@ function renderCarPicker(){
   if(JOB_CAR_ID){
     w.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 13px;border:1px solid var(--gold);border-radius:11px;background:var(--surface2);margin-bottom:12px;"><span style="font-weight:700;">🚗 '+esc(JOB_CAR_LABEL||'')+'</span><button type="button" class="linkbtn" onclick="jobCarClear()" style="color:var(--muted);">'+t('jCarChange')+'</button></div>';
   } else {
-    w.innerHTML='<input id="job-car-q" type="search" autocomplete="off" oninput="jobCarFilter()" placeholder="'+t('jCarSearch')+'" style="width:100%;box-sizing:border-box;padding:11px;border-radius:11px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;margin-bottom:8px;">'
-      +'<div id="job-car-results" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:11px;margin-bottom:12px;"></div>';
-    jobCarFilter();
+    w.innerHTML='<input id="job-car-q" type="search" autocomplete="off" oninput="jobCarFilter()" onfocus="jobCarShow()" onblur="jobCarHide()" placeholder="'+t('jCarSearch')+'" style="width:100%;box-sizing:border-box;padding:11px;border-radius:11px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;margin-bottom:8px;">'
+      +'<div id="job-car-results" style="display:none;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:11px;margin-bottom:12px;"></div>';
   }
 }
+window.jobCarShow=function(){ const r=document.getElementById('job-car-results'); if(r){ jobCarFilter(); r.style.display=''; } };
+window.jobCarHide=function(){ setTimeout(function(){ const r=document.getElementById('job-car-results'); if(r) r.style.display='none'; },200); };
 // Normaliza un # de inventario a solo dígitos SIN ceros a la izquierda (D-00001 → "1") para no distinguir por ceros.
 function _numKey(s){ const m=String(s||'').replace(/\D/g,'').replace(/^0+/,''); return m; }
 window.jobCarFilter=function(){
@@ -1074,7 +1078,7 @@ window.jobCarFilter=function(){
   const grp=(label,arr)=> arr.length?('<div class="faint" style="font-size:11px;font-weight:800;padding:8px 12px 4px;text-transform:uppercase;letter-spacing:.04em;">'+label+'</div>'+arr.map(row).join('')):'';
   let html='<div onclick="jobCarClear()" style="padding:10px 12px;cursor:pointer;font-size:14px;color:var(--muted);">'+t('jNoCar')+'</div>'+grp(t('jGrpInv'),inv)+grp(t('jGrpDis'),dis);
   if(!inv.length&&!dis.length) html+='<div class="faint" style="padding:12px;text-align:center;font-size:13px;">'+t('jCarNoMatch')+'</div>';
-  res.innerHTML=html;
+  res.innerHTML=html; res.style.display='';
 }
 window.jobCarPick=function(id){ const c=JOB_CARS.find(x=>x.id===id); if(!c) return; JOB_CAR_ID=c.id; JOB_CAR_LABEL=c.label; renderCarPicker(); };
 window.jobCarClear=function(){ JOB_CAR_ID=''; JOB_CAR_LABEL=''; renderCarPicker(); };
@@ -1096,10 +1100,10 @@ window.jobAddSave=async function(){
   if(daily && !emp){ whToast(t('jDailyHint'),true); return; }
   try{
     if(JOB_EDIT_ID){
-      await httpsCallable(functions,'taskEdit')({ taskId:JOB_EDIT_ID, title:title, checklist:steps, assignEmpId:emp, assignRole:emp?'':role2, carId:carId, carLabel:carLabel });
+      await httpsCallable(functions,'taskEdit')({ taskId:JOB_EDIT_ID, title:title, checklist:steps, assignEmpId:emp, assignRole:role2, carId:carId, carLabel:carLabel });
       whToast(t('jSaved'));
     } else {
-      await httpsCallable(functions,'taskAdd')({ title:title, line:'general', checklist:steps, assignEmpId:emp, assignRole:emp?'':role2, carId:carId, carLabel:carLabel, recurring:daily?'daily':'none' });
+      await httpsCallable(functions,'taskAdd')({ title:title, line:'general', checklist:steps, assignEmpId:emp, assignRole:role2, carId:carId, carLabel:carLabel, recurring:daily?'daily':'none' });
       whToast(L==='en'?'✅ Task created':'✅ Tarea creada');
     }
     jobAddClose();
