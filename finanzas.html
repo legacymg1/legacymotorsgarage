@@ -1162,6 +1162,26 @@ window.openExp = function(){
 };
 window.closeExp = function(){ document.getElementById('exp-overlay').classList.remove('open'); };
 
+// 🔁 Busca un gasto ya registrado que se parezca (mismo # de orden, o mismo vendedor+fecha+monto) para no duplicar un ticket.
+function _findDupExpense(o){
+  const on=(o.orderNo||'').trim().toLowerCase();
+  const vlc=(o.vendor||'').trim().toLowerCase();
+  const date=String(o.date||'');
+  const totalCents=Math.round(Number(o.totalCents)||0);
+  // 1) por # de orden (señal fuerte)
+  if(on){ for(const t of txns){ if(t.type!=='expense') continue; if(String(t.orderNo||'').trim().toLowerCase()===on && (!vlc || String(t.vendor||'').trim().toLowerCase()===vlc)){ return {tx:t, by:'orderNo'}; } } }
+  // 2) recibos itemizados: suma por receiptId
+  const groups={};
+  for(const t of txns){ if(t.type==='expense' && t.receiptId){ const g=groups[t.receiptId]||(groups[t.receiptId]={sum:0,vendor:t.vendor,date:t.date,amountCents:0}); g.sum+=Number(t.amountCents)||0; } }
+  for(const rid in groups){ const g=groups[rid]; if(Math.abs(g.sum-totalCents)<2 && String(g.date||'')===date && (!vlc || String(g.vendor||'').trim().toLowerCase()===vlc)){ return {tx:{amountCents:g.sum,vendor:g.vendor,date:g.date}, by:'recibo'}; } }
+  // 3) gasto simple con mismo monto+fecha(+vendedor)
+  for(const t of txns){ if(t.type!=='expense' || t.receiptId) continue; if(Math.abs((Number(t.amountCents)||0)-totalCents)<2 && String(t.date||'')===date && (!vlc || String(t.vendor||'').trim().toLowerCase()===vlc)){ return {tx:t, by:'monto'}; } }
+  return null;
+}
+function _confirmDup(dup){
+  const t=dup.tx; const amt=centsToUSD(Number(t.amountCents)||0); const v=t.vendor?(' de '+t.vendor):''; const d=t.date||'';
+  return confirm('⚠️ Ya hay un gasto parecido ('+amt+v+(d?(' · '+d):'')+'), posible duplicado del mismo ticket.\n\n¿Guardarlo de todas formas?');
+}
 window.saveExp = async function(){
   if(_expItemsMode){ return saveExpItems(); }
   const amount=Number(document.getElementById('e-amount').value);
@@ -1178,6 +1198,8 @@ window.saveExp = async function(){
   const carEl=document.getElementById('e-car');
   const carId=((dept==='dealer'||dept==='parts') && carEl)?carEl.value:'';
   const carLabel=carId?((carEl.dataset&&carEl.dataset.label)||''):'';
+  const _dup=_findDupExpense({orderNo, vendor, date, totalCents:Math.round(amount*100)});
+  if(_dup && !_confirmDup(_dup)) return;
   const btn=document.getElementById('exp-save'); btn.disabled=true; btn.textContent='Guardando…';
   const id='exp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
   try{
@@ -1273,6 +1295,8 @@ window.saveExpItems=async function(){
   const orderNo=document.getElementById('e-orderno').value.trim();
   const tax=Number(document.getElementById('exp-tax').value)||0;
   const sub=items.reduce((s,it)=>s+(Number(it.amount)||0),0);
+  const _dup=_findDupExpense({orderNo, vendor, date, totalCents:Math.round((sub+tax)*100)});
+  if(_dup && !_confirmDup(_dup)) return;
   const btn=document.getElementById('exp-save'); btn.disabled=true; btn.textContent='Guardando…';
   const receiptId='rcpt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
   try{
