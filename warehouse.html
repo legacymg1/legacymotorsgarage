@@ -1056,7 +1056,7 @@ function renderCarPicker(){
 }
 // Normaliza un # de inventario a solo dígitos SIN ceros a la izquierda (D-00001 → "1") para no distinguir por ceros.
 function _numKey(s){ const m=String(s||'').replace(/\D/g,'').replace(/^0+/,''); return m; }
-function jobCarFilter(){
+window.jobCarFilter=function(){
   const res=document.getElementById('job-car-results'); if(!res) return;
   const qEl=document.getElementById('job-car-q'); const q=((qEl&&qEl.value)||'').trim().toLowerCase();
   const qnum=_numKey(q);
@@ -1219,14 +1219,15 @@ function renderAddTaskForm(){
   const sel = MECH_ADDCAR ? (MECH_PREP.find(c=>c.id===MECH_ADDCAR)) : null;
   const FLD='width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;margin-bottom:14px;';
   let carUI;
-  if(sel){ carUI='<div class="card" style="padding:11px 13px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:700;">'+(sel.inventoryNum?('#'+esc(sel.inventoryNum)+' · '):'')+esc(sel.label)+'</span><button class="linkbtn" onclick="MECH_ADDCAR=null;renderAddTaskForm()" style="font-size:12px;color:var(--muted);">'+(L==='en'?'change':'cambiar')+'</button></div>'; }
+  if(sel){ carUI='<div class="card" style="padding:11px 13px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:700;">'+(sel.inventoryNum?('#'+esc(sel.inventoryNum)+' · '):'')+esc(sel.label)+'</span><button class="linkbtn" onclick="mechPickAddCar(\'\')" style="font-size:12px;color:var(--muted);">'+(L==='en'?'change':'cambiar')+'</button></div>'; }
   else { const opts='<option value="">'+t('chooseCar')+'</option>'+MECH_PREP.map(c=>'<option value="'+c.id+'">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+esc(c.label)+'</option>').join('');
-    carUI='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">'+t('svcCar')+'</label><select id="mech-addtask-car" onchange="MECH_ADDCAR=this.value;renderAddTaskForm()" style="'+FLD+'">'+opts+'</select>'; }
+    carUI='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">'+t('svcCar')+'</label><select id="mech-addtask-car" onchange="mechPickAddCar(this.value)" style="'+FLD+'">'+opts+'</select>'; }
   inner.innerHTML=carUI
     +'<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">'+t('whatToDo')+'</label>'
     +'<input id="mech-task-title" autocapitalize="sentences" placeholder="'+t('whatToDoPh')+'" style="'+FLD+'">'
     +'<button class="btn-gold" style="width:100%;" onclick="mechAddTaskSave()">'+t('addToQueue')+'</button>';
 }
+window.mechPickAddCar=function(v){ MECH_ADDCAR = v||null; renderAddTaskForm(); };
 window.mechCloseAddTask=function(){ document.getElementById('mech-addtask').classList.add('hide'); };
 window.mechAddTaskSave=async function(){
   const carId=MECH_ADDCAR||''; const title=(document.getElementById('mech-task-title').value||'').trim();
