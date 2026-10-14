@@ -740,14 +740,32 @@
       </div>
     </div>
     <div style="margin-bottom:12px;">
-      <button type="button" id="scan-btn" onclick="scanReceiptStart()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,var(--gold3,#8a6520),var(--gold,#c9a84c));color:#0b0e14;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">📸 Escanear recibo — llena todo solo</button>
+      <button type="button" id="scan-btn" onclick="scanReceiptStart()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,var(--gold3,#8a6520),var(--gold,#c9a84c));color:#0b0e14;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">📸 Escanear recibo — separa cada producto</button>
       <div id="scan-status" style="font-size:12px;text-align:center;margin-top:6px;min-height:16px;color:var(--muted);"></div>
     </div>
-    <div class="row2">
+
+    <!-- 🧾 MODO PRODUCTOS: cada producto se guarda por separado (con su carro y categoría) -->
+    <div id="exp-items-section" style="display:none;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-weight:800;font-size:14px;">🧾 Productos del recibo</div>
+        <span onclick="expItemsExit()" style="cursor:pointer;color:var(--faint);font-size:12px;white-space:nowrap;">↩️ un solo gasto</span>
+      </div>
+      <div class="field" style="margin:0 0 10px;"><label>Fecha</label><input id="e-date2" type="date"></div>
+      <div id="exp-items-list"></div>
+      <button type="button" onclick="expAddItem()" style="width:100%;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;margin-top:4px;">➕ Agregar producto</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px;">
+        <label style="margin:0;font-size:13px;font-weight:700;">Impuesto (tax) $</label>
+        <input id="exp-tax" type="number" inputmode="decimal" placeholder="0.00" oninput="updateExpItemsTotal()" style="width:120px;text-align:right;">
+      </div>
+      <div class="muted" style="font-size:11px;text-align:right;margin-top:2px;">El impuesto se reparte entre los productos.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;font-weight:800;font-size:15px;"><span>Total</span><span id="exp-items-total">$0.00</span></div>
+    </div>
+
+    <div class="row2" id="e-amount-row">
       <div class="field"><label>Monto ($)</label><input id="e-amount" type="number" inputmode="decimal" placeholder="0.00"></div>
       <div class="field"><label>Fecha</label><input id="e-date" type="date"></div>
     </div>
-    <div class="field"><label>Categoría</label><select id="e-cat" onchange="onExpCatChange()"></select></div>
+    <div class="field" id="e-cat-field"><label>Categoría</label><select id="e-cat" onchange="onExpCatChange()"></select></div>
 
     <!-- Vehículo (buscador + lista, opcional) -->
     <div class="field" id="e-car-row">
@@ -783,13 +801,22 @@
       <input type="file" id="e-receipt" accept="image/*" onchange="previewReceipt()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:13px;cursor:pointer;">
       <div id="e-receipt-preview" style="margin-top:8px;"></div>
     </div>
-    <div class="field"><label>Concepto / qué fue</label><input id="e-note" placeholder="Ej. active grille shutter, radio, balatas…"></div>
+    <div class="field" id="e-note-field"><label>Concepto / qué fue</label><input id="e-note" placeholder="Ej. active grille shutter, radio, balatas…"></div>
     <div class="field"><label># de orden / factura (opcional)</label><input id="e-orderno" placeholder="Orden de compra o # de factura del recibo"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeExp()">Cancelar</button>
       <button class="btn btn-primary" id="exp-save" onclick="saveExp()">Guardar gasto</button>
     </div>
     <div style="font-size:11px;color:var(--faint);text-align:center;margin-top:10px;line-height:1.5;">El libro es permanente: un gasto no se edita ni se borra. Si te equivocas, se reversa (queda constancia).</div>
+  </div>
+</div>
+
+<!-- 🚗 Elegir carro para un producto del recibo -->
+<div id="item-car-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center;" onclick="if(event.target===this)closeItemCar()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:86vh;overflow-y:auto;padding:18px 16px calc(20px + env(safe-area-inset-bottom,0px));">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:16px;">🚗 Asignar carro al producto</div><span onclick="closeItemCar()" style="cursor:pointer;color:var(--faint);font-size:24px;line-height:1;">×</span></div>
+    <input id="item-car-q" oninput="renderItemCarResults()" autocomplete="off" placeholder="🔎 Buscar carro (año, marca, # o VIN)…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;color:var(--text);font-size:14px;margin-bottom:8px;">
+    <div id="item-car-results" style="max-height:52vh;overflow-y:auto;border:1px solid var(--border);border-radius:12px;"></div>
   </div>
 </div>
 
@@ -1092,14 +1119,25 @@ window.scanReceiptNow=async function(file){
     const dept=document.getElementById('e-dept').value;
     const r=await httpsCallable(functions,'scanReceipt')({ imageBase64:dataUrl, mediaType:'image/jpeg', categories:(EXP_CATS[dept]||[]) });
     const d=(r&&r.data)||{};
-    if(d.amount>0) document.getElementById('e-amount').value=d.amount;
-    if(d.date) document.getElementById('e-date').value=d.date;
+    // Campos compartidos del recibo
+    if(d.date){ document.getElementById('e-date').value=d.date; const d2=document.getElementById('e-date2'); if(d2) d2.value=d.date; }
     if(d.vendor) document.getElementById('e-vendor').value=d.vendor;
-    if(d.note) document.getElementById('e-note').value=d.note;
     if(d.orderNo){ const el=document.getElementById('e-orderno'); if(el) el.value=d.orderNo; }
     if(d.method){ const m=document.getElementById('e-method'); if(m) m.value=d.method; }
-    if(d.category){ const sel=document.getElementById('e-cat'); if(sel){ const opt=[...sel.options].find(o=>o.value===d.category||o.text===d.category); if(opt){ sel.value=opt.value; } } }
-    if(st) st.innerHTML='<span style="color:#32d74b;">✅ Listo — revisa los datos y guarda.</span>';
+    if(Array.isArray(d.items) && d.items.length){
+      // 🧾 Modo PRODUCTOS: separa cada uno
+      EXP_ITEMS = d.items.map(it=>({ description:String(it.description||''), amount:Number(it.amount)||0, category:_validCat(it.category,dept), carId:'', carLabel:'' }));
+      document.getElementById('exp-tax').value = (Number(d.tax)||0)>0 ? (Number(d.tax).toFixed(2)) : '';
+      showExpItems(true); renderExpItems();
+      if(st) st.innerHTML='<span style="color:#32d74b;">✅ Separé '+EXP_ITEMS.length+' producto(s) — revisa, asigna carro y guarda.</span>';
+    } else {
+      // Un solo gasto (como antes)
+      showExpItems(false);
+      if(d.amount>0) document.getElementById('e-amount').value=d.amount;
+      if(d.note) document.getElementById('e-note').value=d.note;
+      if(d.category){ const sel=document.getElementById('e-cat'); if(sel){ const opt=[...sel.options].find(o=>o.value===d.category||o.text===d.category); if(opt){ sel.value=opt.value; } } }
+      if(st) st.innerHTML='<span style="color:#32d74b;">✅ Listo — revisa los datos y guarda.</span>';
+    }
   }catch(e){
     console.warn('scanReceipt', e);
     if(st) st.innerHTML='<span style="color:#ff9800;">No se pudo leer la foto. Llénalo a mano.</span>';
@@ -1107,6 +1145,8 @@ window.scanReceiptNow=async function(file){
   if(btn) btn.disabled=false;
 };
 window.openExp = function(){
+  EXP_ITEMS=[]; const _tx=document.getElementById('exp-tax'); if(_tx) _tx.value=''; showExpItems(false);
+  const _d2=document.getElementById('e-date2'); if(_d2) _d2.value=new Date().toISOString().slice(0,10);
   document.getElementById('e-amount').value='';
   document.getElementById('e-date').value=new Date().toISOString().slice(0,10);
   applyDeptRestriction('e-dept');
@@ -1123,6 +1163,7 @@ window.openExp = function(){
 window.closeExp = function(){ document.getElementById('exp-overlay').classList.remove('open'); };
 
 window.saveExp = async function(){
+  if(_expItemsMode){ return saveExpItems(); }
   const amount=Number(document.getElementById('e-amount').value);
   if(!amount||amount<=0){ alert('Pon el monto'); return; }
   const date=document.getElementById('e-date').value;
@@ -1160,6 +1201,106 @@ window.saveExp = async function(){
     closeExp();
   }catch(e){ alert('Error al guardar: '+e.message); }
   btn.disabled=false; btn.textContent='Guardar gasto';
+};
+
+// ===================== 🧾 RECIBO POR PRODUCTOS (cada producto = su propio gasto) =====================
+let EXP_ITEMS=[], _expItemsMode=false, _itemCarIdx=-1;
+function _esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _validCat(cat,dept){ const list=EXP_CATS[dept]||[]; const c=String(cat||''); return list.includes(c)?c:'Otro'; }
+function showExpItems(on){
+  _expItemsMode=!!on;
+  const sec=document.getElementById('exp-items-section'); if(sec) sec.style.display = on?'block':'none';
+  ['e-amount-row','e-cat-field','e-note-field'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = on?'none':''; });
+  const carRow=document.getElementById('e-car-row');
+  if(carRow){ const dept=document.getElementById('e-dept').value; carRow.style.display = on?'none':((dept==='dealer'||dept==='parts')?'block':'none'); }
+  const sv=document.getElementById('exp-save'); if(sv) sv.textContent = on?'Guardar productos':'Guardar gasto';
+}
+function _carListForItems(){
+  const inv=[...inventory].map(c=>({id:'inv:'+c.id, label:carLabelOf(c), num:String(c.inventoryNum||''), vin:String(c.vin||''), photo:(Array.isArray(c.photos)&&c.photos[0])||c.img||''}));
+  const dis=[...dismantleCars].map(c=>({id:'dis:'+c.id, label:(c.inventoryNum?(c.inventoryNum+' · '):'')+dcarLabel(c), num:String(c.inventoryNum||''), vin:String(c.vin||''), photo:(Array.isArray(c.photoURLs)&&c.photoURLs[0])||''}));
+  return { inv, dis };
+}
+window.renderExpItems=function(){
+  const box=document.getElementById('exp-items-list'); if(!box) return;
+  const dept=document.getElementById('e-dept').value; const cats=EXP_CATS[dept]||[];
+  box.innerHTML = EXP_ITEMS.map((it,i)=>{
+    const catOpts='<option value="">— Categoría —</option>'+cats.map(c=>'<option'+(c===it.category?' selected':'')+'>'+_esc(c)+'</option>').join('');
+    const carBtn = it.carId
+      ? '<button type="button" onclick="openItemCar('+i+')" style="width:100%;text-align:left;background:rgba(240,192,64,0.1);border:1px solid rgba(240,192,64,0.4);border-radius:9px;padding:9px 11px;color:#f0c040;font-size:13px;font-weight:700;cursor:pointer;">🚗 '+_esc(it.carLabel)+'</button>'
+      : '<button type="button" onclick="openItemCar('+i+')" style="width:100%;text-align:left;background:var(--surface2);border:1px dashed var(--border);border-radius:9px;padding:9px 11px;color:var(--muted);font-size:13px;cursor:pointer;">🚗 Asignar carro (opcional)</button>';
+    return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px;margin-bottom:9px;">'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;"><input value="'+_esc(it.description)+'" oninput="expItemSet('+i+',\'description\',this.value)" placeholder="Producto" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:14px;"><span onclick="expRemoveItem('+i+')" style="cursor:pointer;color:var(--faint);font-size:18px;padding:0 4px;flex:0 0 auto;">🗑️</span></div>'
+      +'<div style="display:flex;gap:8px;margin-bottom:8px;"><div style="flex:0 0 112px;position:relative;"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;">$</span><input type="number" inputmode="decimal" value="'+(it.amount||'')+'" oninput="expItemSet('+i+',\'amount\',this.value)" placeholder="0.00" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px 8px 20px;color:var(--text);font-size:14px;"></div>'
+      +'<select onchange="expItemSet('+i+',\'category\',this.value)" style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;">'+catOpts+'</select></div>'
+      +carBtn+'</div>';
+  }).join('') || '<div class="muted" style="font-size:13px;text-align:center;padding:12px;">Sin productos. Toca "➕ Agregar producto".</div>';
+  updateExpItemsTotal();
+};
+window.expItemSet=function(i,field,val){ if(!EXP_ITEMS[i])return; if(field==='amount'){ EXP_ITEMS[i].amount=Number(val)||0; updateExpItemsTotal(); } else { EXP_ITEMS[i][field]=val; } };
+window.expAddItem=function(){ EXP_ITEMS.push({description:'',amount:0,category:'',carId:'',carLabel:''}); renderExpItems(); };
+window.expRemoveItem=function(i){ EXP_ITEMS.splice(i,1); renderExpItems(); };
+window.expItemsExit=function(){ showExpItems(false); };
+window.updateExpItemsTotal=function(){ const sub=EXP_ITEMS.reduce((s,it)=>s+(Number(it.amount)||0),0); const tax=Number(document.getElementById('exp-tax').value)||0; const el=document.getElementById('exp-items-total'); if(el) el.textContent='$'+(sub+tax).toFixed(2); };
+window.openItemCar=function(i){ _itemCarIdx=i; const q=document.getElementById('item-car-q'); if(q) q.value=''; renderItemCarResults(); document.getElementById('item-car-overlay').style.display='flex'; };
+window.closeItemCar=function(){ document.getElementById('item-car-overlay').style.display='none'; _itemCarIdx=-1; };
+window.renderItemCarResults=function(){
+  const box=document.getElementById('item-car-results'); if(!box) return;
+  const q=(document.getElementById('item-car-q').value||'').trim().toLowerCase();
+  const qnum=q.replace(/\D/g,'').replace(/^0+/,'');
+  const {inv,dis}=_carListForItems();
+  const match=c=>{ if(!q)return true; if(((c.num+' '+c.label+' '+c.vin).toLowerCase()).indexOf(q)>=0)return true; if(qnum&&c.num&&(c.num.replace(/\D/g,'').replace(/^0+/,'')).indexOf(qnum)>=0)return true; return false; };
+  const fi=inv.filter(match), fd=dis.filter(match);
+  const thumb=c=> c.photo?'<img src="'+_esc(c.photo)+'" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex:0 0 auto;background:var(--surface2);">':'<div style="width:38px;height:38px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:17px;flex:0 0 auto;">🚗</div>';
+  const row=c=>'<div onclick="pickItemCar(\''+c.id+'\')" style="display:flex;gap:10px;align-items:center;padding:9px 11px;border-top:1px solid rgba(255,255,255,.06);cursor:pointer;">'+thumb(c)+'<div style="min-width:0;font-size:14px;">'+_esc(c.label)+(c.vin?'<div class="muted" style="font-size:11px;">VIN …'+_esc(String(c.vin).slice(-6))+'</div>':'')+'</div></div>';
+  const grp=(l,a)=>a.length?'<div class="muted" style="font-size:11px;font-weight:800;padding:8px 11px 4px;text-transform:uppercase;">'+l+'</div>'+a.map(row).join(''):'';
+  box.innerHTML='<div onclick="pickItemCar(\'\')" style="padding:10px 11px;cursor:pointer;font-size:14px;color:var(--muted);">— Sin carro —</div>'+grp('🚗 Inventario (dealer)',fi)+grp('🔧 Para desmantelar (yonke)',fd)+((!fi.length&&!fd.length)?'<div class="muted" style="padding:12px;text-align:center;font-size:13px;">Sin resultados.</div>':'');
+};
+window.pickItemCar=function(cid){
+  if(_itemCarIdx<0||!EXP_ITEMS[_itemCarIdx]){ closeItemCar(); return; }
+  if(!cid){ EXP_ITEMS[_itemCarIdx].carId=''; EXP_ITEMS[_itemCarIdx].carLabel=''; }
+  else { const L=_carListForItems(); const c=L.inv.concat(L.dis).find(x=>x.id===cid); if(c){ EXP_ITEMS[_itemCarIdx].carId=cid; EXP_ITEMS[_itemCarIdx].carLabel=c.label; } }
+  closeItemCar(); renderExpItems();
+};
+window.saveExpItems=async function(){
+  const items=EXP_ITEMS.filter(it=>(Number(it.amount)||0)!==0 || (it.description||'').trim());
+  if(!items.length){ alert('Agrega al menos un producto con monto.'); return; }
+  for(const it of items){ if(!(Number(it.amount))){ alert('Cada producto necesita su monto.'); return; } if(!it.category){ alert('Elige la categoría de cada producto.'); return; } }
+  const date=document.getElementById('e-date2').value || document.getElementById('e-date').value;
+  if(!date){ alert('Pon la fecha'); return; }
+  const dept=document.getElementById('e-dept').value;
+  const method=document.getElementById('e-method').value;
+  const vendor=document.getElementById('e-vendor').value.trim();
+  const orderNo=document.getElementById('e-orderno').value.trim();
+  const tax=Number(document.getElementById('exp-tax').value)||0;
+  const sub=items.reduce((s,it)=>s+(Number(it.amount)||0),0);
+  const btn=document.getElementById('exp-save'); btn.disabled=true; btn.textContent='Guardando…';
+  const receiptId='rcpt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  try{
+    let receiptURL='';
+    const file=document.getElementById('e-receipt').files[0];
+    if(file){ btn.textContent='Subiendo recibo…'; const jpg=await toJpeg(file); const r=ref(storage,'receipts/'+receiptId+'/'+Date.now()+'_'+(jpg.name||'recibo.jpg')); await uploadBytes(r,jpg); receiptURL=await getDownloadURL(r); }
+    btn.textContent='Guardando…';
+    const who=(auth.currentUser&&auth.currentUser.email)||'';
+    for(let k=0;k<items.length;k++){
+      const it=items[k];
+      const share = (sub>0 && tax>0) ? (Number(it.amount)/sub*tax) : 0;
+      const cents = Math.round((Number(it.amount)+share)*100);
+      const plainCar = it.carId ? it.carId.replace(/^inv:|^dis:/,'') : '';
+      const isDis = it.carId && it.carId.indexOf('dis:')===0;
+      const id='exp_'+Date.now()+'_'+k+'_'+Math.random().toString(36).slice(2,6);
+      await setDoc(doc(db,'transactions',id), {
+        entryId:id, type:'expense', dept, category:it.category,
+        amountCents:cents, method, date, vendor,
+        carId:plainCar, carLabel:it.carLabel||'',
+        dismantleCarId: isDis?plainCar:'', dismantleCarLabel: isDis?(it.carLabel||''):'',
+        receiptURL, note:(it.description||'').trim(), orderNo,
+        receiptId, itemized:true, baseCents:Math.round(Number(it.amount)*100), taxShareCents:Math.round(share*100),
+        createdAt:new Date().toISOString(), createdBy:who, source:'finanzas'
+      });
+    }
+    closeExp();
+  }catch(e){ alert('Error al guardar: '+e.message); }
+  btn.disabled=false; btn.textContent=_expItemsMode?'Guardar productos':'Guardar gasto';
 };
 
 window.deleteInc = async function(id){
@@ -3319,6 +3460,8 @@ window.saveMov = async function(){
     { label:'Resultados Legacy',   ico:'📊', run:function(){ openPnl('legacy'); } },
     { label:'Resultados Privadas', ico:'🔒', run:function(){ openPnl('privadas'); } },
     { label:'Por carro (yonke)',   ico:'🔧', fn:'openDcarReport' },
+    { header:'🏛️ Empresa' },
+    { label:'Legacy Motors Garage', ico:'🏛️', fn:'openLegacyBase' },
     { header:'🛠️ Herramientas' },
     { label:'Importar',            ico:'⬆️', fn:'openImport' },
     { label:'Asignar a carro',     ico:'🔗', fn:'openBulkAssign' },

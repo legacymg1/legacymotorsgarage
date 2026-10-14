@@ -424,32 +424,49 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
   const sys = "You read a photo of a purchase receipt or invoice for a used-car dealership / parts yard. " +
     "Extract the data and return ONLY a strict JSON object — no prose, no code fences. Keys:\n" +
     "- amount: the GRAND TOTAL actually paid, in dollars, INCLUDING tax (number). If several totals appear, use the final grand total.\n" +
+    "- subtotal: the sum of the line items BEFORE tax, in dollars (number). If not printed, use the sum of the item amounts.\n" +
+    "- tax: the total sales tax in dollars (number). 0 if none printed.\n" +
+    "- items: an ARRAY of the individual products/line items actually purchased. Each element is an object: " +
+    "{\"description\": short name of the product (keep it as printed, trimmed; Spanish ok), " +
+    "\"amount\": the line's price in dollars as printed — if there is a quantity, use the EXTENDED price (qty × unit price) (number), " +
+    "\"qty\": the quantity if printed else 1 (number), " +
+    "\"category\": the SINGLE best category for THIS item, copied EXACTLY from this list: " + JSON.stringify(cats) + " — if none fits use \"Otro\"}. " +
+    "Include ONLY real purchased products. Do NOT include subtotal, tax, total, change, tendered, or payment lines as items. If a discount line appears, include it as an item with a NEGATIVE amount. If you truly cannot read any line items, return an empty array.\n" +
     "- date: purchase date as YYYY-MM-DD. If the year is missing, assume " + today.slice(0, 4) + ". If no date is visible, use \"" + today + "\".\n" +
     "- vendor: the store/business name, short.\n" +
-    "- note: a SHORT description in Spanish (2-6 words) of what was bought.\n" +
+    "- note: a SHORT description in Spanish (2-6 words) of what was bought overall.\n" +
     "- orderNo: the order / invoice / receipt number printed on the document (e.g. 'Order #', 'Invoice #', 'Receipt #', 'Transaction #'). Letters and digits only as printed. Empty string if none.\n" +
-    "- category: choose the SINGLE best match from this list, copied EXACTLY: " + JSON.stringify(cats) + ". If none fits, use \"Otro\".\n" +
+    "- category: choose the SINGLE best match for the WHOLE receipt from the list above, copied EXACTLY. If none fits, use \"Otro\".\n" +
     "- method: one of \"cash\",\"terminal\",\"ach\",\"zelle\". Guess from the receipt (card/VISA/MASTERCARD/DEBIT => \"terminal\"; otherwise \"cash\"). Default \"cash\".\n" +
-    "If a value is unknown use an empty string, except amount (use 0). Return JSON only.";
+    "If a value is unknown use an empty string, except numbers (use 0) and items (use []). Return JSON only.";
   try {
     const AnthropicMod = require("@anthropic-ai/sdk");
     const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
     const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
     const msg = await client.messages.create({
       model: "claude-sonnet-5",
-      max_tokens: 400,
+      max_tokens: 2000,
       system: sys,
       messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: mt, data: b64 } },
-        { type: "text", text: "Extract the receipt data as strict JSON." },
+        { type: "text", text: "Extract the receipt data (including each line item) as strict JSON." },
       ] }],
     });
     let txt = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
     txt = txt.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
     let out = {};
     try { out = JSON.parse(txt); } catch (e) { const m = txt.match(/\{[\s\S]*\}/); if (m) { try { out = JSON.parse(m[0]); } catch (_) {} } }
+    const items = (Array.isArray(out.items) ? out.items : []).map((it) => ({
+      description: String((it && it.description) || "").slice(0, 120),
+      amount: Math.round((Number(it && it.amount) || 0) * 100) / 100,
+      qty: Number(it && it.qty) || 1,
+      category: String((it && it.category) || "").slice(0, 60),
+    })).filter((it) => it.description || it.amount);
     return {
       amount: Number(out.amount) || 0,
+      subtotal: Number(out.subtotal) || 0,
+      tax: Number(out.tax) || 0,
+      items: items.slice(0, 60),
       date: /^\d{4}-\d{2}-\d{2}$/.test(out.date || "") ? out.date : today,
       vendor: String(out.vendor || "").slice(0, 80),
       note: String(out.note || "").slice(0, 120),
