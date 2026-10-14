@@ -754,7 +754,7 @@
 </div>
 
 <!-- 👀 PREVIEW del sales sheet antes de enviar a Lendmark -->
-<div class="modal-overlay" id="lendmark-preview-modal">
+<div class="modal-overlay" id="lendmark-preview-modal" style="z-index:2147483600;">
   <div class="modal" style="max-width:720px;">
     <div class="modal-title">👀 Vista previa — se enviará a Lendmark</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Revisa que todo esté bien. Al enviar, se manda a <b>branch257@lendmarkfinancial.com</b> desde tu Zoho (con copia a ti).</div>
@@ -2789,7 +2789,9 @@ function _outputSheet(mode, box, vin, carTitle){
 window.lendmarkSheet = async function(i, mode){
   mode = mode || 'print';
   const o = cotOpts[i]; if(!o){ alert('Opción no encontrada.'); return; }
-  const sigUrl = await _loadSellerSig();
+  // Feedback inmediato: abre la vista previa al instante (arriba del cotizador) con "Preparando…".
+  if(mode==='email'){ const pb=document.getElementById('lendmark-preview-body'); if(pb) pb.innerHTML='<div style="padding:40px;text-align:center;color:#555;">⏳ Preparando la hoja…</div>'; const pm=document.getElementById('lendmark-preview-modal'); if(pm) pm.classList.add('active'); }
+  let sigUrl=null; try{ sigUrl = await _loadSellerSig(); }catch(e){ console.warn('sellerSig', e); }
   const price=Number(o.price)||0, down=Number(o.down)||0, tax=Number(o.tax)||0, dmv=Number(o.dmv)||0;
   const docFee=70, smog=58.25, total=price+docFee+smog+tax+dmv, financed=Math.max(0, total-down);
   try{ await loadInvCache(); }catch(e){}
