@@ -61,8 +61,9 @@
   .langbtn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 9px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;}
   .langbtn.on{background:var(--gold);color:#0b0e14;border-color:var(--gold);}
   .acct-signout{width:100%;margin-top:10px;background:transparent;border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--red);font-weight:700;cursor:pointer;font-size:14px;}
-  #asemp-banner{position:fixed;left:0;right:0;bottom:0;z-index:6900;background:linear-gradient(135deg,#d9b85a,#9a7420);color:#0f1320;display:none;align-items:center;justify-content:center;gap:12px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));font-weight:800;font-size:13px;}
-  #asemp-banner button{background:#0f1320;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;font-size:13px;}
+  #asemp-banner{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;background:linear-gradient(135deg,#d9b85a,#9a7420);color:#0f1320;display:none;align-items:center;justify-content:center;gap:14px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));font-weight:800;font-size:14px;box-shadow:0 -6px 20px rgba(0,0,0,.4);}
+  #asemp-banner button{background:#0f1320;color:#fff;border:none;border-radius:9px;padding:8px 16px;font-weight:800;cursor:pointer;font-size:14px;}
+  body.wh-asemp #lmg-nav{display:none !important;}
   /* === Mi jornada (tareas guiadas, portado de crew) === */
   .hide{display:none !important;}
   .faint{color:var(--muted);}
@@ -818,11 +819,12 @@ window.whViewAsEmployee=function(){
   _allowedTabs=['yard','lister','pack'];
   const opc=document.getElementById('owner-op-card'); if(opc) opc.style.display='none';
   const co=document.getElementById('clock-owner'); if(co) co.style.display='none';
+  document.body.classList.add('wh-asemp');   // oculta la barra inferior de apps (para que no tape el banner)
   const b=document.getElementById('asemp-banner'); if(b) b.style.display='flex';
   closeAcct(); setHeaderIdentity(); whGoHome();
   try{ window.scrollTo(0,0); }catch(e){}
 };
-window.whExitAsEmployee=function(){ try{ location.reload(); }catch(e){ _asEmp=false; } };
+window.whExitAsEmployee=function(){ try{ location.reload(); }catch(e){ _asEmp=false; document.body.classList.remove('wh-asemp'); const b=document.getElementById('asemp-banner'); if(b) b.style.display='none'; } };
 
 // ---- TABS ----
 let _view='yard';
