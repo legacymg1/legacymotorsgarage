@@ -14893,7 +14893,7 @@ function carCostHTML(c){
     : '<div style="font-size:12px;color:#888;padding:4px 0;line-height:1.5;">Aún no hay gastos ligados a este carro.<br>Regístralos en <b style="color:#f0c040;">Finanzas → Registrar gasto → bolsa Dealer → elige este carro</b>.</div>';
   return '<div style="background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.25);border-radius:12px;padding:14px;margin-bottom:16px;">'+
     '<div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#f0c040;margin-bottom:8px;">💰 Costo y ganancia (solo staff)</div>'+
-    (c.gpsPhotoURL?'<a href="'+c.gpsPhotoURL+'" target="_blank" style="color:#f0c040;font-size:12px;display:block;margin-bottom:8px;">📍 Ver foto GPS</a>':'')+
+    (c.gpsPhotoURL?'<span onclick="showPhoto(\''+c.gpsPhotoURL+'\',\'GPS\')" style="color:#f0c040;font-size:12px;display:block;margin-bottom:8px;cursor:pointer;">📍 Ver foto GPS</span>':'')+
     (c.status==='prep'?'<div style="font-size:11px;color:#ff9800;margin-bottom:8px;">🔧 En preparación (no publicado)</div>':'')+
     rows+
     '<div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:8px;padding-top:8px;">'+
@@ -15177,11 +15177,11 @@ window.openCarModal = function(carId){
   document.getElementById('car-video').value='';
   document.getElementById('car-gps-photo').value='';
   const _gpsC = editingCarId ? cars.find(x=>x.id===editingCarId) : null;
-  document.getElementById('car-gps-preview').innerHTML = (_gpsC && _gpsC.gpsPhotoURL) ? '<a href="'+_gpsC.gpsPhotoURL+'" target="_blank" style="color:#f0c040;font-size:12px;">📍 Ver foto GPS actual</a>' : '';
+  document.getElementById('car-gps-preview').innerHTML = (_gpsC && _gpsC.gpsPhotoURL) ? '<span onclick="showPhoto(\''+_gpsC.gpsPhotoURL+'\',\'GPS\')" style="color:#f0c040;font-size:12px;cursor:pointer;">📍 Ver foto GPS actual</span>' : '';
   const _smE=document.getElementById('car-smog-photo'); if(_smE) _smE.value='';
-  const _smP=document.getElementById('car-smog-preview'); if(_smP) _smP.innerHTML = (_gpsC && _gpsC.smogPhotoURL) ? '<a href="'+_gpsC.smogPhotoURL+'" target="_blank" style="color:#f0c040;font-size:12px;">🧪 Ver foto del smog actual</a>' : '';
+  const _smP=document.getElementById('car-smog-preview'); if(_smP) _smP.innerHTML = (_gpsC && _gpsC.smogPhotoURL) ? '<span onclick="showPhoto(\''+_gpsC.smogPhotoURL+'\',\'Smog\')" style="color:#f0c040;font-size:12px;cursor:pointer;">🧪 Ver foto del smog actual</span>' : '';
   const _vnE=document.getElementById('car-vin-photo'); if(_vnE) _vnE.value='';
-  const _vnP=document.getElementById('car-vin-preview'); if(_vnP) _vnP.innerHTML = (_gpsC && _gpsC.vinPhotoURL) ? '<a href="'+_gpsC.vinPhotoURL+'" target="_blank" style="color:#f0c040;font-size:12px;">🔖 Ver foto del VIN actual</a>' : '';
+  const _vnP=document.getElementById('car-vin-preview'); if(_vnP) _vnP.innerHTML = (_gpsC && _gpsC.vinPhotoURL) ? '<span onclick="showPhoto(\''+_gpsC.vinPhotoURL+'\',\'VIN\')" style="color:#f0c040;font-size:12px;cursor:pointer;">🔖 Ver foto del VIN actual</span>' : '';
   // Nuevo = etapa PREP (solo costo); Editar = etapa EXHIBICIÓN (formulario completo)
   document.getElementById('car-prep-only').style.display = carId ? 'none' : 'block';
   document.getElementById('car-exhib-only').style.display = carId ? 'block' : 'none';
@@ -15404,6 +15404,42 @@ async function toJpeg(file){
     img.src=url;
   });
 }
+
+// 🖼️ Visor interno (igual que en admin): abre fotos/PDF AQUÍ, no en pestaña. Convierte HEIC.
+window.showPhoto = async function(url, title){
+  if(!url) return;
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:2147483600;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML='<div style="color:#fff;font-size:14px;margin-bottom:10px;font-weight:600;">'+(title||'Documento')+'</div>'
+    +'<div data-body style="color:#fff;font-size:13px;">Cargando…</div>'
+    +'<div style="margin-top:14px;display:flex;gap:10px;">'
+    +'<a data-open href="'+url+'" target="_blank" style="background:transparent;color:#f0c040;border:1px solid #f0c040;border-radius:8px;padding:8px 16px;text-decoration:none;font-size:13px;">Abrir en pestaña ↗</a>'
+    +'<button type="button" data-close style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">Cerrar ✕</button>'
+    +'</div>';
+  var close=function(){ ov.remove(); document.removeEventListener('keydown',onKey); };
+  var onKey=function(e){ if(e.key==='Escape') close(); };
+  ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  ov.querySelector('[data-close]').onclick=close;
+  document.addEventListener('keydown',onKey);
+  document.body.appendChild(ov);
+  var body=ov.querySelector('[data-body]'), openLink=ov.querySelector('[data-open]');
+  try{
+    var resp=await fetch(url); if(!resp.ok) throw new Error('HTTP '+resp.status);
+    var blob=await resp.blob();
+    try{ if(await _looksHeic(blob)){ blob=await _heicToJpeg(blob); } }catch(e){}
+    var sig=new Uint8Array(await blob.slice(0,4).arrayBuffer());
+    var isPdf=sig[0]===0x25&&sig[1]===0x50&&sig[2]===0x44&&sig[3]===0x46;
+    var isHtml=sig[0]===0x3C||((blob.type||'').indexOf('html')>=0);
+    var type=blob.type; if(!type||type==='application/octet-stream'){ type=isPdf?'application/pdf':isHtml?'text/html':'image/jpeg'; blob=new Blob([blob],{type:type}); }
+    var burl=URL.createObjectURL(blob);
+    if(openLink) openLink.href=burl;
+    if(type==='application/pdf'||(type.indexOf('html')>=0)||isHtml){
+      body.innerHTML='<iframe src="'+burl+'" style="width:92vw;height:80vh;border:none;border-radius:8px;background:#fff;"></iframe>';
+    } else {
+      body.innerHTML='<img src="'+burl+'" style="max-width:96%;max-height:80vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);background:#fff;">';
+    }
+  }catch(err){ body.innerHTML='<div style="color:#fff;text-align:center;max-width:420px;">No se pudo cargar la vista previa aquí. Usa <strong>Abrir en pestaña ↗</strong> abajo.</div>'; }
+};
 
 window.saveCar = async function(){
   const make=titleCase(document.getElementById('car-make').value.trim());
