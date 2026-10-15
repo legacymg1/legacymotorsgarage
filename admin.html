@@ -538,6 +538,15 @@
       <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">Puedes guardar aquí con los datos del cliente y seguir llenando el resto cuando quieras.</div>
     </div>
 
+    <!-- 🔒 Candado del CONTRATO (tipo de cliente + vehículo + plan de pagos) — solo al EDITAR -->
+    <div id="deal-lock" style="display:none;background:rgba(240,192,64,0.08);border:1px solid var(--gold3);border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer;" onclick="financeUnlock()">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div><div style="font-weight:800;color:var(--gold);font-size:14px;">🔒 Contrato: tipo de cliente, vehículo y plan de pagos (avanzado)</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">Tipo de cliente, carro, precio, enganche, pagos, plazo, fechas, impuestos y DMV. <b>Toca para desbloquear y editar.</b></div></div>
+        <div style="font-size:20px;color:var(--gold);">›</div>
+      </div>
+    </div>
+    <div id="deal-body">
     <!-- ============ 3 · TIPO DE CLIENTE Y VEHÍCULO ============ -->
     <div class="addc-section">
       <div class="addc-head">3 · Tipo de cliente y vehículo</div>
@@ -586,15 +595,6 @@
       </div>
     </div>
     <div id="finance-only" class="addc-section">
-    <!-- 🔒 Candado del contrato (solo al EDITAR un cliente existente): evita cambiar el deal por error -->
-    <div id="finance-lock" style="display:none;background:rgba(240,192,64,0.08);border:1px solid var(--gold3);border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer;" onclick="financeUnlock()">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div><div style="font-weight:800;color:var(--gold);font-size:14px;">🔒 Contrato / plan de pagos (avanzado)</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px;">Precio, enganche, pagos, plazo, fechas, impuestos y DMV. <b>Toca para desbloquear y editar.</b></div></div>
-        <div style="font-size:20px;color:var(--gold);">›</div>
-      </div>
-    </div>
-    <div id="finance-body">
     <div class="addc-head">4 · Venta y financiamiento</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Precio del Vehículo ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcFinancing('price')"></div>
@@ -662,8 +662,8 @@
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha Primer Pago</label><input class="form-input" id="f-startdate" type="date" onchange="setTimeout(calcHint,50)"></div>
     </div>
-    </div><!-- /finance-body -->
     </div><!-- /finance-only -->
+    </div><!-- /deal-body -->
     <!-- ============ 5 · SEGURO Y NOTAS ============ -->
     <div class="addc-section">
       <div class="addc-head">5 · Seguro y notas</div>
@@ -933,7 +933,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, updateDoc, runTransaction, getDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getStorage, ref, uploadBytes, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
@@ -3533,14 +3533,14 @@ window.openEditModal=function(id){
 // 🔒 Candado del contrato en "Editar cliente": evita cambiar precio/enganche/pagos/plazo por error.
 // Al editar arranca cerrado; para tocar el deal hay que desbloquear a propósito. Cliente NUEVO = abierto.
 window.setFinanceLock=function(locked){
-  const bar=document.getElementById('finance-lock'), body=document.getElementById('finance-body');
+  const bar=document.getElementById('deal-lock'), body=document.getElementById('deal-body');
   if(!bar||!body) return;
   if(locked){ bar.style.display='block'; body.style.display='none'; }
   else { bar.style.display='none'; body.style.display=''; }
 };
 window.financeUnlock=function(){
-  if(!confirm('⚠️ Vas a editar el CONTRATO / plan de pagos (precio, enganche, pagos, plazo, fechas, impuestos y DMV).\n\nEsto cambia el acuerdo financiero del cliente. ¿Continuar?')) return;
-  const bar=document.getElementById('finance-lock'), body=document.getElementById('finance-body');
+  if(!confirm('⚠️ Vas a editar el CONTRATO (tipo de cliente, vehículo y plan de pagos: precio, enganche, pagos, plazo, fechas, impuestos y DMV).\n\nEsto cambia el acuerdo del cliente. ¿Continuar?')) return;
+  const bar=document.getElementById('deal-lock'), body=document.getElementById('deal-body');
   if(bar) bar.style.display='none';
   if(body) body.style.display='';
   try{ calcFinancing('load'); }catch(e){}
@@ -3553,6 +3553,26 @@ function _withTimeout(promise, ms, label){
     promise,
     new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout '+(label||'')+' ('+ms+'ms)')), ms))
   ]);
+}
+// Subida ROBUSTA: con progreso (uploadBytesResumable). Solo falla si de verdad se ATASCA
+// (sin avanzar por `stallMs`), no por conexión lenta. Reintenta una vez. Devuelve el downloadURL.
+function uploadResumableSafe(storageRef, blob, metadata, label, stallMs){
+  stallMs = stallMs || 30000;
+  return new Promise((resolve, reject)=>{
+    let watchdog, settled=false;
+    const task = uploadBytesResumable(storageRef, blob, metadata||{});
+    const arm = ()=>{ clearTimeout(watchdog); watchdog=setTimeout(()=>{ if(settled) return; settled=true; try{ task.cancel(); }catch(e){} reject(new Error('atasco '+(label||'')+' (sin avanzar '+Math.round(stallMs/1000)+'s)')); }, stallMs); };
+    arm();
+    task.on('state_changed',
+      ()=>{ if(!settled) arm(); },               // cada avance reinicia el watchdog
+      (err)=>{ if(settled) return; settled=true; clearTimeout(watchdog); reject(err); },
+      async ()=>{ if(settled) return; settled=true; clearTimeout(watchdog); try{ resolve(await getDownloadURL(task.snapshot.ref)); }catch(e){ reject(e); } }
+    );
+  });
+}
+async function uploadPhotoRetry(storageRef, blob, metadata, label){
+  try{ return await uploadResumableSafe(storageRef, blob, metadata, label, 30000); }
+  catch(e1){ console.warn('reintentando subida '+(label||''), e1); return await uploadResumableSafe(storageRef, blob, metadata, label, 45000); }
 }
 window.saveClient=async function(keepOpen){
   // keepOpen=true → "Guardar y seguir" (guardado PARCIAL): no cierra el modal y NO exige el plan de pagos.
@@ -3606,10 +3626,9 @@ window.saveClient=async function(keepOpen){
     try {
       const st = getStorage();
       let _idUp = idPhotoFile;
-      try { _idUp = await _withTimeout(blobToJpeg(idPhotoFile), 20000, 'convertir ID'); } catch(e){ console.warn('ID no convertida, se sube tal cual', e); _idUp = idPhotoFile; }
+      try { _idUp = await _withTimeout(blobToJpeg(idPhotoFile), 25000, 'convertir ID'); } catch(e){ console.warn('ID no convertida, se sube tal cual', e); _idUp = idPhotoFile; }
       const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_id.jpg');
-      await _withTimeout(uploadBytes(idRef, _idUp, {contentType: (_idUp.type||'image/jpeg')}), 30000, 'subir ID');
-      idPhotoURL = await _withTimeout(getDownloadURL(idRef), 15000, 'URL ID');
+      idPhotoURL = await uploadPhotoRetry(idRef, _idUp, {contentType: (_idUp.type||'image/jpeg')}, 'subir ID');
     } catch(storErr){ _idPhotoErr = (storErr && (storErr.code || storErr.message)) || String(storErr); console.error('ID photo FALLÓ:', storErr); }
   }
 
@@ -5103,7 +5122,7 @@ async function blobToJpeg(blob){
   }
   return await new Promise((resolve,reject)=>{
     const u=URL.createObjectURL(blob); const img=new Image();
-    img.onload=function(){ try{ let maxW=1600,w=img.naturalWidth,h=img.naturalHeight; if(!w||!h){URL.revokeObjectURL(u);return reject(new Error('sin dimensiones'));} if(w>maxW){h=Math.round(h*maxW/w);w=maxW;} const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cv.toBlob(function(b){URL.revokeObjectURL(u);b?resolve(b):reject(new Error('toBlob'));},'image/jpeg',0.88);}catch(e){URL.revokeObjectURL(u);reject(e);} };
+    img.onload=function(){ try{ let maxW=1400,w=img.naturalWidth,h=img.naturalHeight; if(!w||!h){URL.revokeObjectURL(u);return reject(new Error('sin dimensiones'));} if(w>maxW){h=Math.round(h*maxW/w);w=maxW;} const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cv.toBlob(function(b){URL.revokeObjectURL(u);b?resolve(b):reject(new Error('toBlob'));},'image/jpeg',0.85);}catch(e){URL.revokeObjectURL(u);reject(e);} };
     img.onerror=function(){ URL.revokeObjectURL(u); reject(new Error('formato no decodificable (HEIC en computadora?)')); };
     img.src=u;
   });
