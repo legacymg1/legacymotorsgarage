@@ -2723,9 +2723,34 @@ window.cotShare=async function(){
 };
 window.saveQuoteLead=async function(cust,phone,lang){
   if(!cust && !phone) return null;
+  const e164=toE164(phone)||'';
+  const newOpts=cotOpts.map(o=>{ const r=cotCalc(o); return { car:o.car||'', vin:o.vin||'', price:r.price, down:r.down, payToday:r.payToday, numpay:r.numpay, freq:r.freq, payEven:r.payEven, cash:r.cash }; });
+  // 🔁 DEDUP: una sola cotización por persona (por teléfono; si no hay, por nombre).
+  // Si ya existe, se ACUMULAN los carros (por VIN/carro) en su mismo perfil, no se crea otra.
+  let existingId=null, existingData=null;
+  try{
+    const snap=await getDocs(collection(db,'quotes'));
+    snap.forEach(d=>{ if(existingId) return; const x=d.data();
+      const match = e164 ? (x.phoneE164===e164)
+                 : (phone ? (x.phone===phone)
+                 : (cust ? ((x.customer||'').trim().toLowerCase()===cust.trim().toLowerCase() && !x.phoneE164 && !x.phone) : false));
+      if(match){ existingId=d.id; existingData=x; }
+    });
+  }catch(e){ console.warn('dedup quotes', e); }
+  if(existingId){
+    const map={}; (existingData.options||[]).forEach(o=>{ map[((o.vin||o.car||'')+'').toUpperCase()]=o; });
+    newOpts.forEach(o=>{ map[((o.vin||o.car||'')+'').toUpperCase()]=o; });   // el carro re-cotizado se actualiza
+    const merged=Object.keys(map).map(k=>map[k]);
+    await setDoc(doc(db,'quotes',existingId),{
+      customer:cust||existingData.customer||'', phone:phone||existingData.phone||'', phoneE164:e164||existingData.phoneE164||'',
+      lang:lang||existingData.lang||'es', city:_cotTaxCity||existingData.city||'', taxRate:_cotTaxRate||existingData.taxRate||0,
+      options:merged, createdAt:existingData.createdAt||new Date().toISOString(), updatedAt:new Date().toISOString(),
+      createdBy:existingData.createdBy||((auth.currentUser&&auth.currentUser.email)||'')
+    },{merge:true});
+    return existingId;
+  }
   const id='quote_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-  const opts=cotOpts.map(o=>{ const r=cotCalc(o); return { car:o.car||'', vin:o.vin||'', price:r.price, down:r.down, payToday:r.payToday, numpay:r.numpay, freq:r.freq, payEven:r.payEven, cash:r.cash }; });
-  await setDoc(doc(db,'quotes',id),{ customer:cust||'', phone:phone||'', phoneE164:toE164(phone)||'', lang:lang||'es', city:_cotTaxCity||'', taxRate:_cotTaxRate||0, options:opts, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' });
+  await setDoc(doc(db,'quotes',id),{ customer:cust||'', phone:phone||'', phoneE164:e164, lang:lang||'es', city:_cotTaxCity||'', taxRate:_cotTaxRate||0, options:newOpts, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' });
   return id;
 };
 // 🧮 FASE 4 — guardar cliente desde el cotizador + cajita "Cotizaciones" en Clientes
@@ -2760,7 +2785,7 @@ window.loadCotiz=async function(){
     const car=(q.options&&q.options[0]&&q.options[0].car)||'';
     const n=(q.options||[]).length;
     const when=q.createdAt?new Date(q.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):'';
-    return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="viewCotiz(\''+q.id+'\')"><div style="min-width:0;"><div style="font-weight:700;">'+esc(q.customer||'(sin nombre)')+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">'+esc(q.phone||'sin teléfono')+(car?(' · '+esc(car)):'')+' · '+n+' opción(es) · '+when+'</div></div><span style="color:var(--gold);flex:0 0 auto;">›</span></div>';
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="viewCotiz(\''+q.id+'\')"><div style="min-width:0;"><div style="font-weight:700;">'+esc(q.customer||'(sin nombre)')+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">'+esc(q.phone||'sin teléfono')+(car?(' · '+esc(car)):'')+' · '+n+' carro(s) · '+when+'</div></div><div style="display:flex;gap:6px;align-items:center;flex:0 0 auto;"><button onclick="deleteCotiz(\''+q.id+'\',event)" title="Borrar cotización" style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:8px;padding:5px 9px;font-size:13px;cursor:pointer;">🗑</button><span style="color:var(--gold);">›</span></div></div>';
   }).join('');
 };
 window.viewCotiz=function(id){
@@ -2779,12 +2804,17 @@ window.viewCotiz=function(id){
   document.getElementById('cotizv-body').innerHTML=h;
   document.getElementById('cotizv-modal').classList.add('active');
 };
-window.deleteCotiz=async function(){
-  if(!_cotizCurrent) return;
-  if(!confirm('¿Borrar esta cotización?')) return;
-  try{ await deleteDoc(doc(db,'quotes',_cotizCurrent)); }
+window.deleteCotiz=async function(id, ev){
+  if(ev){ try{ ev.stopPropagation(); }catch(e){} }
+  const tid = id || _cotizCurrent;
+  if(!tid) return;
+  const q=_cotizCache[tid];
+  if(!confirm('¿Borrar esta cotización'+((q&&q.customer)?' de '+q.customer:'')+'? No se puede deshacer.')) return;
+  try{ await deleteDoc(doc(db,'quotes',tid)); }
   catch(e){ alert('No se pudo borrar: '+((e&&e.message)||e)); return; }
-  delete _cotizCache[_cotizCurrent]; _cotizCurrent=null; closeModal('cotizv-modal'); loadCotiz();
+  delete _cotizCache[tid]; try{ _c360Quotes=null; }catch(e){}
+  if(tid===_cotizCurrent){ _cotizCurrent=null; closeModal('cotizv-modal'); }
+  loadCotiz();
 };
 // Enter en el buscador → agrega la primera coincidencia (como los demás buscadores)
 window.cotCarKey=function(e){
