@@ -1543,7 +1543,7 @@ function _c360InvFor(c, vehicle){ if(!Array.isArray(_c360Inv)) return null; cons
 function _c360DocRow(icon,label,url,vis){ const tag= vis==='interno'
     ? '<span style="background:rgba(255,107,107,.15);color:var(--red);border:1px solid rgba(255,107,107,.4);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px;">interno</span>'
     : '<span style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.4);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px;">público</span>';
-  const link=url?('<a href="'+esc(url)+'" target="_blank" style="color:var(--gold);text-decoration:none;font-size:12px;white-space:nowrap;">ver ›</a>'):'<span style="color:var(--muted);font-size:12px;">—</span>';
+  const link=url?('<span onclick="showPhoto(\''+url+'\',\''+String(label).replace(/\x27/g,"")+'\')" style="color:var(--gold);cursor:pointer;font-size:12px;white-space:nowrap;">ver ›</span>'):'<span style="color:var(--muted);font-size:12px;">—</span>';
   return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-size:13px;">'+icon+' '+label+tag+'</span>'+link+'</div>';
 }
 function c360DocsHtml(c, vehicle){
@@ -1600,7 +1600,7 @@ window.renderClient360=function(id){
   const idTxt = (c.idNumber ? ((c.idType?esc(c.idType)+' ':'')+esc(c.idNumber)) : '');
   const idLink = (c.idNumber || c.idPhotoURL)
     ? (c.idPhotoURL
-        ? '<a href="'+esc(c.idPhotoURL)+'" target="_blank" style="display:inline-flex;align-items:center;gap:5px;color:var(--gold);text-decoration:none;font-size:12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:2px 8px;margin-top:5px;">🪪 ID'+(idTxt?' '+idTxt:'')+' 📷 <span style="font-size:10px;color:var(--muted);">interno</span></a>'
+        ? '<span onclick="showPhoto(\''+c.idPhotoURL+'\',\'ID — '+esc((c.name||'').replace(/\x27/g,""))+'\')" style="display:inline-flex;align-items:center;gap:5px;color:var(--gold);cursor:pointer;font-size:12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:2px 8px;margin-top:5px;">🪪 ID'+(idTxt?' '+idTxt:'')+' 📷 <span style="font-size:10px;color:var(--muted);">interno</span></span>'
         : '<span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);font-size:12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:2px 8px;margin-top:5px;">🪪 ID'+(idTxt?' '+idTxt:' ✓')+' <span style="font-size:10px;color:var(--muted);">interno · sin foto</span></span>')
     : '<span style="display:inline-block;color:var(--muted);font-size:12px;margin-top:5px;">🪪 Sin identificación</span>';
   // Header: nombre + identificación al lado + teléfono/idioma + insignias + cerrar
@@ -3334,7 +3334,7 @@ window.renderAll = function() {
           <div class="payment-row"><span class="pay-label">Saldo ${clientAddons(c).length?'del carro':''}</span><span class="pay-value" style="color:var(--gold)">${formatMoney(balance)}</span></div>
           ${clientAddons(c).length ? `<div style="margin:8px 0;padding:9px 11px;background:rgba(31,111,235,0.08);border:1px solid rgba(31,111,235,0.35);border-radius:8px;font-size:12px;">
             <div style="font-weight:700;color:#1f6feb;margin-bottom:5px;">💳 Deudas adicionales</div>
-            ${clientAddons(c).map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 0;"><span>${a.concept||'Cargo'}${a.settled?' <span style="color:var(--green);">✅</span>':''}</span><span style="display:flex;gap:6px;align-items:center;"><b>${formatMoney(addonBalance(a))}</b>${(a.signedContract&&a.signedContract.url)?`<button onclick="event.stopPropagation();window.open('${a.signedContract.url}','_blank')" title="Ver contrato del cargo" style="background:rgba(0,200,83,0.15);color:var(--green);border:1px solid var(--green);border-radius:5px;padding:1px 6px;font-size:10px;cursor:pointer;">📑</button>`:`<button onclick="event.stopPropagation();signAddonContract('${c.id}','${a.id}')" title="Firmar contrato del cargo" style="background:rgba(240,192,64,0.15);color:var(--gold);border:1px solid var(--gold3);border-radius:5px;padding:1px 6px;font-size:10px;cursor:pointer;">✍️ firmar</button>`}</span></div>`).join('')}
+            ${clientAddons(c).map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 0;"><span>${a.concept||'Cargo'}${a.settled?' <span style="color:var(--green);">✅</span>':''}</span><span style="display:flex;gap:6px;align-items:center;"><b>${formatMoney(addonBalance(a))}</b>${(a.signedContract&&a.signedContract.url)?`<button onclick="event.stopPropagation();showPhoto('${a.signedContract.url}','Contrato del cargo')" title="Ver contrato del cargo" style="background:rgba(0,200,83,0.15);color:var(--green);border:1px solid var(--green);border-radius:5px;padding:1px 6px;font-size:10px;cursor:pointer;">📑</button>`:`<button onclick="event.stopPropagation();signAddonContract('${c.id}','${a.id}')" title="Firmar contrato del cargo" style="background:rgba(240,192,64,0.15);color:var(--gold);border:1px solid var(--gold3);border-radius:5px;padding:1px 6px;font-size:10px;cursor:pointer;">✍️ firmar</button>`}</span></div>`).join('')}
             <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.15);margin-top:5px;padding-top:5px;font-weight:800;"><span>Deuda total a Legacy</span><span style="color:var(--gold);">${formatMoney(totalClientDebt(c))}</span></div>
           </div>` : ''}
           <div class="progress-bar-wrap"><div class="progress-fill" style="width:${progress}%"></div></div>
@@ -3351,7 +3351,7 @@ window.renderAll = function() {
           ${(!c.insurance||c.insuranceExp<today())?'<button class="btn" data-cid="'+c.id+'" onclick="event.stopPropagation();openInsuranceSMS(this.dataset.cid)" style="flex:0;background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);font-size:11px;">🛡</button>':''}
           <button type="button" class="btn btn-edit" style="flex:0;padding:9px 10px;" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">✏️</button>
           <button class="btn" style="flex:0;padding:9px 10px;background:var(--gold3);color:var(--navy3);" onclick="event.stopPropagation();generateContract('${c.id}')" title="Generar Contrato">📄</button>
-          ${(c.signedContract&&c.signedContract.url) ? '<button class="btn" style="flex:0;padding:9px 10px;background:rgba(0,200,83,0.15);color:var(--green);border:1px solid var(--green);" onclick="event.stopPropagation();window.open(\''+c.signedContract.url+'\',\'_blank\')" title="Ver contrato firmado oficial">📑</button>' : ''}
+          ${(c.signedContract&&c.signedContract.url) ? '<button class="btn" style="flex:0;padding:9px 10px;background:rgba(0,200,83,0.15);color:var(--green);border:1px solid var(--green);" onclick="event.stopPropagation();showPhoto(\''+c.signedContract.url+'\',\'Contrato firmado\')" title="Ver contrato firmado oficial">📑</button>' : ''}
         </div>
       </div>`;
     });
@@ -3371,7 +3371,7 @@ window.renderAll = function() {
       const _bcss='border:1px solid var(--border);background:transparent;border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer;';
       const docBtns =
         `<button onclick="event.stopPropagation();generateContract('${c.id}')" title="Contrato" style="${_bcss}color:var(--gold);">📄</button>`
-        + ((c.signedContract&&c.signedContract.url) ? `<button onclick="event.stopPropagation();window.open('${c.signedContract.url}','_blank')" title="Ver contrato firmado" style="${_bcss}color:var(--green);">📑</button>` : '')
+        + ((c.signedContract&&c.signedContract.url) ? `<button onclick="event.stopPropagation();showPhoto('${c.signedContract.url}','Contrato firmado')" title="Ver contrato firmado" style="${_bcss}color:var(--green);">📑</button>` : '')
         + (c.idPhotoURL ? `<button onclick="event.stopPropagation();showPhoto('${c.idPhotoURL}','ID')" title="Ver foto del ID" style="${_bcss}color:var(--text);">🪪</button>` : '')
         + (c.insurancePhotoURL ? `<button onclick="event.stopPropagation();showPhoto('${c.insurancePhotoURL}','Seguro')" title="Ver foto del seguro" style="${_bcss}color:var(--text);">🛡</button>` : '');
       liqHtml += `<div ondblclick="if(!event.target.closest('button,a'))openClient360('${c.id}')" title="Doble clic para ver la ficha completa" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;">
@@ -5276,13 +5276,15 @@ window.showPhoto = async function(url, title){
     const isPng = sig[0]===0x89 && sig[1]===0x50;
     const isGif = sig[0]===0x47 && sig[1]===0x49;
     const isFtyp = sig[4]===0x66 && sig[5]===0x74 && sig[6]===0x79 && sig[7]===0x70; // 'ftyp' (HEIC/HEIF/MP4)
+    // HTML (contratos): empieza con '<' o el tipo dice html
+    const isHtml = sig[0]===0x3C || (type && type.indexOf('html')>=0);
     if(!type || type === 'application/octet-stream'){
-      type = isPdf?'application/pdf':isJpg?'image/jpeg':isPng?'image/png':isGif?'image/gif':isFtyp?'image/heic':'image/jpeg';
+      type = isPdf?'application/pdf':isHtml?'text/html':isJpg?'image/jpeg':isPng?'image/png':isGif?'image/gif':isFtyp?'image/heic':'image/jpeg';
       blob = new Blob([blob], {type});
     }
     const burl = URL.createObjectURL(blob);
     if(openLink) openLink.href = burl; // abrir en pestaña = archivo ya tipado (previsualiza, no descarga)
-    if(type === 'application/pdf'){
+    if(type === 'application/pdf' || (type && type.indexOf('html')>=0) || isHtml){
       body.innerHTML = '<iframe src="'+burl+'" style="width:92vw;height:80vh;border:none;border-radius:8px;background:#fff;"></iframe>';
     } else {
       body.innerHTML = '<img src="'+burl+'" style="max-width:96%;max-height:80vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);background:#fff;" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'[data-heic]\').style.display=\'block\';">'
