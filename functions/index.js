@@ -2960,23 +2960,26 @@ exports.heicConvert = onRequest({ cors: true, timeoutSeconds: 60, memory: "1GiB"
     if (!buf || !buf.length) { res.status(400).send("sin datos"); return; }
     // sharp NO decodifica HEIC (sin plugin HEVC por licencias) → usa heic-convert para decodificar HEIC a JPG,
     // y luego sharp SOLO para redimensionar/comprimir (sharp sí lee JPG).
-    let jpgBuf = buf;
+    let jpgBuf = null, heicErr = "";
     try {
       const convert = require("heic-convert");
       jpgBuf = await convert({ buffer: buf, format: "JPEG", quality: 1 });
     } catch (he) {
-      // No era HEIC (o heic-convert falló): dejamos que sharp intente con el original.
-      jpgBuf = buf;
+      heicErr = (he && (he.stack || he.message)) || String(he);
     }
-    const sharp = require("sharp");
-    const out = await sharp(jpgBuf, { failOn: "none" })
-      .rotate()
-      .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-    res.set("Content-Type", "image/jpeg");
-    res.set("Cache-Control", "no-store");
-    res.status(200).send(out);
+    try {
+      const sharp = require("sharp");
+      const out = await sharp(jpgBuf || buf, { failOn: "none" })
+        .rotate()
+        .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+      res.set("Content-Type", "image/jpeg");
+      res.set("Cache-Control", "no-store");
+      res.status(200).send(out);
+    } catch (se) {
+      res.status(500).send("heic-convert_err=[" + (heicErr || "ok/converted") + "]  |  sharp_err=[" + ((se && se.message) || se) + "]");
+    }
   } catch (e) {
     res.status(500).send("No se pudo convertir: " + ((e && e.message) || e));
   }
