@@ -3581,16 +3581,22 @@ window.idPhotoPicked = async function(inp){
   const f = inp && inp.files && inp.files[0];
   const prev = document.getElementById('f-id-preview');
   if(!f){ if(prev) prev.innerHTML=''; return; }
-  if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--muted);">⏳ Leyendo foto…</span>';
-  try{
-    const buf = await f.arrayBuffer();                 // lee los bytes en el acto
-    window._idPhotoBlob = new Blob([buf], {type: f.type || 'image/jpeg'});
-    if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--green);">📷 Foto lista ('+Math.round((window._idPhotoBlob.size||0)/1024)+' KB) — se subirá al guardar</span>';
-  }catch(e){
-    window._idPhotoBlob = null;
-    if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo leer esa foto</span>';
-    alert('⚠️ No se pudo leer esa foto del disco.\n\nMotivo: '+((e&&e.message)||e)+'\n\nSuele pasar cuando la foto está en iCloud SIN descargar, o se movió. Prueba una de estas:\n• Ábrela en Fotos o Vista Previa y expórtala/guárdala al Escritorio; luego elige esa.\n• O toma una captura de pantalla de la foto y sube la captura.');
+  // Reintenta: al seleccionar una foto de iCloud, macOS la empieza a descargar; le damos tiempo.
+  const waits = [0, 1500, 3000, 5000];  // 4 intentos (~9.5s en total)
+  let lastErr='';
+  for(let i=0;i<waits.length;i++){
+    if(waits[i]){ if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--muted);">⏳ Descargando de iCloud… ('+(i)+')</span>'; await new Promise(r=>setTimeout(r,waits[i])); }
+    else if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--muted);">⏳ Leyendo foto…</span>';
+    try{
+      const buf = await f.arrayBuffer();
+      window._idPhotoBlob = new Blob([buf], {type: f.type || 'image/jpeg'});
+      if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--green);">📷 Foto lista ('+Math.round((window._idPhotoBlob.size||0)/1024)+' KB) — se subirá al guardar</span>';
+      return;
+    }catch(e){ lastErr=(e&&e.message)||String(e); }
   }
+  window._idPhotoBlob = null;
+  if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo leer esa foto (sigue en iCloud)</span>';
+  alert('⚠️ Esa foto sigue en iCloud sin descargar y no se pudo leer.\n\nMotivo: '+lastErr+'\n\nHaz una de estas y vuelve a elegirla:\n• En Finder, dale clic al ícono de nube ☁️ junto a la foto para DESCARGARLA, espera a que termine, y elígela.\n• O ábrela en Fotos / Vista Previa y expórtala al Escritorio; sube esa.\n• O toma una CAPTURA de pantalla de la foto (Cmd+Shift+4) y sube la captura — esa siempre funciona.');
 };
 // 🔧 Diagnóstico: sube 32 bytes a ids/ y a dismantle_vehicles/ y dice EXACTO qué pasa.
 window.diagIdUpload=async function(){
