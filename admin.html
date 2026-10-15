@@ -615,6 +615,11 @@
         <div class="form-group"><label class="form-label">VIN</label><input class="form-input" id="f-vin" placeholder="Número VIN del carro" oninput="this.value=this.value.toUpperCase()"></div>
         <div class="form-group"><label class="form-label">Millas</label><input class="form-input" id="f-miles" placeholder="85000" type="number"></div>
       </div>
+      <div class="form-group">
+        <label class="form-label">📸 Foto del odómetro (al momento de la venta) <span style="font-size:11px;color:var(--muted);">— prueba, se guarda en el jacket</span></label>
+        <input type="file" class="form-input" id="f-odo-photo" accept="image/*" style="padding:8px;cursor:pointer;" onchange="odoPhotoPicked(this)">
+        <div id="f-odo-preview" style="margin-top:6px;"></div>
+      </div>
     </div>
     <div id="finance-only" class="addc-section">
     <div class="addc-head">4 · Venta y financiamiento</div>
@@ -1572,6 +1577,8 @@ function c360DocsHtml(c, vehicle){
   rows+=_c360DocRow('📝','Contrato', (c.signedContract&&c.signedContract.url)||'', 'público');
   rows+=_c360DocRow('🛡️','Seguro', c.insurancePhotoURL||'', 'público');
   if(inv&&inv.smogPhotoURL) rows+=_c360DocRow('💨','Smog', inv.smogPhotoURL, 'público');
+  rows+=_c360DocRow('🔢','Odómetro (venta)', c.odometerPhotoURL||'', 'público');
+  rows+=_c360DocRow('🔖','Foto del VIN', (inv&&inv.vinPhotoURL)||'', 'público');
   const ords=svcOrders.filter(o=>o.clientId===c.id && (!vehicle || (o.vin||'').toUpperCase()===(vehicle.vin||'').toUpperCase()));
   ords.forEach(o=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):''; rows+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-size:13px;">🧾 Invoice servicio '+when+'<span style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.4);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px;">público</span></span><a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">ver ›</a></div>'; });
   rows+=_c360DocRow('🪪','Identificación', c.idPhotoURL||'', 'interno');
@@ -1605,9 +1612,11 @@ function c360JacketHtml(c, v){ const inv=_c360InvFor(c, v); let rows='';
   rows+=_c360DocRow('📝','Contrato', (c.signedContract&&c.signedContract.url)||'', 'público');
   rows+=_c360DocRow('💨','Smog', (inv&&inv.smogPhotoURL)||'', 'público');
   rows+=_c360DocRow('🛡️','Seguro', c.insurancePhotoURL||'', 'público');
+  rows+=_c360DocRow('🔢','Odómetro (venta)', c.odometerPhotoURL||'', 'público');
+  rows+=_c360DocRow('🔖','Foto del VIN', (inv&&inv.vinPhotoURL)||'', 'público');
   rows+=_c360DocRow('🏁','Certificado de salida a la venta', (inv&&(inv.saleCertURL||inv.exitCertURL))||'', 'público');
   rows+=_c360DocRow('📍','GPS', (inv&&inv.gpsPhotoURL)||'', 'interno');
-  return rows+'<div style="color:var(--muted);font-size:11px;margin-top:8px;line-height:1.5;">🔒 El cliente ve en su portal solo lo <b>público</b> (contrato, smog, seguro, certificado, invoices). El <b>GPS</b> y datos internos son solo tuyos.</div>';
+  return rows+'<div style="color:var(--muted);font-size:11px;margin-top:8px;line-height:1.5;">🔒 El cliente ve en su portal solo lo <b>público</b> (contrato, smog, seguro, odómetro, VIN, certificado, invoices). El <b>GPS</b> y datos internos son solo tuyos.</div>';
 }
 window.renderClient360=function(id){
   const c=clients.find(x=>x.id===id); if(!c) return; const body=document.getElementById('c360-body'); if(!body) return;
@@ -3525,6 +3534,7 @@ window.openAddModal=function(){
   document.getElementById('f-hint').textContent='';
   const _k=document.getElementById('f-kind'); if(_k) _k.value='finance'; toggleKind();
   window._idPhotoBlob=null; const _idp=document.getElementById('f-id-photo'); if(_idp) _idp.value=''; const _idpv=document.getElementById('f-id-preview'); if(_idpv) _idpv.innerHTML='';
+  window._odoPhotoBlob=null; const _odp=document.getElementById('f-odo-photo'); if(_odp) _odp.value=''; const _odpv=document.getElementById('f-odo-preview'); if(_odpv) _odpv.innerHTML='';
   if(window.setFinanceLock) setFinanceLock(false);   // cliente NUEVO: contrato abierto (lo necesitas llenar)
   document.getElementById('add-modal').classList.add('active');
 };
@@ -3588,8 +3598,13 @@ window.openEditModal=function(id){
   // ID photo preview
   window._idPhotoBlob=null; const _idpEl=document.getElementById('f-id-photo'); if(_idpEl) _idpEl.value='';
   const idPrev=document.getElementById('f-id-preview');
-  if(idPrev&&c.idPhotoURL) idPrev.innerHTML='<a href="'+c.idPhotoURL+'" target="_blank" style="font-size:12px;color:var(--green);">📷 Ver foto de ID</a>';
+  if(idPrev&&c.idPhotoURL) idPrev.innerHTML='<span onclick="showPhoto(\''+c.idPhotoURL+'\',\'ID\')" style="font-size:12px;color:var(--green);cursor:pointer;">📷 Ver foto de ID</span>';
   else if(idPrev) idPrev.innerHTML='';
+  // Odómetro preview
+  window._odoPhotoBlob=null; const _odoEl=document.getElementById('f-odo-photo'); if(_odoEl) _odoEl.value='';
+  const odoPrev=document.getElementById('f-odo-preview');
+  if(odoPrev&&c.odometerPhotoURL) odoPrev.innerHTML='<span onclick="showPhoto(\''+c.odometerPhotoURL+'\',\'Odómetro\')" style="font-size:12px;color:var(--green);cursor:pointer;">📷 Ver foto del odómetro</span>';
+  else if(odoPrev) odoPrev.innerHTML='';
   if(typeof toggleCashSale==='function') toggleCashSale();   // oculta #pagos/monto si es contado
   calcFinancing('load');
   if(window.setFinanceLock) setFinanceLock(true);   // 🔒 al EDITAR, el contrato arranca bloqueado
@@ -3659,6 +3674,29 @@ window.idPhotoPicked = async function(inp){
   window._idPhotoBlob = null;
   if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo leer esa foto (sigue en iCloud)</span>';
   alert('⚠️ Esa foto sigue en iCloud sin descargar y no se pudo leer.\n\nMotivo: '+lastErr+'\n\nHaz una de estas y vuelve a elegirla:\n• En Finder, dale clic al ícono de nube ☁️ junto a la foto para DESCARGARLA, espera a que termine, y elígela.\n• O ábrela en Fotos / Vista Previa y expórtala al Escritorio; sube esa.\n• O toma una CAPTURA de pantalla de la foto (Cmd+Shift+4) y sube la captura — esa siempre funciona.');
+};
+// 📸 Foto del ODÓMETRO: igual que la del ID (lee los bytes al elegir, reintenta por iCloud).
+window._odoPhotoBlob = null;
+window.odoPhotoPicked = async function(inp){
+  window._odoPhotoBlob = null;
+  const f = inp && inp.files && inp.files[0];
+  const prev = document.getElementById('f-odo-preview');
+  if(!f){ if(prev) prev.innerHTML=''; return; }
+  const waits = [0, 1500, 3000, 5000];
+  let lastErr='';
+  for(let i=0;i<waits.length;i++){
+    if(waits[i]){ if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--muted);">⏳ Descargando de iCloud… ('+i+')</span>'; await new Promise(r=>setTimeout(r,waits[i])); }
+    else if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--muted);">⏳ Leyendo foto…</span>';
+    try{
+      const buf = await f.arrayBuffer();
+      window._odoPhotoBlob = new Blob([buf], {type: f.type || 'image/jpeg'});
+      if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--green);">📷 Odómetro listo ('+Math.round((window._odoPhotoBlob.size||0)/1024)+' KB) — se subirá al guardar</span>';
+      return;
+    }catch(e){ lastErr=(e&&e.message)||String(e); }
+  }
+  window._odoPhotoBlob = null;
+  if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo leer esa foto (iCloud)</span>';
+  alert('⚠️ No se pudo leer la foto del odómetro.\n\nMotivo: '+lastErr+'\n\nDescárgala de iCloud (ícono de nube ☁️ en Finder), o súbela desde el iPhone, o una captura de pantalla.');
 };
 // 🔧 Diagnóstico: sube 32 bytes a ids/ y a dismantle_vehicles/ y dice EXACTO qué pasa.
 window.diagIdUpload=async function(){
@@ -3749,14 +3787,32 @@ window.saveClient=async function(keepOpen){
     } catch(storErr){ _idPhotoErr = (storErr && (storErr.code || storErr.message)) || String(storErr); console.error('ID photo FALLÓ:', storErr); }
   }
 
-  // Inventory sold update
+  // Odometer photo (prueba del odómetro al momento de la venta → jacket, público)
+  let odometerPhotoURL = existing.odometerPhotoURL||'';
+  let _odoErr='';
+  const odoFile = window._odoPhotoBlob || document.getElementById('f-odo-photo')?.files[0];
+  if(odoFile){
+    try {
+      const st = getStorage();
+      let _up=odoFile, _conv='cruda';
+      try{ _up = await _withTimeout(blobToJpeg(odoFile), 25000, 'convertir odómetro'); _conv='comprimida'; }catch(e){ console.warn('Odómetro no convertido', e); _up=odoFile; _conv='CRUDA'; }
+      const _kb=Math.round((_up.size||0)/1024);
+      if(_conv==='CRUDA' && _kb>2048){ throw new Error('no se pudo leer/comprimir la foto del odómetro ('+_kb+'KB). ¿iCloud sin descargar?'); }
+      odometerPhotoURL = await uploadPhotoRetry(ref(st,'odometer/'+id+'/'+Date.now()+'_odo.jpg'), _up, {contentType:(_up.type||'image/jpeg')}, 'subir odómetro');
+    } catch(e){ _odoErr=(e&&(e.code||e.message))||String(e); console.error('Odómetro FALLÓ:', e); }
+  }
+
+  // Inventory sold update + 🔄 sync de MILLAS (al cambiar el odómetro se actualiza el anuncio del inventario)
   const invNum = document.getElementById('f-inventory-num')?.value.trim();
+  const _milesVal = document.getElementById('f-miles')?.value.trim() || existing.miles || '';
   if(invNum){
     try {
       const invSnap = await _withTimeout(getDocs(collection(db,'inventory')), 15000, 'buscar inventario');
       const match = invSnap.docs.find(d => invNumEq(d.data().inventoryNum, invNum));
       if(match){
-        await _withTimeout(setDoc(doc(db,'inventory',match.id),{...match.data(),status:'sold'}), 15000, 'marcar vendido');
+        const _invUpd = {...match.data(), status:'sold'};
+        if(_milesVal) _invUpd.miles = _milesVal;   // sincroniza las millas al anuncio de inventario
+        await _withTimeout(setDoc(doc(db,'inventory',match.id), _invUpd), 15000, 'actualizar inventario');
       }
     } catch(invErr){ console.log('Inventory update skipped:', invErr); }
   }
@@ -3809,6 +3865,7 @@ window.saveClient=async function(keepOpen){
     idState: document.getElementById('f-id-state')?.value.trim() || existing.idState || '',
     idExpiry: document.getElementById('f-id-expiry')?.value || existing.idExpiry || '',
     idPhotoURL,
+    odometerPhotoURL,
     insurance: document.getElementById('f-insurance')?document.getElementById('f-insurance').value.trim():'',
     insuranceExp: document.getElementById('f-insurance-exp')?document.getElementById('f-insurance-exp').value:'',
     startDate,
@@ -3909,6 +3966,7 @@ window.saveClient=async function(keepOpen){
     }catch(finErr){ console.log('Post venta a finanzas omitido:', finErr); }
 
     if(_idPhotoErr){ alert('✅ El cliente se guardó, pero la FOTO del ID no se pudo subir.\n\nMotivo: '+_idPhotoErr+'\n\n(El número de ID sí quedó guardado. Si dice "unauthorized" o "permission", son las reglas de Storage de la carpeta ids/.)'); }
+    if(_odoErr){ alert('✅ El cliente se guardó, pero la FOTO del ODÓMETRO no se pudo subir.\n\nMotivo: '+_odoErr+'\n\n(Vuelve a editarlo y súbela; si es iCloud, descárgala o usa el iPhone.)'); }
     if(!keepOpen) closeModal('add-modal');   // guardado PARCIAL deja el modal abierto para seguir llenando
   }catch(e){console.error('Save error:',e);alert('Error guardando: '+e.message);}
   if(btn){
