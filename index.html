@@ -14707,13 +14707,13 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <input type="file" class="cf-input" id="car-photos" accept="image/*" multiple style="padding:8px;cursor:pointer;">
     <div id="car-photo-preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
     <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">📍 Foto del GPS (para identificar el carro)</label>
-    <input type="file" class="cf-input" id="car-gps-photo" accept="image/*" style="padding:8px;cursor:pointer;">
+    <input type="file" class="cf-input" id="car-gps-photo" accept="image/*" style="padding:8px;cursor:pointer;" onchange="invPhotoPicked(this,'gps')">
     <div id="car-gps-preview" style="margin-top:6px;"></div>
     <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">🧪 Foto del Smog (interna, para Lendmark — no sale en la página)</label>
-    <input type="file" class="cf-input" id="car-smog-photo" accept="image/*" style="padding:8px;cursor:pointer;">
+    <input type="file" class="cf-input" id="car-smog-photo" accept="image/*" style="padding:8px;cursor:pointer;" onchange="invPhotoPicked(this,'smog')">
     <div id="car-smog-preview" style="margin-top:6px;"></div>
     <label style="font-size:12px;color:#aaa;margin-bottom:4px;display:block;margin-top:8px;">🔖 Foto del VIN (prueba — se guarda en el jacket y va en la sales sheet de Lendmark)</label>
-    <input type="file" class="cf-input" id="car-vin-photo" accept="image/*" style="padding:8px;cursor:pointer;">
+    <input type="file" class="cf-input" id="car-vin-photo" accept="image/*" style="padding:8px;cursor:pointer;" onchange="invPhotoPicked(this,'vin')">
     <div id="car-vin-preview" style="margin-top:6px;"></div>
     <div id="car-upload-progress" style="display:none;margin-top:8px;font-size:13px;color:#ccc;text-align:center;">Subiendo archivos...</div>
     <div id="car-manage-section" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
@@ -15175,6 +15175,7 @@ window.openCarModal = function(carId){
   }
   document.getElementById('car-photos').value='';
   document.getElementById('car-video').value='';
+  window._invPhotoBlobs={};
   document.getElementById('car-gps-photo').value='';
   const _gpsC = editingCarId ? cars.find(x=>x.id===editingCarId) : null;
   document.getElementById('car-gps-preview').innerHTML = (_gpsC && _gpsC.gpsPhotoURL) ? '<span onclick="showPhoto(\''+_gpsC.gpsPhotoURL+'\',\'GPS\')" style="color:#f0c040;font-size:12px;cursor:pointer;">📍 Ver foto GPS actual</span>' : '';
@@ -15441,6 +15442,25 @@ window.showPhoto = async function(url, title){
   }catch(err){ body.innerHTML='<div style="color:#fff;text-align:center;max-width:420px;">No se pudo cargar la vista previa aquí. Usa <strong>Abrir en pestaña ↗</strong> abajo.</div>'; }
 };
 
+// 📸 Lee los bytes de la foto AL ELEGIRLA (igual que el ID en admin): evita que la Mac
+// pierda el acceso al archivo entre elegir y guardar (iCloud / stale reference).
+window._invPhotoBlobs = {};
+window.invPhotoPicked = async function(inp, key){
+  window._invPhotoBlobs[key] = null;
+  const f = inp && inp.files && inp.files[0];
+  const prevId = {vin:'car-vin-preview', smog:'car-smog-preview', gps:'car-gps-preview'}[key];
+  const prev = prevId ? document.getElementById(prevId) : null;
+  if(!f){ if(prev) prev.innerHTML=''; return; }
+  const waits=[0,1500,3000,5000]; let lastErr='';
+  for(let i=0;i<waits.length;i++){
+    if(waits[i]){ if(prev) prev.innerHTML='<span style="color:#aaa;font-size:12px;">⏳ Descargando de iCloud…</span>'; await new Promise(r=>setTimeout(r,waits[i])); }
+    else if(prev) prev.innerHTML='<span style="color:#aaa;font-size:12px;">⏳ Leyendo foto…</span>';
+    try{ const buf=await f.arrayBuffer(); window._invPhotoBlobs[key]=new Blob([buf],{type:f.type||'image/jpeg'}); if(prev) prev.innerHTML='<span style="color:#22c55e;font-size:12px;">📷 Foto lista ('+Math.round(window._invPhotoBlobs[key].size/1024)+' KB)</span>'; return; }catch(e){ lastErr=(e&&e.message)||String(e); }
+  }
+  window._invPhotoBlobs[key]=null;
+  if(prev) prev.innerHTML='<span style="color:#ff5a5a;font-size:12px;">⚠️ No se pudo leer esa foto — vuelve a elegirla</span>';
+};
+
 window.saveCar = async function(){
   const make=titleCase(document.getElementById('car-make').value.trim());
   const model=titleCase(document.getElementById('car-model').value.trim());
@@ -15502,7 +15522,7 @@ window.saveCar = async function(){
     
     // Foto del GPS
     let gpsPhotoURL = existing.gpsPhotoURL || '';
-    const gpsFile = document.getElementById('car-gps-photo').files[0];
+    const gpsFile = window._invPhotoBlobs.gps || document.getElementById('car-gps-photo').files[0];
     if(gpsFile){
       progress.style.display='block'; progress.textContent='Subiendo foto GPS...';
       const gconv = await toJpeg(gpsFile);
@@ -15515,7 +15535,7 @@ window.saveCar = async function(){
     }
     // 🧪 Foto del Smog (interna — para el sales sheet de Lendmark; no se muestra al público)
     let smogPhotoURL = existing.smogPhotoURL || '';
-    const smogFile = document.getElementById('car-smog-photo') ? document.getElementById('car-smog-photo').files[0] : null;
+    const smogFile = window._invPhotoBlobs.smog || (document.getElementById('car-smog-photo') ? document.getElementById('car-smog-photo').files[0] : null);
     if(smogFile){
       progress.style.display='block'; progress.textContent='Subiendo foto del smog...';
       const sconv = await toJpeg(smogFile);
@@ -15528,7 +15548,7 @@ window.saveCar = async function(){
     }
     // 🔖 Foto del VIN (prueba — jacket + sales sheet de Lendmark)
     let vinPhotoURL = existing.vinPhotoURL || '';
-    const vinFile = document.getElementById('car-vin-photo') ? document.getElementById('car-vin-photo').files[0] : null;
+    const vinFile = window._invPhotoBlobs.vin || (document.getElementById('car-vin-photo') ? document.getElementById('car-vin-photo').files[0] : null);
     if(vinFile){
       progress.style.display='block'; progress.textContent='Subiendo foto del VIN...';
       const vconv = await toJpeg(vinFile);
