@@ -3572,7 +3572,14 @@ function uploadResumableSafe(storageRef, blob, metadata, label, stallMs){
 }
 async function uploadPhotoRetry(storageRef, blob, metadata, label){
   try{ return await uploadResumableSafe(storageRef, blob, metadata, label, 30000); }
-  catch(e1){ console.warn('reintentando subida '+(label||''), e1); return await uploadResumableSafe(storageRef, blob, metadata, label, 45000); }
+  catch(e1){
+    const code1 = (e1 && (e1.code || e1.message)) || '';
+    // Si es error de PERMISO (reglas de Storage), no lo escondas con un reintento que se atora.
+    if(/unauthorized|permission|unauthenticated|forbidden|quota|403|object-not-found/i.test(String(code1))) throw e1;
+    console.warn('reintentando subida '+(label||''), e1);
+    try{ return await uploadResumableSafe(storageRef, blob, metadata, label, 45000); }
+    catch(e2){ const code2=(e2 && (e2.code||e2.message))||''; throw new Error((code2||'error')+'  ·  1er intento: '+(code1||'?')); }
+  }
 }
 window.saveClient=async function(keepOpen){
   // keepOpen=true → "Guardar y seguir" (guardado PARCIAL): no cierra el modal y NO exige el plan de pagos.
