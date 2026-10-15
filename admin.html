@@ -902,6 +902,11 @@
         <div id="cot-car-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--navy2);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:240px;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,0.5);"></div>
       </div>
     </div>
+    <div class="form-group">
+      <label class="form-label">📸 Foto del odómetro <span style="font-size:11px;color:var(--muted);">(opcional — se manda a Lendmark y se guarda en el jacket)</span></label>
+      <input type="file" class="form-input" id="cot-odo-photo" accept="image/*" style="padding:8px;cursor:pointer;" onchange="cotOdoPicked(this)">
+      <div id="cot-odo-preview" style="margin-top:6px;"></div>
+    </div>
     <div id="cot-options"></div>
     <button type="button" onclick="cotAddBlank()" style="background:transparent;color:var(--gold);border:1px dashed var(--gold);border-radius:10px;padding:10px;width:100%;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">＋ Agregar otra opción en blanco</button>
     <div class="modal-actions">
@@ -2943,6 +2948,8 @@ function _sheetHTML(s, sigUrl){
     +photoHtml
     +'<div style="page-break-before:always;break-before:page;height:0;"></div>'
     +(s.smogPhoto?'<div style="font-weight:800;border-bottom:1px solid #000;margin:2px 0 6px;">SMOG CERTIFICATE / CERTIFICADO DE SMOG</div><div style="text-align:center;margin:8px 0;"><img src="'+s.smogPhoto+'" style="max-width:96%;max-height:430px;border:1px solid #999;"></div>':'')
+    +(s.odometerPhoto?'<div style="font-weight:800;border-bottom:1px solid #000;margin:12px 0 6px;">ODOMETER / ODÓMETRO</div><div style="text-align:center;margin:8px 0;"><img src="'+s.odometerPhoto+'" style="max-width:96%;max-height:430px;border:1px solid #999;"></div>':'')
+    +(s.vinPhoto?'<div style="font-weight:800;border-bottom:1px solid #000;margin:12px 0 6px;">VIN PLATE / PLACA DEL VIN</div><div style="text-align:center;margin:8px 0;"><img src="'+s.vinPhoto+'" style="max-width:96%;max-height:430px;border:1px solid #999;"></div>':'')
     +'<div style="font-weight:800;border-bottom:1px solid #000;margin:14px 0 6px;">PRICE BREAKDOWN / DESGLOSE</div>'
     +'<table style="width:100%;font-size:13px;border-collapse:collapse;">'
       +'<tr><td style="padding:3px 0;">Vehicle Cash Price</td><td style="padding:3px 0;text-align:right;">'+money(s.price)+'</td></tr>'
@@ -3012,6 +3019,13 @@ window.lendmarkSheet = async function(i, mode){
   const inv = vin ? (_invCache||[]).find(c=>(c.vin||'').trim().toUpperCase()===vin) : null;
   const photos=(inv&&inv.photos&&inv.photos.length)?inv.photos.slice(0,6):((inv&&inv.img)?[inv.img]:[]);
   const smogPhoto=(inv&&inv.smogPhotoURL)||'';
+  const vinPhoto=(inv&&inv.vinPhotoURL)||'';
+  // Foto del ODÓMETRO para Lendmark: 1) la del cotizador (opcional) manda; 2) si no, la del cliente que coincide por VIN.
+  let odometerPhoto='';
+  try{ if(vin){ const mc=(clients||[]).find(x=>(x.vin||'').trim().toUpperCase()===vin); if(mc&&mc.odometerPhotoURL) odometerPhoto=mc.odometerPhotoURL; } }catch(e){}
+  if(window._cotOdoBlob){
+    try{ const st=getStorage(); let up=window._cotOdoBlob; try{ up=await _withTimeout(blobToJpeg(window._cotOdoBlob),20000,'convertir odómetro'); }catch(_e){} odometerPhoto=await uploadPhotoRetry(ref(st,'odometer/quotes/'+Date.now()+'_odo.jpg'), up, {contentType:(up.type||'image/jpeg')}, 'subir odómetro cotización'); }catch(e){ console.warn('odo cotización', e); }
+  }
   const year=o.year||(inv&&inv.year)||'', make=o.make||(inv&&inv.make)||'', model=o.model||(inv&&inv.model)||'';
   const trim=(inv&&inv.trim)||'', miles=o.miles||(inv&&inv.miles)||'', color=o.color||(inv&&inv.color)||'', invNum=(inv&&inv.inventoryNum)||'';
   const carTitle=[year,make,model,trim].filter(Boolean).join(' ')||(o.car||'');
@@ -3020,7 +3034,7 @@ window.lendmarkSheet = async function(i, mode){
   if(mode!=='email'){ try{ const _ph=(document.getElementById('cot-phone')?document.getElementById('cot-phone').value.trim():'')||''; const _lg=(document.getElementById('cot-lang')?document.getElementById('cot-lang').value:'es')||'es'; saveQuoteLead(cust,_ph,_lg).catch(()=>{}); }catch(e){} }
   const today=new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
   const cash=(o.freq==='cash'); const lendmark=(o.freq==='lendmark');
-  const s={ carTitle, vin, miles, color, invNum, photos, smogPhoto, cust, price, docFee, smog, tax, dmv, total, down, financed, today, cash, lendmark };
+  const s={ carTitle, vin, miles, color, invNum, photos, smogPhoto, vinPhoto, odometerPhoto, cust, price, docFee, smog, tax, dmv, total, down, financed, today, cash, lendmark };
   // 💾 Guarda el registro para el botón "Lendmark Sales Sheets".
   try{
     const rid='lm_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
@@ -3059,6 +3073,7 @@ function cotResetAll(){
   const lg=document.getElementById('cot-lang'); if(lg) lg.value='es';
   const tn=document.getElementById('cot-tax-note'); if(tn) tn.innerHTML='';
   const cr=document.getElementById('cot-car-results'); if(cr){ cr.style.display='none'; cr.innerHTML=''; }
+  window._cotOdoBlob=null; const _co=document.getElementById('cot-odo-photo'); if(_co) _co.value=''; const _cop=document.getElementById('cot-odo-preview'); if(_cop) _cop.innerHTML='';
   cotOpts=[]; cotSeq=0; try{ renderCotOptions(); }catch(e){}
 }
 // 📮 Envía el sales sheet DIRECTO por el servidor (Zoho SMTP) — arma el correo en el backend con fotos+firma. Devuelve true si se envió.
@@ -3697,6 +3712,20 @@ window.odoPhotoPicked = async function(inp){
   window._odoPhotoBlob = null;
   if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo leer esa foto (iCloud)</span>';
   alert('⚠️ No se pudo leer la foto del odómetro.\n\nMotivo: '+lastErr+'\n\nDescárgala de iCloud (ícono de nube ☁️ en Finder), o súbela desde el iPhone, o una captura de pantalla.');
+};
+// 📸 Foto del odómetro en el COTIZADOR (opcional, para Lendmark).
+window._cotOdoBlob = null;
+window.cotOdoPicked = async function(inp){
+  window._cotOdoBlob = null;
+  const f = inp && inp.files && inp.files[0];
+  const prev = document.getElementById('cot-odo-preview');
+  if(!f){ if(prev) prev.innerHTML=''; return; }
+  const waits=[0,1500,3000,5000]; let lastErr='';
+  for(let i=0;i<waits.length;i++){
+    if(waits[i]){ if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--muted);">⏳ Descargando de iCloud…</span>'; await new Promise(r=>setTimeout(r,waits[i])); }
+    try{ const buf=await f.arrayBuffer(); window._cotOdoBlob=new Blob([buf],{type:f.type||'image/jpeg'}); if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--green);">📷 Odómetro listo ('+Math.round(window._cotOdoBlob.size/1024)+' KB) — se manda a Lendmark</span>'; return; }catch(e){ lastErr=(e&&e.message)||String(e); }
+  }
+  window._cotOdoBlob=null; if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo leer esa foto (iCloud)</span>';
 };
 // 🔧 Diagnóstico: sube 32 bytes a ids/ y a dismantle_vehicles/ y dice EXACTO qué pasa.
 window.diagIdUpload=async function(){

@@ -1852,6 +1852,8 @@ exports.sendLendmarkEmail = onCall({ timeoutSeconds: 60, memory: "512MiB" }, asy
   const photos = Array.isArray(s.photos) ? s.photos.slice(0, 4) : [];
   const photoHtml = photos.length ? ('<div style="margin:8px 0;">' + photos.map((p) => '<img src="' + p + '" style="width:23%;max-height:120px;object-fit:cover;border:1px solid #999;margin:2px;">').join("") + "</div>") : "";
   const smogHtml = s.smogPhoto ? ('<p style="font-weight:bold;border-bottom:1px solid #000;margin:8px 0 3px;">SMOG CERTIFICATE</p><img src="' + s.smogPhoto + '" style="max-width:55%;max-height:220px;border:1px solid #999;">') : "";
+  const odoHtml = s.odometerPhoto ? ('<p style="font-weight:bold;border-bottom:1px solid #000;margin:8px 0 3px;">ODOMETER / ODÓMETRO</p><img src="' + s.odometerPhoto + '" style="max-width:55%;max-height:220px;border:1px solid #999;">') : "";
+  const vinPhotoHtml = s.vinPhoto ? ('<p style="font-weight:bold;border-bottom:1px solid #000;margin:8px 0 3px;">VIN PLATE / PLACA DEL VIN</p><img src="' + s.vinPhoto + '" style="max-width:55%;max-height:220px;border:1px solid #999;">') : "";
   const row = (a, b, bold) => '<tr><td style="padding:3px 0;' + (bold ? "font-weight:bold;border-top:1px solid #000;" : "") + '">' + a + '</td><td style="padding:3px 0;text-align:right;' + (bold ? "font-weight:bold;border-top:1px solid #000;" : "") + '">' + b + "</td></tr>";
   const totalRows = s.cash
     ? row("TOTAL (CASH / CONTADO)", money(s.total), true)
@@ -1861,7 +1863,7 @@ exports.sendLendmarkEmail = onCall({ timeoutSeconds: 60, memory: "512MiB" }, asy
     '<div style="font-weight:bold;font-size:15px;">VEHICLE SALES SHEET</div>' +
     '<table style="width:100%;font-size:13px;border-collapse:collapse;margin:6px 0;">' +
       row("Vehicle", vehicle) + row("VIN", vin || "—") + row("Odometer / Miles", s.miles ? (s.miles + " mi") : "—") + (s.color ? row("Color", s.color) : "") +
-    "</table>" + photoHtml + smogHtml +
+    "</table>" + photoHtml + smogHtml + odoHtml + vinPhotoHtml +
     '<p style="font-weight:bold;border-bottom:1px solid #000;margin:10px 0 3px;">PRICE BREAKDOWN</p>' +
     '<table style="width:100%;font-size:13px;border-collapse:collapse;">' +
       row("Vehicle Cash Price", money(s.price)) + row("Document Preparation Fee", money(s.docFee || 70)) + row("Smog Certification Fee", money(s.smog || 58.25)) +
