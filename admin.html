@@ -2533,8 +2533,14 @@ window.loadCotiz=async function(){
   const box=document.getElementById('cotiz-list'); if(!box) return;
   box.innerHTML='<div style="color:var(--muted);font-size:13px;">Cargando…</div>';
   let qs=[];
-  try{ const snap=await getDocs(collection(db,'quotes')); _cotizCache={}; snap.forEach(d=>{ const x=Object.assign({id:d.id},d.data()); _cotizCache[d.id]=x; qs.push(x); }); }
-  catch(e){ box.innerHTML='<div style="color:#ff6b6b;font-size:13px;line-height:1.5;">No se pudo cargar. Si dice permisos, falta la regla de Firestore para <b>quotes</b>.<br>'+esc((e&&e.message)||e)+'</div>'; return; }
+  try{
+    const snap=await Promise.race([
+      getDocs(collection(db,'quotes')),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),9000))   // si la red se atora, no se queda pegado
+    ]);
+    _cotizCache={}; snap.forEach(d=>{ const x=Object.assign({id:d.id},d.data()); _cotizCache[d.id]=x; qs.push(x); });
+  }
+  catch(e){ const to=/timeout/i.test((e&&e.message)||''); box.innerHTML='<div style="color:#ff6b6b;font-size:13px;line-height:1.5;">'+(to?'Tardó demasiado en cargar (revisa tu internet).':'No se pudo cargar. Si dice permisos, falta la regla de Firestore para <b>quotes</b>.')+'<br>'+esc((e&&e.message)||e)+'<br><button onclick="loadCotiz()" style="margin-top:8px;background:var(--surface3);border:1px solid var(--border);color:var(--gold);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">↻ Reintentar</button></div>'; return; }
   qs.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const cnt=document.getElementById('cotiz-count'); if(cnt) cnt.textContent='('+qs.length+')';
   if(!qs.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:6px 0;line-height:1.5;">Aún no hay cotizaciones guardadas.<br>Haz una en el 🧮 Cotizador (toca el logo) y dale <b>💾 Guardar cliente</b>.</div>'; return; }
@@ -2803,6 +2809,8 @@ window.lendmarkSheet = async function(i, mode){
   const trim=(inv&&inv.trim)||'', miles=o.miles||(inv&&inv.miles)||'', color=o.color||(inv&&inv.color)||'', invNum=(inv&&inv.inventoryNum)||'';
   const carTitle=[year,make,model,trim].filter(Boolean).join(' ')||(o.car||'');
   const cust=(document.getElementById('cot-customer')?document.getElementById('cot-customer').value.trim():'')||'';
+  // 💾 También guarda la cotización (aparece en "Cotizaciones") al generar/mandar la hoja de Lendmark.
+  try{ const _ph=(document.getElementById('cot-phone')?document.getElementById('cot-phone').value.trim():'')||''; const _lg=(document.getElementById('cot-lang')?document.getElementById('cot-lang').value:'es')||'es'; saveQuoteLead(cust,_ph,_lg).catch(()=>{}); }catch(e){}
   const today=new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
   const cash=(o.freq==='cash'); const lendmark=(o.freq==='lendmark');
   const s={ carTitle, vin, miles, color, invNum, photos, smogPhoto, cust, price, docFee, smog, tax, dmv, total, down, financed, today, cash, lendmark };
