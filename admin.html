@@ -5524,16 +5524,11 @@ window.generateContract = function(clientId) {
     clientId: c.id
   });
   
-  // Open English contract, plus Spanish translation when the client is Spanish.
-  // Both opened directly inside this click so the popup blocker doesn't block the 2nd.
-  const enFile = c.freq === 'cash' ? 'contracts_cash.html' : 'contracts.html';
-  const esFile = c.freq === 'cash' ? 'contracts_cash_es.html' : 'contracts_es.html';
+  // UN SOLO documento BILINGÜE (inglés + español juntos, una firma) — tanto en pagos como en contado.
+  const file = c.freq === 'cash' ? 'contracts_cash.html' : 'contracts.html';
   const qs = '?' + params.toString() + '&_cb=' + Date.now();
-  const w1 = window.open(enFile + qs, '_blank');
-  if(c.lang === 'es') {
-    const w2 = window.open(esFile + qs, '_blank');
-    if(!w1 || !w2) alert('⚠️ Tu navegador bloqueó una ventana. Permite las ventanas emergentes (pop-ups) para este sitio y vuelve a generar el contrato.');
-  }
+  const w1 = window.open(file + qs, '_blank');
+  if(!w1) alert('⚠️ Tu navegador bloqueó la ventana. Permite las ventanas emergentes (pop-ups) para este sitio y vuelve a generar el contrato.');
 };
 
 window.closeModal=function(id){document.getElementById(id).classList.remove('active');};
