@@ -5295,8 +5295,9 @@ window.generateContractFromForm = async function() {
     // idiomas quedan en un mismo archivo firmado → para el DMV se ven los dos.
     _showContractLinks('contracts_cash_bilingual.html' + qs, '');
   } else {
-    // Cliente en inglés: un solo contrato en inglés.
-    _showContractLinks((freq === 'cash' ? 'contracts_cash.html' : 'contracts.html') + qs, '');
+    // Cliente en inglés: también el documento BILINGÜE secuencial (inglés completo primero; el español
+    // completo queda abajo). Nunca el archivo "slashed" (contracts.html).
+    _showContractLinks((freq === 'cash' ? 'contracts_cash_bilingual.html' : 'contracts_bilingual.html') + qs, '');
   }
 };
 // Modal con botones para abrir el/los contrato(s) con un TOQUE (evita el bloqueo de popups del iPad)
@@ -5524,8 +5525,9 @@ window.generateContract = function(clientId) {
     clientId: c.id
   });
   
-  // UN SOLO documento BILINGÜE (inglés + español juntos, una firma) — tanto en pagos como en contado.
-  const file = c.freq === 'cash' ? 'contracts_cash.html' : 'contracts.html';
+  // UN SOLO documento BILINGÜE SECUENCIAL: inglés COMPLETO y luego español COMPLETO (como pide la ley),
+  // NO inglés/español mezclado con slashes. Mismo archivo que usa el botón del modal.
+  const file = c.freq === 'cash' ? 'contracts_cash_bilingual.html' : 'contracts_bilingual.html';
   const qs = '?' + params.toString() + '&_cb=' + Date.now();
   const w1 = window.open(file + qs, '_blank');
   if(!w1) alert('⚠️ Tu navegador bloqueó la ventana. Permite las ventanas emergentes (pop-ups) para este sitio y vuelve a generar el contrato.');
