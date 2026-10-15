@@ -500,6 +500,75 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
   }
 });
 
+// 🪪 LECTOR DE ID — lee una licencia / ID / pasaporte y regresa los datos del cliente para autollenar.
+exports.scanId = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, async (request) => {
+  if (!request.auth) { throw new HttpsError("unauthenticated", "Inicia sesión."); }
+  const data = request.data || {};
+  let b64 = String(data.imageBase64 || "");
+  let mt = String(data.mediaType || "image/jpeg");
+  if (b64.indexOf("base64,") >= 0) {
+    const pre = b64.slice(0, b64.indexOf("base64,"));
+    const m = pre.match(/image\/(jpeg|png|webp|gif)/i);
+    if (m) mt = "image/" + m[1].toLowerCase();
+    b64 = b64.split("base64,").pop();
+  }
+  if (!b64) { throw new HttpsError("invalid-argument", "Falta la imagen."); }
+  const sys = "You read a photo of a government ID: a US/Mexican driver's license, a US state ID, a passport, or a Mexican 'Matrícula Consular'. " +
+    "Return ONLY a strict JSON object — no prose, no code fences. Keys:\n" +
+    "- fullName: the person's full name as printed, in natural order 'First Middle Last' (fix ALL-CAPS to Title Case; keep accents/ñ). On US licenses the name may be shown Last, First.\n" +
+    "- firstName: given name(s) only.\n" +
+    "- lastName: family name(s) only.\n" +
+    "- address: the street address line only (number + street + apt), as printed.\n" +
+    "- city: city.\n" +
+    "- state: 2-letter state/province code (e.g. CA). For a passport use the issuing country's region if shown, else empty.\n" +
+    "- zip: postal/ZIP code.\n" +
+    "- dob: date of birth as YYYY-MM-DD.\n" +
+    "- idNumber: the ID / license / document number exactly as printed (letters+digits).\n" +
+    "- idType: EXACTLY one of \"Driver's License\", \"State ID\", \"Passport\", \"Matricula Consular\", \"Other\".\n" +
+    "- idState: the 2-letter code of the issuing state/authority (e.g. CA). Empty if not applicable.\n" +
+    "- idExpiry: expiration date as YYYY-MM-DD.\n" +
+    "- sex: \"M\", \"F\", or empty.\n" +
+    "Convert every date to YYYY-MM-DD (US licenses print MM/DD/YYYY). If a field is not visible or unreadable, use an empty string. Return JSON only.";
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({
+      model: "claude-sonnet-5",
+      max_tokens: 700,
+      system: sys,
+      messages: [{ role: "user", content: [
+        { type: "image", source: { type: "base64", media_type: mt, data: b64 } },
+        { type: "text", text: "Extract the ID data as strict JSON." },
+      ] }],
+    });
+    let txt = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    txt = txt.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
+    let out = {};
+    try { out = JSON.parse(txt); } catch (e) { const m = txt.match(/\{[\s\S]*\}/); if (m) { try { out = JSON.parse(m[0]); } catch (_) {} } }
+    const dstr = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) ? String(v) : "";
+    const idTypes = ["Driver's License", "State ID", "Passport", "Matricula Consular", "Other"];
+    return {
+      fullName: String(out.fullName || "").slice(0, 80),
+      firstName: String(out.firstName || "").slice(0, 60),
+      lastName: String(out.lastName || "").slice(0, 60),
+      address: String(out.address || "").slice(0, 120),
+      city: String(out.city || "").slice(0, 60),
+      state: String(out.state || "").slice(0, 4),
+      zip: String(out.zip || "").slice(0, 12),
+      dob: dstr(out.dob),
+      idNumber: String(out.idNumber || "").slice(0, 40),
+      idType: idTypes.includes(out.idType) ? out.idType : "",
+      idState: String(out.idState || "").slice(0, 4),
+      idExpiry: dstr(out.idExpiry),
+      sex: ["M", "F"].includes(out.sex) ? out.sex : "",
+    };
+  } catch (e) {
+    console.error("scanId error", e);
+    throw new HttpsError("internal", String((e && e.message) || e));
+  }
+});
+
 // ===== 💳 PAGOS CON SQUARE (portal del cliente + "enviar cobro" desde el admin) =====
 const SQUARE_LOCATION_ID = "LDTPHV3ZR18D0";       // Ubicación de Production (NO es secreto)
 const SQUARE_API = "https://connect.squareup.com"; // Production
