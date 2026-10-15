@@ -1490,10 +1490,13 @@ window.svcSetStatus=async function(id,st){ const patch={status:st, updatedAt:new
 // ===================== 👥 CLIENTE 360 (perfil unificado) =====================
 const C360_BADGES=[['buyer','🔑','Compró'],['service','🔧','Servicio'],['quote','🧮','Cotizó'],['parts','🔩','Partes']];
 function c360BadgeHtml(flags){ return C360_BADGES.filter(b=>flags[b[0]]).map(b=>'<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;margin:0 4px 4px 0;">'+b[1]+' '+b[2]+'</span>').join(''); }
-let _c360Quotes=null, _c360Inv=null, _c360Cur=null;
+let _c360Quotes=null, _c360Inv=null, _c360Appts=null, _c360Cur=null;
 function _c360Timeout(p,ms){ return Promise.race([p, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]); }
 async function c360LoadQuotes(){ if(_c360Quotes!==null) return; _c360Quotes=[]; try{ const snap=await _c360Timeout(getDocs(collection(db,'quotes')),8000); const a=[]; snap.forEach(d=>a.push(Object.assign({id:d.id},d.data()))); _c360Quotes=a; }catch(e){ _c360Quotes=[]; } }
 async function c360LoadInv(){ if(_c360Inv!==null) return; _c360Inv=[]; try{ const snap=await _c360Timeout(getDocs(collection(db,'inventory')),8000); const a=[]; snap.forEach(d=>a.push(Object.assign({id:d.id},d.data()))); _c360Inv=a; }catch(e){ _c360Inv=[]; } }
+async function c360LoadAppts(){ if(_c360Appts!==null) return; _c360Appts=[]; try{ const snap=await _c360Timeout(getDocs(collection(db,'appointments')),8000); const a=[]; snap.forEach(d=>a.push(Object.assign({id:d.id},d.data()))); _c360Appts=a; }catch(e){ _c360Appts=[]; } }
+window.c360NewService=function(id){ try{ svcNewOrder(); window._svcDraft.clientId=id; svcRenderModal(); }catch(e){} };
+window.c360Cotizar=function(id){ const c=clients.find(x=>x.id===id); try{ c360Close(); }catch(e){} try{ openCotizador(); }catch(e){} setTimeout(function(){ try{ if(c){ const n=document.getElementById('cot-customer'); if(n&&!n.value)n.value=c.name||''; const p=document.getElementById('cot-phone'); if(p&&!p.value)p.value=c.phone||''; const l=document.getElementById('cot-lang'); if(l&&c.lang)l.value=c.lang; } }catch(e){} }, 60); };
 function c360ClientFlags(c){ const f={};
   if(c.kind==='finance' || Number(c.total)>0 || (Array.isArray(c.payments)&&c.payments.length) || c.signedContract) f.buyer=true;
   if(svcOrders.some(o=>o.clientId===c.id)) f.service=true;
@@ -1523,7 +1526,7 @@ window.openClient360=async function(id){
   _c360Cur=id; c360Clear();
   const body=document.getElementById('c360-body'); if(body) body.innerHTML='<div style="padding:34px;text-align:center;color:var(--muted);">Cargando…</div>';
   document.getElementById('c360-modal').style.display='flex';
-  await c360LoadQuotes(); await c360LoadInv(); renderClient360(id);
+  await c360LoadQuotes(); await c360LoadInv(); await c360LoadAppts(); renderClient360(id);
 };
 function _c360InvFor(c, vehicle){ if(!Array.isArray(_c360Inv)) return null; const vin=((vehicle&&vehicle.vin)||c.vin||'').toUpperCase(); const num=c.vehicleInventoryNum; return _c360Inv.find(x=>(vin&&(x.vin||'').toUpperCase()===vin)||(num&&String(x.inventoryNum)===String(num)))||null; }
 function _c360DocRow(icon,label,url,vis){ const tag= vis==='interno'
@@ -1579,15 +1582,36 @@ window.renderClient360=function(id){
   const M=_c360Money, f=c360ClientFlags(c), phone=(c.phone||'').replace(/[^0-9+]/g,''), vehicles=clientVehicles(c);
   const sOrders=svcOrders.filter(o=>o.clientId===id).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const qz=(_c360Quotes||[]).filter(q=>(q.phoneE164||'')===(c.phoneE164||'')).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
-  const paid=isPaidOff(c), bal=calcBalance(c);
-  const sec=(t,inner)=>'<div style="padding:14px 16px;border-top:1px solid var(--border);"><div style="font-weight:800;font-size:13px;color:var(--gold);letter-spacing:.3px;margin-bottom:8px;">'+t+'</div>'+inner+'</div>';
+  const appts=(Array.isArray(_c360Appts)?_c360Appts:[]).filter(a=>a.clientId===id || (c.phoneE164 && a.phoneE164===c.phoneE164)).sort((a,b)=>String(b.scheduledAt||b.date||b.createdAt||'').localeCompare(String(a.scheduledAt||a.date||a.createdAt||'')));
+  const sec=(t,inner,act)=>'<div style="padding:14px 16px;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><div style="font-weight:800;font-size:13px;color:var(--gold);letter-spacing:.3px;">'+t+'</div>'+(act||'')+'</div>'+inner+'</div>';
   const empty=t=>'<div style="color:var(--muted);font-size:13px;">'+t+'</div>';
-  let h='<div style="padding:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="min-width:0;"><div style="font-family:var(--font-display);font-size:22px;">'+esc(c.name||'(sin nombre)')+'</div><div style="color:var(--muted);font-size:13px;margin-top:2px;">'+esc(c.phone||'sin teléfono')+(c.lang?(' · '+(c.lang==='en'?'English':'Español')):'')+'</div><div style="margin-top:8px;">'+(c360BadgeHtml(f)||'')+'</div></div><div style="display:flex;gap:6px;flex:0 0 auto;align-items:center;">'+(phone?'<a href="tel:'+phone+'" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:15px;">📞</a><a href="sms:'+phone+'" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:15px;">💬</a>':'')+'<button onclick="c360Close()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div></div>';
-  h+=sec('🚗 Vehículos', vehicles.length?vehicles.map((v,i)=>'<div onclick="openVehicle360(\''+id+'\','+i+')" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;"><div style="min-width:0;"><div style="font-weight:700;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN …'+esc(String(v.vin).slice(-6))):'')+'</div></div><span style="color:var(--gold);">›</span></div>').join(''):empty('Sin vehículos registrados.'));
+  const addBtn=(label,fn)=>'<button onclick="'+fn+'" style="background:var(--surface3);border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:4px 11px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;">'+label+'</button>';
+  const idLink = c.idPhotoURL
+    ? '<a href="'+esc(c.idPhotoURL)+'" target="_blank" style="display:inline-flex;align-items:center;gap:4px;color:var(--gold);text-decoration:none;font-size:12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:2px 8px;margin-top:5px;">🪪 Ver identificación <span style="font-size:10px;color:var(--muted);">interno</span></a>'
+    : '<span style="display:inline-block;color:var(--muted);font-size:12px;margin-top:5px;">🪪 Sin identificación</span>';
+  // Header: nombre + identificación al lado + teléfono/idioma + insignias + cerrar
+  let h='<div style="padding:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="min-width:0;">'
+    +'<div style="font-family:var(--font-display);font-size:22px;">'+esc(c.name||'(sin nombre)')+'</div>'
+    +'<div>'+idLink+'</div>'
+    +'<div style="color:var(--muted);font-size:13px;margin-top:5px;">'+esc(c.phone||'sin teléfono')+(c.lang?(' · '+(c.lang==='en'?'English':'Español')):'')+'</div>'
+    +'<div style="margin-top:8px;">'+(c360BadgeHtml(f)||'')+'</div></div>'
+    +'<button onclick="c360Close()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;flex:0 0 auto;">×</button></div>';
+  // Botones de acción rápida (como las tarjetas de afuera)
+  h+='<div style="display:flex;gap:7px;flex-wrap:wrap;padding:0 16px 14px;">'
+    +(f.buyer?'<button onclick="c360Close();openPayModal(\''+id+'\')" style="flex:1 1 auto;background:var(--green,#16a34a);color:#042;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:800;cursor:pointer;">💵 Pago</button>':'')
+    +(phone?'<a href="sms:'+phone+'" style="flex:1 1 auto;text-align:center;text-decoration:none;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px;font-size:13px;font-weight:700;">💬 SMS</a><a href="tel:'+phone+'" style="flex:0 0 auto;text-align:center;text-decoration:none;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 13px;font-size:13px;">📞</a>':'')
+    +'<button onclick="c360Close();openEditModal(\''+id+'\')" style="flex:1 1 auto;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">✏️ Editar</button>'
+    +'</div>';
+  // 1) Resumen de cuenta (arriba de todo, solo compradores)
   if(f.buyer){ h+=sec('💵 Resumen de cuenta', _c360FinSummary(c)); }
-  h+=sec('🔧 Servicio', sOrders.length?sOrders.map(o=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; const stl=(SVC_STATUS[o.status]||{}).lbl||o.status||''; const tot=o.grandTotalCents!=null?M(o.grandTotalCents/100):''; return '<div onclick="c360Close();svcOpenOrder(\''+o.id+'\')" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+esc(o.reason||'Servicio')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:var(--muted);margin-top:3px;">'+stl+(tot?(' · '+tot):'')+(Number(o.balanceCents)?(' · saldo '+M(o.balanceCents/100)):'')+'</div></div>'; }).join(''):empty('Sin órdenes de servicio.'));
-  h+=sec('🧮 Cotizaciones', qz.length?qz.map(q=>{ const car=(q.options&&q.options[0]&&q.options[0].car)||''; const when=q.createdAt?new Date(q.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; return '<div onclick="c360Close();viewCotiz(\''+q.id+'\')" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+esc(car||'Cotización')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:var(--muted);margin-top:3px;">'+((q.options||[]).length)+' opción(es)</div></div>'; }).join(''):empty('Sin cotizaciones.'));
-  h+=sec('📄 Documentos del cliente', _c360DocRow('🪪','Identificación', c.idPhotoURL||'', 'interno')+_c360DocRow('🛡️','Seguro', c.insurancePhotoURL||'', 'público')+'<div style="color:var(--muted);font-size:11px;margin-top:6px;">Los papeles de cada carro (contrato, smog, GPS, certificado) están en la tarjeta del vehículo ↑</div>');
+  // 2) Vehículos
+  h+=sec('🚗 Vehículos', vehicles.length?vehicles.map((v,i)=>'<div onclick="openVehicle360(\''+id+'\','+i+')" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;"><div style="min-width:0;"><div style="font-weight:700;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN …'+esc(String(v.vin).slice(-6))):'')+'</div></div><span style="color:var(--gold);">›</span></div>').join(''):empty('Sin vehículos registrados.'));
+  // 3) Servicio (+ agendar)
+  h+=sec('🔧 Servicio', sOrders.length?sOrders.map(o=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; const stl=(SVC_STATUS[o.status]||{}).lbl||o.status||''; const tot=o.grandTotalCents!=null?M(o.grandTotalCents/100):''; return '<div onclick="c360Close();svcOpenOrder(\''+o.id+'\')" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+esc(o.reason||'Servicio')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:var(--muted);margin-top:3px;">'+stl+(tot?(' · '+tot):'')+(Number(o.balanceCents)?(' · saldo '+M(o.balanceCents/100)):'')+'</div></div>'; }).join(''):empty('Sin órdenes de servicio.'), addBtn('➕ Agendar servicio','c360NewService(\''+id+'\')'));
+  // 4) Citas (solo si tiene) (+ agendar)
+  if(appts.length){ h+=sec('📅 Citas', appts.map(a=>{ const when=(a.scheduledAt||a.date)?new Date(a.scheduledAt||a.date).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; const svc=Array.isArray(a.services)?a.services.join(', '):(a.service||a.reason||a.note||'Cita'); const st=a.status?(' · '+esc(a.status)):''; return '<div style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">📅 '+esc(svc)+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div>'+(st?('<div style="font-size:12px;color:var(--muted);margin-top:3px;">'+st.replace(/^ · /,'')+'</div>'):'')+'</div>'; }).join(''), addBtn('➕ Cita','c360Close();openApptModal(\''+id+'\')')); }
+  // 5) Cotizaciones (solo si tiene)
+  if(qz.length){ h+=sec('🧮 Cotizaciones', qz.map(q=>{ const car=(q.options&&q.options[0]&&q.options[0].car)||''; const when=q.createdAt?new Date(q.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; return '<div onclick="c360Close();viewCotiz(\''+q.id+'\')" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+esc(car||'Cotización')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:var(--muted);margin-top:3px;">'+((q.options||[]).length)+' opción(es)</div></div>'; }).join(''), addBtn('➕ Cotizar','c360Cotizar(\''+id+'\')')); }
   body.innerHTML=h;
 };
 window.openVehicle360=function(id, idx){
@@ -3193,7 +3217,7 @@ window.renderAll = function() {
       const balance=calcBalance(c);
       const payColor=status==='overdue'?'var(--red)':status==='soon'?'var(--yellow)':'var(--green)';
       const dayLabel=days<0?` (${Math.abs(days)}d)`:days===0?' HOY':days<=7?` (${days}d)`:'';
-      html+=`<div class="client-list-item ${status}">
+      html+=`<div class="client-list-item ${status}" style="cursor:pointer;" ondblclick="if(!event.target.closest('button,a'))openClient360('${c.id}')" title="Doble clic para ver la ficha completa">
         <div class="cli-name">${c.name}${c.private?' <span title="Venta privada">🔒</span>':''}</div>
         <div class="cli-car">${c.year} ${c.make} ${c.model}${c.vin?' · …'+c.vin.slice(-6):''}</div>
         <div class="cli-phone">${c.phone}</div>
@@ -3201,6 +3225,7 @@ window.renderAll = function() {
         <div style="font-size:13px;color:var(--cream2);font-weight:500;">${formatMoney(c.weekly)}</div>
         <div class="cli-balance">${formatMoney(totalClientDebt(c))}${addonsBalance(c)>0.005?`<div style="font-size:10px;color:#1f6feb;font-weight:600;">carro ${formatMoney(balance)} + cargos ${formatMoney(addonsBalance(c))}</div>`:''}</div>
         <div class="cli-actions">
+          <button type="button" class="cli-btn" style="background:var(--gold3);color:var(--navy3);" onclick="event.stopPropagation();openClient360('${c.id}')" title="Ver ficha completa">👤</button>
           <button type="button" class="cli-btn" style="background:var(--green);color:#000;" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">💵</button>
           <button type="button" class="cli-btn" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)">💬</button>
           <button type="button" class="cli-btn" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">✏️</button>
@@ -3267,7 +3292,7 @@ window.renderAll = function() {
         schedHTML=`<button class="schedule-toggle" onclick="toggleSchedule('${c.id}')">📅 Calendario (${paidCount}/${totalPay} pagados)</button><div class="schedule-list" id="sched-${c.id}" style="display:none;">${items}</div>`;
       }
 
-      html+=`<div class="client-card ${status}">
+      html+=`<div class="client-card ${status}" ondblclick="if(!event.target.closest('button,a'))openClient360('${c.id}')" title="Doble clic para ver la ficha completa">
         <div class="card-header"><div><div class="client-name">${c.name}${c.private?' <span style="font-size:10px;background:rgba(255,255,255,0.08);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:1px 6px;vertical-align:middle;white-space:nowrap;">🔒 Privada</span>':''}</div><div class="client-phone">${c.phone} &nbsp;${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
           ${c.idNumber?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">🪪 ID: '+(c.idType||'')+' '+c.idNumber+'</div>':''}
           ${c.lastLogin ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Portal: '+formatDate(c.lastLogin.split('T')[0])+' '+new Date(c.lastLogin).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})+'</div>' : '<div style="font-size:11px;color:var(--muted);margin-top:2px;">👁 Sin acceso al portal</div>'}
@@ -3304,6 +3329,7 @@ window.renderAll = function() {
           ${c.notes?'<div style="margin-top:10px;font-size:12px;color:var(--muted);font-style:italic;">'+c.notes+'</div>':''}
         </div>
         <div class="card-actions">
+          <button type="button" class="btn" style="flex:0;padding:9px 11px;background:var(--gold3);color:var(--navy3);font-weight:700;" onclick="event.stopPropagation();openClient360('${c.id}')" title="Ver ficha completa 360">👤</button>
           <button type="button" class="btn btn-pay" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">💵 Pago</button>
           <button type="button" class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)">💬 SMS</button>
           <button type="button" class="btn" style="flex:0;padding:9px 10px;" onclick="event.stopPropagation();openApptModal('${c.id}')" title="Agendar cita">📅</button>
@@ -3334,14 +3360,15 @@ window.renderAll = function() {
         + ((c.signedContract&&c.signedContract.url) ? `<button onclick="event.stopPropagation();window.open('${c.signedContract.url}','_blank')" title="Ver contrato firmado" style="${_bcss}color:var(--green);">📑</button>` : '')
         + (c.idPhotoURL ? `<button onclick="event.stopPropagation();showPhoto('${c.idPhotoURL}','ID')" title="Ver foto del ID" style="${_bcss}color:var(--text);">🪪</button>` : '')
         + (c.insurancePhotoURL ? `<button onclick="event.stopPropagation();showPhoto('${c.insurancePhotoURL}','Seguro')" title="Ver foto del seguro" style="${_bcss}color:var(--text);">🛡</button>` : '');
-      liqHtml += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
+      liqHtml += `<div ondblclick="if(!event.target.closest('button,a'))openClient360('${c.id}')" title="Doble clic para ver la ficha completa" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;">
         <div style="min-width:150px;flex:1;">
           <div style="font-weight:600;font-size:14px;">${c.name} ${abadge} ${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
           <div style="font-size:12px;color:var(--muted);">${acar}${c.vin?' · …'+c.vin.slice(-6):''}${c.phone?' · '+c.phone:''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="event.stopPropagation();openClient360('${c.id}')" title="Ver ficha completa 360" style="background:var(--gold3);color:var(--navy3);border:none;border-radius:7px;padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer;">👤</button>
           ${docBtns}
-          <button onclick="openApptModal('${c.id}')" title="Agendar cita" style="background:var(--gold);color:var(--navy3);border:none;border-radius:7px;padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer;">📅</button>
+          <button onclick="event.stopPropagation();openApptModal('${c.id}')" title="Agendar cita" style="background:var(--gold);color:var(--navy3);border:none;border-radius:7px;padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer;">📅</button>
           <button type="button" onclick="smsPlain('${c.id}')" title="SMS" style="background:#2196F3;color:#fff;border:none;border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer;">💬</button>
           <button type="button" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Editar" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:12px;cursor:pointer;">✏️</button>
         </div>
