@@ -524,7 +524,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">📸 Foto del ID</label>
-        <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;">
+        <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;" onchange="idPhotoPicked(this)">
         <div id="f-id-preview" style="margin-top:6px;"></div>
         <button type="button" onclick="diagIdUpload()" style="margin-top:8px;background:transparent;border:1px dashed var(--border);color:var(--muted);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;">🔧 Probar subida a Storage (diagnóstico)</button>
       </div>
@@ -3462,6 +3462,7 @@ window.openAddModal=function(){
   document.getElementById('f-numpay').value='';
   document.getElementById('f-hint').textContent='';
   const _k=document.getElementById('f-kind'); if(_k) _k.value='finance'; toggleKind();
+  window._idPhotoBlob=null; const _idp=document.getElementById('f-id-photo'); if(_idp) _idp.value=''; const _idpv=document.getElementById('f-id-preview'); if(_idpv) _idpv.innerHTML='';
   if(window.setFinanceLock) setFinanceLock(false);   // cliente NUEVO: contrato abierto (lo necesitas llenar)
   document.getElementById('add-modal').classList.add('active');
 };
@@ -3523,6 +3524,7 @@ window.openEditModal=function(id){
   const ccoa=document.getElementById('f-ccoa');
   if(ccoa) ccoa.value=c.ccoaAccepted?'yes':'no';
   // ID photo preview
+  window._idPhotoBlob=null; const _idpEl=document.getElementById('f-id-photo'); if(_idpEl) _idpEl.value='';
   const idPrev=document.getElementById('f-id-preview');
   if(idPrev&&c.idPhotoURL) idPrev.innerHTML='<a href="'+c.idPhotoURL+'" target="_blank" style="font-size:12px;color:var(--green);">📷 Ver foto de ID</a>';
   else if(idPrev) idPrev.innerHTML='';
@@ -3571,6 +3573,25 @@ function uploadResumableSafe(storageRef, blob, metadata, label, stallMs){
     );
   });
 }
+// 📸 Al ELEGIR la foto del ID, leemos sus bytes YA (a memoria). Así, aunque la foto esté en
+// iCloud o se mueva, no perdemos la referencia al guardar (error "file could not be read").
+window._idPhotoBlob = null;
+window.idPhotoPicked = async function(inp){
+  window._idPhotoBlob = null;
+  const f = inp && inp.files && inp.files[0];
+  const prev = document.getElementById('f-id-preview');
+  if(!f){ if(prev) prev.innerHTML=''; return; }
+  if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--muted);">⏳ Leyendo foto…</span>';
+  try{
+    const buf = await f.arrayBuffer();                 // lee los bytes en el acto
+    window._idPhotoBlob = new Blob([buf], {type: f.type || 'image/jpeg'});
+    if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--green);">📷 Foto lista ('+Math.round((window._idPhotoBlob.size||0)/1024)+' KB) — se subirá al guardar</span>';
+  }catch(e){
+    window._idPhotoBlob = null;
+    if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo leer esa foto</span>';
+    alert('⚠️ No se pudo leer esa foto del disco.\n\nMotivo: '+((e&&e.message)||e)+'\n\nSuele pasar cuando la foto está en iCloud SIN descargar, o se movió. Prueba una de estas:\n• Ábrela en Fotos o Vista Previa y expórtala/guárdala al Escritorio; luego elige esa.\n• O toma una captura de pantalla de la foto y sube la captura.');
+  }
+};
 // 🔧 Diagnóstico: sube 32 bytes a ids/ y a dismantle_vehicles/ y dice EXACTO qué pasa.
 window.diagIdUpload=async function(){
   let who='(sin sesión)';
@@ -3642,7 +3663,8 @@ window.saveClient=async function(keepOpen){
   // ID photo
   let idPhotoURL = existing.idPhotoURL||'';
   let _idPhotoErr = '';
-  const idPhotoFile = document.getElementById('f-id-photo')?.files[0];
+  // Preferimos los bytes ya leídos al elegir la foto (window._idPhotoBlob); si no, el File del input.
+  const idPhotoFile = window._idPhotoBlob || document.getElementById('f-id-photo')?.files[0];
   if(idPhotoFile){
     try {
       const st = getStorage();
