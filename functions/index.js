@@ -423,7 +423,11 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
   const today = new Date().toISOString().slice(0, 10);
   const sys = "You read a photo of a purchase receipt or invoice for a used-car dealership / parts yard. " +
     "Extract the data and return ONLY a strict JSON object — no prose, no code fences. Keys:\n" +
-    "- amount: the GRAND TOTAL actually paid, in dollars, INCLUDING tax (number). If several totals appear, use the final grand total.\n" +
+    "- amount: the GRAND TOTAL finally payable for this purchase, in dollars, INCLUDING tax (number). " +
+    "It is the number next to the FINAL total label (usually at the BOTTOM): Total, TOTAL, Total Due, Amount Due, Balance Due, Grand Total, Total a Pagar, Importe Total, or similar. " +
+    "It is almost ALWAYS the LARGEST dollar amount on the receipt, and it must be >= the subtotal and >= every single line item. " +
+    "NEVER use as the amount: a single line-item price, a unit price, the subtotal, the tax by itself, the amount tendered / cash given / change, an order/invoice/receipt/transaction number, a phone number, an account or card number, a date, a store number, or a quantity. " +
+    "If several totals appear (split payments, etc.) use the final grand total due.\n" +
     "- subtotal: the sum of the line items BEFORE tax, in dollars (number). If not printed, use the sum of the item amounts.\n" +
     "- tax: the total sales tax in dollars (number). 0 if none printed.\n" +
     "- items: an ARRAY of the individual products/line items actually purchased. Each element is an object: " +
@@ -462,8 +466,19 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
       qty: Number(it && it.qty) || 1,
       category: String((it && it.category) || "").slice(0, 60),
     })).filter((it) => it.description || it.amount);
+    // 🔎 Reconciliación del TOTAL: nunca puede ser menor que el subtotal (o la suma de productos) antes de impuestos.
+    // Atrapa el caso donde el modelo agarró un número chico al azar en vez del total.
+    let fixedAmount = Number(out.amount) || 0;
+    const _sub = Number(out.subtotal) || 0;
+    const _tax = Number(out.tax) || 0;
+    const _itemsSum = Math.round(items.reduce((s, it) => s + (Number(it.amount) || 0), 0) * 100) / 100;
+    const _base = _sub > 0 ? _sub : _itemsSum;
+    if (fixedAmount <= 0 || (_base > 0.009 && fixedAmount < _base - 0.01)) {
+      const _calc = Math.round((_base + _tax) * 100) / 100;
+      if (_calc > 0) fixedAmount = _calc;
+    }
     return {
-      amount: Number(out.amount) || 0,
+      amount: fixedAmount,
       subtotal: Number(out.subtotal) || 0,
       tax: Number(out.tax) || 0,
       items: items.slice(0, 60),

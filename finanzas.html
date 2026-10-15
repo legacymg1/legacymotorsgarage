@@ -1130,11 +1130,21 @@ window.scanReceiptNow=async function(file){
     if(d.orderNo){ const el=document.getElementById('e-orderno'); if(el) el.value=d.orderNo; }
     if(d.method){ const m=document.getElementById('e-method'); if(m) m.value=d.method; }
     if(Array.isArray(d.items) && d.items.length){
-      // 🧾 Modo PRODUCTOS: separa cada uno
-      EXP_ITEMS = d.items.map(it=>({ description:String(it.description||''), amount:Number(it.amount)||0, category:_validCat(it.category,dept), carId:'', carLabel:'' }));
+      // 🧾 Modo PRODUCTOS: separa cada uno (para asignar a su carro con su costo real).
+      const raw = d.items.map(it=>({ description:String(it.description||''), amount:Number(it.amount)||0, category:_validCat(it.category,dept), carId:'', carLabel:'' }));
+      // 💸 Descuentos (renglones negativos, p.ej. "Subscribe & Save discount") NO son un gasto aparte:
+      // se REPARTEN proporcionalmente entre los productos para que cada uno quede con su costo REAL ya con descuento.
+      const products = raw.filter(it=> (Number(it.amount)||0) > 0);
+      const discTotal = raw.filter(it=> (Number(it.amount)||0) < 0).reduce((s,it)=>s+(Number(it.amount)||0),0); // negativo o 0
+      if(discTotal < 0 && products.length){
+        const prodSum = products.reduce((s,it)=>s+it.amount,0);
+        products.forEach(it=>{ const share = prodSum>0 ? (it.amount/prodSum)*discTotal : discTotal/products.length; it.amount = Math.round((it.amount+share)*100)/100; });
+      }
+      EXP_ITEMS = products.length ? products : raw;   // si TODO era descuento, deja los renglones para editar a mano
       document.getElementById('exp-tax').value = (Number(d.tax)||0)>0 ? (Number(d.tax).toFixed(2)) : '';
       showExpItems(true); renderExpItems();
-      if(st) st.innerHTML='<span style="color:#32d74b;">✅ Separé '+EXP_ITEMS.length+' producto(s) — revisa, asigna carro y guarda.</span>';
+      const dmsg = (discTotal<0) ? (' · descuento de $'+Math.abs(discTotal).toFixed(2)+' repartido') : '';
+      if(st) st.innerHTML='<span style="color:#32d74b;">✅ Separé '+EXP_ITEMS.length+' producto(s)'+dmsg+' — revisa, asigna carro y guarda.</span>';
     } else {
       // Un solo gasto (como antes)
       showExpItems(false);
