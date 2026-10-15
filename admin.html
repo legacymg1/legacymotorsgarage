@@ -586,6 +586,15 @@
       </div>
     </div>
     <div id="finance-only" class="addc-section">
+    <!-- 🔒 Candado del contrato (solo al EDITAR un cliente existente): evita cambiar el deal por error -->
+    <div id="finance-lock" style="display:none;background:rgba(240,192,64,0.08);border:1px solid var(--gold3);border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer;" onclick="financeUnlock()">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div><div style="font-weight:800;color:var(--gold);font-size:14px;">🔒 Contrato / plan de pagos (avanzado)</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">Precio, enganche, pagos, plazo, fechas, impuestos y DMV. <b>Toca para desbloquear y editar.</b></div></div>
+        <div style="font-size:20px;color:var(--gold);">›</div>
+      </div>
+    </div>
+    <div id="finance-body">
     <div class="addc-head">4 · Venta y financiamiento</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Precio del Vehículo ($)</label><input class="form-input" id="f-total" placeholder="8500" type="number" oninput="calcFinancing('price')"></div>
@@ -653,6 +662,7 @@
     <div class="form-row">
       <div class="form-group"><label class="form-label">Fecha Primer Pago</label><input class="form-input" id="f-startdate" type="date" onchange="setTimeout(calcHint,50)"></div>
     </div>
+    </div><!-- /finance-body -->
     </div><!-- /finance-only -->
     <!-- ============ 5 · SEGURO Y NOTAS ============ -->
     <div class="addc-section">
@@ -3451,6 +3461,7 @@ window.openAddModal=function(){
   document.getElementById('f-numpay').value='';
   document.getElementById('f-hint').textContent='';
   const _k=document.getElementById('f-kind'); if(_k) _k.value='finance'; toggleKind();
+  if(window.setFinanceLock) setFinanceLock(false);   // cliente NUEVO: contrato abierto (lo necesitas llenar)
   document.getElementById('add-modal').classList.add('active');
 };
 
@@ -3516,7 +3527,23 @@ window.openEditModal=function(id){
   else if(idPrev) idPrev.innerHTML='';
   if(typeof toggleCashSale==='function') toggleCashSale();   // oculta #pagos/monto si es contado
   calcFinancing('load');
+  if(window.setFinanceLock) setFinanceLock(true);   // 🔒 al EDITAR, el contrato arranca bloqueado
   document.getElementById('add-modal').classList.add('active');
+};
+// 🔒 Candado del contrato en "Editar cliente": evita cambiar precio/enganche/pagos/plazo por error.
+// Al editar arranca cerrado; para tocar el deal hay que desbloquear a propósito. Cliente NUEVO = abierto.
+window.setFinanceLock=function(locked){
+  const bar=document.getElementById('finance-lock'), body=document.getElementById('finance-body');
+  if(!bar||!body) return;
+  if(locked){ bar.style.display='block'; body.style.display='none'; }
+  else { bar.style.display='none'; body.style.display=''; }
+};
+window.financeUnlock=function(){
+  if(!confirm('⚠️ Vas a editar el CONTRATO / plan de pagos (precio, enganche, pagos, plazo, fechas, impuestos y DMV).\n\nEsto cambia el acuerdo financiero del cliente. ¿Continuar?')) return;
+  const bar=document.getElementById('finance-lock'), body=document.getElementById('finance-body');
+  if(bar) bar.style.display='none';
+  if(body) body.style.display='';
+  try{ calcFinancing('load'); }catch(e){}
 };
 
 // Evita que un paso lento de RED (subir foto del ID, decodificar HEIC, buscar inventario)
