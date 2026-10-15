@@ -1138,6 +1138,13 @@ window.scanReceiptNow=async function(file){
       if(d.category){ const sel=document.getElementById('e-cat'); if(sel){ const opt=[...sel.options].find(o=>o.value===d.category||o.text===d.category); if(opt){ sel.value=opt.value; } } }
       if(st) st.innerHTML='<span style="color:#32d74b;">✅ Listo — revisa los datos y guarda.</span>';
     }
+    // ⚠️ Aviso INMEDIATO de posible duplicado (desde el escaneo, sin esperar a Guardar)
+    try{
+      const dup=_findDupExpense({ orderNo:d.orderNo, vendor:d.vendor, date:d.date, totalCents:Math.round((Number(d.amount)||0)*100) });
+      if(dup && st){ const t=dup.tx; const amt=centsToUSD(Number(t.amountCents)||0); const v=t.vendor?(' de '+t.vendor):''; const dd=t.date||'';
+        st.innerHTML='<span style="color:#ff9800;font-weight:700;">⚠️ Posible DUPLICADO: ya hay un gasto parecido ('+amt+v+(dd?(' · '+dd):'')+'). Revisa antes de guardar.</span>';
+      }
+    }catch(e){}
   }catch(e){
     console.warn('scanReceipt', e);
     if(st) st.innerHTML='<span style="color:#ff9800;">No se pudo leer la foto. Llénalo a mano.</span>';
