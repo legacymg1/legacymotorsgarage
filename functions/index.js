@@ -475,7 +475,9 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
     const _sub = Number(out.subtotal) || 0;
     const _tax = Number(out.tax) || 0;
     const _itemsSum = Math.round(items.reduce((s, it) => s + (Number(it.amount) || 0), 0) * 100) / 100;
-    const _base = _sub > 0 ? _sub : _itemsSum;
+    // Usa la suma NETA de productos (incluye descuentos negativos) como base — así NO re-inflamos un total
+    // que ya trae un descuento aplicado (Subscribe & Save, cupón). Solo cae al subtotal si no hay items.
+    const _base = items.length ? _itemsSum : _sub;
     if (fixedAmount <= 0 || (_base > 0.009 && fixedAmount < _base - 0.01)) {
       const _calc = Math.round((_base + _tax) * 100) / 100;
       if (_calc > 0) fixedAmount = _calc;
