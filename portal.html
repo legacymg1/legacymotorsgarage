@@ -215,7 +215,7 @@ async function _heicToJpeg(blob){
 async function toJpeg(file){
   if(!file) return file;
   var isPdf = (file.type==='application/pdf') || /\.pdf$/i.test(file.name||'');
-  if(!isPdf && await _looksHeic(file)){ try{ file = new File([await _heicToJpeg(file)],(file.name||'photo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}); }catch(e){ console.warn('HEIC no convertida', e); } }
+  if(!isPdf && await _looksHeic(file)){ try{ file = new File([await _heicToJpeg(file)],(file.name||'photo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}); }catch(e){ try{ alert('⚠️ Esta foto está en HEIC (iPhone) y no se pudo convertir a JPG — se vería rota.\n\nSúbela en JPG, o toma una CAPTURA de pantalla y sube esa.'); }catch(_){} throw new Error('HEIC no convertida'); } }
   if(isPdf){
     try{
       var mod = window.__pdfjs || await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs');

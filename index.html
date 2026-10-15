@@ -15463,10 +15463,11 @@ window.saveCar = async function(){
       progress.textContent='Subiendo '+photoFiles.length+' foto(s)...';
       let _done=0;
       // Una por una con reintentos → estable en conexión mala (parallel saturaba y una falla tumbaba todo)
-      const _newUrls=[]; const _fileArr=[...photoFiles];
+      const _newUrls=[]; const _fileArr=[...photoFiles]; let _heicSkipped=0;
       for(let i=0;i<_fileArr.length;i++){
         const conv = await toJpeg(_fileArr[i]);
-        const r = ref(storage, `inventory/${id}/${Date.now()}_${i}_${conv.name}`);
+        if(await _looksHeic(conv)){ _heicSkipped++; continue; }   // HEIC que no convirtió: no subir foto rota
+        const r = ref(storage, `inventory/${id}/${Date.now()}_${i}_${(conv.name||'foto.jpg')}`);
         let ok=false;
         for(let attempt=1; attempt<=3 && !ok; attempt++){
           try{
@@ -15478,8 +15479,9 @@ window.saveCar = async function(){
         _done++; progress.textContent = 'Subidas '+_done+' de '+_fileArr.length+' fotos...';
       }
       photos.push(..._newUrls);
+      if(_heicSkipped>0){ alert('⚠️ '+_heicSkipped+' foto(s) quedaron en HEIC y no se pudieron convertir a JPG — NO se subieron (se verían rotas).\n\nSúbelas en JPG (Vista Previa → Exportar como JPEG) o toma captura de pantalla.'); }
     }
-    
+
     // Upload video
     let videoURL = existing.videoURL || '';
     const videoFile = document.getElementById('car-video').files[0];

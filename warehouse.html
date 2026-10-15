@@ -2705,16 +2705,17 @@ async function _heicToJpeg(blob){
   return out;
 }
 async function toJpeg(file){
+  let src=file;
+  // HEIC del iPhone: si no se puede convertir a JPG, AVISA y NO subas el HEIC roto.
+  if(await _looksHeic(file)){ try{ src=await _heicToJpeg(file); }catch(e){ try{ alert('⚠️ Esta foto está en HEIC (iPhone) y no se pudo convertir a JPG — se vería rota.\n\nSúbela en JPG: ábrela en Vista Previa → Exportar como… → JPEG, o toma una CAPTURA de pantalla y sube esa.'); }catch(_){} throw new Error('HEIC no convertida'); } }
   try{
-    let src=file;
-    if(await _looksHeic(file)){ try{ src=await _heicToJpeg(file); }catch(e){ console.warn('HEIC no convertida', e); } }
     const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(src); });
     const max=1400, sc=Math.min(1,max/Math.max(img.width,img.height));
     const c=document.createElement('canvas'); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc);
     c.getContext('2d').drawImage(img,0,0,c.width,c.height);
     const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.82));
     return new File([blob],(file.name||'foto').replace(/\.\w+$/,'')+'.jpg',{type:'image/jpeg'});
-  }catch(e){ return file; }
+  }catch(e){ return src; }
 }
 async function qrDataUrl(text){
   if(!window.qrcode){ await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }

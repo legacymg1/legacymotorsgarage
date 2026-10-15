@@ -857,7 +857,7 @@ async function _heicToJpeg(blob){
   return out;
 }
 async function toJpeg(file){
-  if(file && await _looksHeic(file)){ try{ file = new File([await _heicToJpeg(file)],(file.name||'recibo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}); }catch(e){ console.warn('HEIC no convertida', e); } }
+  if(file && await _looksHeic(file)){ try{ file = new File([await _heicToJpeg(file)],(file.name||'recibo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}); }catch(e){ try{ alert('⚠️ Esta foto está en HEIC (iPhone) y no se pudo convertir a JPG — se vería rota.\n\nSúbela en JPG: ábrela en Vista Previa → Exportar como… → JPEG, o toma una CAPTURA de pantalla y sube esa.'); }catch(_){} throw new Error('HEIC no convertida'); } }
   return new Promise(function(resolve){
     if(!file || (file.type && file.type.indexOf('image/')!==0 && !/\.(heic|heif)$/i.test(file.name||''))){ resolve(file); return; }
     var url=URL.createObjectURL(file), img=new Image();
