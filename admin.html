@@ -81,6 +81,27 @@
   .client-card.soon { border-color: var(--yellow); }
   .client-card.ok { border-color: var(--green); }
 
+  /* 🟰 Vista BARRAS: misma info de las tarjetas de colores, horizontal y compacta */
+  .client-bars { display:flex; flex-direction:column; gap:8px; }
+  .client-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--card); border:1px solid var(--border); border-left:4px solid var(--border); border-radius:11px; padding:9px 13px; transition:background .15s; }
+  .client-bar:hover { background:var(--navy2); }
+  .client-bar.overdue { border-left-color:var(--red); }
+  .client-bar.soon { border-left-color:var(--yellow); }
+  .client-bar.ok { border-left-color:var(--green); }
+  .cb-id { min-width:150px; flex:1 1 180px; }
+  .cb-name { font-weight:700; font-size:14px; line-height:1.2; }
+  .cb-car { font-size:11.5px; color:var(--muted); margin-top:1px; }
+  .cb-chips { display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
+  .cb-chip { font-size:10px; font-weight:700; border-radius:999px; padding:2px 7px; white-space:nowrap; }
+  .cb-nums { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .cb-num { font-size:11px; color:var(--muted); white-space:nowrap; }
+  .cb-num b { display:block; font-size:13px; color:var(--text); font-weight:700; }
+  .cb-prog { flex:1 1 90px; min-width:70px; height:6px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; }
+  .cb-progfill { height:100%; background:var(--gold); }
+  .cb-actions { display:flex; gap:5px; align-items:center; flex-wrap:wrap; margin-left:auto; }
+  .cb-btn { background:var(--surface3,var(--border)); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:7px 9px; font-size:13px; line-height:1; cursor:pointer; }
+  @media (max-width:620px){ .cb-actions{ margin-left:0; } .client-bar{ gap:8px; } }
+
   .card-header { padding: 14px 16px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--border); min-height: unset; }
   .client-name { font-weight: 600; font-size: 16px; }
   .client-phone { font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -1086,12 +1107,12 @@ onAuthStateChanged(auth, async (user) => {
 // ---- HELPERS ----
 let clients = [];
 let editingId = null, payingId = null, waPhone = null, waLang = 'es';
-let currentView = 'grid';
+let currentView = (()=>{ try{ return localStorage.getItem('cli_view') || 'bar'; }catch(e){ return 'bar'; } })();
 let currentSort = 'next'; // 'next', 'status', 'date', 'name', 'balance'
 
 window.setSort = function(s) { currentSort = s; renderAll(); };
 
-window.setView = function(v) { currentView = v; renderAll(); };
+window.setView = function(v) { currentView = v; try{ localStorage.setItem('cli_view', v); }catch(e){} renderAll(); };
 
 function today() {
   const d = new Date();
@@ -3196,6 +3217,7 @@ window.renderAll = function() {
   let html='';
 
   const isListView = currentView === 'list';
+  const isBarView = currentView === 'bar';
   const actCol = (()=>{try{return localStorage.getItem('col_active-list')==='1';}catch(e){return false;}})();
   const _sb=(k,l)=>`<button onclick="setSort('${k}')" style="background:${currentSort===k?'var(--gold)':'var(--border)'};color:${currentSort===k?'var(--navy3)':'var(--muted)'};border:none;border-radius:6px;padding:6px 10px;font-size:11px;letter-spacing:1px;cursor:pointer;white-space:nowrap;">${l}</button>`;
   const _vb=(v,ic,t)=>`<button onclick="setView('${v}')" title="${t}" style="background:${currentView===v?'var(--gold)':'var(--border)'};color:${currentView===v?'var(--navy3)':'var(--text)'};border:none;border-radius:6px;padding:7px 11px;font-size:16px;cursor:pointer;">${ic}</button>`;
@@ -3205,12 +3227,12 @@ window.renderAll = function() {
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         ${_sb('next','💰 PRÓXIMO')}${_sb('date','📅 FECHA')}${_sb('name','A-Z')}${_sb('balance','💰 SALDO')}
         <div style="width:1px;height:22px;background:var(--border);"></div>
-        ${_vb('grid','⊞','Tarjetas')}${_vb('list','☰','Lista')}
+        ${_vb('bar','▭','Barras')}${_vb('grid','⊞','Tarjetas')}${_vb('list','☰','Lista')}
         <div style="width:1px;height:22px;background:var(--border);"></div>
         <button onclick="openDelClient()" style="background:transparent;color:var(--red);border:1px solid var(--red);border-radius:6px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">🗑 Eliminar</button>
       </div>
     </div>
-    <div id="active-list" style="padding:14px 16px;${actCol?'display:none;':''}"><div class="${isListView ? 'client-list' : 'clients-grid'}" style="${isListView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
+    <div id="active-list" style="padding:14px 16px;${actCol?'display:none;':''}"><div class="${isListView ? 'client-list' : isBarView ? 'client-bars' : 'clients-grid'}" style="${isListView ? '' : isBarView ? '' : 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;'}">`;
   if(!mainList.length){
     html+=`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚗</div><div class="empty-text">Sin clientes con pagos activos</div><div style="font-size:14px">Los de servicio y liquidados están más abajo</div></div>`;
   } else if(isListView) {
@@ -3277,6 +3299,46 @@ window.renderAll = function() {
     });
 
     // skip the else block below
+  } else if(isBarView){
+    // 🟰 BARRAS: misma info de las tarjetas de colores, horizontal y compacta.
+    const chip=(txt,color,bg,onclick)=>`<span class="cb-chip" style="color:${color};background:${bg};border:1px solid ${color};${onclick?'cursor:pointer;':''}" ${onclick?`onclick="${onclick}"`:''}>${txt}</span>`;
+    mainList.forEach(c=>{
+      const status=getStatus(c);
+      const nextPay=getNextPayDate(c);
+      const days=daysUntil(nextPay);
+      const progress=calcProgress(c);
+      const payColor=status==='overdue'?'var(--red)':status==='soon'?'var(--yellow)':'var(--green)';
+      const dayLabel=days<0?` (${Math.abs(days)}d venc.)`:days===0?' (HOY)':days<=7?` (${days}d)`:'';
+      const multi=clientVehicles(c).length;
+      // chips (mismos estados que la tarjeta)
+      let insChip;
+      if(!c.insurance){ insChip=chip('⚠️ Sin seguro','var(--red)','rgba(255,59,59,.15)'); }
+      else { const d=c.insuranceExp?Math.round((new Date(c.insuranceExp+'T00:00:00')-new Date(today()+'T00:00:00'))/86400000):999; const oc=c.insurancePhotoURL?`event.stopPropagation();showPhoto('${c.insurancePhotoURL}','Seguro')`:''; insChip = d<0?chip('🔴 Seguro','var(--red)','rgba(255,59,59,.12)',oc):chip('✅ Seguro','var(--green)','rgba(0,200,83,.1)',oc); }
+      const conChip = (c.signedContract&&c.signedContract.url)?chip('✅ Contrato','var(--green)','rgba(0,200,83,.1)',`event.stopPropagation();showPhoto('${c.signedContract.url}','Contrato firmado')`):(c.contractNumber?chip('📋 Contrato','var(--muted)','rgba(255,255,255,.05)'):'');
+      const idChip = (c.idNumber||c.idPhotoURL)?chip('🪪 ID','var(--green)','rgba(0,200,83,.1)',c.idPhotoURL?`event.stopPropagation();showPhoto('${c.idPhotoURL}','ID')`:''):chip('⚠️ Sin ID','var(--red)','rgba(255,59,59,.12)');
+      html+=`<div class="client-bar ${status}" ondblclick="if(!event.target.closest('button,a'))openClient360('${c.id}')" title="Doble clic para la ficha completa">
+        <div class="cb-id">
+          <div class="cb-name">${c.name}${c.private?' 🔒':''} ${c.lang==='en'?'🇺🇸':'🇲🇽'}</div>
+          <div class="cb-car">${[c.year,c.make,c.model].filter(Boolean).join(' ')}${c.vin?' · …'+c.vin.slice(-6):''}${multi>1?' · 🚗'+multi:''}</div>
+        </div>
+        <div class="cb-chips">${insChip}${conChip}${idChip}</div>
+        <div class="cb-nums">
+          <span class="cb-num">Pago<b>${formatMoney(c.weekly)}</b></span>
+          <span class="cb-num">Próximo<b style="color:${payColor}">${formatDate(nextPay)}${dayLabel}</b></span>
+          <span class="cb-num">Saldo<b style="color:var(--gold)">${formatMoney(totalClientDebt(c))}</b></span>
+        </div>
+        <div class="cb-prog" title="${progress}% pagado"><div class="cb-progfill" style="width:${progress}%"></div></div>
+        <div class="cb-actions">
+          <button class="cb-btn" style="background:var(--gold3);color:var(--navy3);font-weight:700;" onclick="event.stopPropagation();openClient360('${c.id}')" title="Ficha completa">👤</button>
+          <button class="cb-btn" style="background:var(--green);color:#000;" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Pago">💵</button>
+          <button class="cb-btn" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)" title="SMS">💬</button>
+          <button class="cb-btn" onclick="event.stopPropagation();openApptModal('${c.id}')" title="Cita">📅</button>
+          <button class="cb-btn" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Editar">✏️</button>
+          <button class="cb-btn" onclick="event.stopPropagation();generateContract('${c.id}')" title="Generar contrato">📄</button>
+          ${(c.signedContract&&c.signedContract.url)?`<button class="cb-btn" style="background:rgba(0,200,83,.15);color:var(--green);border-color:var(--green);" onclick="event.stopPropagation();showPhoto('${c.signedContract.url}','Contrato firmado')" title="Ver contrato firmado">📑</button>`:''}
+        </div>
+      </div>`;
+    });
   } else {
     mainList.forEach(c=>{
       const status=getStatus(c);
