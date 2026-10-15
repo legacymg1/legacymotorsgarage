@@ -2951,6 +2951,27 @@ const WM_LOGO_URL = "https://legacymotorsgarage.com/logo.png";
 let _wmLogoBuf;
 async function wmLogo(){ if (_wmLogoBuf !== undefined) return _wmLogoBuf; try { const r = await fetch(WM_LOGO_URL); _wmLogoBuf = r.ok ? Buffer.from(await r.arrayBuffer()) : null; } catch (e) { _wmLogoBuf = null; } return _wmLogoBuf; }
 function wmTokenUrl(bucketName, key, token){ return "https://firebasestorage.googleapis.com/v0/b/" + bucketName + "/o/" + encodeURIComponent(key) + "?alt=media&token=" + token; }
+// 🖼️ Convierte CUALQUIER HEIC/HEIF (o imagen) a JPG en el servidor con sharp (libheif).
+// El navegador (heic2any) falla con ciertos HEIC del iPhone; las páginas llaman aquí por fetch como respaldo.
+exports.heicConvert = onRequest({ cors: true, timeoutSeconds: 60, memory: "1GiB" }, async (req, res) => {
+  try {
+    if (req.method !== "POST") { res.status(405).send("POST only"); return; }
+    const buf = (req.rawBody && req.rawBody.length) ? req.rawBody : (Buffer.isBuffer(req.body) ? req.body : null);
+    if (!buf || !buf.length) { res.status(400).send("sin datos"); return; }
+    const sharp = require("sharp");
+    const out = await sharp(buf, { failOn: "none" })
+      .rotate()
+      .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    res.set("Content-Type", "image/jpeg");
+    res.set("Cache-Control", "no-store");
+    res.status(200).send(out);
+  } catch (e) {
+    res.status(500).send("No se pudo convertir: " + ((e && e.message) || e));
+  }
+});
+
 async function watermarkForListing(urls){
   let sharp, crypto;
   try { sharp = require("sharp"); crypto = require("crypto"); } catch (e) { return urls; }   // si no está la lib, deja las originales

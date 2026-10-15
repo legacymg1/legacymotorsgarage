@@ -15380,10 +15380,17 @@ async function _looksHeic(blob){
   return /\.(heic|heif)$/.test(n)||ty.indexOf('heic')>=0||ty.indexOf('heif')>=0;
 }
 async function _heicToJpeg(blob){
-  if(!window.heic2any) await _loadScriptOnce('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
-  var out=await window.heic2any({blob:blob, toType:'image/jpeg', quality:0.9});
-  if(Array.isArray(out)) out=out[0];
-  return out;
+  // 1) Navegador (heic2any) — rápido
+  try{
+    if(!window.heic2any) await _loadScriptOnce('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
+    var out=await window.heic2any({blob:blob, toType:'image/jpeg', quality:0.9});
+    if(Array.isArray(out)) out=out[0];
+    if(out && out.size) return out;
+  }catch(e){ console.warn('heic2any falló, uso el servidor', e); }
+  // 2) Servidor (sharp) — convierte CUALQUIER HEIC del iPhone
+  const resp=await fetch('https://us-central1-legacy-motors-garage.cloudfunctions.net/heicConvert',{ method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:blob });
+  if(!resp.ok) throw new Error('servidor HEIC '+resp.status);
+  return await resp.blob();
 }
 async function toJpeg(file){
   if(file && await _looksHeic(file)){ try{ file = new File([await _heicToJpeg(file)],(file.name||'photo').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}); }catch(e){ console.warn('HEIC no convertida', e); } }

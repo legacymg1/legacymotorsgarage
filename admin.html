@@ -5305,10 +5305,17 @@ async function _looksHeic(blob){
   return /\.(heic|heif)$/.test(n)||ty.indexOf('heic')>=0||ty.indexOf('heif')>=0;
 }
 async function _heicToJpeg(blob){
-  if(!window.heic2any) await _loadScriptOnce('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
-  let out=await window.heic2any({blob:blob, toType:'image/jpeg', quality:0.9});
-  if(Array.isArray(out)) out=out[0];
-  return out;
+  // 1) Navegador (heic2any) — rápido
+  try{
+    if(!window.heic2any) await _loadScriptOnce('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
+    let out=await window.heic2any({blob:blob, toType:'image/jpeg', quality:0.9});
+    if(Array.isArray(out)) out=out[0];
+    if(out && out.size) return out;
+  }catch(e){ console.warn('heic2any falló, uso el servidor', e); }
+  // 2) Servidor (sharp) — convierte CUALQUIER HEIC del iPhone
+  const resp=await fetch('https://us-central1-legacy-motors-garage.cloudfunctions.net/heicConvert',{ method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:blob });
+  if(!resp.ok) throw new Error('servidor HEIC '+resp.status);
+  return await resp.blob();
 }
 // Decodifica a JPEG con DOS estrategias: createImageBitmap (rápido, aguanta fotos enormes)
 // y, si falla, el clásico <img>. Redimensiona a maxW y comprime.
