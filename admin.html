@@ -1586,8 +1586,11 @@ window.renderClient360=function(id){
   const sec=(t,inner,act)=>'<div style="padding:14px 16px;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><div style="font-weight:800;font-size:13px;color:var(--gold);letter-spacing:.3px;">'+t+'</div>'+(act||'')+'</div>'+inner+'</div>';
   const empty=t=>'<div style="color:var(--muted);font-size:13px;">'+t+'</div>';
   const addBtn=(label,fn)=>'<button onclick="'+fn+'" style="background:var(--surface3);border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:4px 11px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;">'+label+'</button>';
-  const idLink = c.idPhotoURL
-    ? '<a href="'+esc(c.idPhotoURL)+'" target="_blank" style="display:inline-flex;align-items:center;gap:4px;color:var(--gold);text-decoration:none;font-size:12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:2px 8px;margin-top:5px;">🪪 Ver identificación <span style="font-size:10px;color:var(--muted);">interno</span></a>'
+  const idTxt = (c.idNumber ? ((c.idType?esc(c.idType)+' ':'')+esc(c.idNumber)) : '');
+  const idLink = (c.idNumber || c.idPhotoURL)
+    ? (c.idPhotoURL
+        ? '<a href="'+esc(c.idPhotoURL)+'" target="_blank" style="display:inline-flex;align-items:center;gap:5px;color:var(--gold);text-decoration:none;font-size:12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:2px 8px;margin-top:5px;">🪪 ID'+(idTxt?' '+idTxt:'')+' 📷 <span style="font-size:10px;color:var(--muted);">interno</span></a>'
+        : '<span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);font-size:12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:2px 8px;margin-top:5px;">🪪 ID'+(idTxt?' '+idTxt:' ✓')+' <span style="font-size:10px;color:var(--muted);">interno · sin foto</span></span>')
     : '<span style="display:inline-block;color:var(--muted);font-size:12px;margin-top:5px;">🪪 Sin identificación</span>';
   // Header: nombre + identificación al lado + teléfono/idioma + insignias + cerrar
   let h='<div style="padding:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="min-width:0;">'
