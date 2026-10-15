@@ -2294,6 +2294,7 @@ window.editAppt=function(id){
   document.getElementById('appt-note').value=a.note||'';
 };
 function escAppt(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 // 🧠 Intel que el bot le sacó al cliente — se muestra en la tarjeta de la cita para llegar sabiendo cómo cerrar
 function apptIntel(a){
   const li=a.leadInfo; const es=(a.lang!=='en');
