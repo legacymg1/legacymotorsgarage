@@ -3474,8 +3474,10 @@ window.renderAll = function() {
   html+='</div></div></div>';
 
   // ---- CLIENTES LIQUIDADOS (se pinta en su tarjeta, al lado de Cotizaciones) ----
-  // Solo liquidados. Los de servicio se buscan o irán a la caja SERVICIO.
-  const liquidados = filtered.filter(c => isPaidOff(c)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  // SOLO quienes COMPRARON UN CARRO (financiado o de contado) y ya lo liquidaron.
+  // Se excluyen servicio / finanzas / otros sin compra de carro.
+  const _boughtCar = (c) => (c.kind==='finance') || (c.freq==='cash') || (Number(c.total)>0) || (Array.isArray(c.schedule)&&c.schedule.length>0) || !!c.vehicleInventoryNum || !!(c.make && c.model);
+  const liquidados = filtered.filter(c => isPaidOff(c) && _boughtCar(c) && c.kind!=='service' && c.kind!=='finanzas').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   let liqHtml='';
   if(!liquidados.length){
     liqHtml = `<div style="color:var(--muted);font-size:13px;padding:6px 0;">Aún no hay contratos liquidados.</div>`;
