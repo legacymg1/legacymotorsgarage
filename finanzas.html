@@ -1470,15 +1470,15 @@ function parseDateQuery(q){
   q=' '+q.toLowerCase().trim()+' '; let m;
   if(/\b(hoy|today)\b/.test(q)){ const t=new Date(); const y=t.getFullYear(),mo=t.getMonth()+1,d=t.getDate(); return {matchedText:(q.match(/\b(hoy|today)\b/)[0]), test:iso=>{const[Y,M,D]=_isoYMD(iso);return Y===y&&M===mo&&D===d;}}; }
   if(/\b(ayer|yesterday)\b/.test(q)){ const t=new Date(Date.now()-86400000); const y=t.getFullYear(),mo=t.getMonth()+1,d=t.getDate(); return {matchedText:(q.match(/\b(ayer|yesterday)\b/)[0]), test:iso=>{const[Y,M,D]=_isoYMD(iso);return Y===y&&M===mo&&D===d;}}; }
-  m=q.match(/(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);   // ISO año-mes-día
+  m=q.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);   // ISO año-mes-día (solo / o -, NO punto: "5.10" es un MONTO)
   if(m){ const y=+m[1],mo=+m[2],d=+m[3]; return {matchedText:m[0], test:iso=>{const[Y,M,D]=_isoYMD(iso);return Y===y&&M===mo&&D===d;}}; }
-  m=q.match(/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/);  // A/B/año (ambiguo)
+  m=q.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);  // A/B/año (ambiguo)
   if(m){ let y=+m[3]; if(y<100) y+=2000; return {matchedText:m[0], test:_ambigPred(+m[1],+m[2],y)}; }
   m=q.match(/(\d{1,2})\s*(?:de\s+)?([a-záéíóúñ]{3,})/);  // día + mes en palabra
   if(m && _MONTHS[m[2]]!==undefined){ const mo=_MONTHS[m[2]],d=+m[1]; return {matchedText:m[0], test:iso=>{const[,M,D]=_isoYMD(iso);return M===mo&&D===d;}}; }
   m=q.match(/([a-záéíóúñ]{3,})\.?\s+(\d{1,2})\b/);       // mes en palabra + día
   if(m && _MONTHS[m[1]]!==undefined){ const mo=_MONTHS[m[1]],d=+m[2]; return {matchedText:m[0], test:iso=>{const[,M,D]=_isoYMD(iso);return M===mo&&D===d;}}; }
-  m=q.match(/\b(\d{1,2})[-\/.](\d{1,2})\b/);             // A/B sin año (ambiguo)
+  m=q.match(/\b(\d{1,2})[-\/](\d{1,2})\b/);              // A/B sin año (ambiguo; solo / o -)
   if(m){ return {matchedText:m[0], test:_ambigPred(+m[1],+m[2],null)}; }
   m=q.match(/\b(20\d{2})\b/);                            // solo año
   if(m){ const y=+m[1]; return {matchedText:m[1], test:iso=>_isoYMD(iso)[0]===y}; }
