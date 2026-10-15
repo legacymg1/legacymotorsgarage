@@ -1131,7 +1131,10 @@ window.scanReceiptNow=async function(file){
     if(d.method){ const m=document.getElementById('e-method'); if(m) m.value=d.method; }
     if(Array.isArray(d.items) && d.items.length){
       // 🧾 Modo PRODUCTOS: separa cada uno (para asignar a su carro con su costo real).
-      const raw = d.items.map(it=>({ description:String(it.description||''), amount:Number(it.amount)||0, category:_validCat(it.category,dept), carId:'', carLabel:'' }));
+      // 💳 Renglones de PAGO (gift card, rewards, "amount charged", "non-gift-card") NO son producto ni descuento:
+      // se IGNORAN (el total queda COMPLETO; el gift card es solo forma de pago).
+      const _isPay = (s)=>/gift\s*card|giftcard|tarjeta de regalo|\breward|\bpoints\b|balance due|amount charged|charged to|non[\s-]?gift/i.test(String(s||''));
+      const raw = d.items.map(it=>({ description:String(it.description||''), amount:Number(it.amount)||0, category:_validCat(it.category,dept), carId:'', carLabel:'' })).filter(it=> !_isPay(it.description));
       // 💸 Descuentos (renglones negativos, p.ej. "Subscribe & Save discount") NO son un gasto aparte:
       // se REPARTEN proporcionalmente entre los productos para que cada uno quede con su costo REAL ya con descuento.
       const products = raw.filter(it=> (Number(it.amount)||0) > 0);

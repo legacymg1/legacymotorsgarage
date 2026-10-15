@@ -427,7 +427,8 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
     "It is the number next to the FINAL total label (usually at the BOTTOM): Total, TOTAL, Total Due, Amount Due, Balance Due, Grand Total, Total a Pagar, Importe Total, or similar. " +
     "It is almost ALWAYS the LARGEST dollar amount on the receipt, and it must be >= the subtotal and >= every single line item. " +
     "NEVER use as the amount: a single line-item price, a unit price, the subtotal, the tax by itself, the amount tendered / cash given / change, an order/invoice/receipt/transaction number, a phone number, an account or card number, a date, a store number, or a quantity. " +
-    "If several totals appear (split payments, etc.) use the final grand total due.\n" +
+    "If a GIFT CARD, rewards, or points were applied, DO NOT subtract them: the amount is the FULL grand total (goods + shipping + tax) — NOT the reduced 'amount charged to card' / 'non-gift-card amount' left after the gift card. " +
+    "If several totals appear (split payments, etc.) use the full grand total of the order.\n" +
     "- subtotal: the sum of the line items BEFORE tax, in dollars (number). If not printed, use the sum of the item amounts.\n" +
     "- tax: the total sales tax in dollars (number). 0 if none printed.\n" +
     "- items: an ARRAY of the individual products/line items actually purchased. Each element is an object: " +
@@ -435,7 +436,9 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
     "\"amount\": the line's price in dollars as printed — if there is a quantity, use the EXTENDED price (qty × unit price) (number), " +
     "\"qty\": the quantity if printed else 1 (number), " +
     "\"category\": the SINGLE best category for THIS item, copied EXACTLY from this list: " + JSON.stringify(cats) + " — if none fits use \"Otro\"}. " +
-    "Include ONLY real purchased products. Do NOT include subtotal, tax, total, change, tendered, or payment lines as items. If a discount line appears, include it as an item with a NEGATIVE amount. If you truly cannot read any line items, return an empty array.\n" +
+    "Include ONLY real purchased products. Do NOT include subtotal, tax, total, change, or tendered as items. " +
+    "NEVER include PAYMENT lines as items: Gift Card, Gift Card Amount, Gift Card Balance, Non-Gift-Card Amount, Amount Charged (to card), Rewards/Points applied, Balance Due — those are HOW it was paid, not products or discounts, so leave them out entirely. " +
+    "A true price DISCOUNT on a product (e.g. 'Subscribe & Save discount', 'Coupon', 'Promotion') DOES count — include it as an item with a NEGATIVE amount. If you truly cannot read any line items, return an empty array.\n" +
     "- date: purchase date as YYYY-MM-DD. If the year is missing, assume " + today.slice(0, 4) + ". If no date is visible, use \"" + today + "\".\n" +
     "- vendor: the store/business name, short.\n" +
     "- note: a SHORT description in Spanish (2-6 words) of what was bought overall.\n" +
