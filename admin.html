@@ -2809,8 +2809,8 @@ window.lendmarkSheet = async function(i, mode){
   const trim=(inv&&inv.trim)||'', miles=o.miles||(inv&&inv.miles)||'', color=o.color||(inv&&inv.color)||'', invNum=(inv&&inv.inventoryNum)||'';
   const carTitle=[year,make,model,trim].filter(Boolean).join(' ')||(o.car||'');
   const cust=(document.getElementById('cot-customer')?document.getElementById('cot-customer').value.trim():'')||'';
-  // 💾 También guarda la cotización (aparece en "Cotizaciones") al generar/mandar la hoja de Lendmark.
-  try{ const _ph=(document.getElementById('cot-phone')?document.getElementById('cot-phone').value.trim():'')||''; const _lg=(document.getElementById('cot-lang')?document.getElementById('cot-lang').value:'es')||'es'; saveQuoteLead(cust,_ph,_lg).catch(()=>{}); }catch(e){}
+  // 💾 En modo imprimir, guarda la cotización al generar. En email, se guarda al TERMINAR de enviar (abajo).
+  if(mode!=='email'){ try{ const _ph=(document.getElementById('cot-phone')?document.getElementById('cot-phone').value.trim():'')||''; const _lg=(document.getElementById('cot-lang')?document.getElementById('cot-lang').value:'es')||'es'; saveQuoteLead(cust,_ph,_lg).catch(()=>{}); }catch(e){} }
   const today=new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
   const cash=(o.freq==='cash'); const lendmark=(o.freq==='lendmark');
   const s={ carTitle, vin, miles, color, invNum, photos, smogPhoto, cust, price, docFee, smog, tax, dmv, total, down, financed, today, cash, lendmark };
@@ -2834,18 +2834,34 @@ function _previewLendmark(s, sigUrl){
 window.lendmarkPreviewSend=async function(){
   const s=_pendingEmailS; if(!s){ alert('Genera la hoja primero.'); return; }
   const b=document.getElementById('lendmark-preview-send'); if(b){ b.disabled=true; b.textContent='📮 Enviando…'; }
-  await _doSendLendmark(s);
+  const ok=await _doSendLendmark(s);
   if(b){ b.disabled=false; b.textContent='📮 Enviar a Lendmark'; }
   closeModal('lendmark-preview-modal');
+  if(ok){
+    // 💾 guarda la cotización (sale en "Cotizaciones") + cierra y LIMPIA el cotizador para el siguiente cliente
+    try{ const _cu=(document.getElementById('cot-customer')?document.getElementById('cot-customer').value.trim():'')||''; const _ph=(document.getElementById('cot-phone')?document.getElementById('cot-phone').value.trim():'')||''; const _lg=(document.getElementById('cot-lang')?document.getElementById('cot-lang').value:'es')||'es'; await saveQuoteLead(_cu,_ph,_lg).catch(()=>{}); }catch(e){}
+    cotResetAll();
+    closeModal('cot-modal');
+    try{ const cl=document.getElementById('cotiz-list'); if(cl && cl.style.display!=='none') loadCotiz(); }catch(e){}
+  }
 };
-// 📮 Envía el sales sheet DIRECTO por el servidor (Zoho SMTP) — arma el correo en el backend con fotos+firma.
+// Limpia TODO el cotizador (para el siguiente cliente), sin preguntar.
+function cotResetAll(){
+  try{ cotClearDraft(); }catch(e){}
+  ['cot-customer','cot-phone','cot-city','cot-car-search'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const lg=document.getElementById('cot-lang'); if(lg) lg.value='es';
+  const tn=document.getElementById('cot-tax-note'); if(tn) tn.innerHTML='';
+  const cr=document.getElementById('cot-car-results'); if(cr){ cr.style.display='none'; cr.innerHTML=''; }
+  cotOpts=[]; cotSeq=0; try{ renderCotOptions(); }catch(e){}
+}
+// 📮 Envía el sales sheet DIRECTO por el servidor (Zoho SMTP) — arma el correo en el backend con fotos+firma. Devuelve true si se envió.
 async function _doSendLendmark(s){
   try{
     const r=await httpsCallable(functions,'sendLendmarkEmail')({ data:s });
     const d=(r&&r.data)||{};
-    if(d.ok){ alert('✅ Enviado a Lendmark (con copia a tu Zoho).'); }
-    else alert('No se pudo enviar: '+((d&&d.error)||'error'));
-  }catch(e){ alert('No se pudo enviar: '+((e&&e.message)||e)+'\n\nSi el backend aún se está desplegando, espera unos minutos y reintenta.'); }
+    if(d.ok){ alert('✅ Enviado a Lendmark (con copia a tu Zoho).'); return true; }
+    alert('No se pudo enviar: '+((d&&d.error)||'error')); return false;
+  }catch(e){ alert('No se pudo enviar: '+((e&&e.message)||e)+'\n\nSi el backend aún se está desplegando, espera unos minutos y reintenta.'); return false; }
 }
 // Re-abrir (imprimir/enviar) una hoja guardada del historial.
 window.openSavedSheet = async function(id, mode){
