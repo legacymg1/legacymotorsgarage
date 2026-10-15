@@ -2958,8 +2958,18 @@ exports.heicConvert = onRequest({ cors: true, timeoutSeconds: 60, memory: "1GiB"
     if (req.method !== "POST") { res.status(405).send("POST only"); return; }
     const buf = (req.rawBody && req.rawBody.length) ? req.rawBody : (Buffer.isBuffer(req.body) ? req.body : null);
     if (!buf || !buf.length) { res.status(400).send("sin datos"); return; }
+    // sharp NO decodifica HEIC (sin plugin HEVC por licencias) → usa heic-convert para decodificar HEIC a JPG,
+    // y luego sharp SOLO para redimensionar/comprimir (sharp sí lee JPG).
+    let jpgBuf = buf;
+    try {
+      const convert = require("heic-convert");
+      jpgBuf = await convert({ buffer: buf, format: "JPEG", quality: 1 });
+    } catch (he) {
+      // No era HEIC (o heic-convert falló): dejamos que sharp intente con el original.
+      jpgBuf = buf;
+    }
     const sharp = require("sharp");
-    const out = await sharp(buf, { failOn: "none" })
+    const out = await sharp(jpgBuf, { failOn: "none" })
       .rotate()
       .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 85 })
