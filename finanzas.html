@@ -1140,11 +1140,26 @@ window.scanReceiptNow=async function(file){
         const prodSum = products.reduce((s,it)=>s+it.amount,0);
         products.forEach(it=>{ const share = prodSum>0 ? (it.amount/prodSum)*discTotal : discTotal/products.length; it.amount = Math.round((it.amount+share)*100)/100; });
       }
-      EXP_ITEMS = products.length ? products : raw;   // si TODO era descuento, deja los renglones para editar a mano
-      document.getElementById('exp-tax').value = (Number(d.tax)||0)>0 ? (Number(d.tax).toFixed(2)) : '';
+      let items2 = products.length ? products : raw;
+      // 🎯 Cuadrar con el TOTAL de la foto: los productos (antes de impuesto) deben sumar (total − impuesto).
+      // Si falta/sobra (envío, cargos o un renglón que no leyó), agrega un renglón de ajuste para que cuadre EXACTO.
+      const _tax = Number(d.tax)||0, _grand = Number(d.amount)||0;
+      let _adjMsg='';
+      if(_grand > 0){
+        const _target = Math.round((_grand - _tax)*100)/100;           // lo que deben sumar los productos
+        const _sum = Math.round(items2.reduce((s,it)=>s+(Number(it.amount)||0),0)*100)/100;
+        const _diff = Math.round((_target - _sum)*100)/100;
+        if(Math.abs(_diff) >= 0.02){
+          items2.push({ description:(_diff>0?'Envío / otros cargos':'Ajuste del recibo'), amount:_diff, category:'', carId:'', carLabel:'' });
+          _adjMsg = ' · agregué un ajuste de $'+_diff.toFixed(2)+' para cuadrar con el total';
+        }
+      }
+      EXP_ITEMS = items2;
+      document.getElementById('exp-tax').value = (_tax>0) ? (_tax.toFixed(2)) : '';
       showExpItems(true); renderExpItems();
       const dmsg = (discTotal<0) ? (' · descuento de $'+Math.abs(discTotal).toFixed(2)+' repartido') : '';
-      if(st) st.innerHTML='<span style="color:#32d74b;">✅ Separé '+EXP_ITEMS.length+' producto(s)'+dmsg+' — revisa, asigna carro y guarda.</span>';
+      const gmsg = (_grand>0) ? (' Total del recibo: $'+_grand.toFixed(2)+'.') : '';
+      if(st) st.innerHTML='<span style="color:#32d74b;">✅ Separé '+EXP_ITEMS.length+' renglón(es)'+dmsg+_adjMsg+'.'+gmsg+' Revisa, asigna carro y guarda.</span>';
     } else {
       // Un solo gasto (como antes)
       showExpItems(false);
