@@ -3573,6 +3573,7 @@ window.saveClient=async function(keepOpen){
 
   // ID photo
   let idPhotoURL = existing.idPhotoURL||'';
+  let _idPhotoErr = '';
   const idPhotoFile = document.getElementById('f-id-photo')?.files[0];
   if(idPhotoFile){
     try {
@@ -3582,7 +3583,7 @@ window.saveClient=async function(keepOpen){
       const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_id.jpg');
       await _withTimeout(uploadBytes(idRef, _idUp, {contentType: (_idUp.type||'image/jpeg')}), 30000, 'subir ID');
       idPhotoURL = await _withTimeout(getDownloadURL(idRef), 15000, 'URL ID');
-    } catch(storErr){ console.log('ID photo skipped (se guarda el cliente sin actualizar la foto):', storErr); }
+    } catch(storErr){ _idPhotoErr = (storErr && (storErr.code || storErr.message)) || String(storErr); console.error('ID photo FALLÓ:', storErr); }
   }
 
   // Inventory sold update
@@ -3744,6 +3745,7 @@ window.saveClient=async function(keepOpen){
       }
     }catch(finErr){ console.log('Post venta a finanzas omitido:', finErr); }
 
+    if(_idPhotoErr){ alert('✅ El cliente se guardó, pero la FOTO del ID no se pudo subir.\n\nMotivo: '+_idPhotoErr+'\n\n(El número de ID sí quedó guardado. Si dice "unauthorized" o "permission", son las reglas de Storage de la carpeta ids/.)'); }
     if(!keepOpen) closeModal('add-modal');   // guardado PARCIAL deja el modal abierto para seguir llenando
   }catch(e){console.error('Save error:',e);alert('Error guardando: '+e.message);}
   if(btn){
