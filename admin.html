@@ -276,6 +276,18 @@
     <button id="cli-service-btn" onclick="setCliView('service')" style="flex:1;max-width:240px;padding:11px;border-radius:13px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:800;font-size:15px;font-family:inherit;cursor:pointer;">🔧 Servicio</button>
   </div>
 
+  <!-- 🔎 Buscador CLIENTE 360 (global: cualquier cliente — quién es y qué tiene) -->
+  <div id="c360-wrap" style="margin:12px 16px 0;position:relative;">
+    <input id="c360-search" oninput="c360Search()" onfocus="c360Search()" autocomplete="off" placeholder="🔎 Buscar un cliente (nombre, teléfono, carro, VIN) — quién es y qué tiene…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--gold);border-radius:12px;padding:12px 40px 12px 14px;color:var(--text);font-size:14px;font-family:inherit;">
+    <span id="c360-x" onclick="c360Clear()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--border);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;user-select:none;">✕</span>
+    <div id="c360-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:45;margin-top:6px;background:var(--navy2);border:1px solid var(--border);border-radius:12px;max-height:62vh;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,.55);"></div>
+  </div>
+
+  <!-- Ficha Cliente 360 -->
+  <div id="c360-modal" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.72);align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 12px;" onclick="if(event.target===this)c360Close()">
+    <div style="background:var(--navy2);border:1px solid var(--border);border-radius:18px;width:100%;max-width:660px;overflow:hidden;"><div id="c360-body"></div></div>
+  </div>
+
   <div id="dealer-view">
   <!-- Resumen compacto (barra delgada) -->
   <div id="stats-bar" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 24px 14px;padding:9px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;font-size:13.5px;">
@@ -1474,6 +1486,98 @@ function svcCard(o){
     +'</div></div>';
 }
 window.svcSetStatus=async function(id,st){ const patch={status:st, updatedAt:new Date().toISOString()}; if(st==='en_proceso'){ const o=svcOrders.find(x=>x.id===id); if(o && !o.startedAt) patch.startedAt=new Date().toISOString(); } try{ await updateDoc(doc(db,'serviceOrders',id),patch); }catch(e){ alert('No se pudo actualizar.'); } };
+
+// ===================== 👥 CLIENTE 360 (perfil unificado) =====================
+const C360_BADGES=[['buyer','🔑','Compró'],['service','🔧','Servicio'],['quote','🧮','Cotizó'],['parts','🔩','Partes']];
+function c360BadgeHtml(flags){ return C360_BADGES.filter(b=>flags[b[0]]).map(b=>'<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;margin:0 4px 4px 0;">'+b[1]+' '+b[2]+'</span>').join(''); }
+let _c360Quotes=null, _c360Inv=null, _c360Cur=null;
+function _c360Timeout(p,ms){ return Promise.race([p, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]); }
+async function c360LoadQuotes(){ if(_c360Quotes!==null) return; _c360Quotes=[]; try{ const snap=await _c360Timeout(getDocs(collection(db,'quotes')),8000); const a=[]; snap.forEach(d=>a.push(Object.assign({id:d.id},d.data()))); _c360Quotes=a; }catch(e){ _c360Quotes=[]; } }
+async function c360LoadInv(){ if(_c360Inv!==null) return; _c360Inv=[]; try{ const snap=await _c360Timeout(getDocs(collection(db,'inventory')),8000); const a=[]; snap.forEach(d=>a.push(Object.assign({id:d.id},d.data()))); _c360Inv=a; }catch(e){ _c360Inv=[]; } }
+function c360ClientFlags(c){ const f={};
+  if(c.kind==='finance' || Number(c.total)>0 || (Array.isArray(c.payments)&&c.payments.length) || c.signedContract) f.buyer=true;
+  if(svcOrders.some(o=>o.clientId===c.id)) f.service=true;
+  const ph=c.phoneE164||''; if(ph && Array.isArray(_c360Quotes) && _c360Quotes.some(q=>(q.phoneE164||'')===ph)) f.quote=true;
+  return f;
+}
+const _c360Money=(n)=>'$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+window.c360Clear=function(){ const i=document.getElementById('c360-search'); if(i)i.value=''; const x=document.getElementById('c360-x'); if(x)x.style.display='none'; const b=document.getElementById('c360-results'); if(b){b.style.display='none';b.innerHTML='';} };
+window.c360Close=function(){ const m=document.getElementById('c360-modal'); if(m) m.style.display='none'; };
+window.c360Search=async function(){
+  const inp=document.getElementById('c360-search'), x=document.getElementById('c360-x'), box=document.getElementById('c360-results'); if(!inp||!box) return;
+  const q=(inp.value||'').trim().toLowerCase(); if(x) x.style.display=q?'':'none';
+  if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+  await c360LoadQuotes();
+  const terms=q.split(/\s+/).filter(Boolean);
+  const hitC=clients.filter(c=>{ const hay=((c.name||'')+' '+(c.phone||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.year||'')+' '+(c.vin||'')+' '+(c.plate||'')).toLowerCase(); return terms.every(t=>hay.indexOf(t)>=0); }).slice(0,50);
+  const cliPhones=new Set(clients.map(c=>c.phoneE164).filter(Boolean));
+  const seen=new Set(), leads=[];
+  (_c360Quotes||[]).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).forEach(qz=>{ const ph=qz.phoneE164||''; if(ph&&cliPhones.has(ph))return; const hay=((qz.customer||'')+' '+(qz.phone||'')+' '+((qz.options&&qz.options[0]&&qz.options[0].car)||'')).toLowerCase(); if(!terms.every(t=>hay.indexOf(t)>=0))return; const k=ph||qz.phone||qz.id; if(seen.has(k))return; seen.add(k); leads.push(qz); });
+  let html='';
+  hitC.forEach(c=>{ const f=c360ClientFlags(c); html+='<div onclick="openClient360(\''+c.id+'\')" style="padding:11px 13px;border-bottom:1px solid var(--border);cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span style="font-weight:700;">'+esc(c.name||'(sin nombre)')+'</span><span style="color:var(--muted);font-size:12px;white-space:nowrap;">'+esc(c.phone||'')+'</span></div><div style="margin-top:5px;">'+(c360BadgeHtml(f)||'<span style="color:var(--muted);font-size:11px;">cliente</span>')+'</div></div>'; });
+  leads.forEach(qz=>{ const car=(qz.options&&qz.options[0]&&qz.options[0].car)||''; html+='<div onclick="openLead360(\''+qz.id+'\')" style="padding:11px 13px;border-bottom:1px solid var(--border);cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span style="font-weight:700;">'+esc(qz.customer||'(sin nombre)')+'</span><span style="color:var(--muted);font-size:12px;white-space:nowrap;">'+esc(qz.phone||'')+'</span></div><div style="margin-top:5px;">'+c360BadgeHtml({quote:true})+(car?'<span style="color:var(--muted);font-size:11px;"> · '+esc(car)+'</span>':'')+'</div></div>'; });
+  box.innerHTML=html||'<div style="padding:16px;color:var(--muted);font-size:13px;text-align:center;">Sin resultados.</div>'; box.style.display='';
+};
+window.openClient360=async function(id){
+  const c=clients.find(x=>x.id===id); if(!c){ alert('Cliente no encontrado.'); return; }
+  _c360Cur=id; c360Clear();
+  const body=document.getElementById('c360-body'); if(body) body.innerHTML='<div style="padding:34px;text-align:center;color:var(--muted);">Cargando…</div>';
+  document.getElementById('c360-modal').style.display='flex';
+  await c360LoadQuotes(); await c360LoadInv(); renderClient360(id);
+};
+function _c360InvFor(c, vehicle){ if(!Array.isArray(_c360Inv)) return null; const vin=((vehicle&&vehicle.vin)||c.vin||'').toUpperCase(); const num=c.vehicleInventoryNum; return _c360Inv.find(x=>(vin&&(x.vin||'').toUpperCase()===vin)||(num&&String(x.inventoryNum)===String(num)))||null; }
+function _c360DocRow(icon,label,url,vis){ const tag= vis==='interno'
+    ? '<span style="background:rgba(255,107,107,.15);color:var(--red);border:1px solid rgba(255,107,107,.4);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px;">interno</span>'
+    : '<span style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.4);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px;">público</span>';
+  const link=url?('<a href="'+esc(url)+'" target="_blank" style="color:var(--gold);text-decoration:none;font-size:12px;white-space:nowrap;">ver ›</a>'):'<span style="color:var(--muted);font-size:12px;">—</span>';
+  return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-size:13px;">'+icon+' '+label+tag+'</span>'+link+'</div>';
+}
+function c360DocsHtml(c, vehicle){
+  const inv=_c360InvFor(c, vehicle); let rows='';
+  rows+=_c360DocRow('📝','Contrato', (c.signedContract&&c.signedContract.url)||'', 'público');
+  rows+=_c360DocRow('🛡️','Seguro', c.insurancePhotoURL||'', 'público');
+  if(inv&&inv.smogPhotoURL) rows+=_c360DocRow('💨','Smog', inv.smogPhotoURL, 'público');
+  const ords=svcOrders.filter(o=>o.clientId===c.id && (!vehicle || (o.vin||'').toUpperCase()===(vehicle.vin||'').toUpperCase()));
+  ords.forEach(o=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):''; rows+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-size:13px;">🧾 Invoice servicio '+when+'<span style="background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.4);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px;">público</span></span><a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">ver ›</a></div>'; });
+  rows+=_c360DocRow('🪪','Identificación', c.idPhotoURL||'', 'interno');
+  if(inv&&inv.gpsPhotoURL) rows+=_c360DocRow('📍','GPS', inv.gpsPhotoURL, 'interno');
+  return rows+'<div style="color:var(--muted);font-size:11px;margin-top:8px;line-height:1.5;">🔒 Lo <b>interno</b> (GPS, identificación) NO lo ve el cliente en su portal — solo tú. Lo <b>público</b> sí.</div>';
+}
+window.renderClient360=function(id){
+  const c=clients.find(x=>x.id===id); if(!c) return; const body=document.getElementById('c360-body'); if(!body) return;
+  const M=_c360Money, f=c360ClientFlags(c), phone=(c.phone||'').replace(/[^0-9+]/g,''), vehicles=clientVehicles(c);
+  const sOrders=svcOrders.filter(o=>o.clientId===id).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const qz=(_c360Quotes||[]).filter(q=>(q.phoneE164||'')===(c.phoneE164||'')).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const paid=isPaidOff(c), bal=calcBalance(c);
+  const sec=(t,inner)=>'<div style="padding:14px 16px;border-top:1px solid var(--border);"><div style="font-weight:800;font-size:13px;color:var(--gold);letter-spacing:.3px;margin-bottom:8px;">'+t+'</div>'+inner+'</div>';
+  const empty=t=>'<div style="color:var(--muted);font-size:13px;">'+t+'</div>';
+  let h='<div style="padding:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="min-width:0;"><div style="font-family:var(--font-display);font-size:22px;">'+esc(c.name||'(sin nombre)')+'</div><div style="color:var(--muted);font-size:13px;margin-top:2px;">'+esc(c.phone||'sin teléfono')+(c.lang?(' · '+(c.lang==='en'?'English':'Español')):'')+'</div><div style="margin-top:8px;">'+(c360BadgeHtml(f)||'')+'</div></div><div style="display:flex;gap:6px;flex:0 0 auto;align-items:center;">'+(phone?'<a href="tel:'+phone+'" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:15px;">📞</a><a href="sms:'+phone+'" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:15px;">💬</a>':'')+'<button onclick="c360Close()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div></div>';
+  h+=sec('🚗 Vehículos', vehicles.length?vehicles.map((v,i)=>'<div onclick="openVehicle360(\''+id+'\','+i+')" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;"><div style="min-width:0;"><div style="font-weight:700;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN …'+esc(String(v.vin).slice(-6))):'')+'</div></div><span style="color:var(--gold);">›</span></div>').join(''):empty('Sin vehículos registrados.'));
+  if(f.buyer){ const st=paid?'<span style="color:var(--green);font-weight:700;">✅ Pagado</span>':'<span style="color:var(--gold);font-weight:700;">● Activo · saldo '+M(bal)+'</span>'; h+=sec('🔑 Compra','<div style="font-size:13px;line-height:1.8;">'+st+(c.total?('<br>Precio '+M(c.total)+(c.down?(' · enganche '+M(c.down)):'')):'')+(c.weekly?('<br>'+(c.numPay||0)+' pagos de '+M(c.weekly)):'')+(c.vehicleInventoryNum?('<br>Inventario #'+esc(c.vehicleInventoryNum)):'')+'</div>'); }
+  h+=sec('🔧 Servicio', sOrders.length?sOrders.map(o=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; const stl=(SVC_STATUS[o.status]||{}).lbl||o.status||''; const tot=o.grandTotalCents!=null?M(o.grandTotalCents/100):''; return '<div onclick="c360Close();svcOpenOrder(\''+o.id+'\')" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+esc(o.reason||'Servicio')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:var(--muted);margin-top:3px;">'+stl+(tot?(' · '+tot):'')+(Number(o.balanceCents)?(' · saldo '+M(o.balanceCents/100)):'')+'</div></div>'; }).join(''):empty('Sin órdenes de servicio.'));
+  h+=sec('🧮 Cotizaciones', qz.length?qz.map(q=>{ const car=(q.options&&q.options[0]&&q.options[0].car)||''; const when=q.createdAt?new Date(q.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; return '<div onclick="c360Close();viewCotiz(\''+q.id+'\')" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+esc(car||'Cotización')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:var(--muted);margin-top:3px;">'+((q.options||[]).length)+' opción(es)</div></div>'; }).join(''):empty('Sin cotizaciones.'));
+  h+=sec('📄 Documentos', c360DocsHtml(c, null));
+  body.innerHTML=h;
+};
+window.openVehicle360=function(id, idx){
+  const c=clients.find(x=>x.id===id); if(!c) return; const v=clientVehicles(c)[idx]; if(!v) return;
+  const body=document.getElementById('c360-body'); if(!body) return; const M=_c360Money;
+  const isFin=!!(c.vin && v.vin && (c.vin||'').toUpperCase()===(v.vin||'').toUpperCase());
+  const paid=isPaidOff(c); const status=isFin?(paid?'✅ Pagado':'● Activo (financiado)'):'🔧 De servicio';
+  let h='<div style="padding:14px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);"><button onclick="renderClient360(\''+id+'\')" style="background:transparent;border:none;color:var(--text);font-size:24px;cursor:pointer;line-height:1;">‹</button><div style="flex:1;min-width:0;"><div style="font-family:var(--font-display);font-size:19px;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN '+esc(v.vin)):'')+'</div></div><button onclick="c360Close()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;">×</button></div>'
+    +'<div style="padding:12px 16px;border-bottom:1px solid var(--border);"><span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:4px 12px;font-weight:700;font-size:13px;">'+status+(isFin&&!paid?(' · saldo '+M(calcBalance(c))):'')+'</span></div>'
+    +'<div style="padding:14px 16px;"><div style="font-weight:800;font-size:13px;color:var(--gold);margin-bottom:8px;">📄 Documentos del auto</div>'+c360DocsHtml(c, v)+'</div>';
+  body.innerHTML=h;
+};
+window.openLead360=async function(qid){
+  await c360LoadQuotes(); const q=(_c360Quotes||[]).find(x=>x.id===qid); if(!q){ alert('Cotización no encontrada.'); return; }
+  c360Clear(); const body=document.getElementById('c360-body'); if(!body) return;
+  const ph=q.phoneE164||'', phone=(q.phone||'').replace(/[^0-9+]/g,'');
+  const mine=(_c360Quotes||[]).filter(x=>(ph&&(x.phoneE164||'')===ph)||(!ph&&x.phone===q.phone)).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  let h='<div style="padding:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div><div style="font-family:var(--font-display);font-size:22px;">'+esc(q.customer||'(sin nombre)')+'</div><div style="color:var(--muted);font-size:13px;margin-top:2px;">'+esc(q.phone||'sin teléfono')+'</div><div style="margin-top:8px;">'+c360BadgeHtml({quote:true})+'</div></div><div style="display:flex;gap:6px;align-items:center;">'+(phone?'<a href="tel:'+phone+'" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:15px;">📞</a><a href="sms:'+phone+'" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:15px;">💬</a>':'')+'<button onclick="c360Close()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;">×</button></div></div>';
+  h+='<div style="padding:14px 16px;border-top:1px solid var(--border);"><div style="font-weight:800;font-size:13px;color:var(--gold);margin-bottom:8px;">🧮 Cotizaciones</div>'+mine.map(x=>{ const car=(x.options&&x.options[0]&&x.options[0].car)||''; const when=x.createdAt?new Date(x.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; return '<div onclick="c360Close();viewCotiz(\''+x.id+'\')" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+esc(car||'Cotización')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div></div>'; }).join('')+'<div style="color:var(--muted);font-size:12px;margin-top:8px;">Aún no es cliente — se vuelve cliente al comprar o agendar servicio.</div></div>';
+  document.getElementById('c360-modal').style.display='flex'; body.innerHTML=h;
+};
 
 window.svcNewOrder=function(){
   window._svcDraft={ clientId:'', clientName:'', clientPhone:'', lang:'es', vin:'', plate:'', vehicleLabel:'', vehPick:'', reason:'', when:'now', scheduledAt:'', estMin:60, assignRole:'Mecánico', assignEmpId:'', assignName:'', services:[{desc:'',minutes:60}], laborRate:100, deposit:0, parts:[], editId:'', status:'' };
