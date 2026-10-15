@@ -3014,7 +3014,7 @@ window.lendmarkSheet = async function(i, mode){
   let sigUrl=null; try{ sigUrl = await _loadSellerSig(); }catch(e){ console.warn('sellerSig', e); }
   const price=Number(o.price)||0, down=Number(o.down)||0, tax=Number(o.tax)||0, dmv=Number(o.dmv)||0;
   const docFee=70, smog=58.25, total=price+docFee+smog+tax+dmv, financed=Math.max(0, total-down);
-  try{ await loadInvCache(); }catch(e){}
+  try{ await loadInvCache(true); }catch(e){}   // fresco: por si acabas de subir la foto del VIN/smog al inventario
   const vin=(o.vin||'').trim().toUpperCase();
   const inv = vin ? (_invCache||[]).find(c=>(c.vin||'').trim().toUpperCase()===vin) : null;
   const photos=(inv&&inv.photos&&inv.photos.length)?inv.photos.slice(0,6):((inv&&inv.img)?[inv.img]:[]);
