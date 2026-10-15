@@ -526,6 +526,7 @@
         <label class="form-label">📸 Foto del ID</label>
         <input type="file" class="form-input" id="f-id-photo" accept="image/*" style="padding:8px;cursor:pointer;">
         <div id="f-id-preview" style="margin-top:6px;"></div>
+        <button type="button" onclick="diagIdUpload()" style="margin-top:8px;background:transparent;border:1px dashed var(--border);color:var(--muted);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;">🔧 Probar subida a Storage (diagnóstico)</button>
       </div>
       <div class="form-group" style="background:rgba(232,182,74,0.06);border:1px solid rgba(232,182,74,0.25);border-radius:10px;padding:12px;">
         <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
@@ -3570,6 +3571,19 @@ function uploadResumableSafe(storageRef, blob, metadata, label, stallMs){
     );
   });
 }
+// 🔧 Diagnóstico: sube 32 bytes a ids/ y a dismantle_vehicles/ y dice EXACTO qué pasa.
+window.diagIdUpload=async function(){
+  let who='(sin sesión)';
+  try{ who = (auth && auth.currentUser && auth.currentUser.email) || '(auth.currentUser = null)'; }catch(e){ who='(no pude leer auth)'; }
+  if(!auth || !auth.currentUser){ alert('⚠️ No hay sesión de Firebase (auth.currentUser = null).\n\nEse es el problema: Storage no te deja subir sin sesión. Cierra y vuelve a entrar a admin.'); return; }
+  const st=getStorage();
+  const mk=()=>new Blob([new Uint8Array(32)], {type:'image/jpeg'});
+  const test=async (folder)=>{ const t0=Date.now(); try{ const url=await uploadResumableSafe(ref(st, folder+'/_diag/'+Date.now()+'.jpg'), mk(), {contentType:'image/jpeg'}, 'diag', 15000); return '✅ OK en '+((Date.now()-t0)/1000).toFixed(1)+'s'; }catch(e){ return '❌ '+((e&&(e.code||e.message))||String(e))+' ('+((Date.now()-t0)/1000).toFixed(1)+'s)'; } };
+  alert('Probando Storage como: '+who+'\n\nDale OK y espera ~5–15s el resultado…');
+  const rIds = await test('ids');
+  const rYard = await test('dismantle_vehicles');
+  alert('RESULTADO (usuario: '+who+')\n\n• ids/  →  '+rIds+'\n• dismantle_vehicles/  →  '+rYard+'\n\nCopia esto y pégamelo.');
+};
 async function uploadPhotoRetry(storageRef, blob, metadata, label){
   try{ return await uploadResumableSafe(storageRef, blob, metadata, label, 30000); }
   catch(e1){
