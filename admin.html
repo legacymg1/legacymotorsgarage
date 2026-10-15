@@ -3647,11 +3647,11 @@ window.saveClient=async function(keepOpen){
     try {
       const st = getStorage();
       const _origKb = Math.round((idPhotoFile.size||0)/1024);
-      let _idUp = idPhotoFile, _conv='cruda';
-      try { _idUp = await _withTimeout(blobToJpeg(idPhotoFile), 25000, 'convertir ID'); _conv='comprimida'; } catch(e){ console.warn('ID no convertida', e); _idUp = idPhotoFile; _conv='CRUDA(fallo compresión)'; }
+      let _idUp = idPhotoFile, _conv='cruda', _convErr='';
+      try { _idUp = await _withTimeout(blobToJpeg(idPhotoFile), 25000, 'convertir ID'); _conv='comprimida'; } catch(e){ _convErr=(e&&e.message)||String(e); console.warn('ID no convertida', e); _idUp = idPhotoFile; _conv='CRUDA'; }
       const _upKb = Math.round((_idUp.size||0)/1024);
-      // Si la compresión falló y el archivo es grande, NO subas el gigante (se cuelga). Avisa claro.
-      if(_conv.indexOf('CRUDA')===0 && _upKb > 2048){ throw new Error('no se pudo comprimir la foto ('+_upKb+'KB). Intenta una foto más chica o clara.'); }
+      // Si la compresión falló y el archivo es grande, NO subas el gigante (se cuelga). Avisa el motivo EXACTO.
+      if(_conv==='CRUDA' && _upKb > 2048){ throw new Error('no se pudo leer/comprimir la foto ('+_upKb+'KB · '+(idPhotoFile.type||'tipo?')+').\nMotivo: '+(_convErr||'desconocido')); }
       const idRef = ref(st, 'ids/'+id+'/'+Date.now()+'_id.jpg');
       try{
         idPhotoURL = await uploadPhotoRetry(idRef, _idUp, {contentType: (_idUp.type||'image/jpeg')}, 'subir ID');
@@ -5133,10 +5133,35 @@ async function _heicToJpeg(blob){
   if(Array.isArray(out)) out=out[0];
   return out;
 }
+// Decodifica a JPEG con DOS estrategias: createImageBitmap (rápido, aguanta fotos enormes)
+// y, si falla, el clásico <img>. Redimensiona a maxW y comprime.
+async function _decodeToJpeg(blob, maxW, quality){
+  // 1) createImageBitmap (lo mejor para fotos grandes de iPhone)
+  try{
+    const bmp = await createImageBitmap(blob);
+    let w=bmp.width, h=bmp.height;
+    if(w && h){
+      if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(bmp,0,0,w,h);
+      try{ bmp.close && bmp.close(); }catch(_){}
+      const out=await new Promise(res=>cv.toBlob(b=>res(b),'image/jpeg',quality));
+      if(out) return out;
+    }
+  }catch(e){ /* sigue al <img> */ }
+  // 2) <img> + canvas
+  return await new Promise((resolve,reject)=>{
+    const u=URL.createObjectURL(blob); const img=new Image();
+    img.onload=function(){ try{ let w=img.naturalWidth,h=img.naturalHeight; if(!w||!h){URL.revokeObjectURL(u);return reject(new Error('sin dimensiones'));} if(w>maxW){h=Math.round(h*maxW/w);w=maxW;} const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cv.toBlob(function(b){URL.revokeObjectURL(u);b?resolve(b):reject(new Error('toBlob'));},'image/jpeg',quality);}catch(e){URL.revokeObjectURL(u);reject(e);} };
+    img.onerror=function(){ URL.revokeObjectURL(u); reject(new Error('no decodificable')); };
+    img.src=u;
+  });
+}
 async function blobToJpeg(blob){
   const sig = new Uint8Array(await blob.slice(0,4).arrayBuffer());
   const isPdf = sig[0]===0x25 && sig[1]===0x50 && sig[2]===0x44 && sig[3]===0x46;
-  if(!isPdf && await _looksHeic(blob)){ try{ blob = await _heicToJpeg(blob); }catch(e){ console.warn('HEIC no convertida', e); } }
+  const wasHeic = !isPdf && await _looksHeic(blob);
+  if(wasHeic){ try{ blob = await _heicToJpeg(blob); }catch(e){ throw new Error('HEIC: heic2any falló ('+((e&&e.message)||e)+')'); } }
   if(isPdf){
     const pdfjs = await _loadPdfjs();
     const buf = await blob.arrayBuffer();
@@ -5147,12 +5172,8 @@ async function blobToJpeg(blob){
     await page.render({canvasContext:cv.getContext('2d'), viewport:vp}).promise;
     return await new Promise((res,rej)=>cv.toBlob(b=>b?res(b):rej(new Error('toBlob')),'image/jpeg',0.9));
   }
-  return await new Promise((resolve,reject)=>{
-    const u=URL.createObjectURL(blob); const img=new Image();
-    img.onload=function(){ try{ let maxW=1200,w=img.naturalWidth,h=img.naturalHeight; if(!w||!h){URL.revokeObjectURL(u);return reject(new Error('sin dimensiones'));} if(w>maxW){h=Math.round(h*maxW/w);w=maxW;} const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cv.toBlob(function(b){URL.revokeObjectURL(u);b?resolve(b):reject(new Error('toBlob'));},'image/jpeg',0.78);}catch(e){URL.revokeObjectURL(u);reject(e);} };
-    img.onerror=function(){ URL.revokeObjectURL(u); reject(new Error('formato no decodificable (HEIC en computadora?)')); };
-    img.src=u;
-  });
+  try{ return await _decodeToJpeg(blob, 1200, 0.78); }
+  catch(e){ throw new Error('no se pudo leer la imagen ['+(blob.type||'tipo?')+(wasHeic?'/heic':'')+']: '+((e&&e.message)||e)); }
 }
 window.repairDocs = function(){
   const ov=document.createElement('div');
