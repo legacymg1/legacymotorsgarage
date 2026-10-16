@@ -299,7 +299,20 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on #floating-bar{display:none!important;}body.admin-on{padding-bottom:62px;}
 #add-car-fab{display:none;position:fixed;top:116px;right:20px;background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border:none;border-radius:50px;padding:15px 24px;font-size:16px;font-weight:800;letter-spacing:0.5px;cursor:pointer;box-shadow:0 6px 24px rgba(240,192,64,0.45);z-index:6100;transition:transform 0.2s;}
 @media(max-width:768px){#add-car-fab{top:94px;right:14px;padding:13px 20px;font-size:15px;}}
-#add-car-fab:hover{transform:translateY(-3px);}</style>
+#add-car-fab:hover{transform:translateY(-3px);}
+/* 🌐 Idioma: muestra EN o ES según <html data-lang>. Un solo idioma a la vez. */
+.lang-es{display:none;}
+html[data-lang="es"] .lang-en{display:none;}
+html[data-lang="es"] .lang-es{display:revert;}
+#site-lang-toggle{background:transparent;border:1px solid rgba(255,255,255,0.25);color:rgba(255,255,255,0.7);border-radius:8px;padding:6px 11px;font-size:11px;font-weight:700;letter-spacing:1.5px;cursor:pointer;font-family:inherit;}
+#site-lang-toggle:hover{color:#fff;border-color:#fff;}</style>
+<script>
+/* Detecta el idioma del navegador (o lo guardado) ANTES de pintar, para que no parpadee. */
+(function(){var s;try{s=localStorage.getItem('lmg_site_lang');}catch(e){}var l=s||(((navigator.language||navigator.userLanguage||'')+'').toLowerCase().indexOf('es')===0?'es':'en');document.documentElement.setAttribute('data-lang',l);document.documentElement.setAttribute('lang',l);})();
+window.lmgSetLang=function(l){l=(l==='es')?'es':'en';document.documentElement.setAttribute('data-lang',l);document.documentElement.setAttribute('lang',l);try{localStorage.setItem('lmg_site_lang',l);}catch(e){}var t=document.getElementById('site-lang-toggle');if(t)t.textContent=(l==='es')?'EN':'ES';};
+window.lmgToggleLang=function(){var c=document.documentElement.getAttribute('data-lang')||'en';window.lmgSetLang(c==='es'?'en':'es');};
+document.addEventListener('DOMContentLoaded',function(){var t=document.getElementById('site-lang-toggle');if(t)t.textContent=(document.documentElement.getAttribute('data-lang')==='es')?'EN':'ES';});
+</script>
 </head>
 <body>
 <div id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;display:none;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></div>
@@ -328,29 +341,31 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
     <a href="#" onclick="return false;"><img src="legacy-logo.png" alt="Legacy Motors Garage LLC"></a>
   </div>
   <div class="nav-links">
-    <a href="#cars">Inventory</a>
-    <a href="#why">Why Us</a>
-    <a href="#reviews">Reviews</a>
-    <a href="#contact">Contact</a>
+    <a href="#cars"><span class="lang-en">Inventory</span><span class="lang-es">Inventario</span></a>
+    <a href="#why"><span class="lang-en">Why Us</span><span class="lang-es">Por Qué Nosotros</span></a>
+    <a href="#reviews"><span class="lang-en">Reviews</span><span class="lang-es">Reseñas</span></a>
+    <a href="#contact"><span class="lang-en">Contact</span><span class="lang-es">Contacto</span></a>
     <a href="portal.html" class="nav-access">
       <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
-      Access
+      <span class="lang-en">Access</span><span class="lang-es">Acceso</span>
     </a>
+    <button id="site-lang-toggle" onclick="lmgToggleLang()">ES</button>
   </div>
   <div class="hamburger" onclick="toggleMenu()">
     <span></span><span></span><span></span>
   </div>
 </nav>
 
-<div class="top-strip">Hablamos Español &nbsp;·&nbsp; Financing Available &nbsp;·&nbsp; Buy Here Pay Here</div>
+<div class="top-strip"><span class="lang-en">Hablamos Español &nbsp;·&nbsp; Financing Available &nbsp;·&nbsp; Buy Here Pay Here</span><span class="lang-es">Hablamos Español &nbsp;·&nbsp; Financiamiento Disponible &nbsp;·&nbsp; Compre Aquí, Pague Aquí</span></div>
 
 <div class="mobile-menu" id="mobile-menu">
   <button class="mobile-close" onclick="toggleMenu()">✕</button>
-  <a href="#cars" onclick="toggleMenu()">Inventory</a>
-  <a href="#why" onclick="toggleMenu()">Why Us</a>
-  <a href="#reviews" onclick="toggleMenu()">Reviews</a>
-  <a href="#contact" onclick="toggleMenu()">Contact</a>
-  <a href="portal.html" onclick="toggleMenu()">Access Account</a>
+  <a href="#cars" onclick="toggleMenu()"><span class="lang-en">Inventory</span><span class="lang-es">Inventario</span></a>
+  <a href="#why" onclick="toggleMenu()"><span class="lang-en">Why Us</span><span class="lang-es">Por Qué Nosotros</span></a>
+  <a href="#reviews" onclick="toggleMenu()"><span class="lang-en">Reviews</span><span class="lang-es">Reseñas</span></a>
+  <a href="#contact" onclick="toggleMenu()"><span class="lang-en">Contact</span><span class="lang-es">Contacto</span></a>
+  <a href="portal.html" onclick="toggleMenu()"><span class="lang-en">Access Account</span><span class="lang-es">Acceder a mi Cuenta</span></a>
+  <a href="#" onclick="lmgToggleLang();toggleMenu();return false;" style="color:var(--gold2);"><span class="lang-en">Ver en Español</span><span class="lang-es">View in English</span></a>
 </div>
 
 
@@ -358,9 +373,9 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
 <section class="cars-section" id="cars">
   <div class="section-header" style="display:flex;justify-content:center;align-items:flex-end;gap:22px;flex-wrap:wrap;">
     <div style="flex:1 1 auto;min-width:240px;">
-      <div class="section-tag">Inventory · Inventario</div>
-      <h2 class="section-title">Available Vehicles<br><em>Vehículos Disponibles</em></h2>
-      <p class="section-sub">Quality vehicles at prices that work for every family. All with financing available.</p>
+      <div class="section-tag"><span class="lang-en">Inventory</span><span class="lang-es">Inventario</span></div>
+      <h2 class="section-title"><span class="lang-en">Available Vehicles</span><span class="lang-es">Vehículos Disponibles</span></h2>
+      <p class="section-sub"><span class="lang-en">Quality vehicles at prices that work for every family. All with financing available.</span><span class="lang-es">Vehículos de calidad a precios para toda la familia. Todos con financiamiento disponible.</span></p>
     </div>
     <div id="ai-usage-box-inv" style="display:none;flex:0 0 auto;width:min(380px,100%);text-align:left;"></div>
   </div>
@@ -370,10 +385,10 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
   </div>
   <div class="cars-grid" id="cars-grid"></div>
   <div class="marketplace-wrap">
-    <p class="mp-note">See More Options · Ver Más Opciones</p>
+    <p class="mp-note"><span class="lang-en">See More Options</span><span class="lang-es">Ver Más Opciones</span></p>
     <a href="https://www.facebook.com/marketplace/profile/636061813/?ref=permalink&mibextid=6ojiHh" target="_blank" class="marketplace-btn">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-      View on Facebook Marketplace
+      <span class="lang-en">View on Facebook Marketplace</span><span class="lang-es">Ver en Facebook Marketplace</span>
     </a>
   </div>
 </section>
@@ -382,8 +397,8 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
 <div class="floating-bar" id="floating-bar">
   <div class="floating-bar-warranty">
     <div>
-      <div class="floating-bar-warranty-text">🛡️ 30-Day Warranty on All Vehicles</div>
-      <div class="floating-bar-warranty-sub">Garantía de 30 Días · Buy With Confidence</div>
+      <div class="floating-bar-warranty-text"><span class="lang-en">🛡️ 30-Day Warranty on All Vehicles</span><span class="lang-es">🛡️ Garantía de 30 Días en Todos los Autos</span></div>
+      <div class="floating-bar-warranty-sub"><span class="lang-en">30-Day Warranty · Buy With Confidence</span><span class="lang-es">Garantía de 30 Días · Compra con Confianza</span></div>
     </div>
   </div>
   <div class="floating-bar-stats">
@@ -395,14 +410,14 @@ footer{background:var(--dark2);border-top:1px solid var(--border);padding:52px 6
     <div class="floating-bar-divider"></div>
     <div class="fbs-item"><div class="fbs-num">30</div><div class="fbs-label">Day Warranty</div></div>
   </div>
-  <a href="tel:5595405145" class="floating-bar-call">📞 Call Now</a>
+  <a href="tel:5595405145" class="floating-bar-call"><span class="lang-en">📞 Call Now</span><span class="lang-es">📞 Llámanos</span></a>
 </div>
 
 <!-- WHY -->
 <section class="why-section" id="why" style="padding-top:40px;">
   <div class="section-header">
-    <h2 class="section-title">Legacy Motors Garage LLC<br><em>Has Your Back</em></h2>
-    <p class="section-sub">We make car ownership simple, affordable, and stress-free — for every family in the Central Valley.</p>
+    <h2 class="section-title">Legacy Motors Garage LLC<br><em><span class="lang-en">Has Your Back</span><span class="lang-es">Te Respalda</span></em></h2>
+    <p class="section-sub"><span class="lang-en">We make car ownership simple, affordable, and stress-free — for every family in the Central Valley.</span><span class="lang-es">Hacemos que tener carro sea simple, accesible y sin estrés — para cada familia del Valle Central.</span></p>
   </div>
   <div class="why-grid">
     <div class="why-card">
