@@ -929,7 +929,7 @@
     <div id="cot-options"></div>
     <button type="button" onclick="cotAddBlank()" style="background:transparent;color:var(--gold);border:1px dashed var(--gold);border-radius:10px;padding:10px;width:100%;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">＋ Agregar otra opción en blanco</button>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal('cot-modal')">Cerrar</button>
+      <button class="btn-cancel" onclick="cotClose()">Cerrar</button>
       <button type="button" onclick="cotShare()" style="background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;">📤 Compartir</button>
       <button class="btn-save" onclick="printCotizacion()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);">🖨 Imprimir</button>
     </div>
@@ -3244,6 +3244,12 @@ function cotResetAll(){
   window._cotOdoBlob=null; window._cotOdoURL=''; window._cotOdoMiles=null; const _co=document.getElementById('cot-odo-photo'); if(_co) _co.value=''; const _cop=document.getElementById('cot-odo-preview'); if(_cop) _cop.innerHTML='';
   cotOpts=[]; cotSeq=0; try{ renderCotOptions(); }catch(e){}
 }
+// ❌ Cerrar el cotizador = LIMPIAR todo (para que la próxima vez abra en blanco, no con lo anterior).
+window.cotClose=function(){
+  try{ cotResetAll(); }catch(e){}
+  try{ const cb=document.getElementById('cot-customer-results'); if(cb){ cb.style.display='none'; cb.innerHTML=''; } }catch(e){}
+  try{ closeModal('cot-modal'); }catch(e){}
+};
 // 📮 Envía el sales sheet DIRECTO por el servidor (Zoho SMTP) — arma el correo en el backend con fotos+firma. Devuelve true si se envió.
 async function _doSendLendmark(s){
   try{
