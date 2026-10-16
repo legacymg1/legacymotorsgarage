@@ -569,6 +569,58 @@ exports.scanId = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, async 
   }
 });
 
+// 🔢 LECTOR DE ODÓMETRO — lee las millas de una foto del tablero (para actualizar el inventario).
+exports.scanOdometer = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, async (request) => {
+  if (!request.auth) { throw new HttpsError("unauthenticated", "Inicia sesión."); }
+  const data = request.data || {};
+  let b64 = String(data.imageBase64 || "");
+  let mt = String(data.mediaType || "image/jpeg");
+  if (b64.indexOf("base64,") >= 0) {
+    const pre = b64.slice(0, b64.indexOf("base64,"));
+    const m = pre.match(/image\/(jpeg|png|webp|gif)/i);
+    if (m) mt = "image/" + m[1].toLowerCase();
+    b64 = b64.split("base64,").pop();
+  }
+  if (!b64) { throw new HttpsError("invalid-argument", "Falta la imagen."); }
+  const sys = "You read a photo of a vehicle's odometer (the dashboard mileage display, digital or analog). " +
+    "Return ONLY a strict JSON object — no prose, no code fences. Keys:\n" +
+    "- miles: the ODOMETER total reading as an integer, digits only, NO commas and NO units (e.g. 85230). " +
+    "This is the big TOTAL mileage number, NOT the trip meter. Trip meters are usually shorter, show a decimal (e.g. 123.4), or are labeled TRIP / A / B / ODO2 — ignore those. If several numbers appear, choose the main total-odometer one (usually the largest whole number). " +
+    "If you cannot read it confidently, use null.\n" +
+    "- unit: \"mi\" or \"km\", whichever the dashboard shows. Use \"mi\" if unsure.\n" +
+    "- confidence: a number from 0 to 1 of how sure you are of the reading.\n" +
+    "Return JSON only.";
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({
+      model: "claude-sonnet-5",
+      max_tokens: 200,
+      system: sys,
+      messages: [{ role: "user", content: [
+        { type: "image", source: { type: "base64", media_type: mt, data: b64 } },
+        { type: "text", text: "Read the odometer TOTAL mileage as strict JSON." },
+      ] }],
+    });
+    let txt = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    txt = txt.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
+    let out = {};
+    try { out = JSON.parse(txt); } catch (e) { const m = txt.match(/\{[\s\S]*\}/); if (m) { try { out = JSON.parse(m[0]); } catch (_) {} } }
+    let miles = null;
+    if (out.miles != null && out.miles !== "") {
+      const n = parseInt(String(out.miles).replace(/[^0-9]/g, ""), 10);
+      if (!isNaN(n) && n >= 0 && n < 2000000) miles = n;
+    }
+    const unit = (String(out.unit || "mi").toLowerCase().indexOf("km") >= 0) ? "km" : "mi";
+    let conf = Number(out.confidence); if (isNaN(conf) || conf < 0 || conf > 1) conf = null;
+    return { miles, unit, confidence: conf };
+  } catch (e) {
+    console.error("scanOdometer error", e);
+    throw new HttpsError("internal", String((e && e.message) || e));
+  }
+});
+
 // ===== 💳 PAGOS CON SQUARE (portal del cliente + "enviar cobro" desde el admin) =====
 const SQUARE_LOCATION_ID = "LDTPHV3ZR18D0";       // Ubicación de Production (NO es secreto)
 const SQUARE_API = "https://connect.squareup.com"; // Production

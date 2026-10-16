@@ -14649,6 +14649,7 @@ gECNAv8P4kvmpMsVcfAAAAAASUVORK5CYII=" alt="Legacy Motors Garage LLC"></div>
     <input class="cf-input" id="car-trim" placeholder="Versión / Trim (LT, XLE, Sport)…" style="text-transform:capitalize">
     <input class="cf-input" id="car-color" placeholder="Color (el VIN no lo trae — escríbelo)" style="text-transform:capitalize">
     <input class="cf-input" id="car-miles" placeholder="Mileage / Millas">
+    <div id="car-miles-record" style="display:none;font-size:11px;color:#9aa;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:6px 9px;margin:-4px 0 8px;line-height:1.5;"></div>
     <input class="cf-input" id="car-vin" placeholder="VIN Number" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter'){event.preventDefault();decodeCarVin();}">
     <button type="button" onclick="decodeCarVin()" style="width:100%;background:rgba(240,192,64,0.14);color:#f0c040;border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">🔎 Decodificar VIN (auto-rellenar)</button>
     <div id="car-vin-msg" style="font-size:12px;color:#aaa;margin:-2px 0 6px;"></div>
@@ -15155,6 +15156,7 @@ window.openCarModal = function(carId){
     document.getElementById('car-price').value=c.price||'';
     document.getElementById('car-weekly').value=c.weekly||'';
     document.getElementById('car-miles').value=c.miles||'';
+    try{ const mr=document.getElementById('car-miles-record'); if(mr){ const fmt=n=>(n==null?'—':Number(n).toLocaleString('en-US')+' mi'); if(c.milesIn!=null||c.milesCurrent!=null||c.milesOut!=null){ mr.style.display=''; mr.innerHTML='🔒 <b>Record interno de millas</b> (no sale en el anuncio)<br>Entró con <b>'+fmt(c.milesIn)+'</b> · actual <b>'+fmt(c.milesCurrent!=null?c.milesCurrent:c.miles)+'</b>'+(c.milesOut!=null?(' · salió con <b>'+fmt(c.milesOut)+'</b>'):'')+(c.odoUpdatedAt?('<br><span style="color:#777;">última lectura del odómetro: '+new Date(c.odoUpdatedAt).toLocaleDateString('es-MX')+'</span>'):''); } else { mr.style.display='none'; mr.innerHTML=''; } } }catch(e){}
     document.getElementById('car-desc').value=c.desc||'';
     document.getElementById('car-vin').value=c.vin||'';
     // Show existing photos
@@ -15169,6 +15171,7 @@ window.openCarModal = function(carId){
     document.getElementById('car-price').value='';
     document.getElementById('car-weekly').value='';
     document.getElementById('car-miles').value='';
+    try{ const mr=document.getElementById('car-miles-record'); if(mr){ mr.style.display='none'; mr.innerHTML=''; } }catch(e){}
     document.getElementById('car-desc').value='';
     document.getElementById('car-vin').value='';
     document.getElementById('car-photo-preview').innerHTML='';
@@ -15566,6 +15569,7 @@ window.saveCar = async function(){
         vinPhotoURL = await getDownloadURL(vr);
       }
     }
+    const _entryMiles=(function(){ const n=parseInt(String((document.getElementById('car-miles')||{}).value||'').replace(/[^0-9]/g,''),10); return isNaN(n)?null:n; })();
     const data = {
       year: document.getElementById('car-year').value,
       make, model,
@@ -15574,6 +15578,12 @@ window.saveCar = async function(){
       price: document.getElementById('car-price').value,
       weekly: document.getElementById('car-weekly').value,
       miles: document.getElementById('car-miles').value,
+      milesIn: (existing.milesIn!=null ? existing.milesIn : _entryMiles),            // 🔢 con cuántas ENTRÓ (privado, se fija una sola vez)
+      milesCurrent: (_entryMiles!=null ? _entryMiles : (existing.milesCurrent!=null?existing.milesCurrent:null)), // millas ACTUALES en número (privado)
+      milesOut: (existing.milesOut!=null ? existing.milesOut : null),                // con cuántas SALIÓ al venderse (Fase 2)
+      odometerPhotoURL: existing.odometerPhotoURL || '',                             // última foto del odómetro (la reemplaza el cotizador)
+      odoUpdatedAt: existing.odoUpdatedAt || null,
+      odoUpdatedBy: existing.odoUpdatedBy || '',
       desc: document.getElementById('car-desc').value.trim(),
       photos, videoURL,
       img: photos[0]||existing.img||'',
