@@ -1429,9 +1429,7 @@ exports.svcClientAccept = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!mine) throw new HttpsError("permission-denied", "No es tu orden.");
   const now = new Date().toISOString();
   await ref.set({ estimateStatus: "accepted", estimateAcceptedAt: now, estimateAcceptedBy: cli.phone, updatedAt: now }, { merge: true });
-  if (d.smsConsent === true) {
-    try { await db.collection("clients").doc(cli.id).set({ smsConsent: true, smsConsentAt: now, smsConsentSource: "service-estimate" }, { merge: true }); } catch (e) {}
-  }
+  // NOTA: el consentimiento SMS lo maneja el sistema que YA existe en el portal (writeConsent → objeto smsConsent + bitácora inmutable clients/{id}/consents). Aquí NO lo tocamos.
   return { ok: true };
 });
 

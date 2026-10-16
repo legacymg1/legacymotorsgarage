@@ -863,10 +863,10 @@ function estimateCardHTML(o){
     ${accepted
       ? `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:700;text-align:center;">✅ ${es?'Aceptaste este estimado':'You approved this estimate'}${o.acceptedAt?(' · '+formatDate((o.acceptedAt||'').slice(0,10))):''}</div>`
       : `<div style="margin-top:12px;">
-          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:rgba(232,182,74,0.06);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;">
+          ${(currentClient&&currentClient.smsConsent&&currentClient.smsConsent.marketing) ? '' : `<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:rgba(232,182,74,0.06);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;">
             <input type="checkbox" id="est-consent-${o.id}" style="width:20px;height:20px;margin-top:1px;flex:none;cursor:pointer;">
             <span style="font-size:12px;line-height:1.5;color:var(--muted);">${es?'Acepto recibir mensajes de texto de Legacy Motors Garage sobre mi servicio y recordatorios. Respondo STOP para cancelar.':'I agree to receive text messages from Legacy Motors Garage about my service and reminders. Reply STOP to cancel.'}</span>
-          </label>
+          </label>`}
           <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
           <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.'}</div>
         </div>`}
@@ -879,10 +879,15 @@ function estimatesHTML(){
 }
 window.portalAcceptEstimate = async function(orderId){
   const btn=document.getElementById('est-accept-'+orderId);
-  const consent = !!((document.getElementById('est-consent-'+orderId)||{}).checked);
+  const cb=document.getElementById('est-consent-'+orderId);
+  const consent = !!(cb && cb.checked);
   if(btn){ btn.disabled=true; btn.textContent=(L==='en'?'Saving…':'Guardando…'); }
   try{
-    await httpsCallable(functions,'svcClientAccept')({ orderId, smsConsent: consent });
+    // Consentimiento SMS: usa el MISMO sistema que ya existe (objeto smsConsent + bitácora inmutable). Solo si marcó la casilla y aún no había consentido.
+    if(consent && !(currentClient&&currentClient.smsConsent&&currentClient.smsConsent.marketing)){
+      try{ await writeConsent(true, 'service_estimate'); }catch(e){ console.warn('writeConsent', e); }
+    }
+    await httpsCallable(functions,'svcClientAccept')({ orderId });
     await loadPortalEstimates();
     const card=document.getElementById('est-'+orderId); if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
   }catch(e){
