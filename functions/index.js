@@ -1403,6 +1403,47 @@ exports.svcFixText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, as
   }
 });
 
+// ⏱️💵 ESTIMADOR DE LABOR — dado el carro + los trabajos, la IA sugiere tiempo y cuánto cobrar de labor (estimado de referencia).
+exports.svcEstimate = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const d = request.data || {};
+  const vehicle = String(d.vehicle || "").slice(0, 120);
+  const vin = String(d.vin || "").slice(0, 20);
+  const rate = Math.max(40, Math.min(250, Number(d.laborRate) || 110));
+  const jobs = Array.isArray(d.jobs) ? d.jobs.map((x) => String(x || "").slice(0, 200)).filter(Boolean).slice(0, 15) : [];
+  if (!jobs.length) return { jobs: [] };
+  const sys = "You are an experienced independent auto-repair shop service advisor in California. Given a vehicle and a list of repair/service jobs, estimate REALISTIC LABOR for EACH job (shop labor only — NOT the price of parts). " +
+    "Assume a shop labor rate of about $" + rate + " per hour. For each job return: minutes (realistic labor time in minutes, rounded to a multiple of 15), laborUsd (a fair labor CHARGE in whole US dollars, roughly hours×rate, rounded to a sensible shop price), note (a VERY short caveat in Spanish, e.g. 'puede variar por condición', 'diagnóstico aparte', '+ partes'). " +
+    "Be realistic and slightly conservative. For detailing/cleaning jobs, price by typical detail packages rather than strictly hourly. If a job is vague, give a typical ballpark and say so briefly in the note. " +
+    "Return ONLY strict JSON {\"jobs\":[{\"minutes\":N,\"laborUsd\":N,\"note\":\"...\"}]} with the SAME length and SAME order as the input jobs. No prose, no code fences.";
+  const userMsg = "Vehicle: " + (vehicle || "(unknown)") + (vin ? (" · VIN " + vin) : "") + "\nJobs (JSON): " + JSON.stringify(jobs);
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({
+      model: "claude-sonnet-5", max_tokens: 900, system: sys,
+      messages: [{ role: "user", content: userMsg }],
+    });
+    let txt = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    txt = txt.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
+    let out = {};
+    try { out = JSON.parse(txt); } catch (e) { const m = txt.match(/\{[\s\S]*\}/); if (m) { try { out = JSON.parse(m[0]); } catch (_) {} } }
+    const arr = Array.isArray(out.jobs) ? out.jobs : [];
+    const res = jobs.map((_, i) => {
+      const j = arr[i] || {};
+      let mins = parseInt(j.minutes, 10); if (isNaN(mins) || mins <= 0) mins = 60;
+      mins = Math.max(15, Math.min(1440, Math.round(mins / 15) * 15));
+      let usd = Math.round(Number(j.laborUsd)); if (isNaN(usd) || usd < 0) usd = Math.round((mins / 60) * rate);
+      return { minutes: mins, laborUsd: usd, note: String(j.note || "").slice(0, 120) };
+    });
+    return { jobs: res };
+  } catch (e) {
+    console.error("svcEstimate", e);
+    throw new HttpsError("internal", String((e && e.message) || e));
+  }
+});
+
 // 🏁 CICLO DEL CARRO (dealer) — carros esperando INSPECCIÓN INICIAL del mecánico (status 'prep' + reconStage 'mecanico').
 // Auto-encolado: un carro nuevo se guarda con status:'prep' y reconStage:'mecanico' → aparece aquí solo.
 exports.mechCars = onCall({ timeoutSeconds: 30 }, async (request) => {

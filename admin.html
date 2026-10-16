@@ -1874,6 +1874,7 @@ function svcRenderModal(){
   const svcHtml='<input id="svc-labor-rate" type="hidden" value="'+rate+'">'
     +rowsHtml
     +'<button type="button" onclick="svcAddService()" style="width:100%;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:9px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">➕ Agregar trabajo</button>'
+    +'<button type="button" id="svc-estimate-btn" onclick="svcEstimateAI()" style="width:100%;background:rgba(240,192,64,0.12);border:1px solid var(--gold3);border-radius:10px;padding:9px;color:var(--gold);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">✨ Estimar tiempo y labor (IA)</button>'
     +'<div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);font-size:12px;">⏱️ Tiempo estimado (interno): <b id="svc-tot-time">'+svcFmtMin(totMin)+'</b></span><span style="font-size:13px;">Trabajos: <b id="svc-tot-labor" style="color:var(--gold);">'+formatMoney(svcSub)+'</b></span></div>'
     +'<div style="margin:6px 0;font-size:12px;color:var(--muted);font-weight:700;">🔩 Partes / otros cargos</div>'
     +'<div id="svc-parts-list">'+partsRows+'</div>'
@@ -1927,6 +1928,23 @@ window.svcRecalc=function(){
   const tg=document.getElementById('svc-tot-grand'); if(tg) tg.textContent=formatMoney(grand);
   const dep=Number((document.getElementById('svc-deposit')||{}).value)||0; d.deposit=dep;
   const sl=document.getElementById('svc-tot-saldo'); if(sl) sl.textContent=formatMoney(Math.max(0,grand-dep));
+};
+// ✨ Estimador IA: toma el carro (VIN/tipo) + los trabajos y sugiere tiempo + cuánto cobrar de labor (editable).
+window.svcEstimateAI=async function(){
+  svcCapture(); const d=window._svcDraft;
+  const idxNonEmpty=[], jobTexts=[];
+  (d.services||[]).forEach((s,i)=>{ const txt=(s.desc||'').trim(); if(txt){ idxNonEmpty.push(i); jobTexts.push(txt); } });
+  if(!jobTexts.length){ alert('Escribe primero el o los trabajos.'); return; }
+  const btn=document.getElementById('svc-estimate-btn'); if(btn){ btn.disabled=true; btn.innerHTML='✨ Estimando…'; }
+  try{
+    const r=await httpsCallable(functions,'svcEstimate')({ vehicle:(d.vehicleLabel||''), vin:(d.vin||''), jobs:jobTexts, laborRate:(Number(d.laborRate)||110) });
+    const arr=((r&&r.data)||{}).jobs||[];
+    const nearest=m=>{ let best=SVC_EST[0].m, bd=1e9; SVC_EST.forEach(o=>{ const dd=Math.abs(o.m-m); if(dd<bd){ bd=dd; best=o.m; } }); return best; };
+    const notes=[];
+    idxNonEmpty.forEach((origIdx,k)=>{ const j=arr[k]; if(!j||!d.services[origIdx]) return; if(j.laborUsd!=null) d.services[origIdx].price=j.laborUsd; if(j.minutes!=null) d.services[origIdx].minutes=nearest(j.minutes); if(j.note) notes.push('• '+jobTexts[k]+' → '+(j.minutes?svcFmtMin(nearest(j.minutes))+', ':'')+'$'+j.laborUsd+(j.note?('  ('+j.note+')'):'')); });
+    svcRenderModal(); try{ svcRecalc(); }catch(e){}
+    setTimeout(()=>{ alert('✨ Estimado de referencia (ya lo puse en los trabajos — ajústalo si quieres):\n\n'+(notes.join('\n')||'Listo.')+'\n\n⚠️ Es un estimado de la IA, no un precio garantizado. Revísalo.'); }, 120);
+  }catch(e){ if(btn){ btn.disabled=false; btn.innerHTML='✨ Estimar tiempo y labor (IA)'; } alert('No se pudo estimar: '+((e&&e.message)||e)); }
 };
 window.svcAddService=function(){ svcCapture(); (window._svcDraft.services=window._svcDraft.services||[]).push({desc:'',minutes:60,price:0}); svcRenderModal(); };
 window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.services||[]; a.splice(i,1); if(!a.length) a.push({desc:'',minutes:60,price:0}); svcRenderModal(); };
