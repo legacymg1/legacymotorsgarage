@@ -910,6 +910,10 @@
       <div class="form-group" style="flex:0 0 auto;min-width:120px;"><label class="form-label">🌐 Idioma del cliente</label><select class="form-input" id="cot-lang" onchange="cotSaveDraft()"><option value="es">Español</option><option value="en">English</option></select></div>
     </div>
     <div id="cot-tax-note" style="font-size:11.5px;margin:-4px 0 8px;"></div>
+    <div style="margin:2px 0 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <button type="button" onclick="cotSaveClient()" style="background:transparent;border:1px solid #22a06b;color:#3ddc97;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">💾 Guardar cliente</button>
+      <span style="font-size:11px;color:var(--muted);">Guárdalo y cualquier cotización que le hagas se guarda en su perfil.</span>
+    </div>
     <div class="form-group"><label class="form-label">Agregar carro del inventario</label>
       <div style="position:relative;">
         <input class="form-input" id="cot-car-search" placeholder="🔍 Busca por # inventario, marca, modelo o VIN..." autocomplete="off" oninput="cotFilterCars()" onfocus="cotFilterCars()" onkeydown="cotCarKey(event)" onblur="setTimeout(()=>{const b=document.getElementById('cot-car-results');if(b)b.style.display='none';},200)" style="padding-right:40px;">
@@ -926,7 +930,6 @@
     <button type="button" onclick="cotAddBlank()" style="background:transparent;color:var(--gold);border:1px dashed var(--gold);border-radius:10px;padding:10px;width:100%;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px;">＋ Agregar otra opción en blanco</button>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('cot-modal')">Cerrar</button>
-      <button type="button" onclick="cotSaveClient()" style="background:transparent;border:1px solid #22a06b;color:#3ddc97;border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;">💾 Guardar cliente</button>
       <button type="button" onclick="cotShare()" style="background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;">📤 Compartir</button>
       <button class="btn-save" onclick="printCotizacion()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);">🖨 Imprimir</button>
     </div>
@@ -2731,38 +2734,69 @@ window.cotAddFromCar=function(id){
 // 📤 Compartir el presupuesto: abre MENSAJES (SMS) al cliente con el texto en SU idioma + link del inventario, y guarda el prospecto.
 window.cotShare=async function(){
   if(!cotOpts.length){ alert('Agrega al menos una opción.'); return; }
-  const cust=(document.getElementById('cot-customer').value||'').trim();
-  const phone=(document.getElementById('cot-phone').value||'').trim();
-  const lang=(document.getElementById('cot-lang')?document.getElementById('cot-lang').value:'es')||'es';
-  const en=(lang==='en');
+  const p=_cotPrettyHTML(); const en=p.en;
+  saveQuoteLead(p.cust,p.phone,p.lang,{snapshot:true}).catch(()=>{});   // 🕒 compartir guarda la cotización con FECHA Y HORA en el perfil del cliente
+  const shareText = en?('Your quote from Legacy Motors Garage'+(p.cust?(' — '+p.cust):'')+'\nInventory: legacymotorsgarage.com · (559) 540-5145'):('Tu presupuesto de Legacy Motors Garage'+(p.cust?(' — '+p.cust):'')+'\nInventario: legacymotorsgarage.com · (559) 540-5145');
+  // 🖼️ Arma la HOJA BONITA en PDF y la comparte (iOS: Mensajes/WhatsApp con el PDF adjunto).
+  const box=document.getElementById('print-receipt'); let built=false;
+  try{
+    await _ensurePdfLibs();
+    if(box && window.html2canvas && window.jspdf){
+      box.innerHTML='<style>'+p.style+'</style>'+p.body;
+      const prevd={display:box.style.display, position:box.style.position, left:box.style.left, top:box.style.top, width:box.style.width, background:box.style.background};
+      box.style.display='block'; box.style.position='fixed'; box.style.left='-10000px'; box.style.top='0'; box.style.width='760px'; box.style.background='#fff';
+      const el=box.querySelector('.cotsheet')||box; let canvas;
+      try{ canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#fff',logging:false}); }
+      finally{ box.style.display=prevd.display||'none'; box.style.position=prevd.position; box.style.left=prevd.left; box.style.top=prevd.top; box.style.width=prevd.width; box.style.background=prevd.background; box.innerHTML=''; }
+      const { jsPDF }=window.jspdf; const pdf=new jsPDF('p','pt','letter');
+      const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+      const iw=pw-40, ratio=iw/canvas.width, pageCanvasH=(ph-40)/ratio;
+      let pos=0,pageN=0;
+      while(pos<canvas.height){ const sh=Math.min(pageCanvasH,canvas.height-pos); const slice=document.createElement('canvas'); slice.width=canvas.width; slice.height=sh; slice.getContext('2d').drawImage(canvas,0,pos,canvas.width,sh,0,0,canvas.width,sh); if(pageN>0) pdf.addPage(); pdf.addImage(slice.toDataURL('image/jpeg',0.92),'JPEG',20,20,iw,sh*ratio); pos+=sh; pageN++; }
+      const blob=pdf.output('blob');
+      const fname='Presupuesto_'+(((p.cust||'').replace(/[^A-Za-z0-9]/g,''))||'LegacyMotors')+'.pdf';
+      const file=new File([blob],fname,{type:'application/pdf'}); built=true;
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        try{ await navigator.share({files:[file], title:(en?'Quote':'Presupuesto'), text:shareText}); return; }
+        catch(e){ if(e&&e.name==='AbortError') return; }
+      }
+      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=fname; a.click(); setTimeout(()=>URL.revokeObjectURL(url),6000);
+      alert(en?'Quote PDF downloaded — attach it to your text to the customer. 📎':'Presupuesto en PDF descargado — adjúntalo en tu mensaje al cliente. 📎');
+      return;
+    }
+  }catch(e){ try{ if(box) box.innerHTML=''; }catch(_){} console.warn('compartir PDF presupuesto', e); }
+  // Respaldo (si no se pudo armar el PDF): texto por SMS.
   const fq=en?{weekly:'weekly',biweekly:'biweekly',monthly:'monthly',cash:'cash'}:{weekly:'semanales',biweekly:'quincenales',monthly:'mensuales',cash:'de contado'};
-  const lines=[en?('Legacy Motors Garage — Quote'+(cust?(' for '+cust):'')):('Legacy Motors Garage — Presupuesto'+(cust?(' para '+cust):''))];
+  const lines=[en?('Legacy Motors Garage — Quote'+(p.cust?(' for '+p.cust):'')):('Legacy Motors Garage — Presupuesto'+(p.cust?(' para '+p.cust):''))];
   cotOpts.forEach((o,i)=>{ const r=cotCalc(o); const nm=o.car||('#'+(i+1));
     if(r.cash){ lines.push('• '+nm+': '+(en?'cash ':'de contado ')+formatMoney(r.price+r.tax+r.dmv)); }
     else if(r.lendmark){ lines.push('• '+nm+': '+(en?'down ':'enganche ')+formatMoney(r.down)+(en?' today · financed through Lendmark ':' hoy · financiado por Lendmark ')+formatMoney(r.lendmarkFunds)); }
     else if(en){ lines.push('• '+nm+': pay today '+formatMoney(r.payToday)+' · '+r.numpay+' '+fq[r.freq]+' payments of '+formatMoney(r.payEven)); }
     else { lines.push('• '+nm+': paga hoy '+formatMoney(r.payToday)+' · '+r.numpay+' pagos '+fq[r.freq]+' de '+formatMoney(r.payEven)); }
   });
-  lines.push('');
-  lines.push(en?'See our full inventory 👉 https://legacymotorsgarage.com':'Mira todo nuestro inventario 👉 https://legacymotorsgarage.com');
+  lines.push(''); lines.push(en?'See our full inventory 👉 https://legacymotorsgarage.com':'Mira todo nuestro inventario 👉 https://legacymotorsgarage.com');
   lines.push('📞 (559) 540-5145 · Legacy Motors Garage, Porterville CA');
-  lines.push(en?'(Estimate only, subject to approval.)':'(Presupuesto informativo, sujeto a aprobación.)');
   const text=lines.join('\n');
-  saveQuoteLead(cust,phone,lang).catch(()=>{});
-  // Abre el MENSAJE directo al cliente (igual que el flujo de pagos): enlace sms: → app de Mensajes con el texto puesto.
-  const digits=phone.replace(/\D/g,'');
+  const digits=p.phone.replace(/\D/g,'');
   if(digits.length>=10){ const num=(digits.length===10?('+1'+digits):('+'+digits)); const a=document.createElement('a'); a.href='sms:'+num+'?&body='+encodeURIComponent(text); a.click(); return; }
-  // Sin teléfono: compartir del sistema o copiar.
   try{ if(navigator.share){ await navigator.share({ text:text }); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
   try{ await navigator.clipboard.writeText(text); }catch(e){}
-  alert(en?'Quote copied — paste it into a text to the customer. 📋':'Presupuesto copiado — pégalo en un mensaje de texto al cliente. 📋');
+  alert(en?'Quote copied — paste it into a text. 📋':'Presupuesto copiado — pégalo en un mensaje. 📋');
 };
-window.saveQuoteLead=async function(cust,phone,lang){
+window.saveQuoteLead=async function(cust,phone,lang,opts){
+  opts=opts||{};
   if(!cust && !phone) return null;
   const e164=toE164(phone)||'';
-  const newOpts=cotOpts.map(o=>{ const r=cotCalc(o); return { car:o.car||'', vin:o.vin||'', price:r.price, down:r.down, payToday:r.payToday, numpay:r.numpay, freq:r.freq, payEven:r.payEven, cash:r.cash }; });
-  // 🔁 DEDUP: una sola cotización por persona (por teléfono; si no hay, por nombre).
-  // Si ya existe, se ACUMULAN los carros (por VIN/carro) en su mismo perfil, no se crea otra.
+  // Snapshot RICO: guarda los campos crudos (para recargar en el cotizador) + los calculados (para mostrar).
+  const rich=o=>{ const r=cotCalc(o); const v=(x)=>(x!=null&&x!=='')?x:null; return {
+    car:o.car||'', vin:o.vin||'', color:o.color||'', miles:o.miles||'', year:o.year||'', make:o.make||'', model:o.model||'',
+    price:(v(o.price)!=null?o.price:r.price), down:(v(o.down)!=null?o.down:r.down), tax:(v(o.tax)!=null?o.tax:0), dmv:(v(o.dmv)!=null?o.dmv:0),
+    numpay:(v(o.numpay)!=null?o.numpay:r.numpay), freq:o.freq||r.freq||'weekly',
+    payToday:r.payToday, payEven:r.payEven, cash:r.cash, lendmark:r.lendmark }; };
+  const newOpts=cotOpts.map(rich);
+  // 🕒 Snapshot para el HISTORIAL (con fecha/hora) — SOLO al compartir/imprimir (opts.snapshot).
+  const snapEntry = (opts.snapshot && newOpts.length) ? { at:new Date().toISOString(), by:(auth.currentUser&&auth.currentUser.email)||'', options:newOpts } : null;
+  // 🔁 DEDUP: una sola cotización por persona (por teléfono; si no hay, por nombre). Los carros se ACUMULAN; el historial crece.
   let existingId=null, existingData=null;
   try{
     const snap=await getDocs(collection(db,'quotes'));
@@ -2777,16 +2811,18 @@ window.saveQuoteLead=async function(cust,phone,lang){
     const map={}; (existingData.options||[]).forEach(o=>{ map[((o.vin||o.car||'')+'').toUpperCase()]=o; });
     newOpts.forEach(o=>{ map[((o.vin||o.car||'')+'').toUpperCase()]=o; });   // el carro re-cotizado se actualiza
     const merged=Object.keys(map).map(k=>map[k]);
+    const hist=Array.isArray(existingData.history)?existingData.history.slice():[];
+    if(snapEntry) hist.push(snapEntry);
     await setDoc(doc(db,'quotes',existingId),{
       customer:cust||existingData.customer||'', phone:phone||existingData.phone||'', phoneE164:e164||existingData.phoneE164||'',
       lang:lang||existingData.lang||'es', city:_cotTaxCity||existingData.city||'', taxRate:_cotTaxRate||existingData.taxRate||0,
-      options:merged, createdAt:existingData.createdAt||new Date().toISOString(), updatedAt:new Date().toISOString(),
+      options:merged, history:hist, createdAt:existingData.createdAt||new Date().toISOString(), updatedAt:new Date().toISOString(),
       createdBy:existingData.createdBy||((auth.currentUser&&auth.currentUser.email)||'')
     },{merge:true});
     return existingId;
   }
   const id='quote_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-  await setDoc(doc(db,'quotes',id),{ customer:cust||'', phone:phone||'', phoneE164:e164, lang:lang||'es', city:_cotTaxCity||'', taxRate:_cotTaxRate||0, options:newOpts, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' });
+  await setDoc(doc(db,'quotes',id),{ customer:cust||'', phone:phone||'', phoneE164:e164, lang:lang||'es', city:_cotTaxCity||'', taxRate:_cotTaxRate||0, options:newOpts, history:(snapEntry?[snapEntry]:[]), createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' });
   return id;
 };
 // 🧮 FASE 4 — guardar cliente desde el cotizador + cajita "Cotizaciones" en Clientes
@@ -2823,7 +2859,7 @@ window.loadCotiz=async function(){
     const n=(q.options||[]).length;
     const when=q.createdAt?new Date(q.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):'';
     const convBadge=q.convertedClientId?' <span style="font-size:10px;background:rgba(62,207,142,.15);color:var(--green);border:1px solid var(--green);border-radius:999px;padding:1px 7px;font-weight:700;">✅ cliente</span>':'';
-    return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="viewCotiz(\''+q.id+'\')"><div style="min-width:0;"><div style="font-weight:700;">'+esc(q.customer||'(sin nombre)')+convBadge+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">'+esc(q.phone||'sin teléfono')+(car?(' · '+esc(car)):'')+' · '+(n?(n+' carro(s)'):'sin carros aún')+(when?(' · '+when):'')+'</div></div><div style="display:flex;gap:6px;align-items:center;flex:0 0 auto;"><button onclick="deleteCotiz(\''+q.id+'\',event)" title="Borrar cotización" style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:8px;padding:5px 9px;font-size:13px;cursor:pointer;">🗑</button><span style="color:var(--gold);">›</span></div></div>';
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="cotizOpenInCotizador(\''+q.id+'\')"><div style="min-width:0;"><div style="font-weight:700;">'+esc(q.customer||'(sin nombre)')+convBadge+'</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">'+esc(q.phone||'sin teléfono')+(car?(' · '+esc(car)):'')+' · '+(n?(n+' carro(s)'):'sin carros aún')+(when?(' · '+when):'')+'</div></div><div style="display:flex;gap:6px;align-items:center;flex:0 0 auto;"><button onclick="event.stopPropagation();viewCotiz(\''+q.id+'\')" title="Ver historial de cotizaciones" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:13px;cursor:pointer;">🕒</button><button onclick="deleteCotiz(\''+q.id+'\',event)" title="Borrar cotización" style="background:transparent;border:1px solid var(--red);color:var(--red);border-radius:8px;padding:5px 9px;font-size:13px;cursor:pointer;">🗑</button><span style="color:var(--gold);">›</span></div></div>';
   }).join('');
 };
 window.viewCotiz=function(id){
@@ -2845,7 +2881,22 @@ window.viewCotiz=function(id){
       h+='</div>';
     });
   }
-  h+='<button onclick="cotizAddCar(\''+id+'\')" style="width:100%;margin-top:4px;background:transparent;color:var(--gold);border:1px dashed var(--gold);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;">🧮 Cotizarle / agregar carro</button>';
+  // 🕒 Historial: cada vez que se compartió/imprimió, con fecha y hora (lo más reciente arriba).
+  const _hist=Array.isArray(q.history)?q.history.slice().reverse():[];
+  if(_hist.length){
+    h+='<div style="font-size:12px;color:var(--gold);font-weight:700;margin:16px 0 8px;">🕒 Historial de cotizaciones ('+_hist.length+')</div>';
+    _hist.forEach(e=>{
+      const when=e.at?new Date(e.at).toLocaleString('es-MX',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+      h+='<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--surface2);">';
+      h+='<div style="font-size:11px;color:var(--muted);margin-bottom:5px;">'+esc(when)+(e.by?(' · '+esc((e.by||'').split("@")[0])):'')+'</div>';
+      (e.options||[]).forEach((o,i)=>{
+        let t; if(o.cash){ t='De contado '+money(o.price); } else if(o.lendmark){ t='Enganche '+money(o.down)+' · financia Lendmark'; } else { t='Paga hoy '+money(o.payToday)+' · '+(o.numpay||0)+' pagos '+(fq[o.freq]||o.freq||'')+' de '+money(o.payEven); }
+        h+='<div style="font-size:12px;line-height:1.5;"><b>'+esc(o.car||('Opción '+(i+1)))+'</b> — <span style="color:var(--muted);">'+esc(t)+'</span></div>';
+      });
+      h+='</div>';
+    });
+  }
+  h+='<button onclick="cotizOpenInCotizador(\''+id+'\')" style="width:100%;margin-top:4px;background:transparent;color:var(--gold);border:1px dashed var(--gold);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;">🧮 Abrir en el cotizador (cargar y re-cotizar)</button>';
   document.getElementById('cotizv-body').innerHTML=h;
   document.getElementById('cotizv-modal').classList.add('active');
 };
@@ -2854,6 +2905,22 @@ window.cotizAddCar=function(id){
   const q=_cotizCache[id]; try{ closeModal('cotizv-modal'); }catch(e){}
   try{ openCotizador(); }catch(e){}
   setTimeout(function(){ try{ if(q){ const n=document.getElementById('cot-customer'); if(n)n.value=q.customer||''; const p=document.getElementById('cot-phone'); if(p)p.value=q.phone||''; const l=document.getElementById('cot-lang'); if(l&&q.lang)l.value=q.lang; const ci=document.getElementById('cot-city'); if(ci&&q.city)ci.value=q.city; } }catch(e){} }, 60);
+};
+// 🧮 Abre el cotizador con TODA la cotización cargada (cliente + carros + números) — al hacer click en una cotización de la lista.
+window.cotizOpenInCotizador=function(id){
+  const q=_cotizCache[id]; if(!q){ alert('Cotización no encontrada.'); return; }
+  try{ closeModal('cotizv-modal'); }catch(e){}
+  try{ openCotizador(); }catch(e){}
+  setTimeout(function(){ try{
+    const sv=(elid,v)=>{ const el=document.getElementById(elid); if(el) el.value=(v!=null?v:''); };
+    sv('cot-customer', q.customer||''); sv('cot-phone', q.phone||''); sv('cot-city', q.city||'');
+    const l=document.getElementById('cot-lang'); if(l) l.value=q.lang||'es';
+    cotOpts=(q.options||[]).map(o=>({ car:o.car||'', vin:o.vin||'', color:o.color||'', miles:o.miles||'', year:o.year||'', make:o.make||'', model:o.model||'', price:(o.price!=null?o.price:''), down:(o.down!=null?o.down:''), tax:(o.tax!=null?o.tax:''), dmv:(o.dmv!=null?o.dmv:''), numpay:(o.numpay!=null?o.numpay:''), freq:o.freq||'weekly' }));
+    cotSeq=cotOpts.length;
+    try{ renderCotOptions(); }catch(e){}
+    try{ cotSaveDraft(); }catch(e){}
+    try{ cotTitleName(document.getElementById('cot-customer')); }catch(e){}
+  }catch(e){} }, 90);
 };
 window.deleteCotiz=async function(id, ev){
   if(ev){ try{ ev.stopPropagation(); }catch(e){} }
@@ -2958,10 +3025,11 @@ function renderCotOptions(){
         </div>
       </div>
       <div id="cot-res-${i}" style="margin-top:6px;"></div>
-      <div style="display:flex;gap:8px;margin-top:8px;">
+      ${o.freq==='lendmark' ? `<div style="display:flex;gap:8px;margin-top:8px;">
         <button type="button" onclick="lendmarkSheet(${i},'print')" style="flex:1;background:transparent;color:#1f6feb;border:1px solid #1f6feb;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">🖨️ Sales sheet</button>
         <button type="button" onclick="lendmarkSheet(${i},'email')" style="flex:1;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">📧 Firmar y enviar (Lendmark)</button>
       </div>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:5px;text-align:center;">Solo para ventas Lendmark. Para el cliente usa 📤 Compartir o 🖨 Imprimir abajo.</div>` : ''}
     </div>`).join('');
   cotOpts.forEach((o,i)=>cotUpdateResult(i));
   cotSaveDraft();
@@ -3220,15 +3288,14 @@ window.deleteLendmarkSheet = async function(id){
   if(!confirm('¿Eliminar esta hoja del historial?')) return;
   try{ await deleteDoc(doc(db,'lendmark_sheets',id)); openLendmarkList(); }catch(e){ alert('Error: '+((e&&e.message)||e)); }
 };
-window.printCotizacion=function(){
-  if(!cotOpts.length){ alert('Agrega al menos una opción.'); return; }
+// 🧾 Construye la HOJA BONITA del presupuesto (la usan Imprimir y Compartir). Estilos scoped a .cotsheet para renderizarla a PDF sin afectar la página.
+function _cotPrettyHTML(){
   const cust=document.getElementById('cot-customer').value.trim();
   const phone=(document.getElementById('cot-phone').value||'').trim();
   const city=(document.getElementById('cot-city').value||'').trim();
   const lang=(document.getElementById('cot-lang')?document.getElementById('cot-lang').value:'es')||'es';
   const en=(lang==='en');
-  saveQuoteLead(cust,phone,lang).catch(()=>{});   // al imprimir también guarda el prospecto
-  const dstr=new Date().toLocaleDateString(en?'en-US':'es-MX',{year:'numeric',month:'long',day:'numeric'});
+  const dstr=new Date().toLocaleString(en?'en-US':'es-MX',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
   const freqTxt=en?{weekly:'weekly',biweekly:'biweekly',monthly:'monthly',cash:'cash'}:{weekly:'semanales',biweekly:'quincenales',monthly:'mensuales',cash:'de contado'};
   const L=en?{sub:'FINANCING ESTIMATE',client:'Customer',date:'Date',opt:'Option',cashPrice:'Cash price',taxDmv:'Taxes + DMV',cashTotal:'Cash total',vprice:'Vehicle price',down:'Down payment',payToday:'Due today',financed:'Amount financed',finCharge:'Finance charge',totalFin:'Total to finance',payWord:'payments of',lastWord:'last',invLine:'See our full inventory: legacymotorsgarage.com',disc:'<b>Estimate only — not a contract or a credit offer.</b> Figures are approximate and subject to verification, available inventory and approval. Final amounts are set in the signed contract. Includes a $70 documentation fee.'}:{sub:'PRESUPUESTO · FINANCING ESTIMATE',client:'Cliente',date:'Fecha',opt:'Opción',cashPrice:'Precio de contado',taxDmv:'Impuestos + DMV',cashTotal:'Total de contado',vprice:'Precio del vehículo',down:'Enganche / Down',payToday:'Paga hoy / Due today',financed:'Monto financiado',finCharge:'Cargo por financiamiento',totalFin:'Total a financiar',payWord:'pagos de',lastWord:'último',invLine:'Mira todo nuestro inventario: legacymotorsgarage.com',disc:'<b>Presupuesto informativo — no es un contrato ni una oferta de crédito.</b> Cifras aproximadas, sujetas a verificación, inventario disponible y aprobación. Los montos finales se establecen en el contrato firmado. Incluye tarifa de documentación de $70.'};
   let cards='';
@@ -3246,36 +3313,42 @@ window.printCotizacion=function(){
     const vinBits=[o.vin?('VIN: '+o.vin):'', o.color?o.color:'', o.miles?(Number(o.miles).toLocaleString()+' mi'):''].filter(Boolean).join(' · ');
     cards+=`<div class="opt"><h3>${L.opt} ${i+1}${o.car?' — '+o.car:''}</h3>${vinBits?`<div class="vin">${vinBits}</div>`:''}<table>${rows}</table>${payLine}</div>`;
   });
-  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Presupuesto — Legacy Motors Garage</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;padding:32px;max-width:900px;margin:0 auto;}
-  .head{text-align:center;border-bottom:3px solid #c9a24a;padding-bottom:16px;margin-bottom:8px;}
-  .head h1{font-size:26px;letter-spacing:2px;color:#0b0e14;}
-  .head .sub{color:#c9a24a;font-weight:700;letter-spacing:3px;font-size:12px;margin-top:2px;}
-  .meta{display:flex;justify-content:space-between;font-size:13px;color:#555;margin:14px 0 20px;}
-  .opt{border:1px solid #ddd;border-radius:10px;padding:16px 18px;margin-bottom:16px;page-break-inside:avoid;}
-  .opt h3{font-size:16px;color:#0b0e14;margin-bottom:4px;}
-  .opt .vin{font-size:11px;color:#888;margin-bottom:10px;}
-  table{width:100%;border-collapse:collapse;font-size:13px;}
-  td{padding:6px 0;border-bottom:1px solid #eee;}
-  td:last-child{text-align:right;font-weight:600;}
-  tr.hl td{color:#0a7a35;font-weight:700;}
-  tr.tot td{border-top:2px solid #0b0e14;border-bottom:none;color:#0b0e14;font-weight:800;padding-top:8px;}
-  .pay{margin-top:12px;text-align:center;background:#faf4e4;border:1px solid #e6d29a;border-radius:8px;padding:12px;font-size:15px;color:#0b0e14;}
-  .pay b{font-size:22px;color:#0b0e14;}
-  .pay .last{font-size:12px;color:#777;}
-  .disc{font-size:10.5px;color:#888;border-top:1px solid #ddd;margin-top:20px;padding-top:12px;line-height:1.5;}
-  .foot{text-align:center;font-size:12px;color:#555;margin-top:14px;line-height:1.7;}
-  @media print{body{padding:0;}}
-</style></head><body>
+  const style=`
+  .cotsheet *{box-sizing:border-box;margin:0;padding:0;}
+  .cotsheet{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;padding:32px;max-width:900px;margin:0 auto;background:#fff;}
+  .cotsheet .head{text-align:center;border-bottom:3px solid #c9a24a;padding-bottom:16px;margin-bottom:8px;}
+  .cotsheet .head h1{font-size:26px;letter-spacing:2px;color:#0b0e14;}
+  .cotsheet .head .sub{color:#c9a24a;font-weight:700;letter-spacing:3px;font-size:12px;margin-top:2px;}
+  .cotsheet .meta{display:flex;justify-content:space-between;font-size:13px;color:#555;margin:14px 0 20px;}
+  .cotsheet .opt{border:1px solid #ddd;border-radius:10px;padding:16px 18px;margin-bottom:16px;page-break-inside:avoid;}
+  .cotsheet .opt h3{font-size:16px;color:#0b0e14;margin-bottom:4px;}
+  .cotsheet .opt .vin{font-size:11px;color:#888;margin-bottom:10px;}
+  .cotsheet table{width:100%;border-collapse:collapse;font-size:13px;}
+  .cotsheet td{padding:6px 0;border-bottom:1px solid #eee;}
+  .cotsheet td:last-child{text-align:right;font-weight:600;}
+  .cotsheet tr.hl td{color:#0a7a35;font-weight:700;}
+  .cotsheet tr.tot td{border-top:2px solid #0b0e14;border-bottom:none;color:#0b0e14;font-weight:800;padding-top:8px;}
+  .cotsheet .pay{margin-top:12px;text-align:center;background:#faf4e4;border:1px solid #e6d29a;border-radius:8px;padding:12px;font-size:15px;color:#0b0e14;}
+  .cotsheet .pay b{font-size:22px;color:#0b0e14;}
+  .cotsheet .pay .last{font-size:12px;color:#777;}
+  .cotsheet .disc{font-size:10.5px;color:#888;border-top:1px solid #ddd;margin-top:20px;padding-top:12px;line-height:1.5;}
+  .cotsheet .foot{text-align:center;font-size:12px;color:#555;margin-top:14px;line-height:1.7;}
+  @media print{ body{padding:0;} .cotsheet{padding:0;} }`;
+  const body=`<div class="cotsheet">
   <div class="head"><h1>LEGACY MOTORS GARAGE</h1><div class="sub">${L.sub}</div></div>
   <div class="meta"><div><b>${L.client}:</b> ${cust||'—'}${phone?' · '+phone:''}${city?' · '+city:''}</div><div><b>${L.date}:</b> ${dstr}</div></div>
   ${cards}
   <div style="text-align:center;background:#faf4e4;border:1px solid #e6d29a;border-radius:8px;padding:10px;font-size:13px;margin:6px 0 16px;">🚗 ${L.invLine}</div>
   <div class="disc">${L.disc}</div>
   <div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California Dealer License No. 83177</div>
-</body></html>`;
+  </div>`;
+  return {style, body, cust, phone, lang, en};
+}
+window.printCotizacion=function(){
+  if(!cotOpts.length){ alert('Agrega al menos una opción.'); return; }
+  const p=_cotPrettyHTML();
+  saveQuoteLead(p.cust,p.phone,p.lang,{snapshot:true}).catch(()=>{});   // 🕒 imprimir guarda la cotización con FECHA Y HORA en el perfil del cliente
+  const html='<!doctype html><html lang="'+(p.en?'en':'es')+'"><head><meta charset="utf-8"><title>Presupuesto — Legacy Motors Garage</title><style>'+p.style+'</style></head><body>'+p.body+'</body></html>';
   const w=window.open('','_blank');
   if(!w){ alert('Permite las ventanas emergentes para imprimir el presupuesto.'); return; }
   w.document.write(html); w.document.close(); w.focus();
