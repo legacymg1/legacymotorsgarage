@@ -1888,10 +1888,9 @@ function svcRenderModal(){
   const svcHtml='<div style="display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-bottom:8px;font-size:11.5px;color:var(--muted);">⚙️ Tarifa mecánico (para estimar): $<input id="svc-labor-rate" type="number" inputmode="decimal" value="'+rate+'" onchange="svcSetRate(this.value)" style="width:56px;padding:4px 6px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;text-align:right;">/hr</div>'
     +rowsHtml
     +'<button type="button" onclick="svcAddService()" style="width:100%;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:9px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">➕ Agregar servicio</button>'
-    +'<div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);font-size:12px;">⏱️ Tiempo estimado (interno): <b id="svc-tot-time">'+svcFmtMin(totMin)+'</b></span><span style="font-size:13px;">Labor: <b id="svc-tot-labor" style="color:var(--gold);">'+formatMoney(svcSub)+'</b></span></div>'
-    +'<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px;margin-bottom:8px;"><span style="font-weight:800;font-size:14px;">Total (labor + partes)</span><b id="svc-tot-grand" style="color:var(--gold);font-size:16px;">'+formatMoney(grand)+'</b></div>'
+    +'<div style="padding:6px 0;"><span style="color:var(--muted);font-size:12px;">⏱️ Tiempo estimado (interno): <b id="svc-tot-time">'+svcFmtMin(totMin)+'</b></span></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;"><label style="font-size:13px;color:var(--muted);">💵 Anticipo / Apartado $</label><input id="svc-deposit" type="number" inputmode="decimal" value="'+((Number(d.deposit)||0)?(Number(d.deposit)):'')+'" placeholder="0.00" oninput="svcRecalc()" style="'+SVC_IN+';width:120px;text-align:right;margin:0;"></div>'
-    +'<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px;margin-bottom:12px;"><span style="font-weight:800;font-size:14px;">Saldo</span><b id="svc-tot-saldo" style="color:var(--green);font-size:15px;">'+formatMoney(Math.max(0,grand-(Number(d.deposit)||0)))+'</b></div>'
+    +'<div id="svc-bill">'+svcBillHtml(svcList, Number(d.deposit)||0)+'</div>'
     +'<div style="display:flex;gap:8px;margin-top:8px;">'
     +'<button onclick="svcCapture();window._svcDraft.when=\'now\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when!=='later'?'var(--gold)':'var(--border)')+';background:'+(d.when!=='later'?'var(--gold)':'transparent')+';color:'+(d.when!=='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">🕐 Ahora</button>'
     +'<button onclick="svcCapture();window._svcDraft.when=\'later\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">📅 Agendar</button></div>'
@@ -1920,23 +1919,33 @@ function svcRenderModal(){
     +'<button onclick="svcClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>'
     +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio',svcHtml)+SVC_SEC('4 · Asignar a',asgHtml)
     +(isEdit?SVC_SEC('5 · Estatus y fechas',datesHtml):'')
-    +'<button onclick="svcShareEstimate()" style="width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 Dar estimado al cliente</button>'
+    +'<button onclick="svcGenEstimate()" style="width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 Generar estimado</button>'
     +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">'+(isEdit?'💾 Guardar cambios':'✅ Crear orden')+'</button>';
 }
 window.svcRenderModal=svcRenderModal;
 // Servicios individuales + labor
 function svcFmtMin(m){ m=Number(m)||0; if(m<60) return m+' min'; const h=m/60; return (Number.isInteger(h)?h:h.toFixed(1))+(h===1?' hora':' horas'); }
+// 🧾 Resumen de la cuenta (solo Labor / Partes / Total / Saldo). El desglose completo va en el estimado bonito.
+function svcBillHtml(services, deposit){
+  const money=formatMoney; services=services||[]; deposit=Number(deposit)||0;
+  let laborSub=0, partsSub=0;
+  services.forEach(s=>{ if(!(s.desc||'').trim() && !((s.parts||[]).length)) return; laborSub+=Number(s.price)||0; (s.parts||[]).forEach(p=>{ partsSub+=Number(p.price)||0; }); });
+  const grand=laborSub+partsSub;
+  let h='<div style="background:var(--surface3);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin:4px 0 12px;">';
+  h+='<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;"><span style="color:var(--muted);">Labor</span><b>'+money(laborSub)+'</b></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;"><span style="color:var(--muted);">Partes</span><b>'+money(partsSub)+'</b></div>';
+  h+='<div style="display:flex;justify-content:space-between;border-top:2px solid var(--border);margin-top:5px;padding-top:6px;font-size:15px;"><span style="font-weight:800;">Total</span><b style="color:var(--gold);">'+money(grand)+'</b></div>';
+  if(deposit>0){ h+='<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:3px;"><span>Anticipo</span><b style="color:var(--text);">−'+money(deposit)+'</b></div><div style="display:flex;justify-content:space-between;font-size:14px;margin-top:2px;"><span style="font-weight:800;">Saldo</span><b style="color:var(--green);">'+money(Math.max(0,grand-deposit))+'</b></div>'; }
+  h+='</div>';
+  return h;
+}
 window.svcDescCap=function(el){ if(el && el.value){ const v=el.value; const nv=v.charAt(0).toUpperCase()+v.slice(1); if(nv!==v){ const p=el.selectionStart; el.value=nv; try{ el.setSelectionRange(p,p); }catch(e){} } } };
 window.svcRecalc=function(){
   svcCapServices(); const d=window._svcDraft; if(!d) return;
-  let totMin=0, svcSub=0, partsSub=0;
-  (d.services||[]).forEach(s=>{ totMin+=Number(s.minutes)||0; svcSub+=Number(s.price)||0; (s.parts||[]).forEach(p=>{ partsSub+=Number(p.price)||0; }); });   // precio PLANO por servicio + sus partes
+  d.deposit=Number((document.getElementById('svc-deposit')||{}).value)||0;
+  let totMin=0; (d.services||[]).forEach(s=>{ totMin+=Number(s.minutes)||0; });
   const tt=document.getElementById('svc-tot-time'); if(tt) tt.textContent=svcFmtMin(totMin);
-  const tl=document.getElementById('svc-tot-labor'); if(tl) tl.textContent=formatMoney(svcSub);
-  const grand=svcSub+partsSub;
-  const tg=document.getElementById('svc-tot-grand'); if(tg) tg.textContent=formatMoney(grand);
-  const dep=Number((document.getElementById('svc-deposit')||{}).value)||0; d.deposit=dep;
-  const sl=document.getElementById('svc-tot-saldo'); if(sl) sl.textContent=formatMoney(Math.max(0,grand-dep));
+  const bill=document.getElementById('svc-bill'); if(bill) bill.innerHTML=svcBillHtml(d.services, d.deposit);
 };
 // ⚙️ Tarifa de mano de obra del taller (para el estimado IA). Se recuerda en el navegador. Default Central Valley ~$130/hr.
 function _svcDefaultRate(){ try{ const v=parseFloat(localStorage.getItem('svcLaborRate')); if(!isNaN(v)&&v>0) return v; }catch(e){} return 130; }
@@ -1985,30 +1994,76 @@ window.svcAddService=function(){ svcCapture(); (window._svcDraft.services=window
 window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.services||[]; a.splice(i,1); if(!a.length) a.push({desc:'',minutes:60,price:0,parts:[]}); svcRenderModal(); };
 window.svcAddPart=function(si){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s){ (s.parts=s.parts||[]).push({desc:'',price:0}); } svcRenderModal(); };
 window.svcRemovePart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s&&Array.isArray(s.parts)){ s.parts.splice(pi,1); } svcRenderModal(); };
-// 📄 Dar el estimado al cliente (SMS en su idioma, o compartir/copiar).
-window.svcShareEstimate=function(){
-  svcCapture(); const d=window._svcDraft; const rate=Number(d.laborRate)||0;
-  const services=(d.services||[]).filter(s=>(s.desc||'').trim());
+// 📄 GENERAR ESTIMADO bonito (tipo cotizador), bien desglosado por servicio + sus partes.
+function svcEstimateSheetHTML(d, services){
+  const en=(d.lang==='en'); const money=formatMoney;
+  const dstr=new Date().toLocaleString(en?'en-US':'es-MX',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  let laborSub=0, partsSub=0, rows='';
+  services.forEach((s,i)=>{ const sp=Number(s.price)||0; laborSub+=sp;
+    rows+='<tr class="svcrow"><td>'+svcEsc((s.desc||'').trim()||('Servicio '+(i+1)))+'</td><td class="r">'+money(sp)+'</td></tr>';
+    (s.parts||[]).forEach(p=>{ const pp=Number(p.price)||0; partsSub+=pp; rows+='<tr class="prow"><td>• '+svcEsc((p.desc||'').trim()||(en?'Part':'Parte'))+'</td><td class="r">'+money(pp)+'</td></tr>'; });
+  });
+  const grand=laborSub+partsSub, dep=Number(d.deposit)||0, bal=Math.max(0,grand-dep);
+  const L=en?{sub:'SERVICE ESTIMATE',cust:'Customer',date:'Date',veh:'Vehicle',labor:'Labor',parts:'Parts',total:'TOTAL',dep:'Deposit',bal:'Balance',disc:'<b>Estimate only — subject to your authorization.</b> Final amounts may change after inspection; we will notify you before any additional work.'}:{sub:'ESTIMADO DE SERVICIO',cust:'Cliente',date:'Fecha',veh:'Vehículo',labor:'Mano de obra',parts:'Partes',total:'TOTAL',dep:'Anticipo',bal:'Saldo',disc:'<b>Estimado informativo — sujeto a su autorización.</b> Los montos finales pueden cambiar tras la inspección; le avisamos antes de cualquier trabajo adicional.'};
+  const style='.estsheet{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1a1a1a;padding:26px;max-width:620px;margin:0 auto;background:#fff;}'
+    +'.estsheet .h{text-align:center;border-bottom:3px solid #c9a24a;padding-bottom:14px;margin-bottom:10px;}'
+    +'.estsheet .h h1{font-size:22px;letter-spacing:1.5px;color:#0b0e14;margin:0;}'
+    +'.estsheet .h .s{color:#c9a24a;font-weight:700;letter-spacing:2px;font-size:11px;margin-top:3px;}'
+    +'.estsheet .meta{font-size:13px;color:#555;margin:12px 0;line-height:1.7;}'
+    +'.estsheet table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}'
+    +'.estsheet td{padding:6px 0;border-bottom:1px solid #eee;}'
+    +'.estsheet td.r{text-align:right;font-weight:600;white-space:nowrap;}'
+    +'.estsheet tr.svcrow td{font-weight:700;color:#0b0e14;border-bottom:none;padding-top:9px;}'
+    +'.estsheet tr.prow td{font-size:12px;color:#777;padding:2px 0 2px 14px;border-bottom:none;}'
+    +'.estsheet .tot{border-top:2px solid #0b0e14;margin-top:10px;padding-top:8px;}'
+    +'.estsheet .line{display:flex;justify-content:space-between;font-size:13px;padding:2px 0;}'
+    +'.estsheet .grand{font-size:17px;font-weight:800;color:#0b0e14;}'
+    +'.estsheet .disc{font-size:10.5px;color:#888;border-top:1px solid #ddd;margin-top:16px;padding-top:10px;line-height:1.5;}'
+    +'.estsheet .foot{text-align:center;font-size:12px;color:#555;margin-top:12px;line-height:1.6;}'
+    +'@media print{body{padding:0;}}';
+  const body='<div class="estsheet"><div class="h"><h1>LEGACY MOTORS GARAGE</h1><div class="s">'+L.sub+'</div></div>'
+    +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(d.clientName||'—')+(d.clientPhone?(' · '+svcEsc(d.clientPhone)):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+dstr+'</div>'
+    +'<table>'+rows+'</table>'
+    +'<div class="tot"><div class="line"><span style="color:#777;">'+L.labor+'</span><b>'+money(laborSub)+'</b></div><div class="line"><span style="color:#777;">'+L.parts+'</span><b>'+money(partsSub)+'</b></div><div class="line grand"><span>'+L.total+'</span><span>'+money(grand)+'</span></div>'
+    +(dep>0?('<div class="line"><span style="color:#777;">'+L.dep+'</span><b>−'+money(dep)+'</b></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.bal+'</span><span>'+money(bal)+'</span></div>'):'')+'</div>'
+    +'<div class="disc">'+L.disc+'</div>'
+    +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California Dealer License No. 83177</div></div>';
+  return '<style>'+style+'</style>'+body;
+}
+window.svcGenEstimate=function(){
+  svcCapture(); const d=window._svcDraft;
+  const services=(d.services||[]).filter(s=>(s.desc||'').trim()||(s.parts||[]).length);
   if(!services.length){ alert('Agrega al menos un servicio.'); return; }
-  const en=(d.lang==='en');
+  window._svcEstHtml=svcEstimateSheetHTML(d, services);
+  const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100001;display:flex;align-items:center;justify-content:center;padding:14px;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const box=document.createElement('div'); box.style.cssText='background:#fff;color:#111;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow:auto;';
+  box.innerHTML='<div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;z-index:2;">'
+    +'<button onclick="var o=document.getElementById(\'svc-est-overlay\');if(o)o.remove();" style="background:#eee;border:none;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;">Cerrar</button>'
+    +'<button onclick="svcEstPrint()" style="background:#0b0e14;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;">🖨 Imprimir</button>'
+    +'<button onclick="svcEstSend()" style="background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;">💬 Enviar</button>'
+    +'</div><div>'+window._svcEstHtml+'</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+};
+window.svcEstPrint=function(){ const html=window._svcEstHtml||''; const w=window.open('','_blank'); if(!w){ alert('Permite las ventanas emergentes para imprimir.'); return; } w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Estimado — Legacy Motors Garage</title></head><body>'+html+'</body></html>'); w.document.close(); w.focus(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400); };
+window.svcEstSend=function(){
+  const d=window._svcDraft; const en=(d.lang==='en');
+  const services=(d.services||[]).filter(s=>(s.desc||'').trim()||(s.parts||[]).length);
   const lines=[en?'Legacy Motors Garage — Service estimate':'Legacy Motors Garage — Estimado de servicio'];
   if(d.clientName) lines.push((en?'Customer: ':'Cliente: ')+d.clientName);
   if(d.vehicleLabel||d.plate) lines.push('🚗 '+(d.vehicleLabel||'')+(d.plate?(' · '+d.plate):''));
   lines.push('');
-  let labor=0; services.forEach(s=>{ const l=rate*(Number(s.minutes)||0)/60; labor+=l; lines.push('• '+s.desc+' — '+formatMoney(l)); });
-  const parts=(d.parts||[]).filter(p=>(p.desc||'').trim()||Number(p.price));
-  let partsSub=0; if(parts.length){ lines.push(''); lines.push(en?'Parts / charges:':'Partes / cargos:'); parts.forEach(p=>{ const pr=Number(p.price)||0; partsSub+=pr; lines.push('• '+(p.desc||(en?'Part':'Parte'))+' — '+formatMoney(pr)); }); }
+  let labor=0, partsSub=0;
+  services.forEach(s=>{ const sp=Number(s.price)||0; labor+=sp; lines.push('• '+(s.desc||'')+' — '+formatMoney(sp)); (s.parts||[]).forEach(p=>{ const pp=Number(p.price)||0; partsSub+=pp; lines.push('   · '+(p.desc||(en?'Part':'Parte'))+' — '+formatMoney(pp)); }); });
   const grand=labor+partsSub, dep=Number(d.deposit)||0, bal=Math.max(0,grand-dep);
-  lines.push('');
-  lines.push('Total: '+formatMoney(grand));
+  lines.push(''); lines.push('Total: '+formatMoney(grand));
   if(dep>0){ lines.push((en?'Deposit: ':'Anticipo: ')+formatMoney(dep)); lines.push((en?'Balance: ':'Saldo: ')+formatMoney(bal)); }
-  lines.push('');
-  lines.push(en?'(Estimate only, subject to authorization.)':'(Estimado informativo, sujeto a autorización.)');
+  lines.push(''); lines.push(en?'(Estimate only, subject to authorization.)':'(Estimado informativo, sujeto a autorización.)');
   lines.push('📞 (559) 540-5145 · Legacy Motors Garage');
   const text=lines.join('\n');
   const digits=(d.clientPhone||'').replace(/\D/g,'');
   if(digits.length>=10){ const num=digits.length===10?('+1'+digits):('+'+digits); const a=document.createElement('a'); a.href='sms:'+num+'?&body='+encodeURIComponent(text); a.click(); return; }
-  (async()=>{ try{ if(navigator.share){ await navigator.share({text}); return; } }catch(e){ if(e&&e.name==='AbortError') return; } try{ await navigator.clipboard.writeText(text); }catch(e){} alert(en?'Estimate copied — paste it into a text to the customer. 📋':'Estimado copiado — pégalo en un mensaje al cliente. 📋'); })();
+  (async()=>{ try{ if(navigator.share){ await navigator.share({text}); return; } }catch(e){ if(e&&e.name==='AbortError') return; } try{ await navigator.clipboard.writeText(text); }catch(e){} alert(en?'Estimate copied. 📋':'Estimado copiado. 📋'); })();
 };
 window.svcSaveOrder=async function(){
   svcCapture(); const d=window._svcDraft;
