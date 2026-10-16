@@ -2616,6 +2616,7 @@ window.cotSaveDraft=cotSaveDraft;   // expuesto para el oninput inline del campo
 window.openCotizador=function(){
   document.getElementById('cot-car-search').value='';
   document.getElementById('cot-car-results').style.display='none';
+  window._cotOdoBlob=null; window._cotOdoURL=''; try{ const _coi=document.getElementById('cot-odo-photo'); if(_coi)_coi.value=''; const _cop=document.getElementById('cot-odo-preview'); if(_cop)_cop.innerHTML=''; }catch(e){}
   if(cotInventory.length===0){ getDocs(collection(db,'inventory')).then(snap=>{ cotInventory=snap.docs.map(d=>({id:d.id,...d.data()})); }).catch(()=>{}); }
   // Restaura un borrador reciente (si la app se recargó a media cotización, no se pierde)
   let draft=null; try{ draft=JSON.parse(localStorage.getItem('cotDraft')||'null'); }catch(e){}
@@ -3103,8 +3104,9 @@ window.lendmarkSheet = async function(i, mode){
   // Foto del ODÓMETRO para Lendmark: 1) la del cotizador (opcional) manda; 2) si no, la del cliente que coincide por VIN.
   let odometerPhoto='';
   try{ if(vin){ const mc=(clients||[]).find(x=>(x.vin||'').trim().toUpperCase()===vin); if(mc&&mc.odometerPhotoURL) odometerPhoto=mc.odometerPhotoURL; } }catch(e){}
-  if(window._cotOdoBlob){
-    try{ const st=getStorage(); let up=window._cotOdoBlob; try{ up=await _withTimeout(blobToJpeg(window._cotOdoBlob),20000,'convertir odómetro'); }catch(_e){} odometerPhoto=await uploadPhotoRetry(ref(st,'odometer/quotes/'+Date.now()+'_odo.jpg'), up, {contentType:(up.type||'image/jpeg')}, 'subir odómetro cotización'); }catch(e){ console.warn('odo cotización', e); }
+  if(window._cotOdoURL){ odometerPhoto=window._cotOdoURL; }   // ya convertida y subida al escoger la foto (lo normal)
+  else if(window._cotOdoBlob){                               // respaldo: si por algo no se subió antes, intenta aquí (nunca sube HEIC crudo)
+    try{ const st=getStorage(); let up=window._cotOdoBlob; try{ up=await _withTimeout(blobToJpeg(window._cotOdoBlob),30000,'convertir odómetro'); }catch(_e){} if(!(await _looksHeic(up))){ odometerPhoto=await uploadPhotoRetry(ref(st,'odometer/quotes/'+Date.now()+'_odo.jpg'), up, {contentType:(up.type||'image/jpeg')}, 'subir odómetro cotización'); } }catch(e){ console.warn('odo cotización', e); }
   }
   const year=o.year||(inv&&inv.year)||'', make=o.make||(inv&&inv.make)||'', model=o.model||(inv&&inv.model)||'';
   const trim=(inv&&inv.trim)||'', miles=o.miles||(inv&&inv.miles)||'', color=o.color||(inv&&inv.color)||'', invNum=(inv&&inv.inventoryNum)||'';
@@ -3153,7 +3155,7 @@ function cotResetAll(){
   const lg=document.getElementById('cot-lang'); if(lg) lg.value='es';
   const tn=document.getElementById('cot-tax-note'); if(tn) tn.innerHTML='';
   const cr=document.getElementById('cot-car-results'); if(cr){ cr.style.display='none'; cr.innerHTML=''; }
-  window._cotOdoBlob=null; const _co=document.getElementById('cot-odo-photo'); if(_co) _co.value=''; const _cop=document.getElementById('cot-odo-preview'); if(_cop) _cop.innerHTML='';
+  window._cotOdoBlob=null; window._cotOdoURL=''; const _co=document.getElementById('cot-odo-photo'); if(_co) _co.value=''; const _cop=document.getElementById('cot-odo-preview'); if(_cop) _cop.innerHTML='';
   cotOpts=[]; cotSeq=0; try{ renderCotOptions(); }catch(e){}
 }
 // 📮 Envía el sales sheet DIRECTO por el servidor (Zoho SMTP) — arma el correo en el backend con fotos+firma. Devuelve true si se envió.
@@ -3928,17 +3930,33 @@ window.odoPhotoPicked = async function(inp){
 };
 // 📸 Foto del odómetro en el COTIZADOR (opcional, para Lendmark).
 window._cotOdoBlob = null;
+window._cotOdoURL = '';
 window.cotOdoPicked = async function(inp){
-  window._cotOdoBlob = null;
+  window._cotOdoBlob = null; window._cotOdoURL='';
   const f = inp && inp.files && inp.files[0];
   const prev = document.getElementById('cot-odo-preview');
   if(!f){ if(prev) prev.innerHTML=''; return; }
-  const waits=[0,1500,3000,5000]; let lastErr='';
+  // 1) Leer los bytes al instante (iCloud a veces tarda en bajar el archivo).
+  const waits=[0,1500,3000,5000]; let lastErr=''; let raw=null;
   for(let i=0;i<waits.length;i++){
     if(waits[i]){ if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--muted);">⏳ Descargando de iCloud…</span>'; await new Promise(r=>setTimeout(r,waits[i])); }
-    try{ const buf=await f.arrayBuffer(); window._cotOdoBlob=new Blob([buf],{type:f.type||'image/jpeg'}); if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--green);">📷 Odómetro listo ('+Math.round(window._cotOdoBlob.size/1024)+' KB) — se manda a Lendmark</span>'; return; }catch(e){ lastErr=(e&&e.message)||String(e); }
+    try{ const buf=await f.arrayBuffer(); raw=new Blob([buf],{type:f.type||'image/jpeg'}); break; }catch(e){ lastErr=(e&&e.message)||String(e); }
   }
-  window._cotOdoBlob=null; if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo leer esa foto (iCloud)</span>';
+  if(!raw){ if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo leer esa foto (iCloud)</span>'; return; }
+  window._cotOdoBlob = raw;
+  // 2) Convertir a JPG (incluye HEIC del iPhone) y SUBIR YA — así llega seguro al sales sheet (antes fallaba al generar la hoja).
+  if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--muted);">⏳ Procesando odómetro…</span>';
+  try{
+    let jpg = raw;
+    try{ jpg = await blobToJpeg(raw); }catch(e){ console.warn('odo convert', e); }
+    if(await _looksHeic(jpg)){ throw new Error('quedó en HEIC'); }   // nunca subir HEIC crudo (no se ve en el sheet)
+    const st=getStorage();
+    window._cotOdoURL = await uploadPhotoRetry(ref(st,'odometer/quotes/'+Date.now()+'_odo.jpg'), jpg, {contentType:(jpg.type||'image/jpeg')}, 'subir odómetro cotización');
+    if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--green);">📷 Odómetro listo ✓ — se incluye en el sales sheet de Lendmark</span>';
+  }catch(e){
+    window._cotOdoURL='';
+    if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo procesar el odómetro ('+((e&&e.message)||e)+'). Toma la foto normal (JPG) o reintenta.</span>';
+  }
 };
 // 🔧 Diagnóstico: sube 32 bytes a ids/ y a dismantle_vehicles/ y dice EXACTO qué pasa.
 window.diagIdUpload=async function(){
