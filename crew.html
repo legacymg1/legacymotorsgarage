@@ -1188,7 +1188,7 @@ function renderMyService(){
       +'<span style="font-size:11px;font-weight:800;color:'+s.c+';background:'+s.c+'22;padding:3px 9px;border-radius:999px;white-space:nowrap;">'+svcStLabel(o.status)+'</span></div>'
       +'<div style="font-size:14px;margin-bottom:3px;">🚗 '+car+'</div>'
       +(idbits?'<div class="faint" style="font-size:12px;margin-bottom:6px;">'+idbits+'</div>':'')
-      +'<div style="font-size:14px;background:var(--surface2,#1a1f2c);border-radius:9px;padding:8px 10px;line-height:1.4;margin-bottom:8px;">🔧 '+svcEscE(o.reason||'')+'</div>'
+      +'<div style="font-size:14px;background:var(--surface2,#1a1f2c);border-radius:9px;padding:8px 10px;line-height:1.4;margin-bottom:8px;">🔧 '+svcEscE((LANG==='en'?(o.reasonEn||o.reason):(o.reasonEs||o.reason))||'')+'</div>'
       +'<div class="faint" style="font-size:12px;margin-bottom:10px;">'+when+(phone?(' · <a href="sms:'+phone+'" style="color:var(--gold,#c9a84c);text-decoration:none;">'+t('svcMsg')+'</a>'):'')+'</div>'
       +actions+'</div>';
   }).join('');
@@ -1214,7 +1214,7 @@ window.svcOpenReception=function(orderId){
   SVC_CHECK.forEach(it=>SVC_RCPT.chk[it.key]={ok:true,note:''});
   const en=(LANG==='en');
   let h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><h2 style="font-size:19px;margin:0;">'+(en?'📋 Vehicle reception':'📋 Recepción del vehículo')+'</h2><button class="linkbtn" onclick="svcCloseReception()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>';
-  h+='<div class="card" style="padding:12px;margin-bottom:12px;"><div style="font-weight:800;font-size:15px;">'+svcEscE(o.clientName||'')+'</div><div class="faint" style="font-size:12.5px;margin-top:3px;">🚗 '+svcEscE(o.vehicleLabel||o.vin||'')+(o.plate?(' · 🪪 '+svcEscE(o.plate)):'')+'</div><div style="font-size:13px;margin-top:5px;">🔧 '+svcEscE(o.reason||'')+'</div></div>';
+  h+='<div class="card" style="padding:12px;margin-bottom:12px;"><div style="font-weight:800;font-size:15px;">'+svcEscE(o.clientName||'')+'</div><div class="faint" style="font-size:12.5px;margin-top:3px;">🚗 '+svcEscE(o.vehicleLabel||o.vin||'')+(o.plate?(' · 🪪 '+svcEscE(o.plate)):'')+'</div><div style="font-size:13px;margin-top:5px;">🔧 '+svcEscE((LANG==='en'?(o.reasonEn||o.reason):(o.reasonEs||o.reason))||'')+'</div></div>';
   h+='<label style="font-size:13px;font-weight:600;display:block;margin:4px 0 6px;">'+(en?'Mileage at intake':'Millas con las que entra')+'</label>';
   h+='<input id="svc-rcpt-miles" type="number" inputmode="numeric" placeholder="85230" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:16px;margin-bottom:14px;">';
   h+='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">'+(en?'Fuel level':'Nivel de gasolina')+'</label><div style="display:flex;gap:6px;margin-bottom:16px;">'+SVC_FUELS.map(f=>'<button type="button" id="fuel-'+f+'" onclick="svcSetFuel(\''+f+'\')" style="flex:1;padding:10px 0;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:15px;font-weight:700;cursor:pointer;">'+f+'</button>').join('')+'</div>';

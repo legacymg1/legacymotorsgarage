@@ -1997,7 +1997,16 @@ window.svcSaveOrder=async function(){
   const services=(d.services||[]).map(s=>({ desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0 })).filter(s=>s.desc);
   if(!services.length){ alert('Agrega al menos un trabajo.'); return; }
   services.forEach(s=>{ s.priceCents=Math.round((Number(s.price)||0)*100); s.laborCents=s.priceCents; });   // el cobro es el PRECIO PLANO del trabajo (no tiempo × tarifa)
-  const reason=services.map(s=>s.desc).join(' · ');
+  // ✨ Corrector + bilingüe (IA): corrige ortografía ES/EN/mixto de cada trabajo y lo deja en los 2 idiomas (el trabajador lo verá en SU idioma).
+  let reasonEn='';
+  try{
+    const _r=await httpsCallable(functions,'svcFixText')({ items: services.map(s=>s.desc) });
+    const _dd=(_r&&_r.data)||{}; const _es=_dd.es||[], _en=_dd.en||[];
+    services.forEach((s,i)=>{ if(_es[i]) s.desc=_es[i]; s.descEn=_en[i]||_es[i]||s.desc; });
+    reasonEn=services.map(s=>s.descEn||s.desc).join(' · ');
+  }catch(e){ console.warn('svcFixText', e); }
+  const reason=services.map(s=>s.desc).join(' · ');   // ya corregido (ES) si la IA respondió
+  const reasonEs=reason; if(!reasonEn) reasonEn=reason;
   const estMinutes=services.reduce((a,s)=>a+s.minutes,0);
   const laborTotalCents=services.reduce((a,s)=>a+(s.priceCents||0),0);
   const laborRateCents=Math.round(rate*100);
@@ -2020,7 +2029,7 @@ window.svcSaveOrder=async function(){
   const assignRole=d.assignRole||'Mecánico'; let assignEmpId=d.assignEmpId||'', assignName='';
   if(assignEmpId){ const e=svcRoster.find(x=>String(x.id)===String(assignEmpId)); assignName=e?e.name:''; }
   // guardar
-  const payload={ clientId, clientName, clientPhone, vin, plate, vehicleLabel, reason, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, estMinutes, assignRole, assignEmpId, assignName, status };
+  const payload={ clientId, clientName, clientPhone, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, estMinutes, assignRole, assignEmpId, assignName, status };
   try{
     if(d.editId){ await updateDoc(doc(db,'serviceOrders',d.editId), Object.assign(payload,{ updatedAt:new Date().toISOString() })); }
     else { const oref=doc(collection(db,'serviceOrders')); await setDoc(oref, Object.assign(payload,{ createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' })); }

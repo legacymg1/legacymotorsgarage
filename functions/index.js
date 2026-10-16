@@ -1305,7 +1305,8 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
   const out = mine.map((o) => ({
     id: o.id, clientName: o.clientName || "", clientPhone: o.clientPhone || "",
     vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
-    reason: o.reason || "", scheduledAt: o.scheduledAt || null, status: o.status || "por_recibir",
+    reason: o.reason || "", reasonEs: o.reasonEs || o.reason || "", reasonEn: o.reasonEn || o.reason || "",
+    scheduledAt: o.scheduledAt || null, status: o.status || "por_recibir",
     assignRole: o.assignRole || "", assignName: o.assignName || "",
   }));
   return { ok: true, orders: out, roles: id.roles || [], name: id.name || "" };
@@ -1368,6 +1369,38 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (SVC_ORDER_STATUSES.indexOf(o.status || "agendado") < SVC_ORDER_STATUSES.indexOf("recibido")) patch.status = "recibido";
   await ref.set(patch, { merge: true });
   return { ok: true };
+});
+
+// ✨ CORRECTOR + BILINGÜE de los trabajos de una orden de servicio. Entra una lista (ES/EN/mixto, con typos) → sale corregida en ES y EN (misma longitud/orden).
+exports.svcFixText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const items = Array.isArray((request.data || {}).items)
+    ? request.data.items.map((x) => String(x || "").slice(0, 300)).filter(Boolean).slice(0, 20) : [];
+  if (!items.length) return { es: [], en: [] };
+  const sys = "You clean up short auto-shop service line items written by shop staff. The input is a JSON array of strings; each is a service/job note that may be in Spanish, English, or mixed, with typos or abbreviations. " +
+    "For EACH item: fix spelling and obvious grammar and keep it concise and faithful to the meaning. Do NOT add, merge, split, remove, reorder or invent items. Keep standard automotive part/term names. " +
+    "Return ONLY strict JSON {\"es\":[...],\"en\":[...]} where \"es\" is the corrected items in natural Spanish and \"en\" the same items in natural English, with the SAME length and SAME order as the input. No prose, no code fences.";
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({
+      model: "claude-sonnet-5", max_tokens: 900, system: sys,
+      messages: [{ role: "user", content: JSON.stringify(items) }],
+    });
+    let txt = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    txt = txt.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
+    let out = {};
+    try { out = JSON.parse(txt); } catch (e) { const m = txt.match(/\{[\s\S]*\}/); if (m) { try { out = JSON.parse(m[0]); } catch (_) {} } }
+    let es = Array.isArray(out.es) ? out.es.map((x) => String(x || "").slice(0, 300)) : [];
+    let en = Array.isArray(out.en) ? out.en.map((x) => String(x || "").slice(0, 300)) : [];
+    es = items.map((it, i) => es[i] || it);   // si la IA se desalinea o falta, cae al original
+    en = items.map((it, i) => en[i] || it);
+    return { es, en };
+  } catch (e) {
+    console.error("svcFixText", e);
+    return { es: items, en: items };   // si falla, no bloquea: regresa el original
+  }
 });
 
 // 🏁 CICLO DEL CARRO (dealer) — carros esperando INSPECCIÓN INICIAL del mecánico (status 'prep' + reconStage 'mecanico').
