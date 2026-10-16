@@ -3955,7 +3955,7 @@ window.cotOdoPicked = async function(inp){
     if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--green);">📷 Odómetro listo ✓ — se incluye en el sales sheet de Lendmark</span>';
   }catch(e){
     window._cotOdoURL='';
-    if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ No se pudo procesar el odómetro ('+((e&&e.message)||e)+'). Toma la foto normal (JPG) o reintenta.</span>';
+    if(prev) prev.innerHTML='<span style="font-size:12px;color:var(--red);">⚠️ La foto del odómetro quedó en HEIC y no se puede mostrar en el sheet. Súbela en JPG: ábrela en Vista Previa → Exportar como JPEG, o toma una CAPTURA de pantalla (siempre funciona). No se guardó para no dejarla rota.</span>';
   }
 };
 // 🔧 Diagnóstico: sube 32 bytes a ids/ y a dismantle_vehicles/ y dice EXACTO qué pasa.
