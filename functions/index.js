@@ -1371,6 +1371,69 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true };
 });
 
+// 🔧 SERVICE Fase 6 — identidad del CLIENTE del portal (entra por TELÉFONO, NO es staff). Lo buscamos por phoneE164.
+async function _portalClient(request) {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const phone = String((request.auth.token || {}).phone_number || "");
+  if (!phone) throw new HttpsError("permission-denied", "Sin teléfono verificado.");
+  const db = admin.firestore();
+  let snap;
+  try { snap = await db.collection("clients").where("phoneE164", "==", phone).limit(1).get(); }
+  catch (e) { snap = { empty: true }; }
+  if (!snap || snap.empty) throw new HttpsError("not-found", "No encontramos tu expediente.");
+  const d = snap.docs[0];
+  return { id: d.id, phone, data: d.data() || {} };
+}
+// Convierte una orden de servicio a un estimado limpio para el portal del cliente (montos en dólares, idioma del cliente).
+function _estPayload(o, en) {
+  const c = (x) => Math.round(Number(x) || 0) / 100;
+  const services = (Array.isArray(o.services) ? o.services : []).map((s) => ({
+    desc: (en && s.descEn) ? s.descEn : (s.desc || ""),
+    price: c(s.priceCents != null ? s.priceCents : Math.round((Number(s.price) || 0) * 100)),
+    parts: (Array.isArray(s.parts) ? s.parts : []).map((p) => ({ desc: p.desc || "", price: c(p.priceCents != null ? p.priceCents : Math.round((Number(p.price) || 0) * 100)) })),
+  }));
+  return {
+    id: o.id, vehicleLabel: o.vehicleLabel || "", vin: o.vin || "", plate: o.plate || "",
+    status: o.status || "", estimateStatus: o.estimateStatus || "",
+    services,
+    laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
+    deposit: c(o.depositCents), balance: c(o.balanceCents),
+    sentAt: o.estimateSentAt || "", acceptedAt: o.estimateAcceptedAt || "", createdAt: o.createdAt || "",
+  };
+}
+// El PORTAL del cliente lee sus estimados por aquí (no puede leer serviceOrders directo: no es staff).
+exports.svcPortalEstimates = onCall({ timeoutSeconds: 20 }, async (request) => {
+  const cli = await _portalClient(request);
+  const en = ((cli.data.lang || "") === "en");
+  const db = admin.firestore();
+  let docs = [];
+  try { const snap = await db.collection("serviceOrders").where("clientId", "==", cli.id).get(); docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) {}
+  if (!docs.length) { try { const s2 = await db.collection("serviceOrders").where("clientPhone", "==", cli.data.phone || "").get(); docs = s2.docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) {} }
+  const withEst = docs.filter((o) => (o.estimateStatus === "sent" || o.estimateStatus === "accepted") || (Array.isArray(o.services) && o.services.length));
+  withEst.sort((a, b) => ((b.createdAt || "") < (a.createdAt || "") ? -1 : 1));
+  return { ok: true, lang: en ? "en" : "es", clientName: cli.data.name || "", orders: withEst.map((o) => _estPayload(o, en)) };
+});
+// El cliente ACEPTA el estimado desde su teléfono (+ consentimiento SMS opcional). Solo su propia orden.
+exports.svcClientAccept = onCall({ timeoutSeconds: 20 }, async (request) => {
+  const cli = await _portalClient(request);
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const mine = (o.clientId && o.clientId === cli.id) || (o.clientPhone && o.clientPhone === (cli.data.phone || ""));
+  if (!mine) throw new HttpsError("permission-denied", "No es tu orden.");
+  const now = new Date().toISOString();
+  await ref.set({ estimateStatus: "accepted", estimateAcceptedAt: now, estimateAcceptedBy: cli.phone, updatedAt: now }, { merge: true });
+  if (d.smsConsent === true) {
+    try { await db.collection("clients").doc(cli.id).set({ smsConsent: true, smsConsentAt: now, smsConsentSource: "service-estimate" }, { merge: true }); } catch (e) {}
+  }
+  return { ok: true };
+});
+
 // ✨ CORRECTOR + BILINGÜE de los trabajos de una orden de servicio. Entra una lista (ES/EN/mixto, con typos) → sale corregida en ES y EN (misma longitud/orden).
 exports.svcFixText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");

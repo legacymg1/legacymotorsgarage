@@ -2046,8 +2046,16 @@ window.svcGenEstimate=function(){
   ov.appendChild(box); document.body.appendChild(ov);
 };
 window.svcEstPrint=function(){ const html=window._svcEstHtml||''; const w=window.open('','_blank'); if(!w){ alert('Permite las ventanas emergentes para imprimir.'); return; } w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Estimado — Legacy Motors Garage</title></head><body>'+html+'</body></html>'); w.document.close(); w.focus(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400); };
-window.svcEstSend=function(){
+window.svcEstSend=async function(){
   const d=window._svcDraft; const en=(d.lang==='en');
+  // 1) Guarda la orden (silencioso) para tener su ID → el cliente la abre y acepta en su teléfono.
+  let id;
+  try{ id=await window.svcSaveOrder({silent:true}); }catch(e){ alert('No se pudo guardar la orden: '+(e.message||e)); return; }
+  if(!id) return;   // falló validación (ya avisó)
+  // 2) Marca el estimado como ENVIADO (el portal del cliente lo leerá por callable).
+  try{ await updateDoc(doc(db,'serviceOrders',id), { estimateStatus:'sent', estimateSentAt:new Date().toISOString(), estimateSentBy:(auth.currentUser&&auth.currentUser.email)||'' }); }catch(e){ console.warn('estimateStatus', e); }
+  // 3) Arma el mensaje con el LINK al portal.
+  const link=PORTAL_URL+'?order='+id;
   const services=(d.services||[]).filter(s=>(s.desc||'').trim()||(s.parts||[]).length);
   const lines=[en?'Legacy Motors Garage — Service estimate':'Legacy Motors Garage — Estimado de servicio'];
   if(d.clientName) lines.push((en?'Customer: ':'Cliente: ')+d.clientName);
@@ -2058,15 +2066,20 @@ window.svcEstSend=function(){
   const grand=labor+partsSub, dep=Number(d.deposit)||0, bal=Math.max(0,grand-dep);
   lines.push(''); lines.push('Total: '+formatMoney(grand));
   if(dep>0){ lines.push((en?'Deposit: ':'Anticipo: ')+formatMoney(dep)); lines.push((en?'Balance: ':'Saldo: ')+formatMoney(bal)); }
-  lines.push(''); lines.push(en?'(Estimate only, subject to authorization.)':'(Estimado informativo, sujeto a autorización.)');
+  lines.push('');
+  lines.push(en?'👉 See it and approve it here:':'👉 Ve tu estimado y apruébalo aquí:');
+  lines.push(link);
   lines.push('📞 (559) 540-5145 · Legacy Motors Garage');
   const text=lines.join('\n');
+  const ov=document.getElementById('svc-est-overlay'); if(ov) ov.remove();
   const digits=(d.clientPhone||'').replace(/\D/g,'');
   if(digits.length>=10){ const num=digits.length===10?('+1'+digits):('+'+digits); const a=document.createElement('a'); a.href='sms:'+num+'?&body='+encodeURIComponent(text); a.click(); return; }
-  (async()=>{ try{ if(navigator.share){ await navigator.share({text}); return; } }catch(e){ if(e&&e.name==='AbortError') return; } try{ await navigator.clipboard.writeText(text); }catch(e){} alert(en?'Estimate copied. 📋':'Estimado copiado. 📋'); })();
+  try{ if(navigator.share){ await navigator.share({text}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  try{ await navigator.clipboard.writeText(text); }catch(e){}
+  alert(en?'Estimate saved & copied. 📋':'Estimado guardado y copiado. 📋');
 };
-window.svcSaveOrder=async function(){
-  svcCapture(); const d=window._svcDraft;
+window.svcSaveOrder=async function(opts){
+  opts=opts||{}; svcCapture(); const d=window._svcDraft;
   // 1 · cliente
   let clientId=d.clientId, clientName='', clientPhone='', lang=d.lang||'es';
   if(clientId){ const c=clients.find(x=>x.id===clientId); clientName=c?c.name:''; clientPhone=c?(c.phone||''):''; }
@@ -2137,14 +2150,25 @@ window.svcSaveOrder=async function(){
   // 4 · asignar
   const assignRole=d.assignRole||'Mecánico'; let assignEmpId=d.assignEmpId||'', assignName='';
   if(assignEmpId){ const e=svcRoster.find(x=>String(x.id)===String(assignEmpId)); assignName=e?e.name:''; }
+  // 🔒 BLOQUEO SUAVE: si se va a asignar mecánico pero el cliente aún no acepta el estimado, avisa (por si lo autorizan en persona/teléfono).
+  if(assignEmpId && !opts.silent){
+    const o0 = d.editId ? (svcOrders.find(x=>x.id===d.editId)||{}) : {};
+    if(o0.estimateStatus!=='accepted'){
+      if(!confirm('⚠️ El cliente aún no acepta el estimado.\n¿Asignar al mecánico de todos modos?')) return;
+    }
+  }
   // guardar
-  const payload={ clientId, clientName, clientPhone, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, estMinutes, assignRole, assignEmpId, assignName, status };
+  const payload={ clientId, clientName, clientPhone, lang, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, estMinutes, assignRole, assignEmpId, assignName, status };
+  const wasEdit=!!d.editId; let orderId=d.editId||'';
   try{
     if(d.editId){ await updateDoc(doc(db,'serviceOrders',d.editId), Object.assign(payload,{ updatedAt:new Date().toISOString() })); }
-    else { const oref=doc(collection(db,'serviceOrders')); await setDoc(oref, Object.assign(payload,{ createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' })); }
+    else { const oref=doc(collection(db,'serviceOrders')); orderId=oref.id; await setDoc(oref, Object.assign(payload,{ createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' })); }
   }catch(e){ alert('No se pudo guardar la orden: '+(e.message||e)); return; }
+  d.editId=orderId;   // ya quedó guardada: futuras acciones (p.ej. Enviar estimado) apuntan al mismo doc
+  if(opts.silent) return orderId;
   svcClose();
-  alert(d.editId?'💾 Orden actualizada.':('✅ Orden de servicio creada'+(status==='agendado'?' (agendada)':'')+'.'));
+  alert(wasEdit?'💾 Orden actualizada.':('✅ Orden de servicio creada'+(status==='agendado'?' (agendada)':'')+'.'));
+  return orderId;
 };
 
 window.calcCCOA = function() {
