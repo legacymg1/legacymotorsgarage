@@ -306,6 +306,13 @@
   </div>
 </div>
 
+<!-- 📋 F3: Hoja de recepción de la ORDEN DE SERVICIO (checklist corto al recibir) -->
+<div id="svc-intake" class="hide" style="position:fixed;inset:0;z-index:121;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)svcCloseReception()">
+  <div style="background:var(--card,#141924);border:1px solid var(--line,#232a3a);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));">
+    <div id="svc-intake-body"></div>
+  </div>
+</div>
+
 <!-- Panel del dueño: agregar trabajo (tarea) a un carro -->
 <div id="mech-addtask" class="hide" style="position:fixed;inset:0;z-index:121;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)mechCloseAddTask()">
   <div style="background:var(--card,#141924);border:1px solid var(--line,#232a3a);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));">
@@ -1172,7 +1179,7 @@ function renderMyService(){
     const idbits=[o.plate?('🪪 '+svcEscE(o.plate)):'', o.vin?('VIN …'+svcEscE((o.vin||'').slice(-6))):''].filter(Boolean).join(' · ');
     const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
     let actions='';
-    if(o.status==='por_recibir'||o.status==='agendado') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'recibido\')">'+t('svcReceiveCar')+'</button>';
+    if(o.status==='por_recibir'||o.status==='agendado') actions='<button class="btn btn-gold" onclick="svcOpenReception(\''+o.id+'\')">'+t('svcReceiveCar')+'</button>';
     else if(o.status==='recibido') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcStartWork')+'</button>';
     else if(o.status==='en_proceso') actions='<div style="display:flex;gap:8px;"><button class="btn btn-ghost" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'pausado_partes\')">'+t('svcWaitParts')+'</button><button class="btn btn-green" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'listo\')">'+t('svcReady')+'</button></div>';
     else if(o.status==='pausado_partes') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcResume')+'</button>';
@@ -1189,6 +1196,64 @@ function renderMyService(){
 window.svcAdvance=async function(orderId,status){
   try{ await httpsCallable(functions,'svcOrderStatus')({orderId:orderId,status:status}); toast(t('updated')); loadMyService(); }
   catch(e){ toast((e&&e.message)||t('couldntLoad'), true); }
+};
+// 📋 F3 — HOJA DE RECEPCIÓN: checklist corto al recibir el carro (protege de daños pre-existentes).
+const SVC_CHECK=[
+  {key:'body', es:'Carrocería (golpes/rayones)', en:'Body (dents/scratches)'},
+  {key:'glass', es:'Vidrios (estrellados)', en:'Glass (cracks/chips)'},
+  {key:'tires', es:'Llantas', en:'Tires'},
+  {key:'lightsOut', es:'Luces exteriores', en:'Exterior lights'},
+  {key:'interior', es:'Interior (daños)', en:'Interior (damage)'},
+  {key:'dash', es:'Luces del tablero (testigos)', en:'Dashboard warning lights'}
+];
+const SVC_FUELS=['E','¼','½','¾','F'];
+let SVC_RCPT=null;
+window.svcOpenReception=function(orderId){
+  const o=(SVC_MY||[]).find(x=>x.id===orderId); if(!o) return;
+  SVC_RCPT={ orderId:orderId, fuel:'', chk:{} };
+  SVC_CHECK.forEach(it=>SVC_RCPT.chk[it.key]={ok:true,note:''});
+  const en=(LANG==='en');
+  let h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><h2 style="font-size:19px;margin:0;">'+(en?'📋 Vehicle reception':'📋 Recepción del vehículo')+'</h2><button class="linkbtn" onclick="svcCloseReception()" style="font-size:26px;color:var(--muted,#8a8fa8);line-height:1;">×</button></div>';
+  h+='<div class="card" style="padding:12px;margin-bottom:12px;"><div style="font-weight:800;font-size:15px;">'+svcEscE(o.clientName||'')+'</div><div class="faint" style="font-size:12.5px;margin-top:3px;">🚗 '+svcEscE(o.vehicleLabel||o.vin||'')+(o.plate?(' · 🪪 '+svcEscE(o.plate)):'')+'</div><div style="font-size:13px;margin-top:5px;">🔧 '+svcEscE(o.reason||'')+'</div></div>';
+  h+='<label style="font-size:13px;font-weight:600;display:block;margin:4px 0 6px;">'+(en?'Mileage at intake':'Millas con las que entra')+'</label>';
+  h+='<input id="svc-rcpt-miles" type="number" inputmode="numeric" placeholder="85230" style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:16px;margin-bottom:14px;">';
+  h+='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">'+(en?'Fuel level':'Nivel de gasolina')+'</label><div style="display:flex;gap:6px;margin-bottom:16px;">'+SVC_FUELS.map(f=>'<button type="button" id="fuel-'+f+'" onclick="svcSetFuel(\''+f+'\')" style="flex:1;padding:10px 0;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:15px;font-weight:700;cursor:pointer;">'+f+'</button>').join('')+'</div>';
+  h+='<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--gold,#c9a84c);">'+(en?'Condition at intake — tap ⚠️ if it ALREADY had the damage':'Estado al recibir — marca ⚠️ si YA traía el daño')+'</div>';
+  SVC_CHECK.forEach(it=>{ const lbl=en?it.en:it.es;
+    h+='<div style="border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 12px;margin-bottom:8px;">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:14px;">'+svcEscE(lbl)+'</span>';
+    h+='<div style="display:flex;gap:6px;flex:0 0 auto;"><button type="button" id="chk-ok-'+it.key+'" onclick="svcSetChk(\''+it.key+'\',true)" style="padding:7px 11px;border-radius:9px;border:1px solid #32d74b;background:#32d74b22;color:#32d74b;font-size:13px;font-weight:700;cursor:pointer;">'+(en?'✅ OK':'✅ Bien')+'</button>';
+    h+='<button type="button" id="chk-bad-'+it.key+'" onclick="svcSetChk(\''+it.key+'\',false)" style="padding:7px 11px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:transparent;color:var(--muted,#8a8fa8);font-size:13px;font-weight:700;cursor:pointer;">'+(en?'⚠️ Had it':'⚠️ Ya traía')+'</button></div></div>';
+    h+='<input id="chk-note-'+it.key+'" placeholder="'+(en?'What / where? (e.g. scratch on left door)':'¿Qué / dónde? (ej. rayón puerta izq)')+'" style="display:none;width:100%;box-sizing:border-box;margin-top:8px;padding:9px 11px;border-radius:9px;border:1px solid rgba(255,59,59,.4);background:rgba(255,59,59,.06);color:var(--text,#f0ede6);font-size:14px;">';
+    h+='</div>';
+  });
+  h+='<label style="font-size:13px;font-weight:600;display:block;margin:6px 0 6px;">'+(en?'Notes / belongings in the car':'Notas / pertenencias en el carro')+'</label>';
+  h+='<textarea id="svc-rcpt-notes" rows="2" placeholder="'+(en?'Anything else to note…':'Algo más que anotar…')+'" style="width:100%;box-sizing:border-box;padding:11px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text,#f0ede6);font-size:15px;margin-bottom:16px;resize:vertical;"></textarea>';
+  h+='<button class="btn btn-gold" id="svc-rcpt-save" style="width:100%;" onclick="svcReceptionSave()">'+(en?'✅ Receive car':'✅ Recibir carro')+'</button>';
+  h+='<div class="faint" style="font-size:11px;text-align:center;margin-top:9px;line-height:1.4;">'+(en?'Photos coming next. This protects us from pre-existing damage claims.':'Las fotos vienen en el siguiente paso. Esto nos protege de daños que ya traía el carro.')+'</div>';
+  document.getElementById('svc-intake-body').innerHTML=h;
+  document.getElementById('svc-intake').classList.remove('hide');
+};
+window.svcSetFuel=function(f){ if(!SVC_RCPT) return; SVC_RCPT.fuel=f; SVC_FUELS.forEach(x=>{ const b=document.getElementById('fuel-'+x); if(b){ const on=(x===f); b.style.background=on?'#c9a84c':'rgba(255,255,255,.05)'; b.style.color=on?'#0b0e14':'var(--text,#f0ede6)'; b.style.borderColor=on?'#c9a84c':'rgba(255,255,255,.14)'; } }); };
+window.svcSetChk=function(key,ok){ if(!SVC_RCPT||!SVC_RCPT.chk[key]) return; SVC_RCPT.chk[key].ok=ok;
+  const okb=document.getElementById('chk-ok-'+key), bad=document.getElementById('chk-bad-'+key), nr=document.getElementById('chk-note-'+key);
+  if(okb){ okb.style.background=ok?'#32d74b22':'transparent'; okb.style.borderColor=ok?'#32d74b':'rgba(255,255,255,.14)'; okb.style.color=ok?'#32d74b':'var(--muted,#8a8fa8)'; }
+  if(bad){ bad.style.background=!ok?'#ff3b3b22':'transparent'; bad.style.borderColor=!ok?'#ff3b3b':'rgba(255,255,255,.14)'; bad.style.color=!ok?'#ff3b3b':'var(--muted,#8a8fa8)'; }
+  if(nr){ nr.style.display=ok?'none':'block'; if(!ok) try{ nr.focus(); }catch(e){} }
+};
+window.svcCloseReception=function(){ const m=document.getElementById('svc-intake'); if(m) m.classList.add('hide'); SVC_RCPT=null; };
+window.svcReceptionSave=async function(){
+  if(!SVC_RCPT) return;
+  const miles=((document.getElementById('svc-rcpt-miles')||{}).value||'').trim();
+  const notes=((document.getElementById('svc-rcpt-notes')||{}).value||'').trim();
+  const items=SVC_CHECK.map(it=>{ const st=SVC_RCPT.chk[it.key]||{ok:true}; const note=st.ok?'':(((document.getElementById('chk-note-'+it.key)||{}).value)||'').trim(); return { key:it.key, label:(LANG==='en'?it.en:it.es), ok:!!st.ok, note:note }; });
+  const intake={ fuel:SVC_RCPT.fuel||'', miles:miles, notes:notes, items:items, photos:[] };
+  const btn=document.getElementById('svc-rcpt-save'); if(btn){ btn.disabled=true; btn.textContent=(LANG==='en'?'Saving…':'Guardando…'); }
+  try{
+    await httpsCallable(functions,'svcIntake')({ orderId:SVC_RCPT.orderId, intake:intake });
+    toast(LANG==='en'?'✅ Car received':'✅ Carro recibido');
+    svcCloseReception(); loadMyService();
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent=(LANG==='en'?'✅ Receive car':'✅ Recibir carro'); } toast((e&&e.message)||t('couldntLoad'), true); }
 };
 function detailView(v){
   document.getElementById('detail-home').classList.toggle('hide', v!=='home');

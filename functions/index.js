@@ -1333,6 +1333,43 @@ exports.svcOrderStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true };
 });
 
+// 📋 F3 — HOJA DE RECEPCIÓN del carro de servicio (checklist corto al recibir). Guarda el estado AL RECIBIRLO (protege de daños pre-existentes) y avanza a 'recibido'.
+exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const mine = (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && o.assignRole && Array.isArray(id.roles) && id.roles.includes(o.assignRole));
+  if (!(id.isOwner || id.email || mine)) throw new HttpsError("permission-denied", "No es tu orden.");
+  const inRaw = d.intake || {};
+  const items = Array.isArray(inRaw.items) ? inRaw.items.slice(0, 24).map((it) => ({
+    key: String(it.key || "").slice(0, 24),
+    label: String(it.label || "").slice(0, 60),
+    ok: !!it.ok,
+    note: String(it.note || "").slice(0, 300),
+  })) : [];
+  const intake = {
+    fuel: String(inRaw.fuel || "").slice(0, 8),
+    miles: String(inRaw.miles || "").slice(0, 12),
+    items,
+    notes: String(inRaw.notes || "").slice(0, 1000),
+    photos: Array.isArray(inRaw.photos) ? inRaw.photos.slice(0, 12).map((u) => String(u || "").slice(0, 600)) : [],
+    at: new Date().toISOString(),
+    by: id.email || id.name || id.empId || "",
+  };
+  const patch = { intake, updatedAt: new Date().toISOString(), updatedBy: id.email || id.name || id.empId || "" };
+  if (SVC_ORDER_STATUSES.indexOf(o.status || "agendado") < SVC_ORDER_STATUSES.indexOf("recibido")) patch.status = "recibido";
+  await ref.set(patch, { merge: true });
+  return { ok: true };
+});
+
 // 🏁 CICLO DEL CARRO (dealer) — carros esperando INSPECCIÓN INICIAL del mecánico (status 'prep' + reconStage 'mecanico').
 // Auto-encolado: un carro nuevo se guarda con status:'prep' y reconStage:'mecanico' → aparece aquí solo.
 exports.mechCars = onCall({ timeoutSeconds: 30 }, async (request) => {
