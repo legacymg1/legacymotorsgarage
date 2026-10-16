@@ -1475,10 +1475,30 @@ const SVC_IN='width:100%;padding:10px 12px;border-radius:10px;border:1px solid v
 function svcEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function SVC_SEC(title,inner){ return '<div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'+title+'</div>'+inner+'</div>'; }
 
+// 🔔 Aviso visible (toast) — el admin no tenía ninguno. Salta aunque no estés en la vista de servicio.
+window.svcToast=function(msg, onClick){
+  let host=document.getElementById('svc-toast-host');
+  if(!host){ host=document.createElement('div'); host.id='svc-toast-host'; host.style.cssText='position:fixed;left:0;right:0;bottom:16px;z-index:100002;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 12px;'; document.body.appendChild(host); }
+  const t=document.createElement('div');
+  t.style.cssText='pointer-events:auto;max-width:460px;width:100%;background:linear-gradient(135deg,#14331f,#0f2418);border:1px solid rgba(40,180,99,.5);color:#eafff1;border-radius:14px;padding:14px 16px;font-size:14px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.45);cursor:pointer;display:flex;align-items:center;gap:10px;';
+  t.innerHTML=msg;
+  t.onclick=function(){ try{ if(onClick) onClick(); }catch(e){} t.remove(); };
+  host.appendChild(t);
+  try{ if(navigator.vibrate) navigator.vibrate(120); }catch(e){}
+  setTimeout(()=>{ t.style.transition='opacity .4s'; t.style.opacity='0'; setTimeout(()=>t.remove(),400); }, 9000);
+};
 function startSvcListening(){
   try{
     onSnapshot(query(collection(db,'serviceOrders')), (snap)=>{
       svcOrders = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      // Detecta cuándo un cliente ACABA de aceptar su estimado → toast (no en la primera carga).
+      try{
+        const nowAccepted={}; svcOrders.forEach(o=>{ if(o.estimateStatus==='accepted') nowAccepted[o.id]=o; });
+        if(window._svcAccSeen){
+          Object.keys(nowAccepted).forEach(id=>{ if(!window._svcAccSeen[id]){ const o=nowAccepted[id]; window.svcToast('✅ '+(o.clientName||'El cliente')+' aceptó el estimado'+((o.vehicleLabel||o.plate)?(' de '+(o.vehicleLabel||o.plate)):''), function(){ if(window.setCliView) setCliView('service'); if(window.svcOpenOrder) svcOpenOrder(id); }); } });
+        }
+        window._svcAccSeen=nowAccepted;
+      }catch(e){ console.warn('svc accept toast', e); }
       const sv=document.getElementById('service-view');
       if(sv && sv.style.display!=='none') svcRenderOrders();
     }, (e)=>{ console.warn('serviceOrders offline', e); });
