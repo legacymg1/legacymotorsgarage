@@ -561,6 +561,7 @@ onAuthStateChanged(auth, async (user)=>{
     document.getElementById('app').style.display='block';
     { const _hf=document.getElementById('help-fab'); if(_hf) _hf.style.display='flex'; }
     renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); maybeAskConsent();
+    loadPortalEstimates();   // 🧾 trae los estimados de servicio (se pintan al llegar)
     checkSquareReturn();   // 💳 si viene de pagar con Square, registra y refresca
     try{ await updateDoc(doc(db,'clients',currentClient.id), { lastLogin: new Date().toISOString() }); }catch(e){}
   }catch(e){ showLoginError(t('errConn')); }
@@ -823,6 +824,72 @@ function serviceCardHTML(nextServ, nextAppt, lastAppt){
       </div>
     </div>`;
 }
+// ===== 🧾 ESTIMADOS DE SERVICIO (Fase 6) — el cliente los ve y los ACEPTA desde su teléfono =====
+let portalEstimates = [];
+const focusOrderId = (new URLSearchParams(location.search).get('order') || '');
+function escPortal(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+async function loadPortalEstimates(){
+  try{ const r = await httpsCallable(functions,'svcPortalEstimates')({}); portalEstimates = (r&&r.data&&r.data.orders)||[]; }
+  catch(e){ portalEstimates = []; }
+  try{ if(currentClient){ renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); } }catch(e){}
+}
+function vehListCardHTML(c){
+  const es=L!=='en'; const vehicles=clientVehicles(c);
+  if(!vehicles.length) return '';
+  const rows=vehicles.map(v=>`<div class="info-row"><span class="ir-label">🚗 ${es?'Vehículo':'Vehicle'}</span><span class="ir-value">${escPortal(v.label)}${v.vin?' · …'+escPortal(v.vin.slice(-6)):''}</span></div>`).join('');
+  return `<div class="info-card" style="margin-top:16px;"><div class="section-title" style="margin:0 0 14px;">${es?'Mis vehículos':'My vehicles'}</div>${rows}</div>`;
+}
+function estimateCardHTML(o){
+  const es=L!=='en'; const accepted=o.estimateStatus==='accepted';
+  let rows='';
+  (o.services||[]).forEach(s=>{
+    rows+=`<div class="info-row" style="border:none;padding:6px 0 2px;"><span class="ir-label" style="font-weight:700;color:var(--white);">${escPortal(s.desc||'')}</span><span class="ir-value">${formatMoney(s.price)}</span></div>`;
+    (s.parts||[]).forEach(p=>{ rows+=`<div class="info-row" style="border:none;padding:1px 0 1px 12px;"><span class="ir-label" style="font-size:12px;">• ${escPortal(p.desc||'')}</span><span class="ir-value" style="font-size:12px;color:var(--muted);">${formatMoney(p.price)}</span></div>`; });
+  });
+  const focus = focusOrderId && o.id===focusOrderId;
+  return `
+  <div class="info-card" id="est-${o.id}" style="margin-top:16px;${focus?'border:1px solid var(--gold);box-shadow:0 0 0 2px rgba(200,162,74,.25);':''}">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div class="section-title" style="margin:0;">${es?'Estimado de servicio':'Service estimate'}</div><span style="font-size:20px;">🧾</span>
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">🚗 ${escPortal(o.vehicleLabel||o.vin||'')}${o.plate?(' · '+escPortal(o.plate)):''}</div>
+    ${rows}
+    <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
+      <div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label">${es?'Mano de obra':'Labor'}</span><span class="ir-value">${formatMoney(o.laborTotal)}</span></div>
+      <div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label">${es?'Partes':'Parts'}</span><span class="ir-value">${formatMoney(o.partsTotal)}</span></div>
+      <div class="info-row" style="border:none;padding:4px 0;"><span class="ir-label" style="font-weight:800;color:var(--white);">Total</span><span class="ir-value" style="font-weight:800;color:var(--gold);">${formatMoney(o.total)}</span></div>
+      ${o.deposit>0?`<div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label">${es?'Anticipo':'Deposit'}</span><span class="ir-value">−${formatMoney(o.deposit)}</span></div><div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label" style="font-weight:700;">${es?'Saldo':'Balance'}</span><span class="ir-value" style="font-weight:700;">${formatMoney(o.balance)}</span></div>`:''}
+    </div>
+    ${accepted
+      ? `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:700;text-align:center;">✅ ${es?'Aceptaste este estimado':'You approved this estimate'}${o.acceptedAt?(' · '+formatDate((o.acceptedAt||'').slice(0,10))):''}</div>`
+      : `<div style="margin-top:12px;">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:rgba(232,182,74,0.06);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;">
+            <input type="checkbox" id="est-consent-${o.id}" style="width:20px;height:20px;margin-top:1px;flex:none;cursor:pointer;">
+            <span style="font-size:12px;line-height:1.5;color:var(--muted);">${es?'Acepto recibir mensajes de texto de Legacy Motors Garage sobre mi servicio y recordatorios. Respondo STOP para cancelar.':'I agree to receive text messages from Legacy Motors Garage about my service and reminders. Reply STOP to cancel.'}</span>
+          </label>
+          <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.'}</div>
+        </div>`}
+  </div>`;
+}
+function estimatesHTML(){
+  if(!portalEstimates.length) return '';
+  const list = portalEstimates.slice().sort((a,b)=> (a.id===focusOrderId?-1:(b.id===focusOrderId?1:0)) );
+  return list.map(estimateCardHTML).join('');
+}
+window.portalAcceptEstimate = async function(orderId){
+  const btn=document.getElementById('est-accept-'+orderId);
+  const consent = !!((document.getElementById('est-consent-'+orderId)||{}).checked);
+  if(btn){ btn.disabled=true; btn.textContent=(L==='en'?'Saving…':'Guardando…'); }
+  try{
+    await httpsCallable(functions,'svcClientAccept')({ orderId, smsConsent: consent });
+    await loadPortalEstimates();
+    const card=document.getElementById('est-'+orderId); if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent=(L==='en'?'✅ Approve estimate':'✅ Aceptar estimado'); }
+    alert((L==='en'?'Could not save: ':'No se pudo guardar: ')+((e&&e.message)||e));
+  }
+};
 window.togglePaySchedule = function(){
   const w=document.getElementById('pay-sched'); if(!w) return;
   w.style.display='block';
@@ -855,6 +922,7 @@ function renderServicePortal(c){
       <div class="section-title" style="margin:0 0 14px;">${es?'Mis vehículos':'My vehicles'}</div>
       ${vehHTML}
     </div>
+    ${estimatesHTML()}
     ${serviceCardHTML(nextServ, next, last)}
     <div class="insurance-section" id="sms-section" style="margin-top:16px;padding:16px 20px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -1161,6 +1229,8 @@ function renderPortal() {
     ${status==='paidoff' ? '' : `
     <button onclick="payNow()" style="width:100%;background:linear-gradient(135deg,#2e7d32,#43a047);color:#fff;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:16px;box-shadow:0 6px 18px rgba(67,160,71,.35);">💳 ${L==='en'?'Pay now':'Pagar ahora'}</button>`}
 
+    ${clientVehicles(c).length>1 ? vehListCardHTML(c) : ''}
+    ${estimatesHTML()}
     ${serviceCardHTML(nextServ2, nextAppt, _lastAppt)}
 
     <!-- Seguro/ID PENDIENTES arriba -->
