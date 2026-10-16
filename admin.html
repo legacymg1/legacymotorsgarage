@@ -1621,7 +1621,26 @@ function _c360FinSummary(c){
   return h;
 }
 function _c360PayHistory(c){ const pays=(c.payments||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))); if(!pays.length) return '<div style="color:var(--muted);font-size:13px;">Sin pagos registrados.</div>'; return pays.map(p=>{ const when=p.date?new Date(p.date+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;"><span>'+when+(p.method?(' · '+esc(p.method)):'')+'</span><b>'+_c360Money(p.amount)+'</b></div>'; }).join(''); }
-function c360SvcHistory(c, v){ const ords=svcOrders.filter(o=>o.clientId===c.id && (!v || (o.vin||'').toUpperCase()===(v.vin||'').toUpperCase())).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))); if(!ords.length) return '<div style="color:var(--muted);font-size:13px;">Sin servicios.</div>'; return ords.map(o=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; const tot=o.grandTotalCents!=null?_c360Money(o.grandTotalCents/100):''; const stl=(SVC_STATUS[o.status]||{}).lbl||''; return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);"><div style="min-width:0;"><div style="font-size:13px;font-weight:600;">'+esc(o.reason||'Servicio')+'</div><div style="font-size:11px;color:var(--muted);">'+when+(stl?(' · '+stl):'')+(tot?(' · '+tot):'')+'</div></div><a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;white-space:nowrap;">🧾 invoice ›</a></div>'; }).join(''); }
+function c360SvcHistory(c, v){
+  const ords=svcOrders.filter(o=>o.clientId===c.id && (!v || (o.vin||'').toUpperCase()===(v.vin||'').toUpperCase())).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  if(!ords.length) return '<div style="color:var(--muted);font-size:13px;">Sin servicios.</div>';
+  return ords.map(o=>{
+    const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'';
+    const ss=SVC_STATUS[o.status]||{lbl:(o.status||'—'),c:'var(--muted)'};
+    const hasInvoice=Number(o.grandTotalCents)>0;          // 🧾 solo hay invoice cuando ya tiene precio/total
+    const tot=hasInvoice?_c360Money(o.grandTotalCents/100):'';
+    const done=(o.status==='listo'||o.status==='entregado');
+    const svcList=Array.isArray(o.services)?o.services.map(s=>s&&s.desc).filter(Boolean):[];
+    const photos=(Array.isArray(o.photos)&&o.photos.length)?o.photos:((Array.isArray(o.workPhotos)&&o.workPhotos.length)?o.workPhotos:[]);
+    let row='<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">';
+    row+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="min-width:0;"><div style="font-size:13px;font-weight:700;">'+esc(o.reason||'Servicio')+'</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">'+when+(hasInvoice?(' · '+tot):'')+'</div></div><span style="flex:0 0 auto;background:'+ss.c+'22;color:'+ss.c+';border:1px solid '+ss.c+';border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">'+ss.lbl+'</span></div>';
+    if(done && svcList.length){ row+='<div style="font-size:12px;color:var(--text);margin-top:7px;">🛠️ Se hizo: '+svcList.map(esc).join(' · ')+'</div>'; }
+    if(photos.length){ row+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;">'+photos.slice(0,8).map((u,i)=>'<span onclick="showPhoto(\''+u+'\',\'Trabajo realizado\')" style="font-size:11px;color:var(--gold);cursor:pointer;">📷 Foto '+(i+1)+'</span>').join('')+'</div>'; }
+    const docLbl = done ? '🧾 invoice ›' : '📄 estimado ›';   // antes de entregar = ESTIMADO; al entregar = INVOICE
+    row+='<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;"><a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">ver orden ›</a>'+(hasInvoice?('<a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">'+docLbl+'</a>'):'')+'</div></div>';
+    return row;
+  }).join('');
+}
 function c360JacketHtml(c, v){ const inv=_c360InvFor(c, v); let rows='';
   rows+=_c360DocRow('📝','Contrato', (c.signedContract&&c.signedContract.url)||'', 'público');
   rows+=_c360DocRow('💨','Smog', (inv&&inv.smogPhotoURL)||'', 'público');
@@ -1676,13 +1695,14 @@ window.openVehicle360=function(id, idx){
   const c=clients.find(x=>x.id===id); if(!c) return; const v=clientVehicles(c)[idx]; if(!v) return;
   const body=document.getElementById('c360-body'); if(!body) return; const M=_c360Money;
   const isFin=!!(c.vin && v.vin && (c.vin||'').toUpperCase()===(v.vin||'').toUpperCase());
-  let stLbl, stColor; if(isFin){ const s=C360_ST[getStatus(c)]||['—','var(--muted)']; stLbl=s[0]; stColor=s[1]; } else { stLbl='🔧 De servicio'; stColor='var(--muted)'; }
+  const bought = isFin || !!_c360InvFor(c, v) || v.bought===true;   // comprado con nosotros (jacket) vs traído a servicio (sin jacket)
+  let stLbl, stColor; if(isFin){ const s=C360_ST[getStatus(c)]||['—','var(--muted)']; stLbl=s[0]; stColor=s[1]; } else if(bought){ stLbl='✅ Comprado'; stColor='var(--green)'; } else { stLbl='🔧 De servicio'; stColor='var(--muted)'; }
   const sec=(t,inner)=>'<div style="padding:14px 16px;border-top:1px solid var(--border);"><div style="font-weight:800;font-size:13px;color:var(--gold);margin-bottom:8px;">'+t+'</div>'+inner+'</div>';
   let h='<div style="padding:14px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);"><button onclick="renderClient360(\''+id+'\')" style="background:transparent;border:none;color:var(--text);font-size:24px;cursor:pointer;line-height:1;">‹</button><div style="flex:1;min-width:0;"><div style="font-family:var(--font-display);font-size:19px;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN '+esc(v.vin)):'')+'</div></div><button onclick="c360Close()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;">×</button></div>'
     +'<div style="padding:12px 16px;border-bottom:1px solid var(--border);"><span style="display:inline-block;background:'+stColor+'22;color:'+stColor+';border:1px solid '+stColor+';border-radius:999px;padding:4px 13px;font-weight:800;font-size:13px;">'+stLbl+'</span>'+(isFin&&!isPaidOff(c)?('<span style="margin-left:8px;color:var(--muted);font-size:13px;">saldo '+M(calcBalance(c))+'</span>'):'')+'</div>';
   if(isFin){ h+=sec('💳 Historial de pagos', _c360PayHistory(c)); }
   h+=sec('🔧 Historial de servicio', c360SvcHistory(c, v));
-  h+=sec('🗂️ Jacket del carro (documentos)', c360JacketHtml(c, v));
+  if(bought){ h+=sec('🗂️ Jacket del carro (documentos)', c360JacketHtml(c, v)); }   // solo carros COMPRADOS; los de servicio no llevan jacket
   body.innerHTML=h;
 };
 window.openLead360=async function(qid){
@@ -1696,7 +1716,7 @@ window.openLead360=async function(qid){
 };
 
 window.svcNewOrder=function(){
-  window._svcDraft={ clientId:'', clientName:'', clientPhone:'', lang:'es', vin:'', plate:'', vehicleLabel:'', vehPick:'', reason:'', when:'now', scheduledAt:'', estMin:60, assignRole:'Mecánico', assignEmpId:'', assignName:'', services:[{desc:'',minutes:60}], laborRate:100, deposit:0, parts:[], editId:'', status:'' };
+  window._svcDraft={ clientId:'', clientName:'', clientPhone:'', lang:'es', vin:'', plate:'', vehicleLabel:'', vehPick:'', reason:'', when:'now', scheduledAt:'', estMin:60, assignRole:'Mecánico', assignEmpId:'', assignName:'', services:[{desc:'',minutes:60,price:0}], laborRate:100, deposit:0, parts:[], editId:'', status:'' };
   svcRenderModal();
   document.getElementById('svc-modal').style.display='flex';
   svcLoadRoster().then(()=>svcRenderModal());
@@ -1704,7 +1724,7 @@ window.svcNewOrder=function(){
 // 👁️ Abrir una orden EXISTENTE para ver/editar (mismo formulario, modo editar).
 window.svcOpenOrder=function(id){
   const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
-  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60}];
+  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0,price:(s.price!=null?Number(s.price):((Number(s.laborCents)||0)/100))})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60,price:(Number(o.grandTotalCents)||0)/100}];
   const parts=Array.isArray(o.parts)?o.parts.map(p=>({desc:p.desc||'',price:(Number(p.priceCents)||0)/100})):[];
   window._svcDraft={ clientId:o.clientId||'', clientName:o.clientName||'', clientPhone:o.clientPhone||'', lang:o.lang||'es',
     vin:o.vin||'', plate:o.plate||'', vehicleLabel:o.vehicleLabel||'', vehPick:'__keep__',
@@ -1756,9 +1776,10 @@ function svcCapServices(){
   rows.forEach(row=>{ const i=row.getAttribute('data-svc-row');
     const desc=(document.getElementById('svc-svc-desc-'+i)||{}).value||'';
     const minutes=Number((document.getElementById('svc-svc-time-'+i)||{}).value)||0;
-    arr.push({desc:desc, minutes:minutes});
+    const price=Number((document.getElementById('svc-svc-price-'+i)||{}).value)||0;
+    arr.push({desc:desc, minutes:minutes, price:price});
   });
-  d.services=arr.length?arr:[{desc:'',minutes:60}];
+  d.services=arr.length?arr:[{desc:'',minutes:60,price:0}];
 }
 window.svcCapture=svcCapture;
 window.svcCliSearch=function(){
@@ -1824,26 +1845,28 @@ function svcRenderModal(){
   }
   // 3 · SERVICIO (cada servicio individual, con su labor = tiempo × tarifa; feed del invoice)
   const rate=Number(d.laborRate)||0;
-  const svcList=(d.services&&d.services.length)?d.services:[{desc:'',minutes:60}];
-  const rowsHtml=svcList.map((s,i)=>{ const mins=Number(s.minutes)||0; const labor=rate*mins/60;
+  const svcList=(d.services&&d.services.length)?d.services:[{desc:'',minutes:60,price:0}];
+  const rowsHtml=svcList.map((s,i)=>{ const mins=Number(s.minutes)||0; const price=Number(s.price)||0;
     const timeOpts=SVC_EST.map(o=>'<option value="'+o.m+'" '+(String(mins)===String(o.m)?'selected':'')+'>'+o.l+'</option>').join('');
     return '<div data-svc-row="'+i+'" style="background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;">'
-      +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:7px;"><input id="svc-svc-desc-'+i+'" value="'+svcEsc(s.desc||'')+'" oninput="svcDescCap(this)" placeholder="Servicio (ej. Cambio de balatas)" autocapitalize="sentences" style="'+SVC_IN+';flex:1;margin:0;">'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:7px;"><input id="svc-svc-desc-'+i+'" value="'+svcEsc(s.desc||'')+'" oninput="svcDescCap(this)" placeholder="Trabajo (ej. Cambiar turbo, Detallada interior)" autocapitalize="sentences" style="'+SVC_IN+';flex:1;margin:0;">'
       +(svcList.length>1?'<span onclick="svcRemoveService('+i+')" style="cursor:pointer;color:var(--faint);font-size:18px;flex:0 0 auto;">🗑️</span>':'')+'</div>'
       +'<div style="display:flex;gap:8px;align-items:center;">'
-      +'<select id="svc-svc-time-'+i+'" onchange="svcRecalc()" style="'+SVC_IN+';flex:1;margin:0;">'+timeOpts+'</select>'
-      +'<div style="flex:0 0 auto;text-align:right;min-width:92px;"><div style="font-size:10px;color:var(--muted);">Labor</div><div id="svc-svc-labor-'+i+'" style="font-weight:800;color:var(--gold);">'+formatMoney(labor)+'</div></div></div></div>';
+      +'<div style="position:relative;flex:1;"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);">$</span><input id="svc-svc-price-'+i+'" type="number" inputmode="decimal" value="'+(price||'')+'" oninput="svcRecalc()" placeholder="Precio del trabajo" style="'+SVC_IN+';width:100%;box-sizing:border-box;padding-left:20px;text-align:right;margin:0;font-weight:700;"></div>'
+      +'<select id="svc-svc-time-'+i+'" onchange="svcRecalc()" title="Tiempo estimado (solo interno, no lo ve el cliente)" style="'+SVC_IN+';flex:0 0 120px;margin:0;color:var(--muted);">'+timeOpts+'</select>'
+      +'</div></div>';
   }).join('');
   const totMin=svcList.reduce((a,s)=>a+(Number(s.minutes)||0),0);
+  const svcSub=svcList.reduce((a,s)=>a+(Number(s.price)||0),0);
   const partsList=(d.parts&&d.parts.length)?d.parts:[];
   const PIN=SVC_IN;
   const partsRows=partsList.map((p,i)=>'<div data-part-row="'+i+'" style="display:flex;gap:8px;align-items:center;margin-bottom:7px;"><input id="svc-part-desc-'+i+'" value="'+svcEsc(p.desc||'')+'" oninput="svcDescCap(this)" placeholder="Parte / cargo" autocapitalize="sentences" style="'+PIN+';flex:1;margin:0;"><div style="position:relative;flex:0 0 100px;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);">$</span><input id="svc-part-price-'+i+'" type="number" inputmode="decimal" value="'+(p.price||'')+'" oninput="svcRecalc()" placeholder="0.00" style="'+PIN+';width:100%;box-sizing:border-box;padding-left:18px;text-align:right;margin:0;"></div><span onclick="svcRemovePart('+i+')" style="cursor:pointer;color:var(--faint);font-size:17px;flex:0 0 auto;">🗑️</span></div>').join('');
   const partsSub=partsList.reduce((a,p)=>a+(Number(p.price)||0),0);
-  const grand=rate*totMin/60+partsSub;
-  const svcHtml='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;"><label style="font-size:12px;color:var(--muted);">Tarifa de labor $/hora</label><input id="svc-labor-rate" type="number" inputmode="decimal" value="'+rate+'" onchange="svcRecalc()" style="'+SVC_IN+';width:110px;text-align:right;margin:0;"></div>'
+  const grand=svcSub+partsSub;
+  const svcHtml='<input id="svc-labor-rate" type="hidden" value="'+rate+'">'
     +rowsHtml
-    +'<button type="button" onclick="svcAddService()" style="width:100%;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:9px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">➕ Agregar servicio</button>'
-    +'<div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);font-size:13px;">Tiempo total: <b id="svc-tot-time">'+svcFmtMin(totMin)+'</b></span><span style="font-size:13px;">Labor: <b id="svc-tot-labor" style="color:var(--gold);">'+formatMoney(rate*totMin/60)+'</b></span></div>'
+    +'<button type="button" onclick="svcAddService()" style="width:100%;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:9px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">➕ Agregar trabajo</button>'
+    +'<div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--muted);font-size:12px;">⏱️ Tiempo estimado (interno): <b id="svc-tot-time">'+svcFmtMin(totMin)+'</b></span><span style="font-size:13px;">Trabajos: <b id="svc-tot-labor" style="color:var(--gold);">'+formatMoney(svcSub)+'</b></span></div>'
     +'<div style="margin:6px 0;font-size:12px;color:var(--muted);font-weight:700;">🔩 Partes / otros cargos</div>'
     +'<div id="svc-parts-list">'+partsRows+'</div>'
     +'<button type="button" onclick="svcAddPart()" style="width:100%;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:9px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">➕ Agregar parte / cargo</button>'
@@ -1887,20 +1910,18 @@ function svcFmtMin(m){ m=Number(m)||0; if(m<60) return m+' min'; const h=m/60; r
 window.svcDescCap=function(el){ if(el && el.value){ const v=el.value; const nv=v.charAt(0).toUpperCase()+v.slice(1); if(nv!==v){ const p=el.selectionStart; el.value=nv; try{ el.setSelectionRange(p,p); }catch(e){} } } };
 window.svcRecalc=function(){
   svcCapServices(); svcCapParts(); const d=window._svcDraft; if(!d) return;
-  const rate=Number((document.getElementById('svc-labor-rate')||{}).value)||0; d.laborRate=rate;
-  let totMin=0;
-  (d.services||[]).forEach((s,i)=>{ const mins=Number(s.minutes)||0; totMin+=mins; const el=document.getElementById('svc-svc-labor-'+i); if(el) el.textContent=formatMoney(rate*mins/60); });
+  let totMin=0, svcSub=0;
+  (d.services||[]).forEach(s=>{ totMin+=Number(s.minutes)||0; svcSub+=Number(s.price)||0; });   // precio PLANO por trabajo
   const tt=document.getElementById('svc-tot-time'); if(tt) tt.textContent=svcFmtMin(totMin);
-  const totLabor=rate*totMin/60;
-  const tl=document.getElementById('svc-tot-labor'); if(tl) tl.textContent=formatMoney(totLabor);
+  const tl=document.getElementById('svc-tot-labor'); if(tl) tl.textContent=formatMoney(svcSub);
   const partsSub=(d.parts||[]).reduce((a,p)=>a+(Number(p.price)||0),0);
-  const grand=totLabor+partsSub;
+  const grand=svcSub+partsSub;
   const tg=document.getElementById('svc-tot-grand'); if(tg) tg.textContent=formatMoney(grand);
   const dep=Number((document.getElementById('svc-deposit')||{}).value)||0; d.deposit=dep;
   const sl=document.getElementById('svc-tot-saldo'); if(sl) sl.textContent=formatMoney(Math.max(0,grand-dep));
 };
-window.svcAddService=function(){ svcCapture(); (window._svcDraft.services=window._svcDraft.services||[]).push({desc:'',minutes:60}); svcRenderModal(); };
-window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.services||[]; a.splice(i,1); if(!a.length) a.push({desc:'',minutes:60}); svcRenderModal(); };
+window.svcAddService=function(){ svcCapture(); (window._svcDraft.services=window._svcDraft.services||[]).push({desc:'',minutes:60,price:0}); svcRenderModal(); };
+window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.services||[]; a.splice(i,1); if(!a.length) a.push({desc:'',minutes:60,price:0}); svcRenderModal(); };
 window.svcAddPart=function(){ svcCapture(); (window._svcDraft.parts=window._svcDraft.parts||[]).push({desc:'',price:0}); svcRenderModal(); };
 window.svcRemovePart=function(i){ svcCapture(); const a=window._svcDraft.parts||[]; a.splice(i,1); svcRenderModal(); };
 // 📄 Dar el estimado al cliente (SMS en su idioma, o compartir/copiar).
@@ -1965,12 +1986,12 @@ window.svcSaveOrder=async function(){
   // 3 · servicios (cada uno con su labor = tiempo × tarifa) + partes — feed del invoice
   const rate=Number(d.laborRate)||0;
   const capF=s=>{ s=(s||'').trim(); return s?s.charAt(0).toUpperCase()+s.slice(1):s; };
-  const services=(d.services||[]).map(s=>({ desc:capF(s.desc), minutes:Number(s.minutes)||0 })).filter(s=>s.desc);
-  if(!services.length){ alert('Agrega al menos un servicio.'); return; }
-  services.forEach(s=>{ s.laborCents=Math.round((rate*s.minutes/60)*100); });
+  const services=(d.services||[]).map(s=>({ desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0 })).filter(s=>s.desc);
+  if(!services.length){ alert('Agrega al menos un trabajo.'); return; }
+  services.forEach(s=>{ s.priceCents=Math.round((Number(s.price)||0)*100); s.laborCents=s.priceCents; });   // el cobro es el PRECIO PLANO del trabajo (no tiempo × tarifa)
   const reason=services.map(s=>s.desc).join(' · ');
   const estMinutes=services.reduce((a,s)=>a+s.minutes,0);
-  const laborTotalCents=services.reduce((a,s)=>a+s.laborCents,0);
+  const laborTotalCents=services.reduce((a,s)=>a+(s.priceCents||0),0);
   const laborRateCents=Math.round(rate*100);
   const parts=(d.parts||[]).map(p=>({ desc:capF(p.desc), priceCents:Math.round((Number(p.price)||0)*100) })).filter(p=>p.desc||p.priceCents);
   const partsTotalCents=parts.reduce((a,p)=>a+p.priceCents,0);
