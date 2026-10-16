@@ -1788,13 +1788,14 @@ function svcCapServices(){
     const pp=Number((document.getElementById('svc-spart-price-'+si+'-'+pi)||{}).value)||0;
     (partsBySvc[si]=partsBySvc[si]||[]).push({desc:pd, price:pp});
   });
+  const prev=d.services||[];
   const arr=[];
   rows.forEach(row=>{ const i=row.getAttribute('data-svc-row');
     const desc=(document.getElementById('svc-svc-desc-'+i)||{}).value||'';
     const minutes=Number((document.getElementById('svc-svc-time-'+i)||{}).value)||0;
     const price=Number((document.getElementById('svc-svc-price-'+i)||{}).value)||0;
     const parts=(partsBySvc[i]||[]).filter(p=>p.desc||p.price);
-    arr.push({desc:desc, minutes:minutes, price:price, parts:parts});
+    arr.push({desc:desc, minutes:minutes, price:price, parts:parts, estNote:((prev[Number(i)]&&prev[Number(i)].estNote)||'')});
   });
   d.services=arr.length?arr:[{desc:'',minutes:60,price:0,parts:[]}];
 }
@@ -1875,6 +1876,7 @@ function svcRenderModal(){
       +'<select id="svc-svc-time-'+i+'" onchange="svcRecalc()" title="Tiempo estimado (solo interno, no lo ve el cliente)" style="'+SVC_IN+';flex:0 0 110px;margin:0;color:var(--muted);">'+timeOpts+'</select>'
       +'</div>'
       +'<button type="button" id="svc-est-btn-'+i+'" onclick="svcEstimateOne('+i+')" style="width:100%;margin-top:7px;background:rgba(240,192,64,0.12);border:1px solid var(--gold3);border-radius:9px;padding:7px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;">✨ Estimar tiempo y labor (IA)</button>'
+      +(s.estNote?('<div style="font-size:11.5px;color:var(--gold);margin-top:5px;line-height:1.4;">'+svcEsc(s.estNote)+'</div>'):'')
       +'<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:7px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:2px;">🔩 Partes de este servicio</div>'+spartRows
       +'<button type="button" onclick="svcAddPart('+i+')" style="width:100%;margin-top:6px;background:transparent;border:1px dashed var(--border);border-radius:9px;padding:6px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;">➕ Agregar parte / cargo</button></div>'
       +'</div>';
@@ -1948,8 +1950,8 @@ window.svcEstimateOne=async function(si){
     const nearest=m=>{ let best=SVC_EST[0].m, bd=1e9; SVC_EST.forEach(o=>{ const dd=Math.abs(o.m-m); if(dd<bd){ bd=dd; best=o.m; } }); return best; };
     if(j.laborUsd!=null) s.price=j.laborUsd;
     if(j.minutes!=null) s.minutes=nearest(j.minutes);
+    s.estNote='✨ Sugerido: '+(j.minutes?('⏱️ '+svcFmtMin(nearest(j.minutes))+' · '):'')+'💵 $'+j.laborUsd+(j.note?(' · '+j.note):'');
     svcRenderModal(); try{ svcRecalc(); }catch(e){}
-    setTimeout(()=>{ alert('✨ Estimado de referencia para «'+(s.desc||'')+'»:\n\n'+(j.minutes?('⏱️ '+svcFmtMin(nearest(j.minutes))+'\n'):'')+'💵 Labor $'+j.laborUsd+(j.note?('\n\n📝 '+j.note):'')+'\n\n⚠️ Es un estimado de la IA, no un precio garantizado. Ajústalo.'); }, 120);
   }catch(e){ if(btn){ btn.disabled=false; btn.innerHTML='✨ Estimar tiempo y labor (IA)'; } alert('No se pudo estimar: '+((e&&e.message)||e)); }
 };
 window.svcAddService=function(){ svcCapture(); (window._svcDraft.services=window._svcDraft.services||[]).push({desc:'',minutes:60,price:0,parts:[]}); svcRenderModal(); };
