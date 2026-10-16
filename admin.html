@@ -898,7 +898,12 @@
   <div class="modal" style="max-width:920px;width:100%;">
     <div class="modal-title">🧮 COTIZADOR DE PAGOS</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Simula el pago de uno o varios carros para que el cliente se lleve el presupuesto impreso. Es informativo, no es un contrato.</div>
-    <div class="form-group"><label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">Cliente (para el presupuesto y seguimiento)<span onclick="cotNueva()" style="color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;">🆕 Cotización nueva</span></label><input class="form-input" id="cot-customer" placeholder="Nombre del cliente" autocomplete="name" autocapitalize="words" oninput="cotSaveDraft()" onblur="cotTitleName(this)"></div>
+    <div class="form-group"><label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">Cliente (para el presupuesto y seguimiento)<span onclick="cotNueva()" style="color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;">🆕 Cotización nueva</span></label>
+      <div style="position:relative;">
+        <input class="form-input" id="cot-customer" placeholder="🔍 Busca un cliente o escribe uno nuevo..." autocomplete="off" autocapitalize="words" oninput="cotCustomerSuggest(this.value);cotSaveDraft()" onfocus="cotCustomerSuggest(this.value)" onblur="setTimeout(function(){var b=document.getElementById('cot-customer-results');if(b)b.style.display='none';},200);cotTitleName(this)">
+        <div id="cot-customer-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--navy2);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:260px;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,0.5);"></div>
+      </div>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">📱 Teléfono (para seguimiento)</label><input class="form-input" id="cot-phone" type="tel" inputmode="tel" placeholder="(559) 555-1234" oninput="cotSaveDraft()"></div>
       <div class="form-group" style="flex:1;min-width:150px;"><label class="form-label">📍 Ciudad o ZIP (calcula impuestos)</label><input class="form-input" id="cot-city" placeholder="Porterville o 93257" autocomplete="off" oninput="cotApplyTax()"></div>
@@ -3668,6 +3673,62 @@ window.pickNewClientQuote=function(qid){
   if(m.city) set('f-city', m.city);
   const box=document.getElementById('f-name-results'); if(box){ box.style.display='none'; box.innerHTML=''; }
   const note=document.getElementById('f-name-note'); if(note) note.innerHTML='🧮 Cliente que ya cotizó'+((m.options&&m.options.length)?(' ('+m.options.length+' carro(s))'):'')+' — al guardar se marcará como <b>convertido a cliente</b>.';
+};
+
+// Buscador del cliente DENTRO del cotizador — busca en TODA la base (compradores, servicio, partes, todos) + cotizaciones. Igual que el buscador del CRM.
+window.cotCustomerSuggest=async function(val){
+  const box=document.getElementById('cot-customer-results'); if(!box) return;
+  const q=(val||'').trim().toLowerCase();
+  const qDigits=q.replace(/[^0-9]/g,'');
+  if(q.length<2 && qDigits.length<3){ box.style.display='none'; box.innerHTML=''; return; }
+  const terms=q.split(/\s+/).filter(Boolean);
+  // 1) clientes de la base (cualquiera: dealer, servicio, partes, los que compraron)
+  const hitC=(clients||[]).filter(c=>{
+    if(qDigits.length>=3 && String(c.phone||'').replace(/[^0-9]/g,'').indexOf(qDigits)>=0) return true;
+    const hay=((c.name||'')+' '+(c.phone||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.year||'')+' '+(c.vin||'')+' '+(c.plate||'')).toLowerCase();
+    return terms.every(t=>hay.indexOf(t)>=0);
+  }).slice(0,8);
+  // 2) cotizaciones (cotizaron pero quizá aún no son cliente) — sin duplicar los que ya están como cliente
+  try{ if(_c360Quotes===null) await c360LoadQuotes(); }catch(e){}
+  const cliPhones=new Set((clients||[]).map(c=>c.phoneE164).filter(Boolean));
+  const hitQ=(_c360Quotes||[]).filter(z=>{
+    const ph=z.phoneE164||''; if(ph && cliPhones.has(ph)) return false;
+    if(qDigits.length>=3 && String(z.phone||'').replace(/[^0-9]/g,'').indexOf(qDigits)>=0) return true;
+    const hay=((z.customer||'')+' '+(z.phone||'')+' '+((z.options&&z.options[0]&&z.options[0].car)||'')).toLowerCase();
+    return terms.every(t=>hay.indexOf(t)>=0);
+  }).slice(0,6);
+  if(!hitC.length && !hitQ.length){ box.style.display='none'; box.innerHTML=''; return; }
+  let html='';
+  hitC.forEach(c=>{
+    let badge=''; try{ const f=c360ClientFlags(c); badge=c360BadgeHtml(f)||''; }catch(e){}
+    html+='<div onmousedown="cotPickCustomer(\'c\',\''+c.id+'\')" style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span style="font-weight:700;">'+esc(c.name||'(sin nombre)')+'</span><span style="color:var(--muted);font-size:12px;white-space:nowrap;">'+esc(c.phone||'')+'</span></div>'+(badge?('<div style="margin-top:4px;">'+badge+'</div>'):'<div style="margin-top:3px;"><span style="color:var(--muted);font-size:11px;">cliente</span></div>')+'</div>';
+  });
+  hitQ.forEach(z=>{
+    const cars=(z.options||[]).map(o=>o.car).filter(Boolean).slice(0,2).join(', ');
+    html+='<div onmousedown="cotPickCustomer(\'q\',\''+z.id+'\')" style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;"><div style="font-weight:700;">'+esc(z.customer||'(sin nombre)')+'<span style="font-size:10px;background:rgba(240,192,64,.15);color:var(--gold);border:1px solid var(--gold3);border-radius:999px;padding:1px 6px;margin-left:5px;">🧮 cotizó</span></div><div style="font-size:12px;color:var(--muted);">'+esc(z.phone||'sin teléfono')+(cars?(' · '+esc(cars)):'')+'</div></div>';
+  });
+  box.innerHTML=html; box.style.display='';
+};
+window.cotPickCustomer=function(type,id){
+  const box=document.getElementById('cot-customer-results');
+  const set=(elId,v)=>{ const el=document.getElementById(elId); if(el&&v!=null&&v!=='') el.value=v; };
+  if(type==='c'){
+    const c=(clients||[]).find(x=>x.id===id); if(!c) return;
+    const cn=document.getElementById('cot-customer'); if(cn) cn.value=c.name||'';
+    set('cot-phone', c.phone||'');
+    if(c.lang){ const l=document.getElementById('cot-lang'); if(l)l.value=c.lang; }
+    if(c.city) set('cot-city', c.city);
+  } else {
+    const z=(_c360Quotes||[]).find(x=>x.id===id); if(!z) return;
+    const cn=document.getElementById('cot-customer'); if(cn) cn.value=z.customer||'';
+    set('cot-phone', z.phone||'');
+    if(z.lang){ const l=document.getElementById('cot-lang'); if(l)l.value=z.lang; }
+    if(z.city) set('cot-city', z.city);
+  }
+  if(box){ box.style.display='none'; box.innerHTML=''; }
+  try{ cotApplyTax(); }catch(e){}
+  try{ cotSaveDraft(); }catch(e){}
+  try{ cotTitleName(document.getElementById('cot-customer')); }catch(e){}
 };
 
 window.openEditModal=function(id){
