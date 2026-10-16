@@ -1379,7 +1379,7 @@ exports.svcFixText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, as
   if (!items.length) return { es: [], en: [] };
   const sys = "You clean up short auto-shop service line items written by shop staff. The input is a JSON array of strings; each is a service/job note that may be in Spanish, English, or mixed, with typos or abbreviations. " +
     "For EACH item: fix spelling and obvious grammar and keep it concise and faithful to the meaning. Do NOT add, merge, split, remove, reorder or invent items. Keep standard automotive part/term names. " +
-    "Return ONLY strict JSON {\"es\":[...],\"en\":[...]} where \"es\" is the corrected items in natural Spanish and \"en\" the same items in natural English, with the SAME length and SAME order as the input. No prose, no code fences.";
+    "Return ONLY strict JSON {\"es\":[...],\"en\":[...],\"fixed\":[...]} where \"es\" is each item corrected in natural Spanish, \"en\" each item corrected in natural English, and \"fixed\" each item corrected IN ITS OWN original language (Spanish stays Spanish, English stays English, mixed is cleaned up but not forced to one language — only fix spelling/grammar, do NOT translate). All three arrays have the SAME length and SAME order as the input. No prose, no code fences.";
   try {
     const AnthropicMod = require("@anthropic-ai/sdk");
     const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
@@ -1394,12 +1394,14 @@ exports.svcFixText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, as
     try { out = JSON.parse(txt); } catch (e) { const m = txt.match(/\{[\s\S]*\}/); if (m) { try { out = JSON.parse(m[0]); } catch (_) {} } }
     let es = Array.isArray(out.es) ? out.es.map((x) => String(x || "").slice(0, 300)) : [];
     let en = Array.isArray(out.en) ? out.en.map((x) => String(x || "").slice(0, 300)) : [];
+    let fixed = Array.isArray(out.fixed) ? out.fixed.map((x) => String(x || "").slice(0, 300)) : [];
     es = items.map((it, i) => es[i] || it);   // si la IA se desalinea o falta, cae al original
     en = items.map((it, i) => en[i] || it);
-    return { es, en };
+    fixed = items.map((it, i) => fixed[i] || es[i] || it);
+    return { es, en, fixed };
   } catch (e) {
     console.error("svcFixText", e);
-    return { es: items, en: items };   // si falla, no bloquea: regresa el original
+    return { es: items, en: items, fixed: items };   // si falla, no bloquea: regresa el original
   }
 });
 
