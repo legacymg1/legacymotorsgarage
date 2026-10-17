@@ -1077,35 +1077,54 @@ window.whTeamDelete=async function(id,name){
   try{ await httpsCallable(functions,'empAdmin')({op:'delete', empId:id}); whToast(L==='en'?'✅ Deleted':'✅ Borrado'); try{ const r=await httpsCallable(functions,'empAdmin')({op:'list', withOwners:true}); const d=(r&&r.data)||{}; _teamEmps=d.emps||[]; }catch(e){} whTeamList(); }
   catch(e){ whToast((e&&e.message)||(L==='en'?'Could not delete':'No se pudo borrar'),true); }
 };
+// 👥 EQUIPO — lista limpia (estilo CarMax/Tesla): una fila por miembro, toca para abrir su perfil con acciones.
 function whTeamList(){
   const body=document.getElementById('wh-team-body'); if(!body) return;
-  const emps=_teamEmps.slice().sort((a,b)=>Number(b.active!==false)-Number(a.active!==false)||(a.name||'').localeCompare(b.name||''));
-  const cards = emps.length ? emps.map(e=>{
-    const syn=!!e.synthetic;   // 👑 dueño por default: no se edita/borra, no ficha
-    const rs = syn ? (L==='en'?'All functions':'Todas las funciones') : ((Array.isArray(e.roles)?e.roles:[]).join(' · ')||(L==='en'?'No functions':'Sin funciones'));
-    const sub = syn ? ('👑 '+(L==='en'?'Owner · no clock':'Dueño · sin reloj')) : (whEscA(e.phone||(L==='en'?'no phone':'sin tel'))+(e.rate?(' · $'+e.rate+'/h'):''));
-    const _nm = whEscA(e.name||'').replace(/\x27/g,"");
-    const reportBtn = '<button onclick="whEmpReport(\''+e.id+'\',\''+_nm+'\')" style="flex:1;min-width:72px;background:transparent;border:1px solid #2e5a3a;color:#35c46a;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">📊 '+L2('Reporte','Report')+'</button>';
-    const btns = syn
-      ? ('<div style="display:flex;gap:6px;margin-top:10px;">'+reportBtn+'</div>')
-      : ('<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
-      +reportBtn
-      +'<button onclick="whTeamEdit(\''+e.id+'\')" style="flex:1;min-width:72px;background:#1d2636;border:1px solid #273043;color:#fff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">✏️ '+(L==='en'?'Edit':'Editar')+'</button>'
-      +'<button onclick="whViewAsEmployee(\''+e.id+'\')" style="flex:1;min-width:72px;background:transparent;border:1px solid #273043;color:#c9a84c;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">👁️ '+(L==='en'?'View as':'Ver como')+'</button>'
-      +'<button onclick="whActAsEmployee(\''+e.id+'\')" style="flex:1;min-width:72px;background:transparent;border:1px solid #6b3fb0;color:#a98bff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">🎭 '+(L==='en'?'Act as':'Actuar como')+'</button>'
-      +'<button onclick="whTeamDelete(\''+e.id+'\',\''+whEscA(e.name||'').replace(/\x27/g,"")+'\')" title="'+(L==='en'?'Delete':'Borrar')+'" style="flex:0 0 auto;background:transparent;border:1px solid #7f1d1d;color:#ff6b6b;border-radius:9px;padding:9px 11px;font-size:13px;font-weight:700;cursor:pointer;">🗑️</button>'
-      +'</div>');
-    return '<div style="background:#121722;border:1px solid '+(syn?'#4a3a12':'#273043')+';border-radius:14px;padding:13px;margin-bottom:9px;'+(e.active!==false?'':'opacity:.55;')+'">'
-      +'<div style="display:flex;align-items:center;gap:10px;"><span style="width:38px;height:38px;border-radius:50%;background:'+(syn?'#3a2f10':'#1d2636')+';display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;color:#fff;">'+whInitials(e.name)+'</span>'
-      +'<div style="min-width:0;flex:1;"><div style="font-weight:800;color:#fff;">'+(e.owner?'👑 ':'')+whEscA(e.name||'—')+(e.active!==false?'':' <span style="color:#8a93a6;font-size:11px;">('+(L==='en'?'inactive':'inactivo')+')</span>')+'</div>'
-      +'<div style="font-size:12px;color:#8a93a6;">'+sub+'</div><div style="font-size:11px;color:#8a93a6;margin-top:3px;">'+whEscA(rs)+'</div></div></div>'
-      + btns +'</div>';
-  }).join('') : '<div style="color:#8a93a6;text-align:center;padding:24px;">'+(L==='en'?'No employees yet.':'Aún no hay empleados.')+'</div>';
-  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;color:#fff;">👥 '+(L==='en'?'Team & payroll':'Equipo y nómina')+'</div><button onclick="whTeamClose()" style="background:transparent;border:none;color:#8a93a6;font-size:24px;cursor:pointer;">×</button></div>'
-    +'<div style="display:flex;gap:8px;margin-bottom:12px;"><button onclick="whTeamNew()" style="flex:1;background:#c9a84c;color:#0b0e14;border:none;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;">➕ '+(L==='en'?'New':'Nuevo')+'</button><button onclick="whOpenPayroll()" style="flex:1;background:transparent;border:1px solid #273043;color:#fff;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;">💵 '+(L==='en'?'Payroll / Hours':'Nómina / Horas')+'</button></div>'
-    +cards
-    +'<div style="font-size:11px;color:#6b7280;margin-top:10px;line-height:1.5;">'+(L==='en'?'Photo & sensitive data: coming here soon (for now in Finanzas).':'Foto y datos sensibles: pronto aquí (por ahora en Finanzas).')+'</div>';
+  const emps=_teamEmps.slice().sort((a,b)=>Number(!!b.owner)-Number(!!a.owner)||Number(b.active!==false)-Number(a.active!==false)||(a.name||'').localeCompare(b.name||''));
+  const rows = emps.length ? emps.map(e=>{
+    const syn=!!e.synthetic;
+    const roleTxt = syn ? L2('Dueño · todas las funciones','Owner · all functions') : ((Array.isArray(e.roles)?e.roles:[]).slice(0,3).join(' · ')||L2('Sin funciones','No functions'));
+    const dot = (e.active!==false) ? '#35c46a' : '#6b7280';
+    return '<div onclick="whTeamDetail(\''+e.id+'\')" style="display:flex;align-items:center;gap:13px;padding:13px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;'+(e.active!==false?'':'opacity:.5;')+'">'
+      +'<span style="position:relative;flex:none;"><span style="width:42px;height:42px;border-radius:50%;background:'+(syn?'#3a2f10':'#1d2636')+';display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:15px;">'+whInitials(e.name)+'</span><span style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;background:'+dot+';border:2px solid #0d1119;"></span></span>'
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#fff;font-size:15.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(e.owner?'👑 ':'')+whEscA(e.name||'—')+'</div><div style="font-size:12.5px;color:#8a93a6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;">'+whEscA(roleTxt)+'</div></div>'
+      +'<span style="color:#4b5563;font-size:22px;flex:none;line-height:1;">›</span></div>';
+  }).join('') : '<div style="color:#8a93a6;text-align:center;padding:34px 10px;line-height:1.6;">'+L2('Aún no hay miembros en el equipo.','No team members yet.')+'</div>';
+  body.innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;"><div><div style="font-weight:800;font-size:21px;color:#fff;letter-spacing:-.01em;">'+L2('Equipo','Team')+'</div><div style="font-size:12.5px;color:#8a93a6;margin-top:2px;">'+emps.length+' '+L2('miembros','members')+'</div></div><button onclick="whTeamClose()" style="background:transparent;border:none;color:#8a93a6;font-size:26px;cursor:pointer;line-height:1;padding:0;">×</button></div>'
+    +'<div style="display:flex;gap:8px;margin:16px 0 8px;">'
+      +'<button onclick="whTeamNew()" style="flex:1;background:#c9a84c;color:#0b0e14;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;">+ '+L2('Nuevo miembro','New member')+'</button>'
+      +'<button onclick="whOpenPayroll()" style="flex:none;background:#1d2636;border:1px solid #273043;color:#fff;border-radius:12px;padding:13px 18px;font-weight:700;font-size:14px;cursor:pointer;">💵 '+L2('Nómina','Payroll')+'</button>'
+    +'</div>'
+    +'<div style="margin-top:8px;">'+rows+'</div>';
 }
+// 👤 PERFIL de un miembro — acciones organizadas (lista estilo ajustes). Volver a la lista con ‹.
+window.whTeamDetail=function(empId){
+  const e=(_teamEmps||[]).find(x=>x.id===empId); if(!e){ whTeamList(); return; }
+  const body=document.getElementById('wh-team-body'); if(!body) return;
+  const syn=!!e.synthetic;
+  const rolesTxt = syn ? L2('Todas las funciones','All functions') : ((Array.isArray(e.roles)?e.roles:[]).join(' · ')||L2('Sin funciones','No functions'));
+  const _nm = whEscA(e.name||'').replace(/\x27/g,"");
+  const act=(icon,label,onclick,col)=>'<div onclick="'+onclick+'" style="display:flex;align-items:center;gap:13px;padding:15px 4px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><span style="font-size:18px;width:26px;text-align:center;flex:none;">'+icon+'</span><span style="flex:1;color:'+(col||'#fff')+';font-size:15px;font-weight:600;">'+label+'</span><span style="color:#4b5563;font-size:18px;flex:none;">›</span></div>';
+  let actions = act('📊', L2('Ver reporte','View report'), 'whEmpReport(\''+e.id+'\',\''+_nm+'\')', '#35c46a');
+  if(!syn){
+    actions += act('👁️', L2('Ver como (solo lectura)','View as (read-only)'), 'whViewAsEmployee(\''+e.id+'\')', '#c9a84c')
+      + act('🎭', L2('Actuar como (para probar)','Act as (to test)'), 'whActAsEmployee(\''+e.id+'\')', '#a98bff')
+      + act('✏️', L2('Editar','Edit'), 'whTeamEdit(\''+e.id+'\')')
+      + act('🗑️', L2('Eliminar del equipo','Remove from team'), 'whTeamDelete(\''+e.id+'\',\''+_nm+'\')', '#ff6b6b');
+  }
+  const subLine = syn ? ('👑 '+L2('Dueño · sin reloj','Owner · no clock'))
+    : (whEscA(e.phone||L2('sin teléfono','no phone'))+(e.rate?(' · $'+e.rate+'/h'):'')+(e.active===false?(' · '+L2('inactivo','inactive')):''));
+  body.innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;"><button onclick="whTeamList()" style="background:transparent;border:none;color:#c9a84c;font-size:15px;cursor:pointer;font-weight:700;padding:0;">‹ '+L2('Equipo','Team')+'</button><button onclick="whTeamClose()" style="background:transparent;border:none;color:#8a93a6;font-size:24px;cursor:pointer;line-height:1;padding:0;">×</button></div>'
+    +'<div style="display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:20px;">'
+      +'<span style="width:76px;height:76px;border-radius:50%;background:'+(syn?'#3a2f10':'#1d2636')+';display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:28px;margin-bottom:11px;">'+whInitials(e.name)+'</span>'
+      +'<div style="font-weight:800;color:#fff;font-size:20px;">'+(e.owner?'👑 ':'')+whEscA(e.name||'—')+'</div>'
+      +'<div style="font-size:13px;color:#8a93a6;margin-top:4px;">'+whEscA(rolesTxt)+'</div>'
+      +'<div style="font-size:12.5px;color:#8a93a6;margin-top:3px;">'+subLine+'</div>'
+    +'</div>'
+    +'<div>'+actions+'</div>';
+};
 // 📊 REPORTE POR EMPLEADO — cuánto generó / costó su labor / carros / tareas / horas.
 window.whEmpReport=async function(empId, name){
   if(role!=='owner') return;
