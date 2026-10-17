@@ -209,6 +209,8 @@
     <div id="op-summary" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-team-h" style="font-weight:800;font-size:14px;">👥 Equipo en vivo</span></div>
     <div id="op-team" style="margin-bottom:14px;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-done-h" style="font-weight:800;font-size:14px;">✅ Hoy se hizo</span></div>
+    <div id="op-done" style="margin-bottom:14px;"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-tasks-h" style="font-weight:800;font-size:14px;">📋 Tareas</span>
       <div style="display:flex;gap:8px;"><button class="btn sm" onclick="jobAddOpen()" data-i18n="opAddTask" style="padding:6px 11px;font-size:12px;">➕ Tarea</button><button class="btn ghost sm" onclick="openCarsProc()" data-i18n="opCarsProc" style="padding:6px 11px;font-size:12px;">🚗 Carros</button></div>
     </div>
@@ -1077,14 +1079,20 @@ window.taskDoComplete=async function(){
 };
 
 // 👑 Panel de operación del dueño — todas las tareas abiertas (allTasks) con resumen + scroll.
-let OP_TASKS=[], OP_TEAM=[], OP_DEALER=[], OP_SVC=[];
-// 📊 CENTRO DE OPERACIONES (dueño) — Resumen de hoy + Equipo en vivo + Tareas. Reusa allTasks/clockWeek/carsInProcess/svcMyOrders.
+let OP_TASKS=[], OP_TEAM=[], OP_DEALER=[], OP_SVC=[], OP_DONE=[], OP_CLOCK=null;
+// 📊 CENTRO DE OPERACIONES (dueño) — Resumen de hoy + Equipo en vivo + Hoy se hizo + Tareas. Reusa callables existentes.
 window.loadOwnerPanel=async function(){
   const tb=document.getElementById('op-team'); if(tb) tb.innerHTML='<div class="faint" style="text-align:center;padding:12px;">'+t('jLoadingTxt')+'</div>';
   const box=document.getElementById('op-tasks'); if(box) box.innerHTML='';
   const call=(n)=>httpsCallable(functions,n)({}).then(r=>(r&&r.data)||{}).catch(()=>({}));
-  const [a,c,cars,svc]=await Promise.all([ call('allTasks'), call('clockWeek'), call('carsInProcess'), call('svcMyOrders') ]);
-  OP_TASKS=a.tasks||[]; OP_TEAM=c.list||[]; OP_DEALER=cars.cars||[]; OP_SVC=(svc.orders||[]).filter(o=>o.status!=='entregado');
+  const [a,c,cars,svc,done]=await Promise.all([ call('allTasks'), call('clockWeek'), call('carsInProcess'), call('svcMyOrders'), call('opsDoneToday') ]);
+  OP_TASKS=a.tasks||[]; OP_CLOCK=c; OP_DEALER=cars.cars||[]; OP_SVC=(svc.orders||[]).filter(o=>o.status!=='entregado'); OP_DONE=done.people||[];
+  // 👥 Equipo en vivo = quién está TRABAJANDO ahora. Reloj (asistencia) = empleados; tiempo de tarea/servicio = TODOS (incl. dueños) para el COSTO.
+  const live={}; const keyN=n=>(String(n||'').trim().toLowerCase());
+  (c.list||[]).filter(e=>!e.owner && e.open).forEach(e=>{ const k=keyN(e.name)||e.key; if(!live[k]) live[k]={name:e.name, open:true, hours:(e.hours||0), task:null}; else { live[k].open=true; live[k].hours+=(e.hours||0); } });
+  (OP_TASKS||[]).filter(tk=>tk.status==='en_proceso' && tk.assignName).forEach(tk=>{ const k=keyN(tk.assignName); if(!live[k]) live[k]={name:tk.assignName, open:false, hours:0, task:null}; if(!live[k].task) live[k].task={title:tk.title, line:tk.line||'general'}; });
+  (OP_SVC||[]).forEach(o=>{ (o.services||[]).forEach(sv=>{ if(sv.status==='en_proceso' && sv.assignName){ const k=keyN(sv.assignName); if(!live[k]) live[k]={name:sv.assignName, open:false, hours:0, task:null}; if(!live[k].task) live[k].task={title:sv.desc||'', line:'service'}; } }); });
+  OP_TEAM=Object.values(live);
   renderOwnerPanel();
 };
 // Normaliza cualquier estatus interno a los términos UNIFICADOS: En cola → En proceso → En pausa → Terminado.
@@ -1103,16 +1111,29 @@ function renderOwnerPanel(){
   const onShift=OP_TEAM.filter(x=>x.open).length;
   const cells=[['🚗',OP_DEALER.length,'Dealer'],['🔧',OP_SVC.length,'Service'],['📋',OP_TASKS.length,(L==='en'?'Tasks':'Tareas')],['🟢',onShift,(L==='en'?'On shift':'En turno')]];
   if(sum) sum.innerHTML=cells.map(x=>'<div style="flex:1;min-width:68px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 6px;text-align:center;"><div style="font-size:22px;font-weight:800;">'+x[1]+'</div><div class="faint" style="font-size:10.5px;">'+x[0]+' '+x[2]+'</div></div>').join('');
-  // Equipo en vivo (quién fichado + en qué + estatus)
+  // 👥 Equipo en vivo: quién trabaja ahora (🟢 fichado · 🔧 con tarea activa) + horas de la semana + ✅ terminadas hoy.
+  const doneCount={}; (OP_DONE||[]).forEach(p=>{ doneCount[(p.name||'').trim().toLowerCase()]=p.count; });
   const tb=document.getElementById('op-team');
   if(tb){
-    const team=OP_TEAM.slice().sort((a,b)=>Number(b.open)-Number(a.open)||(b.hours||0)-(a.hours||0));
-    if(!team.length){ tb.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No employees.':'Sin empleados.')+'</div>'; }
+    const team=OP_TEAM.slice().sort((a,b)=>Number(!!b.open)-Number(!!a.open)||Number(!!b.task)-Number(!!a.task)||(b.hours||0)-(a.hours||0));
+    if(!team.length){ tb.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nobody working right now.':'Nadie trabajando ahora.')+'</div>'; }
     else tb.innerHTML=team.map(e=>{
-      const task=OP_TASKS.filter(tk=>(tk.assignEmpId&&tk.assignEmpId===e.empId)||(e.name&&tk.assignName===e.name)).sort((a,b)=>Number(b.status==='en_proceso')-Number(a.status==='en_proceso'))[0];
-      const dot=e.open?'🟢':'⚪';
-      const sub=task?('<span style="color:var(--text);">'+esc(task.title)+'</span> '+lineBadge(task.line)+' · '+_opStatusLabel(task.status)):(e.open?(L==='en'?'Clocked in · no active task':'Fichado · sin tarea activa'):(L==='en'?'Off':'Fuera'));
-      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:30px;height:30px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none;">'+whInitials(e.name)+'</span><div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:14px;">'+dot+' '+esc(e.name||'—')+' <span class="faint" style="font-weight:400;font-size:12px;">· '+Number(e.hours||0).toFixed(1)+' h</span></div><div class="faint" style="font-size:12px;">'+sub+'</div></div></div>';
+      const dot=e.open?'🟢':(e.task?'🔧':'⚪');
+      const hrs=(e.open||e.hours)?(' <span class="faint" style="font-weight:400;font-size:12px;">· '+Number(e.hours||0).toFixed(1)+' h</span>'):'';
+      const dc=doneCount[(e.name||'').trim().toLowerCase()]||0;
+      const doneBadge=dc?(' <span style="font-size:11px;color:#35c46a;font-weight:700;">· ✅ '+dc+'</span>'):'';
+      const sub=e.task?('<span style="color:var(--text);">'+esc(e.task.title)+'</span> '+lineBadge(e.task.line)+' · '+_opStatusLabel('en_proceso')):(e.open?(L==='en'?'Clocked in · no active task':'Fichado · sin tarea activa'):'');
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:30px;height:30px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none;">'+whInitials(e.name)+'</span><div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:14px;">'+dot+' '+esc(e.name||'—')+hrs+doneBadge+'</div><div class="faint" style="font-size:12px;">'+sub+'</div></div></div>';
+    }).join('');
+  }
+  // ✅ Hoy se hizo (terminado hoy por persona)
+  const dh=document.getElementById('op-done-h'); if(dh) dh.textContent=L==='en'?'✅ Done today':'✅ Hoy se hizo';
+  const donebox=document.getElementById('op-done');
+  if(donebox){
+    if(!OP_DONE.length){ donebox.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nothing completed yet today.':'Aún nada terminado hoy.')+'</div>'; }
+    else donebox.innerHTML=OP_DONE.map(p=>{
+      const items=(p.items||[]).map(it=>'<div style="font-size:12px;color:var(--text);padding:2px 0 2px 38px;">• '+esc(it.title||'')+' '+lineBadge(it.line)+(it.car?(' <span class="faint">· 🚗 '+esc(it.car)+'</span>'):'')+'</div>').join('');
+      return '<div style="padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex:none;">'+whInitials(p.name)+'</span><div style="font-weight:700;font-size:14px;">'+esc(p.name||'—')+' <span style="color:#35c46a;font-size:12px;">· ✅ '+p.count+'</span></div></div>'+items+'</div>';
     }).join('');
   }
   // Tareas

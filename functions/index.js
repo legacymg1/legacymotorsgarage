@@ -1907,6 +1907,24 @@ exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   return { ok: true, tasks: out };
 });
 
+// 👑 HOY SE HIZO (dueño): todo lo TERMINADO HOY (zona LA) por empleado — tareas, trabajos de carro, servicios y detallado.
+exports.opsDoneToday = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  const laDay = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const isToday = (iso) => { if (!iso) return false; try { return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) === laDay; } catch (e) { return false; } };
+  const byPerson = {};
+  const add = (name, item) => { const k = (String(name || "").trim().toLowerCase()) || "?"; if (!byPerson[k]) byPerson[k] = { name: name || "—", items: [] }; byPerson[k].items.push(item); };
+  try { const s = await db.collection("tasks").get(); s.forEach((d) => { const t = d.data() || {}; if (t.status === "hecho" && isToday(t.finishedAt)) add(t.assignName || t.finishedBy, { kind: "task", title: t.title || "", line: t.line || "general", car: t.carLabel || "" }); }); } catch (e) {}
+  try { const s = await db.collection("car_tasks").get(); s.forEach((d) => { const t = d.data() || {}; if (t.status === "hecho" && isToday(t.finishedAt)) add(t.assignName || t.finishedBy, { kind: "carTask", title: t.title || "", line: "dealer", car: t.carLabel || "" }); }); } catch (e) {}
+  try { const s = await db.collection("serviceOrders").get(); s.forEach((d) => { const o = d.data() || {}; (Array.isArray(o.services) ? o.services : []).forEach((sv) => { if (sv.status === "listo" && isToday(sv.finishedAt)) add(sv.assignName, { kind: "service", title: sv.desc || "", line: "service", car: o.vehicleLabel || o.plate || "" }); }); }); } catch (e) {}
+  try { const s = await db.collection("detail_jobs").get(); s.forEach((d) => { const j = d.data() || {}; if (j.status === "done" && isToday(j.finishedAt)) add(j.name, { kind: "detail", title: j.car ? ("Detailing · " + j.car) : "Detailing", line: "dealer", car: j.car || "" }); }); } catch (e) {}
+  const people = Object.values(byPerson).map((p) => ({ name: p.name, count: p.items.length, items: p.items.slice(0, 40) })).sort((a, b) => b.count - a.count);
+  return { ok: true, day: laDay, total: people.reduce((s, p) => s + p.count, 0), people };
+});
+
 // 👑 CARROS Y PARTES EN PROCESO (dueño): inventario en prep con su etapa, inspección y # de trabajos pendientes.
 exports.carsInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
@@ -2163,8 +2181,8 @@ exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
   const rates = cfg.rates || {};
   const wk = (request.data && request.data.weekKey) || _laMondayKey(new Date());
   // Tarifas de empleados por teléfono (viven en el registro `employees`).
-  const empRateById = {};
-  try { const es = await db.collection("employees").get(); es.forEach((e) => { empRateById[e.id] = Number((e.data() || {}).rate) || 0; }); }
+  const empRateById = {}; const empOwnerById = {};
+  try { const es = await db.collection("employees").get(); es.forEach((e) => { const dd = e.data() || {}; empRateById[e.id] = Number(dd.rate) || 0; empOwnerById[e.id] = dd.owner === true; }); }
   catch (e) {}
   const keyOf = (x) => x.actorKey || ("em_" + _emailKey((x.email || "?").toLowerCase()));
   const byKey = {};
@@ -2181,7 +2199,8 @@ exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
   const list = Object.values(byKey).map((r) => {
     const rate = r.empId ? (empRateById[r.empId] || 0) : (Number(rates[r.email]) || 0);
     const hrs = Math.round(r.hours * 100) / 100;
-    return { key: r.key, email: r.email, phone: r.phone, empId: r.empId, name: r.name, hours: hrs, open: r.open, shifts: r.shifts, rate, rateSource: r.empId ? "emp" : "email", pay: Math.round(hrs * rate * 100) / 100 };
+    const owner = OWNER_EMAILS.includes(r.email) || (r.empId && empOwnerById[r.empId] === true);
+    return { key: r.key, email: r.email, phone: r.phone, empId: r.empId, name: r.name, hours: hrs, open: r.open, shifts: r.shifts, rate, rateSource: r.empId ? "emp" : "email", pay: Math.round(hrs * rate * 100) / 100, owner: !!owner };
   }).sort((a, b) => b.hours - a.hours);
   const totalPay = list.reduce((s, r) => s + r.pay, 0);
   return { ok: true, weekKey: wk, rates, config: { dealer: cfg.dealer || null, yonke: cfg.yonke || null, radiusM: Number(cfg.radiusM) || 150 }, list, totalPay: Math.round(totalPay * 100) / 100 };
