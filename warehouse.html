@@ -1067,24 +1067,34 @@ window.whOpenTeam=async function(){
     box.innerHTML='<div id="wh-team-body"></div>'; ov.appendChild(box); document.body.appendChild(ov);
   }
   const bd=document.getElementById('wh-team-body'); if(bd) bd.innerHTML='<div style="color:#8a93a6;text-align:center;padding:24px;">'+(L==='en'?'Loading…':'Cargando…')+'</div>';
-  try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); const d=(r&&r.data)||{}; _teamEmps=d.emps||[]; _teamRoles=d.roles||[]; }catch(e){ _teamEmps=[]; }
+  try{ const r=await httpsCallable(functions,'empAdmin')({op:'list', withOwners:true}); const d=(r&&r.data)||{}; _teamEmps=d.emps||[]; _teamRoles=d.roles||[]; }catch(e){ _teamEmps=[]; }
   whTeamList();
 };
 window.whTeamClose=function(){ const o=document.getElementById('wh-team'); if(o) o.remove(); };
+window.whTeamDelete=async function(id,name){
+  if(id.indexOf('owner:')===0) return;
+  if(!confirm((L==='en'?'Delete ':'¿Borrar a ')+(name||(L==='en'?'this employee':'este empleado'))+(L==='en'?' from the team? This cannot be undone.':' del equipo? No se puede deshacer.'))) return;
+  try{ await httpsCallable(functions,'empAdmin')({op:'delete', empId:id}); whToast(L==='en'?'✅ Deleted':'✅ Borrado'); try{ const r=await httpsCallable(functions,'empAdmin')({op:'list', withOwners:true}); const d=(r&&r.data)||{}; _teamEmps=d.emps||[]; }catch(e){} whTeamList(); }
+  catch(e){ whToast((e&&e.message)||(L==='en'?'Could not delete':'No se pudo borrar'),true); }
+};
 function whTeamList(){
   const body=document.getElementById('wh-team-body'); if(!body) return;
   const emps=_teamEmps.slice().sort((a,b)=>Number(b.active!==false)-Number(a.active!==false)||(a.name||'').localeCompare(b.name||''));
   const cards = emps.length ? emps.map(e=>{
-    const rs=(Array.isArray(e.roles)?e.roles:[]).join(' · ')||(L==='en'?'No functions':'Sin funciones');
-    return '<div style="background:#121722;border:1px solid #273043;border-radius:14px;padding:13px;margin-bottom:9px;'+(e.active!==false?'':'opacity:.55;')+'">'
-      +'<div style="display:flex;align-items:center;gap:10px;"><span style="width:38px;height:38px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;color:#fff;">'+whInitials(e.name)+'</span>'
+    const syn=!!e.synthetic;   // 👑 dueño por default: no se edita/borra, no ficha
+    const rs = syn ? (L==='en'?'All functions':'Todas las funciones') : ((Array.isArray(e.roles)?e.roles:[]).join(' · ')||(L==='en'?'No functions':'Sin funciones'));
+    const sub = syn ? ('👑 '+(L==='en'?'Owner · no clock':'Dueño · sin reloj')) : (whEscA(e.phone||(L==='en'?'no phone':'sin tel'))+(e.rate?(' · $'+e.rate+'/h'):''));
+    const btns = syn ? '' : ('<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
+      +'<button onclick="whTeamEdit(\''+e.id+'\')" style="flex:1;min-width:72px;background:#1d2636;border:1px solid #273043;color:#fff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">✏️ '+(L==='en'?'Edit':'Editar')+'</button>'
+      +'<button onclick="whViewAsEmployee(\''+e.id+'\')" style="flex:1;min-width:72px;background:transparent;border:1px solid #273043;color:#c9a84c;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">👁️ '+(L==='en'?'View as':'Ver como')+'</button>'
+      +'<button onclick="whActAsEmployee(\''+e.id+'\')" style="flex:1;min-width:72px;background:transparent;border:1px solid #6b3fb0;color:#a98bff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">🎭 '+(L==='en'?'Act as':'Actuar como')+'</button>'
+      +'<button onclick="whTeamDelete(\''+e.id+'\',\''+whEscA(e.name||'').replace(/\x27/g,"")+'\')" title="'+(L==='en'?'Delete':'Borrar')+'" style="flex:0 0 auto;background:transparent;border:1px solid #7f1d1d;color:#ff6b6b;border-radius:9px;padding:9px 11px;font-size:13px;font-weight:700;cursor:pointer;">🗑️</button>'
+      +'</div>');
+    return '<div style="background:#121722;border:1px solid '+(syn?'#4a3a12':'#273043')+';border-radius:14px;padding:13px;margin-bottom:9px;'+(e.active!==false?'':'opacity:.55;')+'">'
+      +'<div style="display:flex;align-items:center;gap:10px;"><span style="width:38px;height:38px;border-radius:50%;background:'+(syn?'#3a2f10':'#1d2636')+';display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;color:#fff;">'+whInitials(e.name)+'</span>'
       +'<div style="min-width:0;flex:1;"><div style="font-weight:800;color:#fff;">'+(e.owner?'👑 ':'')+whEscA(e.name||'—')+(e.active!==false?'':' <span style="color:#8a93a6;font-size:11px;">('+(L==='en'?'inactive':'inactivo')+')</span>')+'</div>'
-      +'<div style="font-size:12px;color:#8a93a6;">'+whEscA(e.phone||(L==='en'?'no phone':'sin tel'))+(e.rate?(' · $'+e.rate+'/h'):'')+'</div><div style="font-size:11px;color:#8a93a6;margin-top:3px;">'+whEscA(rs)+'</div></div></div>'
-      +'<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
-      +'<button onclick="whTeamEdit(\''+e.id+'\')" style="flex:1;min-width:80px;background:#1d2636;border:1px solid #273043;color:#fff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">✏️ '+(L==='en'?'Edit':'Editar')+'</button>'
-      +'<button onclick="whViewAsEmployee(\''+e.id+'\')" style="flex:1;min-width:80px;background:transparent;border:1px solid #273043;color:#c9a84c;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">👁️ '+(L==='en'?'View as':'Ver como')+'</button>'
-      +'<button onclick="whActAsEmployee(\''+e.id+'\')" style="flex:1;min-width:80px;background:transparent;border:1px solid #6b3fb0;color:#a98bff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">🎭 '+(L==='en'?'Act as':'Actuar como')+'</button>'
-      +'</div></div>';
+      +'<div style="font-size:12px;color:#8a93a6;">'+sub+'</div><div style="font-size:11px;color:#8a93a6;margin-top:3px;">'+whEscA(rs)+'</div></div></div>'
+      + btns +'</div>';
   }).join('') : '<div style="color:#8a93a6;text-align:center;padding:24px;">'+(L==='en'?'No employees yet.':'Aún no hay empleados.')+'</div>';
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;color:#fff;">👥 '+(L==='en'?'Team & payroll':'Equipo y nómina')+'</div><button onclick="whTeamClose()" style="background:transparent;border:none;color:#8a93a6;font-size:24px;cursor:pointer;">×</button></div>'
     +'<div style="display:flex;gap:8px;margin-bottom:12px;"><button onclick="whTeamNew()" style="flex:1;background:#c9a84c;color:#0b0e14;border:none;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;">➕ '+(L==='en'?'New':'Nuevo')+'</button><button onclick="whOpenPayroll()" style="flex:1;background:transparent;border:1px solid #273043;color:#fff;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;">💵 '+(L==='en'?'Payroll / Hours':'Nómina / Horas')+'</button></div>'

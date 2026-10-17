@@ -1210,6 +1210,8 @@ exports.cfgSet = onCall({ timeoutSeconds: 30 }, async (request) => {
 });
 // ===== 🕐 RELOJ DE EMPLEADOS (check-in/out con GPS validado en el servidor) =====
 const OWNER_EMAILS = ["ev@legacymotorsgarage.com", "ivan.garcia@legacymotorsgarage.com"];
+// Dueños reconocidos por default en el equipo (todas las funciones, SIN reloj). No son empleados que fichan.
+const OWNER_NAMES = { "ev@legacymotorsgarage.com": "Enrique", "ivan.garcia@legacymotorsgarage.com": "Ivan" };
 function _haversineM(aLat, aLng, bLat, bLng) {
   const R = 6371000, toR = (x) => x * Math.PI / 180;
   const dLat = toR(bLat - aLat), dLng = toR(bLng - aLng);
@@ -2135,13 +2137,20 @@ exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
   const op = String(d.op || "list");
   if (op === "list") {
     const snap = await db.collection("employees").get();
-    const emps = [];
+    let emps = [];
     snap.forEach((doc) => {
       const x = doc.data() || {};
       emps.push({ id: doc.id, name: x.name || "", phone: x.phone || "", phoneE164: x.phoneE164 || "", roles: Array.isArray(x.roles) ? x.roles : [], rate: Number(x.rate) || 0, active: x.active !== false, owner: x.owner === true, photoURL: x.photoURL || "" });
     });
     emps.sort((a, b) => (Number(b.active) - Number(a.active)) || a.name.localeCompare(b.name));
     try { await Promise.all(emps.map((e) => _syncEmpPhone(db, e.id))); } catch (e) {}   // mantiene el índice emp_phones al día
+    // 👑 Dueños por DEFAULT en el PANEL DE EQUIPO (withOwners): todas las funciones, SIN reloj. Sintéticos: no se editan/borran/fichan.
+    // Fuera del panel (ej. asignar servicios) NO se inyectan, para no meter ids "owner:" donde no van.
+    if (d.withOwners === true) {
+      emps = emps.filter((e) => !e.owner);   // los dueños no van como empleados que fichan
+      const owners = OWNER_EMAILS.map((em) => ({ id: "owner:" + em, name: OWNER_NAMES[em] || em.split("@")[0], email: em, phone: "", phoneE164: "", roles: ALL_EMP_ROLES.slice(), rate: 0, active: true, owner: true, synthetic: true, noClock: true, photoURL: "" }));
+      return { ok: true, emps: owners.concat(emps), roles: ALL_EMP_ROLES };
+    }
     return { ok: true, emps, roles: ALL_EMP_ROLES };
   }
   if (op === "save") {
@@ -2180,6 +2189,14 @@ exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
       tx.set(ref, { roles, updatedAt: new Date().toISOString() }, { merge: true });
     });
     await _syncEmpPhone(db, empId);
+    return { ok: true };
+  }
+  if (op === "delete") {
+    const empId = String(d.empId || "");
+    if (!empId) throw new HttpsError("invalid-argument", "Falta el empleado.");
+    if (empId.indexOf("owner:") === 0) throw new HttpsError("invalid-argument", "Un dueño no se borra.");
+    try { await db.collection("employees").doc(empId).delete(); } catch (e) { throw new HttpsError("internal", "No se pudo borrar."); }
+    try { await _syncEmpPhone(db, empId); } catch (e) {}   // limpia el índice de teléfono
     return { ok: true };
   }
   throw new HttpsError("invalid-argument", "Operación inválida.");
