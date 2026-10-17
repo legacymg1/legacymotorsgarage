@@ -147,7 +147,11 @@
       <div class="sub" style="font-weight:800;font-size:15px;margin:2px 0 10px;" data-i18n="jMyJourney">📋 Mi jornada</div>
       <div id="journey-list"><div class="faint" style="text-align:center;padding:16px;">Cargando…</div></div>
     </div>
-    <div class="sub" style="font-weight:800;font-size:15px;margin:20px 0 10px;" data-i18n="homeTitle">Tus funciones</div>
+    <div id="home-svc-wrap" style="margin-top:18px;display:none;">
+      <div class="sub" id="home-svc-h" style="font-weight:800;font-size:15px;margin:2px 0 10px;">🔧 Órdenes de servicio</div>
+      <div id="home-svc-list"></div>
+    </div>
+    <div class="sub" id="home-fn-h" style="font-weight:800;font-size:15px;margin:20px 0 10px;" data-i18n="homeTitle">Tus funciones</div>
     <div id="home-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
     <div id="home-empty" class="sub" style="display:none;margin-top:10px;" data-i18n="homeTapFn">Toca una función para empezar.</div>
   </div>
@@ -1038,7 +1042,21 @@ window.whGoHome=function(){
   document.body.classList.add('wh-home');
   renderHomeTiles();
   try{ loadJourney(); }catch(e){}
+  try{ loadHomeSvc(); }catch(e){}
 };
+// 🔧 Órdenes de servicio del trabajador, DENTRO de Mi jornada (no detrás de un mosaico).
+window.loadHomeSvc=async function(){
+  const wrap=document.getElementById('home-svc-wrap'); const h=document.getElementById('home-svc-h'); if(h) h.textContent=L==='en'?'🔧 Service orders':'🔧 Órdenes de servicio';
+  try{ const r=await httpsCallable(functions,'svcMyOrders')(vaData({})); SVC_MY=((r&&r.data)||{}).orders||[]; }catch(e){ SVC_MY=[]; }
+  if(wrap) wrap.style.display = SVC_MY.length ? '' : 'none';
+  if(SVC_MY.length) renderMyService('home-svc-list');
+};
+// Re-carga las órdenes y refresca donde se estén viendo (home y/o vista de servicio).
+async function svcRefresh(){
+  try{ const r=await httpsCallable(functions,'svcMyOrders')(vaData({})); SVC_MY=((r&&r.data)||{}).orders||[]; }catch(e){}
+  const hw=document.getElementById('home-svc-wrap'); if(hw){ hw.style.display=SVC_MY.length?'':'none'; if(SVC_MY.length) renderMyService('home-svc-list'); }
+  const sv=document.getElementById('view-service'); if(sv && !sv.classList.contains('hide')) renderMyService('svc-emp-list');
+}
 function renderHomeTiles(){
   const box=document.getElementById('home-tiles'); if(!box) return;
   const seen={}; const list=(_myRoles&&_myRoles.length?_myRoles:[]).filter(r=>{ if(seen[r])return false; seen[r]=1; return WH_ROLE_TILES[r]; });
@@ -1483,8 +1501,8 @@ window.mechAddTaskSave=async function(){
 };
 // Roles de la LÍNEA de servicio (bilingüe) — para el relevo.
 function svcRoleLabel(r){ const m={'Mecánico':{es:'Mecánico',en:'Mechanic'},'Detallador':{es:'Detallador',en:'Detailer'},'Fotos':{es:'Fotos',en:'Photos'},'Limpieza':{es:'Limpieza',en:'Cleaning'}}; const o=m[r]; return o?(L==='en'?o.en:o.es):(r||''); }
-function renderMyService(){
-  const box=document.getElementById('svc-emp-list'); if(!box) return;
+function renderMyService(boxId){
+  const box=document.getElementById(boxId||'svc-emp-list'); if(!box) return;
   if(!SVC_MY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:30px 20px;line-height:1.6;">'+t('svcNoOrders')+'</div>'; return; }
   const ic={'Mecánico':'🔧','Detallador':'✨','Fotos':'📷','Limpieza':'🧽','Lavado':'🧽'};
   const rk=r=>({'Mecánico':0,'Detallador':1,'Fotos':2}[r]!=null?{'Mecánico':0,'Detallador':1,'Fotos':2}[r]:9);
@@ -1534,7 +1552,7 @@ function renderMyService(){
 // 🔧 RELEVO: el trabajador marca SU etapa; al terminar su rol, pasa al siguiente. (En "actuar como" escribe como el empleado.)
 window.svcStage=async function(orderId,action){
   if(_vaReadOnly()) return;
-  try{ await httpsCallable(functions,'svcServiceDone')(vaData({orderId:orderId,action:action})); whToast(action==='finish'?(L==='en'?'Done! 🎉':'¡Listo! 🎉'):(t('updated')||'✅')); loadMyService(); }
+  try{ await httpsCallable(functions,'svcServiceDone')(vaData({orderId:orderId,action:action})); whToast(action==='finish'?(L==='en'?'Done! 🎉':'¡Listo! 🎉'):(t('updated')||'✅')); svcRefresh(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 
@@ -1699,7 +1717,7 @@ async function loadMyJobs(){
 window.resumeJob=function(id){ if(_vaReadOnly())return; const j=(window._myJobs||[]).find(x=>x.id===id); if(!j){ whToast(L2('No se encontró el carro.','Car not found.'),true); return; } JOB={ id:j.id, car:j.car, vin:j.vin||'', inventoryId:j.inventoryId||'', inventoryNum:j.inventoryNum||'', triage:j.triage||{}, estMin:Number(j.estMin)||0, startedAt:j.startedAt, status:'active', steps:DETAIL_SOP.map(s=>{ const p=(j.steps||[]).find(x=>x.id===s.id)||{}; return {id:s.id,title:s.title,seconds:Number(p.seconds)||0,done:!!p.done,skipped:!!p.skipped}; }) }; runIdx=JOB.steps.findIndex(s=>!s.done&&!s.skipped); if(runIdx<0)runIdx=0; detailView('run'); renderRunner(); };
 window.svcAdvance=async function(orderId,status){
   if(_vaReadOnly()) return;
-  try{ await httpsCallable(functions,'svcOrderStatus')(vaData({orderId:orderId,status:status})); whToast(t('updated')||'✅'); loadMyService(); }
+  try{ await httpsCallable(functions,'svcOrderStatus')(vaData({orderId:orderId,status:status})); whToast(t('updated')||'✅'); svcRefresh(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 
