@@ -2126,6 +2126,44 @@ exports.disInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
   return { ok: true, cars };
 });
 
+// 💰 CUENTAS DE UN CARRO de Dismantling — SOLO INFORMATIVO (lee, no escribe, NO toca Finanzas).
+// Costo inicial + labor (interno) + conteo de partes + sumas a precio de LISTA (referencia).
+// El NETO real de eBay ("lo que nos quedó") se conecta después (API de Finanzas de eBay). Solo dueños.
+exports.carAccounts = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  const vid = String((request.data || {}).vehicleId || ""); if (!vid) throw new HttpsError("invalid-argument", "Falta el carro.");
+  const vs = await db.collection("dismantle_vehicles").doc(vid).get();
+  if (!vs.exists) throw new HttpsError("not-found", "El carro no existe.");
+  const v = vs.data() || {};
+  const counts = { total: 0, vendido: 0, proceso: 0, publicado: 0, disponible: 0, borrador: 0 };
+  let soldListCents = 0, pipelineListCents = 0, availListCents = 0, sinPrecio = 0;
+  try {
+    const ps = await db.collection("parts").get();
+    ps.forEach((d) => {
+      const p = d.data() || {}; if (p.vehicleId !== vid) return;
+      counts.total++;
+      const pc = Number(p.priceCents) || 0; if (!pc) sinPrecio++;
+      const st = p.status || "disponible";
+      if (st === "vendido") { counts.vendido++; soldListCents += pc; }
+      else if (st === "empaquetando" || st === "en_transito") { counts.proceso++; pipelineListCents += pc; }
+      else if (st === "publicado" || st === "en_ebay") { counts.publicado++; availListCents += pc; }
+      else if (st === "borrador") { counts.borrador++; availListCents += pc; }
+      else { counts.disponible++; availListCents += pc; }
+    });
+  } catch (e) {}
+  const costCents = Number(v.costCents) || 0, laborCents = Number(v.laborCents) || 0, laborMin = Number(v.laborMin) || 0;
+  return {
+    ok: true, label: [v.year, v.make, v.model].filter(Boolean).join(" ") || v.title || ("#" + (v.inventoryNum || "")),
+    inventoryNum: String(v.inventoryNum || ""), vin: String(v.vin || ""),
+    costCents, laborCents, laborMin, totalCostCents: costCents + laborCents,
+    counts, soldListCents, pipelineListCents, availListCents, sinPrecio,
+    ebayNetReady: false,
+  };
+});
+
 // 🚗 Lista ligera de carros para apuntar una tarea suelta del Pit: inventario del dealer + carros para desmantelar (yarda). Solo dueños.
 exports.invCarsLite = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");

@@ -1244,6 +1244,55 @@ window.whOwnerHome=function(){
 };
 // Botón "‹ volver": dueño → Centro de Operaciones; empleado → Mi jornada.
 window.whBack=function(){ if(role==='owner' && !_asEmp){ if(_ownerJornada){ _ownerJornada=false; whOwnerHome(); } else whOwnerHome(); } else whGoHome(); };
+// 💰 CUENTAS DEL CARRO (Dismantling) — overlay SOLO INFORMATIVO. No toca Finanzas.
+window.openCarAccounts=async function(vid){
+  if(role!=='owner') return;
+  let ov=document.getElementById('wh-acct');
+  if(!ov){ ov=document.createElement('div'); ov.id='wh-acct'; ov.style.cssText='position:fixed;inset:0;z-index:100060;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    const box=document.createElement('div'); box.id='wh-acct-box'; box.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:440px;width:100%;padding:18px;box-sizing:border-box;cursor:default;margin:auto;';
+    ov.appendChild(box); document.body.appendChild(ov);
+  } else ov.style.display='flex';
+  const box=document.getElementById('wh-acct-box');
+  box.innerHTML='<div class="faint" style="text-align:center;padding:24px;">'+t('jLoadingTxt')+'</div>';
+  try{ const r=await httpsCallable(functions,'carAccounts')({vehicleId:vid}); renderCarAccounts((r&&r.data)||{}); }
+  catch(e){ box.innerHTML='<div class="faint" style="text-align:center;padding:24px;">'+((e&&e.message)||t('jCouldnt'))+'</div><button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="document.getElementById(\'wh-acct\').remove()">✕</button>'; }
+};
+function _m2(c){ return '$'+((Number(c)||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function renderCarAccounts(d){
+  const box=document.getElementById('wh-acct-box'); if(!box) return;
+  const c=d.counts||{};
+  const row=(lbl,val,col)=>'<div style="display:flex;justify-content:space-between;align-items:center;font-size:13.5px;padding:4px 0;"><span style="color:var(--muted);">'+lbl+'</span><span style="font-weight:700;'+(col?('color:'+col+';'):'')+'">'+val+'</span></div>';
+  const card=(inner)=>'<div class="card" style="padding:12px 14px;margin-bottom:10px;">'+inner+'</div>';
+  const refList = (d.soldListCents+d.pipelineListCents+d.availListCents);
+  box.innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-weight:800;font-size:17px;min-width:0;">💰 '+L2('Cuentas del carro','Car accounts')+'</div><button onclick="document.getElementById(\'wh-acct\').remove()" class="btn ghost sm" style="padding:6px 12px;flex:none;">✕</button></div>'
+    +'<div class="faint" style="font-size:13px;margin-bottom:4px;">'+(d.inventoryNum?('#'+esc(d.inventoryNum)+' · '):'')+esc(d.label||'')+'</div>'
+    +'<div style="font-size:11px;color:#8ab4ff;background:rgba(138,180,255,.1);border:1px solid rgba(138,180,255,.3);border-radius:9px;padding:7px 10px;margin-bottom:12px;line-height:1.5;">📊 '+L2('Solo informativo — no afecta Finanzas ni la nómina.','Info only — does not affect Finanzas or payroll.')+'</div>'
+    // Costos
+    +card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+L2('Costo del carro','Car cost')+'</div>'
+      +row(L2('Costo inicial (Finanzas)','Initial cost (Finanzas)'), _m2(d.costCents))
+      +row('💪 '+L2('Labor interna','Internal labor')+(d.laborMin?(' ('+d.laborMin+' min)'):''), '+'+_m2(d.laborCents), '#8ab4ff')
+      +'<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">'+row('<b>'+L2('Costo total','Total cost')+'</b>', '<b>'+_m2(d.totalCostCents)+'</b>')+'</div>')
+    // Partes
+    +card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+L2('Partes','Parts')+' ('+(c.total||0)+')</div>'
+      +row('✅ '+L2('Vendidas','Sold'), (c.vendido||0))
+      +(c.proceso?row('🚚 '+L2('En envío','Shipping'), c.proceso):'')
+      +row('🏷️ '+L2('Publicadas','Listed'), (c.publicado||0))
+      +row('📦 '+L2('Por publicar','To publish'), (c.disponible||0)+(c.borrador?(' (+'+c.borrador+' '+L2('borrador','draft')+')'):''))
+      +(d.sinPrecio?('<div class="faint" style="font-size:11px;margin-top:5px;">⚠️ '+d.sinPrecio+' '+L2('sin precio capturado','without a price yet')+'</div>'):''))
+    // Dinero
+    +card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+L2('Dinero','Money')+'</div>'
+      +row('💵 '+L2('Generado (neto real de eBay)','Earned (real eBay net)'), '⏳ '+L2('pendiente','pending'), '#f0a030')
+      +'<div class="faint" style="font-size:11px;margin:2px 0 8px;line-height:1.5;">'+L2('El neto real (lo que nos quedó) se conecta en el siguiente paso con la API de Finanzas de eBay.','The real net kept connects next via eBay\'s Finances API.')+'</div>'
+      +'<div style="border-top:1px solid var(--border);padding-top:7px;">'
+      +'<div class="faint" style="font-size:11px;margin-bottom:4px;">'+L2('Referencia a precio de lista (no es el neto):','List-price reference (not the net):')+'</div>'
+      +row(L2('Vendidas','Sold'), _m2(d.soldListCents))
+      +(d.pipelineListCents?row(L2('En envío','Shipping'), _m2(d.pipelineListCents)):'')
+      +row(L2('Por vender (publicadas + por publicar)','Unsold (listed + to publish)'), _m2(d.availListCents))
+      +row('<b>'+L2('Potencial total','Total potential')+'</b>', '<b>'+_m2(refList)+'</b>')
+      +'</div>');
+}
 // 👷 Dueño trabajando: abre SU jornada (tareas + órdenes que puede tomar) encima del Centro.
 let _ownerJornada=false;
 window.whOwnerJornada=function(){
@@ -2799,7 +2848,8 @@ function renderCarDetail(){
   const docsBtn = (role==='owner') ? `<button class="btn ghost sm" onclick="openDocsModal('${v.id}')">📄 ${t('carDocsBtn')}${(v.docURLs&&v.docURLs.length)?' ('+v.docURLs.length+')':''}</button>` : '';
   const _vCost=(Number(v.costCents)||0)/100, _vLabor=(Number(v.laborCents)||0)/100;
   const costTag = (role==='owner' && (v.costCents||v.laborCents)) ? `<div class="sub" style="margin:6px 2px 0;line-height:1.6;">💵 ${t('carCost')}: $${_vCost.toFixed(2)}${v.costBolsa?' · '+(v.costBolsa==='parts'?'Partes':v.costBolsa==='ebay'?'eBay':'Dealer'):''}${_vLabor>0?` · <span style="color:#8ab4ff;">💪 Labor $${_vLabor.toFixed(2)}</span> · <b>Total $${(_vCost+_vLabor).toFixed(2)}</b> <span style="color:#777;font-size:11px;">(${L2('labor no afecta Finanzas','labor not in Finanzas')})</span>`:''}</div>` : '';
-  const btnRow = (specBtn||titleBtn||docsBtn) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${specBtn}${titleBtn}${docsBtn}</div>` : '';
+  const acctBtn = (role==='owner') ? `<button class="btn ghost sm" onclick="openCarAccounts('${v.id}')">💰 ${L2('Cuentas del carro','Car accounts')}</button>` : '';
+  const btnRow = (specBtn||titleBtn||docsBtn||acctBtn) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${acctBtn}${specBtn}${titleBtn}${docsBtn}</div>` : '';
   const canEditCar = (role==='owner');
   box.innerHTML=`
     <button class="btn ghost sm" style="margin-bottom:12px;" onclick="closeCar()">${t('backCars')}</button>
