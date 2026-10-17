@@ -1548,8 +1548,9 @@ function renderOwnerPanel(){
       else if(c.reconStage==='mecanico' && c.inspStarted && !c.inspDone) dvi='<span style="color:var(--gold);">'+L2('En inspección','Inspecting')+'</span>';
       else if(c.inspDone) dvi='<span style="color:#35c46a;">✓ '+L2('Inspección lista','Inspection done')+'</span>';
       const tsk=c.tasks?(' · 🔧 '+c.tasks+' '+t('jobsN')):'';
+      const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' '+L2('labor','labor')+'</span>'):'';
       return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+esc(stage)+'</span></div>'
-        +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(dvi||'&nbsp;')+tsk+'</div>'+dealPipelineHtml(c.reconStage)+'</div>';
+        +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(dvi||'&nbsp;')+tsk+lab+'</div>'+dealPipelineHtml(c.reconStage)+'</div>';
     }).join('');
   }
   // 🔧 Órdenes de servicio abiertas (línea Service) — para que dueños las vean sin entrar como trabajador.
@@ -1576,8 +1577,9 @@ function renderOwnerPanel(){
         ? ('🧩 '+c.partsLeft+'/'+c.partsTotal+' '+L2('partes','parts')+' · '+L2('vendidas','sold')+' '+c.partsSold)
         : ('<span style="color:var(--muted);">'+L2('Aún sin partes capturadas','No parts captured yet')+'</span>');
       const allSold = c.partsTotal>0 && c.partsLeft===0;
+      const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' labor</span>'):'';
       return '<div style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span>'+(allSold?'<span style="font-size:11px;color:#35c46a;font-weight:700;">✓</span>':'')+'</div>'
-        +'<div class="faint" style="font-size:12px;margin-top:2px;">'+parts+'</div></div>';
+        +'<div class="faint" style="font-size:12px;margin-top:2px;">'+parts+lab+'</div></div>';
     }).join('');
   }
   // Tareas

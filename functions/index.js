@@ -1215,6 +1215,32 @@ const OWNER_NAMES = { "ev@legacymotorsgarage.com": "Enrique", "ivan.garcia@legac
 // 💵 Tarifa de LABOR de los dueños (Enrique/Ivan) SOLO para costo de labor (tiempo×tarifa → costo del carro).
 // NO es nómina: los dueños no fichan asistencia. Decidido por Enrique: $16.25/h (como Ayudante general).
 const OWNER_LABOR_RATE = 16.25;
+// 💪 COSTO DE LABOR por carro (INTERNO / gerencial) — tiempo × tarifa. NO toca Finanzas (NO crea transacción):
+// acumula `laborCents`/`laborMin` en el carro (campo aparte) + bitácora `labor_log` (para P&L por carro y reporte por empleado).
+async function _addCarLabor(db, rawCarId, info) {
+  try {
+    const raw = String(rawCarId || ""); if (!raw) return 0;
+    let kind = "inventory", docId = raw;
+    if (raw.indexOf("inv:") === 0) { kind = "inventory"; docId = raw.slice(4); }
+    else if (raw.indexOf("dis:") === 0) { kind = "dismantle_vehicles"; docId = raw.slice(4); }
+    const minutes = Math.max(0, Number(info.minutes) || 0);
+    const rate = Math.max(0, Number(info.rate) || 0);   // $/h
+    const costCents = Math.round((minutes / 60) * rate * 100);
+    if (minutes <= 0 && costCents <= 0) return 0;
+    const inc = admin.firestore.FieldValue.increment;
+    try { await db.collection(kind).doc(docId).set({ laborCents: inc(costCents), laborMin: inc(Math.round(minutes)), laborUpdatedAt: new Date().toISOString() }, { merge: true }); } catch (e) {}
+    try {
+      await db.collection("labor_log").add({
+        carId: docId, carKind: kind, carLabel: String(info.carLabel || ""),
+        workerKey: String(info.workerKey || ""), workerName: String(info.workerName || ""), role: String(info.role || ""),
+        line: String(info.line || ""), minutes: Math.round(minutes), rateCents: Math.round(rate * 100), costCents: costCents,
+        source: String(info.source || ""), refId: String(info.refId || ""), title: String(info.title || ""),
+        at: new Date().toISOString(),
+      });
+    } catch (e) {}
+    return costCents;
+  } catch (e) { return 0; }
+}
 function _haversineM(aLat, aLng, bLat, bLng) {
   const R = 6371000, toR = (x) => x * Math.PI / 180;
   const dLat = toR(bLat - aLat), dLng = toR(bLng - aLng);
@@ -1948,7 +1974,12 @@ exports.taskComplete = onCall({ timeoutSeconds: 20 }, async (request) => {
   const add = t.lastResumeAt ? Math.max(0, Date.now() - new Date(t.lastResumeAt).getTime()) : 0;
   const workedMs = (Number(t.workedMs) || 0) + add;
   await ref.set({ status: "hecho", finishedAt: new Date().toISOString(), finishedBy: id.name || id.email || id.empId || "", workedMs: workedMs, lastResumeAt: null }, { merge: true });
-  return { ok: true, workedMs: workedMs };
+  // 💪 Costo de labor al CARRO (Dealer o Dismantling, según el prefijo del carId) — informativo, NO Finanzas.
+  let laborCents = 0;
+  if (t.carId && workedMs > 0) {
+    laborCents = await _addCarLabor(db, t.carId, { minutes: workedMs / 60000, rate: Number(id.rate) || 0, workerKey: id.key, workerName: id.name || id.email || id.empId || "", role: t.assignRole || "", line: t.line || "", carLabel: t.carLabel || "", source: "task", refId: taskId, title: t.title || "" });
+  }
+  return { ok: true, workedMs: workedMs, laborCents: laborCents };
 });
 
 // 🔧 F4 — Ejecución de tareas: pausar (con motivo) / reanudar / reportar problema.
@@ -2054,7 +2085,7 @@ exports.carsInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
     const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
     const photo = (Array.isArray(c.photos) && c.photos[0]) || c.img || "";
     const insp = c.inspection || {};
-    cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), reconStage: c.reconStage || "mecanico", receivedMiles: String(c.receivedMiles || ""), inspStarted: !!insp.startedAt, inspDone: !!insp.reportAt, waitingParts: !!insp.waitingParts, partsNeeded: (Array.isArray(insp.parts) ? insp.parts.length : 0), tasks: taskCount[d.id] || 0 });
+    cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), reconStage: c.reconStage || "mecanico", receivedMiles: String(c.receivedMiles || ""), inspStarted: !!insp.startedAt, inspDone: !!insp.reportAt, waitingParts: !!insp.waitingParts, partsNeeded: (Array.isArray(insp.parts) ? insp.parts.length : 0), tasks: taskCount[d.id] || 0, laborCents: Number(c.laborCents) || 0, laborMin: Number(c.laborMin) || 0 });
   });
   cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
   return { ok: true, cars };
@@ -2088,7 +2119,7 @@ exports.disInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
       const left = Math.max(0, b.total - b.sold);
       // La línea termina cuando se vendió la última parte: ocultar los que ya tienen partes y todas vendidas.
       if (b.total > 0 && left === 0) return;
-      cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), status: String(c.status || "desmantelando"), partsTotal: b.total, partsSold: b.sold, partsLeft: left });
+      cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), status: String(c.status || "desmantelando"), partsTotal: b.total, partsSold: b.sold, partsLeft: left, laborCents: Number(c.laborCents) || 0, laborMin: Number(c.laborMin) || 0 });
     });
   } catch (e) {}
   cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
