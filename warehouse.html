@@ -64,6 +64,10 @@
   #asemp-banner{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;background:linear-gradient(135deg,#d9b85a,#9a7420);color:#0f1320;display:none;align-items:center;justify-content:center;gap:14px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));font-weight:800;font-size:14px;box-shadow:0 -6px 20px rgba(0,0,0,.4);}
   #asemp-banner button{background:#0f1320;color:#fff;border:none;border-radius:9px;padding:8px 16px;font-weight:800;cursor:pointer;font-size:14px;}
   body.wh-asemp #lmg-nav{display:none !important;}
+  /* 👁️/🎭 Viendo/Actuando como empleado: el menú del logo (owner) NO debe salir — un empleado real no tiene menú en el logo. */
+  body.wh-asemp .lmg-logo{pointer-events:none !important;}
+  body.wh-asemp .lmg-chev{display:none !important;}
+  body.wh-asemp #lmg-dd, body.wh-asemp #lmg-catch{display:none !important;}
   /* === Mi jornada (tareas guiadas, portado de crew) === */
   .hide{display:none !important;}
   .faint{color:var(--muted);}
