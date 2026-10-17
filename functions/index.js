@@ -1907,7 +1907,7 @@ exports.myTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   }
   const list = all.filter((t) => !t.isTemplate && t.status !== "hecho" && _taskMine(t, id));
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], status: t.status || "cola", assignName: t.assignName || "", assignRole: t.assignRole || "", carLabel: t.carLabel || "", pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }));
+  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], materials: Array.isArray(t.materials) ? t.materials : [], status: t.status || "cola", assignName: t.assignName || "", assignRole: t.assignRole || "", carId: t.carId || "", carLabel: t.carLabel || "", pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }));
   return { ok: true, tasks: out, today };
 });
 exports.taskStep = onCall({ timeoutSeconds: 20 }, async (request) => {
@@ -1940,9 +1940,12 @@ exports.taskComplete = onCall({ timeoutSeconds: 20 }, async (request) => {
   const t = snap.data() || {};
   if (!_taskMine(t, id)) throw new HttpsError("permission-denied", "No es tu tarea.");
   const cl = Array.isArray(t.checklist) ? t.checklist : [];
-  if (cl.length && cl.some((c) => !c.done)) throw new HttpsError("failed-precondition", "Faltan pasos por marcar.");
-  await ref.set({ status: "hecho", finishedAt: new Date().toISOString(), finishedBy: id.name || id.email || id.empId || "" }, { merge: true });
-  return { ok: true };
+  if (cl.length && cl.some((c) => !c.done) && d.force !== true) throw new HttpsError("failed-precondition", "Faltan pasos por marcar.");
+  // ⏱️ cierra el cronómetro: suma el tramo abierto si venía en proceso
+  const add = t.lastResumeAt ? Math.max(0, Date.now() - new Date(t.lastResumeAt).getTime()) : 0;
+  const workedMs = (Number(t.workedMs) || 0) + add;
+  await ref.set({ status: "hecho", finishedAt: new Date().toISOString(), finishedBy: id.name || id.email || id.empId || "", workedMs: workedMs, lastResumeAt: null }, { merge: true });
+  return { ok: true, workedMs: workedMs };
 });
 
 // 🔧 F4 — Ejecución de tareas: pausar (con motivo) / reanudar / reportar problema.
@@ -1958,14 +1961,41 @@ exports.taskAction = onCall({ timeoutSeconds: 20 }, async (request) => {
   const tsk = snap.data() || {};
   if (!_taskMine(tsk, id)) throw new HttpsError("permission-denied", "No es tu tarea.");
   const nowIso = new Date().toISOString();
+  const nowMs = Date.now();
+  // ⏱️ Cronómetro de TRABAJO (≠ asistencia): acumula workedMs mientras está en proceso. Base del costo de labor.
+  if (op === "start") {   // arranca la tarea (primera vez)
+    await ref.set({ status: "en_proceso", startedAt: tsk.startedAt || nowIso, lastResumeAt: nowIso, pausedReason: "", updatedAt: nowIso }, { merge: true });
+    return { ok: true };
+  }
   if (op === "pause") {
     const reason = String(d.reason || "").trim().slice(0, 200);
-    await ref.set({ status: "pausada", pausedReason: reason, pausedAt: nowIso, updatedAt: nowIso }, { merge: true });
+    const add = tsk.lastResumeAt ? Math.max(0, nowMs - new Date(tsk.lastResumeAt).getTime()) : 0;
+    await ref.set({ status: "pausada", pausedReason: reason, pausedAt: nowIso, workedMs: (Number(tsk.workedMs) || 0) + add, lastResumeAt: null, updatedAt: nowIso }, { merge: true });
     return { ok: true };
   }
   if (op === "resume") {
-    await ref.set({ status: "en_proceso", pausedReason: "", updatedAt: nowIso }, { merge: true });
+    await ref.set({ status: "en_proceso", pausedReason: "", lastResumeAt: nowIso, startedAt: tsk.startedAt || nowIso, updatedAt: nowIso }, { merge: true });
     return { ok: true };
+  }
+  if (op === "matAdd") {
+    const text = String(d.text || "").trim().slice(0, 140); if (!text) throw new HttpsError("invalid-argument", "Falta el material.");
+    const mats = (Array.isArray(tsk.materials) ? tsk.materials.slice() : []);
+    if (mats.length >= 60) throw new HttpsError("failed-precondition", "Demasiados materiales.");
+    mats.push({ id: "m" + nowMs + Math.random().toString(36).slice(2, 6), text: text, done: false });
+    await ref.set({ materials: mats, updatedAt: nowIso }, { merge: true });
+    return { ok: true, materials: mats };
+  }
+  if (op === "matToggle") {
+    const mid = String(d.mid || "");
+    const mats = (Array.isArray(tsk.materials) ? tsk.materials : []).map((m) => (m.id === mid ? Object.assign({}, m, { done: !m.done }) : m));
+    await ref.set({ materials: mats, updatedAt: nowIso }, { merge: true });
+    return { ok: true, materials: mats };
+  }
+  if (op === "matRemove") {
+    const mid = String(d.mid || "");
+    const mats = (Array.isArray(tsk.materials) ? tsk.materials : []).filter((m) => m.id !== mid);
+    await ref.set({ materials: mats, updatedAt: nowIso }, { merge: true });
+    return { ok: true, materials: mats };
   }
   if (op === "problem") {
     const text = String(d.text || "").trim().slice(0, 300); if (!text) throw new HttpsError("invalid-argument", "Falta el detalle.");
@@ -1984,7 +2014,7 @@ exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   let snap; try { snap = await db.collection("tasks").get(); } catch (e) { return { ok: true, tasks: [] }; }
   const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.isTemplate && t.status !== "hecho");
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", assignEmpId: t.assignEmpId || "", carId: t.carId || "", carLabel: t.carLabel || "", checklist: cl.map((c) => ({ text: c.text, done: !!c.done })), status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length, pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }; });
+  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", assignEmpId: t.assignEmpId || "", carId: t.carId || "", carLabel: t.carLabel || "", checklist: cl.map((c) => ({ text: c.text, done: !!c.done })), materials: Array.isArray(t.materials) ? t.materials : [], status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length, pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }; });
   return { ok: true, tasks: out };
 });
 

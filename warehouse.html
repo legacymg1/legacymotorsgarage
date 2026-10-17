@@ -1361,23 +1361,37 @@ function renderJourney(){
 window.openTaskDetail=function(taskId){ const o=JOURNEY.find(x=>x.id===taskId); if(!o) return; JOB_CUR=JSON.parse(JSON.stringify(o)); renderTaskDetail(); document.getElementById('task-detail').classList.remove('hide'); };
 window.taskDetailBack=function(){ document.getElementById('task-detail').classList.add('hide'); JOB_CUR=null; if(_opFromCenter){ _opFromCenter=false; try{ loadOwnerPanel(); }catch(e){} } else { loadJourney(); } };
 function renderTaskDetail(){
-  const cur=JOB_CUR; if(!cur) return; const body=document.getElementById('task-detail-body'); const cl=cur.checklist||[];
-  const done=cl.filter(c=>c.done).length; const pend=cl.length>0 && done<cl.length;
-  const btnCls=pend?'btn-ghost':'btn-gold', btnDis=pend?'disabled':'';
-  const btnLabel=pend?(t('jMark')+' ('+done+'/'+cl.length+')'):t('jComplete');
-  const paused=cur.status==='pausada';
+  const cur=JOB_CUR; if(!cur) return; const body=document.getElementById('task-detail-body');
+  const cl=cur.checklist||[]; const done=cl.filter(c=>c.done).length;
+  const status=cur.status||'cola';
+  const notStarted=(status==='cola'); const paused=(status==='pausada');
+  const mats=cur.materials||[]; const matDone=mats.filter(m=>m.done).length;
   const pausedBanner = paused ? '<div style="background:rgba(255,152,0,.12);border:1px solid rgba(255,152,0,.4);border-radius:12px;padding:11px 13px;margin-bottom:14px;font-size:13px;color:#ffb74d;line-height:1.4;">'+t('jPaused')+(cur.pausedReason?(': '+esc(cur.pausedReason)):'')+'</div>' : '';
-  const actionRow = paused
-    ? '<button class="btn-gold" style="margin-bottom:10px;" onclick="taskResume()">'+t('jResume')+'</button>'
-    : '<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn-ghost" style="flex:1;" onclick="taskPause()">'+t('jPause')+'</button><button class="btn-ghost" style="flex:1;" onclick="taskReportProblem()">'+t('jProblem')+'</button></div>';
+  // 🧱 Materiales / partes que necesita (con check) — siempre disponible
+  const matRows = mats.length ? mats.map(m=>'<div class="stepitem '+(m.done?'on':'')+'" style="display:flex;align-items:center;gap:8px;"><div onclick="taskMatToggle(\''+m.id+'\')" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;"><div class="stepbox">'+(m.done?'✓':'')+'</div><div style="flex:1;min-width:0;font-size:14.5px;line-height:1.35;'+(m.done?'text-decoration:line-through;opacity:.6;':'')+'">'+esc(m.text)+'</div></div><button onclick="taskMatRemove(\''+m.id+'\')" title="Quitar" style="flex:none;background:transparent;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:2px 6px;">✕</button></div>').join('') : '<div class="faint" style="font-size:12.5px;padding:5px 2px;">'+L2('Anota lo que necesitas (pintura, cinta, rodillo, una pieza…)','List what you need (paint, tape, roller, a part…)')+'</div>';
+  const matSection = '<div class="faint" style="font-size:13px;margin:4px 0 6px;font-weight:700;">🧱 '+L2('Materiales / partes','Materials / parts')+(mats.length?(' ('+matDone+'/'+mats.length+')'):'')+'</div>'
+    +'<div class="card" style="padding:6px 12px;margin-bottom:8px;">'+matRows+'</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:16px;"><input id="task-mat-input" placeholder="'+L2('Agregar material/parte…','Add material/part…')+'" style="flex:1;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;" onkeydown="if(event.key===\'Enter\')taskMatAdd()"><button class="btn ghost sm" onclick="taskMatAdd()" style="flex:none;">➕</button></div>';
+  // Pasos (checklist) — si tiene
+  const stepsSection = cl.length ? ('<div class="faint" style="font-size:13px;margin:4px 0 6px;font-weight:700;">'+t('jMarkSteps')+' ('+done+'/'+cl.length+'):</div>'
+    +'<div class="card" style="padding:2px 14px;margin-bottom:16px;">'+cl.map((c,i)=>'<div class="stepitem '+(c.done?'on':'')+'" onclick="taskToggleStep('+i+')"><div class="stepbox">'+(c.done?'✓':'')+'</div><div class="steptext" style="flex:1;min-width:0;font-size:15px;padding-top:2px;line-height:1.4;">'+esc(c.text)+'</div></div>').join('')+'</div>') : '';
+  // Botones por estado: cola → Empezar · en proceso → Pausar/Problema + Terminar · pausada → Reanudar + Terminar
+  let actions='';
+  if(notStarted){
+    actions='<button class="btn-gold" style="width:100%;" onclick="taskStart()">▶️ '+L2('Empezar tarea','Start task')+'</button>';
+  } else {
+    actions = (paused
+      ? '<button class="btn-gold" style="width:100%;margin-bottom:10px;" onclick="taskResume()">'+t('jResume')+'</button>'
+      : '<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn-ghost" style="flex:1;" onclick="taskPause()">'+t('jPause')+'</button><button class="btn-ghost" style="flex:1;" onclick="taskReportProblem()">'+t('jProblem')+'</button></div>')
+      + '<button class="btn-green" style="width:100%;" onclick="taskDoComplete()">✅ '+L2('Terminar tarea','Finish task')+'</button>';
+  }
   body.innerHTML='<div class="topbar"><button class="linkbtn" onclick="taskDetailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>'
     +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+taskChip(cur)+'</div><h2 style="font-size:20px;margin:0;">'+esc(cur.title)+'</h2>'+(cur.carLabel?'<div style="font-size:13.5px;font-weight:600;margin-top:2px;">🚗 '+esc(cur.carLabel)+'</div>':'')+'</div></div>'
     +pausedBanner
-    +(cl.length?('<div class="faint" style="font-size:13px;margin-bottom:8px;">'+t('jMarkSteps')+' ('+done+'/'+cl.length+'):</div>'
-      +'<div class="card" style="padding:2px 14px;margin-bottom:18px;">'+cl.map((c,i)=>'<div class="stepitem '+(c.done?'on':'')+'" onclick="taskToggleStep('+i+')"><div class="stepbox">'+(c.done?'✓':'')+'</div><div class="steptext" style="flex:1;min-width:0;font-size:15px;padding-top:2px;line-height:1.4;">'+esc(c.text)+'</div></div>').join('')+'</div>')
-      :'<div class="faint" style="margin:14px 0 18px;">'+t('jNoSteps')+'</div>')
-    +actionRow
-    +'<button class="'+btnCls+'" style="width:100%;" '+btnDis+' onclick="taskDoComplete()">'+btnLabel+'</button>';
+    +(notStarted?'<div class="faint" style="font-size:13px;margin-bottom:12px;line-height:1.5;">'+L2('Anota los materiales que necesitas y toca Empezar cuando arranques.','List the materials you need and tap Start when you begin.')+'</div>':'')
+    +stepsSection
+    +matSection
+    +actions;
 }
 window.taskPause=async function(){
   if(_vaReadOnly()) return;
@@ -1390,6 +1404,27 @@ window.taskResume=async function(){
   if(_vaReadOnly()) return;
   if(!JOB_CUR) return;
   try{ await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'resume'})); JOB_CUR.status='en_proceso'; JOB_CUR.pausedReason=''; renderTaskDetail(); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+window.taskStart=async function(){
+  if(_vaReadOnly()) return; if(!JOB_CUR) return;
+  try{ await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'start'})); JOB_CUR.status='en_proceso'; renderTaskDetail(); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+window.taskMatAdd=async function(){
+  if(_vaReadOnly()) return; if(!JOB_CUR) return;
+  const inp=document.getElementById('task-mat-input'); const text=(inp&&inp.value||'').trim(); if(!text) return;
+  try{ const r=await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'matAdd', text})); JOB_CUR.materials=((r&&r.data)||{}).materials||JOB_CUR.materials||[]; renderTaskDetail(); setTimeout(()=>{ const i=document.getElementById('task-mat-input'); if(i) i.focus(); },30); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+window.taskMatToggle=async function(mid){
+  if(_vaReadOnly()) return; if(!JOB_CUR) return;
+  try{ const r=await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'matToggle', mid})); JOB_CUR.materials=((r&&r.data)||{}).materials||JOB_CUR.materials; renderTaskDetail(); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+window.taskMatRemove=async function(mid){
+  if(_vaReadOnly()) return; if(!JOB_CUR) return;
+  try{ const r=await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'matRemove', mid})); JOB_CUR.materials=((r&&r.data)||{}).materials||[]; renderTaskDetail(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 window.taskReportProblem=async function(){
@@ -1410,12 +1445,15 @@ window.taskToggleStep=async function(idx){
 window.taskDoComplete=async function(){
   if(_vaReadOnly()) return;
   if(!JOB_CUR) return; const cur=JOB_CUR;
-  try{ await httpsCallable(functions,'taskComplete')(vaData({taskId:cur.id})); }
+  const cl=cur.checklist||[]; const pend=cl.filter(c=>!c.done).length;
+  let force=false;
+  if(pend>0){ if(!confirm(L2('Faltan '+pend+' paso(s) por marcar. ¿Terminar la tarea de todos modos?','Still '+pend+' step(s) unchecked. Finish the task anyway?'))) return; force=true; }
+  try{ await httpsCallable(functions,'taskComplete')(vaData({taskId:cur.id, force})); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); return; }
   document.getElementById('task-detail').classList.add('hide');
   const sub=document.getElementById('task-gold-sub'); if(sub) sub.textContent=cur.title;
   const g=document.getElementById('task-gold'); g.classList.remove('hide');
-  setTimeout(function(){ g.classList.add('hide'); JOB_CUR=null; loadJourney(); }, 1500);
+  setTimeout(function(){ g.classList.add('hide'); JOB_CUR=null; if(_opFromCenter){ _opFromCenter=false; try{ loadOwnerPanel(); }catch(e){} } else { loadJourney(); } }, 1500);
 };
 
 // 👑 Panel de operación del dueño — todas las tareas abiertas (allTasks) con resumen + scroll.
