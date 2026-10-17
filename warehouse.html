@@ -1421,8 +1421,23 @@ window.whOwnerHome=function(){
   document.body.classList.remove('wh-home');
   try{ refreshClock(); }catch(e){}   // esconde la tarjeta del reloj (dueño no ficha)
   try{ loadOwnerPanel(); }catch(e){}
+  try{ _opStartAuto(); }catch(e){}   // mantiene el Centro "en vivo"
   try{ window.scrollTo(0,0); }catch(e){}
 };
+// ⏱️ Auto-refresco del Centro: cada 90s, SOLO si está visible y sin overlay/vista encima (no interrumpe al dueño).
+let _opAutoTimer=null;
+function _opStartAuto(){
+  if(_opAutoTimer) return;
+  _opAutoTimer=setInterval(function(){
+    const opc=document.getElementById('owner-op-card');
+    if(!opc || opc.style.display==='none') return;
+    if(document.visibilityState && document.visibilityState!=='visible') return;
+    if(document.getElementById('wh-pay')||document.getElementById('wh-report')||document.getElementById('wh-acct')) return;
+    const td=document.getElementById('task-detail'); if(td && !td.classList.contains('hide')) return;
+    const sv=document.getElementById('view-service'); if(sv && !sv.classList.contains('hide')) return;
+    try{ loadOwnerPanel(); }catch(e){}
+  }, 90000);
+}
 // Botón "‹ volver": dueño → Centro de Operaciones; empleado → Mi jornada.
 window.whBack=function(){ if(role==='owner' && !_asEmp){ if(_ownerJornada){ _ownerJornada=false; whOwnerHome(); } else whOwnerHome(); } else whGoHome(); };
 // 💰 CUENTAS DEL CARRO (Dismantling) — overlay SOLO INFORMATIVO. No toca Finanzas.
@@ -1772,6 +1787,9 @@ window.opJump=function(key){ _opCollapse[key]=false; renderOwnerPanel(); setTime
 let _opFromCenter=false;
 window.opWorkTask=function(id){ const o=(OP_TASKS||[]).find(x=>x.id===id); if(!o) return; JOB_CUR=JSON.parse(JSON.stringify(o)); _opFromCenter=true; try{ renderTaskDetail(); }catch(e){} const d=document.getElementById('task-detail'); if(d) d.classList.remove('hide'); try{ window.scrollTo(0,0); }catch(e){} };
 window.opWorkService=function(){ _opFromCenter=true; try{ openService(); }catch(e){} };   // abre la vista de trabajo de servicio/mecánico (relevo)
+// 🚗 Click en un carro Dealer del Centro → abre la recepción/DVI de ESE carro (no la vista genérica). Se abre al cargar la lista del mecánico.
+let _pendingMechCar='';
+window.opWorkDealer=function(id){ if(!id) return; _opFromCenter=true; _pendingMechCar=id; try{ openService(); }catch(e){} };
 // Encabezado clicable (minimiza/expande) + contador + flecha. listId = id del contenedor de la lista.
 function opHeader(key, headerId, listId, label, count){
   const el=document.getElementById(headerId); if(!el) return;
@@ -1833,7 +1851,7 @@ function renderOwnerPanel(){
       else if(c.inspDone) dvi='<span style="color:#35c46a;">✓ '+L2('Inspección lista','Inspection done')+'</span>';
       const tsk=c.tasks?(' · 🔧 '+c.tasks+' '+t('jobsN')):'';
       const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' '+L2('labor','labor')+'</span>'):'';
-      return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+esc(stage)+'</span></div>'
+      return '<div onclick="opWorkDealer(\''+c.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+esc(stage)+' <span style="color:var(--muted);">›</span></span></div>'
         +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(dvi||'&nbsp;')+tsk+lab+'</div>'+dealPipelineHtml(c.reconStage)+'</div>';
     }).join('');
   }
@@ -1848,7 +1866,7 @@ function renderOwnerPanel(){
       const doneSt=(o.status==='listo'||o.status==='entregado'||o.status==='hecho');
       const stage = o.activeRole ? ('🚩 '+svcRoleLabel(o.activeRole)) : (doneSt ? ('🏁 '+L2('Terminado','Done')) : ('🚩 '+_opStatusLabel(o.status)));
       const s=(o.services||[]).find(x=>x.role===o.activeRole && x.assignName); const who=s?(' · 👤 '+esc(s.assignName)):'';
-      return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+'</span></div><div class="faint" style="font-size:12px;margin-top:2px;">🚗 '+car+who+' · '+_opStatusLabel(o.status)+'</div></div>';
+      return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+' <span style="color:var(--muted);">›</span></span></div><div class="faint" style="font-size:12px;margin-top:2px;">🚗 '+car+who+' · '+_opStatusLabel(o.status)+'</div></div>';
     }).join('');
   }
   // 🧩 LÍNEA DISMANTLING — carros en desmantelado + contador de partes (quedan / vendidas).
@@ -1862,7 +1880,7 @@ function renderOwnerPanel(){
         : ('<span style="color:var(--muted);">'+L2('Aún sin partes capturadas','No parts captured yet')+'</span>');
       const allSold = c.partsTotal>0 && c.partsLeft===0;
       const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' labor</span>'):'';
-      return '<div style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span>'+(allSold?'<span style="font-size:11px;color:#35c46a;font-weight:700;">✓</span>':'')+'</div>'
+      return '<div onclick="openCarAccounts(\''+c.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="white-space:nowrap;">'+(allSold?'<span style="font-size:11px;color:#35c46a;font-weight:700;">✓ </span>':'')+'<span style="font-size:11px;font-weight:700;color:var(--gold);">💰 '+L2('cuentas','accounts')+' <span style="color:var(--muted);">›</span></span></span></div>'
         +'<div class="faint" style="font-size:12px;margin-top:2px;">'+parts+lab+'</div></div>';
     }).join('');
   }
@@ -2045,6 +2063,8 @@ function renderMechCars(){
       +(c.inspStarted?'<div style="font-size:11px;color:var(--gold);margin-top:2px;">'+t('inspStarted')+'</div>':'')+'</div>'
       +'<button class="btn-gold" style="width:auto;padding:9px 13px;font-size:13px;flex:0 0 auto;" onclick="mechOpenIntake(\''+c.id+'\')">'+(c.inspStarted?t('continueBtn'):t('inspectBtn'))+'</button></div>';
   }).join('');
+  // Si venimos del Centro con un carro Dealer específico, abre su recepción/DVI directamente.
+  if(_pendingMechCar){ const pc=_pendingMechCar; _pendingMechCar=''; if(MECH_CARS.find(x=>x.id===pc)) setTimeout(function(){ try{ mechOpenIntake(pc); }catch(e){} },70); }
 }
 window.mechOpenIntake=function(carId){
   const c=MECH_CARS.find(x=>x.id===carId); if(!c) return; MECH_CUR=c;
