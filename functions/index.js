@@ -1304,18 +1304,20 @@ const SVC_ORDER_STATUSES = ["agendado", "por_recibir", "recibido", "en_proceso",
 const SVC_ROLE_PIPELINE = ["Mecánico", "Detallador"];
 function svcRoleRankSrv(r) { const i = SVC_ROLE_PIPELINE.indexOf(r); return i < 0 ? 99 : i; }
 // Etapa ACTIVA = el primer rol de la línea con servicios sin terminar (null = todo listo).
-function svcActiveRoleSrv(services) {
-  const by = {}; (services || []).forEach((s) => { const r = s.role || "Mecánico"; (by[r] = by[r] || []).push(s); });
+// Si un servicio no trae rol, usa defRole (el rol de la orden) — igual que el admin.
+function svcActiveRoleSrv(services, defRole) {
+  const by = {}; (services || []).forEach((s) => { const r = s.role || defRole || "Mecánico"; (by[r] = by[r] || []).push(s); });
   const roles = Object.keys(by).sort((a, b) => svcRoleRankSrv(a) - svcRoleRankSrv(b));
   for (const r of roles) { if (by[r].some((s) => (s.status || "pendiente") !== "listo")) return r; }
   return null;
 }
 // Índices de servicios que le tocan a este trabajador (por persona asignada, o por rol si no hay persona fija).
-function svcWorkerServiceIdx(services, id) {
+function svcWorkerServiceIdx(services, id, defRole) {
   const out = [];
   (services || []).forEach((s, i) => {
+    const role = s.role || defRole;
     const byEmp = s.assignEmpId && id.empId && s.assignEmpId === id.empId;
-    const byRole = !s.assignEmpId && s.role && Array.isArray(id.roles) && id.roles.includes(s.role);
+    const byRole = !s.assignEmpId && role && Array.isArray(id.roles) && id.roles.includes(role);
     if (byEmp || byRole) out.push(i);
   });
   return out;
@@ -1325,7 +1327,7 @@ function svcDeriveStatusSrv(o, svs) {
   if (!svs.length) return o.status || "por_recibir";
   const base = o.status || "por_recibir";
   if (base === "por_recibir" || base === "agendado" || base === "entregado") return base; // aún sin recibir / ya entregado
-  if (!svcActiveRoleSrv(svs)) return "listo";
+  if (!svcActiveRoleSrv(svs, o.assignRole)) return "listo";
   if (svs.some((s) => (s.status) === "en_proceso")) return "en_proceso";
   if (svs.some((s) => (s.status) === "pausado")) return "pausado_partes";
   return "recibido"; // recibido, etapa actual sin empezar
@@ -1344,7 +1346,7 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
   else if (id.empId || (Array.isArray(id.roles) && id.roles.length)) {
     mine = open.filter((o) => {
       const svs = Array.isArray(o.services) ? o.services : [];
-      const bySvc = svs.length && svcWorkerServiceIdx(svs, id).length > 0;     // por SERVICIO
+      const bySvc = svs.length && svcWorkerServiceIdx(svs, id, o.assignRole).length > 0;     // por SERVICIO (rol del servicio o de la orden)
       const byOrder = (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && o.assignRole && Array.isArray(id.roles) && id.roles.includes(o.assignRole)); // por orden (compat / respaldo)
       return bySvc || byOrder;
     });
@@ -1353,12 +1355,13 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
   mine.sort((a, b) => ((rank[a.status] == null ? 9 : rank[a.status]) - (rank[b.status] == null ? 9 : rank[b.status])) || ((a.scheduledAt || a.createdAt || "") < (b.scheduledAt || b.createdAt || "") ? -1 : 1));
   const out = mine.map((o) => {
     const svs = Array.isArray(o.services) ? o.services : [];
-    const activeRole = svcActiveRoleSrv(svs);
-    const myIdx = isStaff ? svs.map((s, i) => i) : svcWorkerServiceIdx(svs, id);
-    const myRoles = [...new Set(myIdx.map((i) => svs[i].role || "Mecánico"))];
+    const defRole = o.assignRole || "Mecánico";   // si un servicio no trae rol, usa el de la orden
+    const activeRole = svcActiveRoleSrv(svs, defRole);
+    const myIdx = isStaff ? svs.map((s, i) => i) : svcWorkerServiceIdx(svs, id, defRole);
+    const myRoles = [...new Set(myIdx.map((i) => svs[i].role || defRole))];
     const myStageActive = isStaff ? true : myRoles.includes(activeRole);
     // La PRIMERA etapa de ESTA orden (no siempre Mecánico): la primera función presente según el orden de la línea.
-    const presentRoles = [...new Set(svs.map((s) => s.role || "Mecánico"))].sort((a, b) => svcRoleRankSrv(a) - svcRoleRankSrv(b));
+    const presentRoles = [...new Set(svs.map((s) => s.role || defRole))].sort((a, b) => svcRoleRankSrv(a) - svcRoleRankSrv(b));
     const isFirstRole = activeRole && presentRoles[0] === activeRole;
     return {
       id: o.id, clientName: o.clientName || "", clientPhone: o.clientPhone || "",
@@ -1369,8 +1372,8 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
       // 🔧 línea / relevo
       activeRole: activeRole || "", myStageActive, waitingFor: (!myStageActive && activeRole) ? activeRole : "",
       canReceive: isStaff || (myRoles.includes(activeRole) && isFirstRole),
-      services: svs.map((s) => ({ role: s.role || "Mecánico", status: s.status || "pendiente", assignName: s.assignName || "", desc: s.desc || "", descEn: s.descEn || s.desc || "" })),
-      myServices: myIdx.map((i) => ({ index: i, role: svs[i].role || "Mecánico", status: svs[i].status || "pendiente", desc: svs[i].desc || "", descEn: svs[i].descEn || svs[i].desc || "" })),
+      services: svs.map((s) => ({ role: s.role || defRole, status: s.status || "pendiente", assignName: s.assignName || "", desc: s.desc || "", descEn: s.descEn || s.desc || "" })),
+      myServices: myIdx.map((i) => ({ index: i, role: svs[i].role || defRole, status: svs[i].status || "pendiente", desc: svs[i].desc || "", descEn: svs[i].descEn || svs[i].desc || "" })),
     };
   });
   return { ok: true, orders: out, roles: id.roles || [], name: id.name || "" };
@@ -1392,18 +1395,19 @@ exports.svcServiceDone = onCall({ timeoutSeconds: 20 }, async (request) => {
   const svs = Array.isArray(o.services) ? o.services : [];
   if (!svs.length) throw new HttpsError("failed-precondition", "La orden no tiene servicios.");
   const isStaff = (id.isOwner || id.email);
-  const activeRole = svcActiveRoleSrv(svs);
+  const defRole = o.assignRole || "Mecánico";
+  const activeRole = svcActiveRoleSrv(svs, defRole);
   if (!activeRole) throw new HttpsError("failed-precondition", "La línea ya terminó.");
   // ¿qué servicios toca? staff: todos los del rol activo (o d.role). trabajador: los suyos del rol activo.
   let targetIdx;
   if (isStaff) {
     const role = d.role || activeRole;
-    targetIdx = svs.map((s, i) => i).filter((i) => (svs[i].role || "Mecánico") === role);
+    targetIdx = svs.map((s, i) => i).filter((i) => (svs[i].role || defRole) === role);
   } else {
-    const myIdx = svcWorkerServiceIdx(svs, id);
-    const myRoles = [...new Set(myIdx.map((i) => svs[i].role || "Mecánico"))];
+    const myIdx = svcWorkerServiceIdx(svs, id, defRole);
+    const myRoles = [...new Set(myIdx.map((i) => svs[i].role || defRole))];
     if (!myRoles.includes(activeRole)) throw new HttpsError("permission-denied", "Aún no es tu turno (espera a " + activeRole + ").");
-    targetIdx = myIdx.filter((i) => (svs[i].role || "Mecánico") === activeRole);
+    targetIdx = myIdx.filter((i) => (svs[i].role || defRole) === activeRole);
   }
   if (!targetIdx.length) throw new HttpsError("failed-precondition", "No hay servicios de esta etapa para ti.");
   const now = new Date().toISOString();
