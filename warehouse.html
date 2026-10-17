@@ -6,13 +6,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Legacy Warehouse</title>
+<title>Legacy Pit Crew</title>
 <link rel="manifest" href="manifest-warehouse.json">
 <meta name="theme-color" content="#0b0e14">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Warehouse">
+<meta name="apple-mobile-web-app-title" content="Pit Crew">
 <link rel="apple-touch-icon" href="wh-apple-touch-icon.png">
 <link rel="stylesheet" href="legacy-theme.css">
 <style>
@@ -94,15 +94,15 @@
 <body>
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
-  <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Warehouse como app</span>
+  <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
   <button onclick="dismissInstall(event)" title="Cerrar" style="position:absolute;top:50%;right:8px;transform:translateY(-50%);background:rgba(0,0,0,.18);color:#0b0e14;border:none;border-radius:50%;width:26px;height:26px;font-size:14px;font-weight:800;cursor:pointer;line-height:1;">✕</button>
 </div>
 
 <div id="login">
   <div class="card" style="max-width:360px;width:100%;">
     <div style="text-align:right;margin-bottom:2px;"><button class="btn ghost sm" id="login-lang-toggle" onclick="toggleLang()">EN</button></div>
-    <div class="title" style="margin-bottom:4px;">🏭 Legacy Warehouse</div>
-    <div class="sub" style="margin-bottom:16px;" data-i18n="teamAccess">Acceso del equipo</div>
+    <div style="text-align:center;margin-bottom:6px;"><img src="legacy-logo.png" alt="Legacy Pit Crew" style="width:160px;max-width:62%;height:auto;display:inline-block;margin-bottom:4px;"><div class="title" style="font-size:18px;letter-spacing:.2em;font-weight:800;">PIT CREW</div></div>
+    <div class="sub" style="margin-bottom:16px;text-align:center;" data-i18n="teamAccess">Acceso del equipo</div>
     <label data-i18n="email">Correo</label><input id="l-email" type="email" autocomplete="username">
     <label data-i18n="pass">Contraseña</label><input id="l-pass" type="password" autocomplete="current-password">
     <div id="l-err" style="color:var(--red);font-size:13px;min-height:18px;margin:8px 0;"></div>
@@ -496,8 +496,8 @@ let _messaging=null;
 
 // ================= IDIOMA / LANGUAGE =================
 const T={
-  es:{ installApp:'📲 Instalar Warehouse como app', teamAccess:'Acceso del equipo', email:'Correo', pass:'Contraseña', enter:'Entrar', logout:'Salir', logoutConfirm:'¿Cerrar sesión? Tendrás que volver a poner tu correo y contraseña.',
-    needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Warehouse.',
+  es:{ installApp:'📲 Instalar Pit Crew como app', teamAccess:'Acceso del equipo', email:'Correo', pass:'Contraseña', enter:'Entrar', logout:'Salir', logoutConfirm:'¿Cerrar sesión? Tendrás que volver a poner tu correo y contraseña.',
+    needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Pit Crew.',
     roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque', roleMech:'Mecánico',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
     homeTitle:'Tus funciones', homeBack:'‹ Mi jornada', homeHi:'Hola', homeTapFn:'Toca una función para empezar.',
@@ -547,8 +547,8 @@ const T={
     ePublishConfirm:'⚠️ Esto PUBLICA el borrador EN VIVO en eBay (aplica tarifa de eBay como siempre).\n\n¿Publicar ahora?', ePublishing:'🚀 Publicando…', ePublishedOk:'✅ ¡PUBLICADO EN EBAY!', eViewW:'Ver', ePublishedEnd:'La parte pasó a Publicadas.', ePublishFail:'⚠️ eBay no publicó', priceAsk:'¿A qué precio la publicaste? (opcional, en $)', confirmUnpublish:'¿Quitar "publicada"? Vuelve a Pendientes. (La venta se marca en Empaque, no aquí.)',
     scanTitle:'🔎 Busca una parte', scanHint:'Escribe el número de estampa o el nombre de la pieza.', multiMatch:'Varias coinciden — elige la parte:', searchBtn:'Buscar', scanCam:'📷 Escanear con cámara', saveNewLoc:'Guardar nueva ubicación', relocBtn:'📍 Asignar ubicación', relocMode:'📥 Recibir / asignar ubicación', relocHint:'Escanea con el láser (o escribe el número) de la pieza que llegó de la yarda, y asígnale su bin.', confirmSellBtn:'✅ Es esta pieza', takeFromBin:'Ve al bin, saca la pieza y, para confirmar que sí la tienes en la mano, teclea o escanea el número directo de la pieza. 👇', itIsHere:'✅ Sí, ya la tengo en la mano', alreadySold:'Ya vendida / empacada', undoSold:'↩️ Regresar a inventario', undoSoldConfirm:'¿Regresar esta pieza a inventario? (deshacer la venta)', undoSoldOk:'✅ Regresada a inventario (disponible).', markShipped:'🚚 Marcar como enviada (en tránsito)', markPaid:'💵 Marcar como VENDIDA (eBay pagó)', confirmScanTitle:'📷 Confírmala en su lugar', confirmScanHint:'Escanea el código de la pieza para confirmar que la tienes en la mano.', keepScan:'Escanea otra vez la parte correcta.', wrongPart:'⚠️ Esa NO es. Escaneaste:', soldOk:'✅ ¡Es esta! Confirmada y lista para enviar', notFoundBtn:'❌ No la encuentro', leftPending:'Quedó en pendientes — la verás abajo para no perderla.', leftPendingChat:'Quedó pendiente y avisé a los supervisores en el chat.', removePending:'✓ Quitar', empacarTitle:'Empaca tu producto', dims:'Medidas de la caja (pulgadas)', lengthL:'Largo', widthW:'Ancho', heightH:'Alto', weightLbl:'Peso (como sale en la báscula, en libras)', weightPh:'ej. 15.85', irregular:'Producto irregular', labelNextPhase:'La etiqueta de eBay se conecta en la siguiente fase.', packDone:'✅ Empacado y listo', sentAnim:'¡Enviado!', toolsTitle:'🛠️ Herramientas de almacén', receiveBtn:'📥 Recibir / asignar ubicación', oldItemBtn:'🏷️ Alta de pieza vieja (estampa + bin)', consolidateBtn:'📦 Consolidar bins', rollBtn:'🧾 Imprimir rollo de estampas (varias de golpe)', binRollBtn:'🗄️ Imprimir rollo de bines (4×6, números grandes)', consolidateTitle:'Consolidar bins', consolidateHint:'Junta los bins con pocas piezas en uno solo. Empieza por el que tiene menos.', emptyBin:'Vaciar este', piezas:'piezas', noBins:'No hay bins con piezas para consolidar.', moveTo:'Mover las {n} piezas de {bin} a:', orPick:'O elige un bin que ya existe:', moveConfirm:'✅ Mover todo', moveDone:'Movidas {n} piezas de {src} → {tgt}', setAside:'Aparta el bin {bin} vacío para entregarlo a Captura. ¡Gracias! 🙌', sameBin:'Es el mismo bin — elige otro destino.', pendingTitle:'📋 Pendientes de encontrar', qTitle:'Por enviar (eBay)', qLoading:'Cargando órdenes de eBay…', qEmpty:'No hay órdenes pendientes de enviar. 🎉', qError:'No se pudo cargar:', qRetry:'↻ Reintentar', qNeedConsent:'Falta el permiso para leer las órdenes de eBay. Enrique tiene que autorizar una sola vez.', qAuthorize:'🔗 Autorizar eBay (órdenes)', qToday:'HOY', qTomorrow:'Mañana', qLate:'¡Atrasada!', qNoDate:'Sin fecha', qNoMatch:'Sin match en inventario', qItem:'Artículo', manualHint:'Esta venta de eBay todavía no está ligada a una pieza del inventario. Abre la foto, busca el número de la pieza, cierra la foto y escríbelo aquí para encontrarla. 👇', manualSearchPh:'Escribe el número o nombre de la pieza…', manualNoResults:'No aparece en el inventario. Revisa el número o avísale a un supervisor.', manualNoBin:'Sin bin asignado', manualNoPhotos:'Esta orden no trajo fotos de eBay. Búscala por el número.', manualNotInSys:'❌ No está en el sistema todavía', notInSysHint:'Compárala con las fotos. Si ya la tienes en la mano y es la correcta, confírmalo y sigue a empacar.', notInSysConfirm:'✅ Ya la tengo — no está en el sistema pero es esta', back:'‹ Regresar', soldInPerson:'💰 Se vendió en persona', soldInPersonConfirm:'¿Marcar esta pieza como VENDIDA en persona?', soldOkPerson:'✅ Marcada como vendida en persona.', reassignBin:'📍 Reasignar bin', saveBin:'✅ Guardar bin', binSaved:'✅ Bin guardado', editFull:'✏️ Editar (nombre, bin, foto)', closeResult:'✕ Cerrar', cancelPack:'✕ Cancelar', notFoundPart:'No encontré esa parte.', codeLbl:'Código', locSaved:'✓ Ubicación guardada', noCamera:'Este dispositivo no soporta escaneo por cámara. Usa el lector físico o teclea el código.', camErr:'No se pudo abrir la cámara: ', installHint:'Para instalar: menú del navegador (⋮) → "Agregar a inicio" / "Instalar app".',
     alertPart:'Escribe qué parte es.', alertCar:'Pon al menos VIN o marca/modelo.', carNotFound:'Carro no encontrado.', vinShort:'El VIN se ve corto (deben ser ~17).', decoding:'Decodificando…', decodeOk:'✓ Datos rellenados — revisa y corrige si hace falta.', decodeNone:'No se encontró info de ese VIN; captura a mano.', decodeErr:'No se pudo decodificar (sin internet o VIN inválido). Captura a mano.', error:'Error: ' },
-  en:{ installApp:'📲 Install Warehouse as app', teamAccess:'Team access', email:'Email', pass:'Password', enter:'Sign in', logout:'Log out', logoutConfirm:'Log out? You\'ll have to enter your email and password again.',
-    needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Warehouse.',
+  en:{ installApp:'📲 Install Pit Crew as app', teamAccess:'Team access', email:'Email', pass:'Password', enter:'Sign in', logout:'Log out', logoutConfirm:'Log out? You\'ll have to enter your email and password again.',
+    needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Pit Crew.',
     roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing', roleMech:'Mechanic',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
     homeTitle:'Your functions', homeBack:'‹ My day', homeHi:'Hi', homeTapFn:'Tap a function to start.',

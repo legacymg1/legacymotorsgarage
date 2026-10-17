@@ -1,6 +1,6 @@
 {
-  "name": "Legacy Warehouse",
-  "short_name": "Warehouse",
+  "name": "Legacy Pit Crew",
+  "short_name": "Pit Crew",
   "start_url": "warehouse.html",
   "scope": "./",
   "display": "standalone",
