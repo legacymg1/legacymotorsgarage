@@ -1262,7 +1262,7 @@ window.whPartsDiag=async function(){
       +'  • artículo rápido (warehouseOnly): '+d.soldWarehouseOnly+'\n'
       +'  • con orden de eBay: '+d.soldWithEbayOrder+'\n'
       +'  • vendidas en persona: '+d.soldInPerson;
-    try{ alert(msg); }catch(e){ whToast('vendidas '+d.soldTotal+' · con carro '+d.soldWithVehicle+' · sin carro '+d.soldNoVehicle); }
+    try{ showMsg(msg); }catch(e){ try{ alert(msg); }catch(_){ whToast('vendidas '+d.soldTotal+' · con carro '+d.soldWithVehicle+' · sin carro '+d.soldNoVehicle); } }
     console.log('partsDiag', d);
   }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
