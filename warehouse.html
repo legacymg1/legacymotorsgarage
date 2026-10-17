@@ -101,12 +101,36 @@
 <div id="login">
   <div class="card" style="max-width:360px;width:100%;">
     <div style="text-align:right;margin-bottom:2px;"><button class="btn ghost sm" id="login-lang-toggle" onclick="toggleLang()">EN</button></div>
-    <div style="text-align:center;margin-bottom:6px;"><img src="legacy-logo.png" alt="Legacy Pit Crew" style="width:160px;max-width:62%;height:auto;display:inline-block;margin-bottom:4px;"><div class="title" style="font-size:18px;letter-spacing:.2em;font-weight:800;">PIT CREW</div></div>
-    <div class="sub" style="margin-bottom:16px;text-align:center;" data-i18n="teamAccess">Acceso del equipo</div>
-    <label data-i18n="email">Correo</label><input id="l-email" type="email" autocomplete="username">
-    <label data-i18n="pass">Contraseña</label><input id="l-pass" type="password" autocomplete="current-password">
-    <div id="l-err" style="color:var(--red);font-size:13px;min-height:18px;margin:8px 0;"></div>
-    <button class="btn" style="width:100%;" onclick="doLogin()" data-i18n="enter">Entrar</button>
+    <div style="text-align:center;margin-bottom:6px;"><img src="legacy-logo.png" alt="Legacy Pit Crew" style="width:160px;max-width:62%;height:auto;display:inline-block;margin-bottom:4px;"><div class="title" style="font-size:18px;letter-spacing:.2em;font-weight:800;">🏁 PIT CREW</div></div>
+    <div class="sub" style="margin-bottom:14px;text-align:center;" data-i18n="teamAccess">Acceso del equipo</div>
+    <!-- Modo de entrada: equipo por TELÉFONO (default) / dueños y estaciones por CORREO -->
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button id="login-tab-phone" class="btn" style="flex:1;" onclick="loginMode('phone')" data-i18n="loginPhone">📱 Teléfono</button>
+      <button id="login-tab-email" class="btn ghost" style="flex:1;" onclick="loginMode('email')" data-i18n="loginEmail">✉️ Correo</button>
+    </div>
+    <!-- TELÉFONO (empleados) -->
+    <div id="login-phone-box">
+      <div id="lp-step1">
+        <label data-i18n="phoneLbl">Tu teléfono</label>
+        <input id="l-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(559) 555-1234">
+        <button class="btn" id="l-sendcode" style="width:100%;margin-top:10px;" onclick="phoneSendCode()" data-i18n="sendCode">Enviar código</button>
+      </div>
+      <div id="lp-step2" class="hide">
+        <div class="faint" style="font-size:12.5px;margin-bottom:6px;" id="lp-sent-to"></div>
+        <label data-i18n="codeLbl">Código que te llegó por SMS</label>
+        <input id="l-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="------">
+        <button class="btn" id="l-verify" style="width:100%;margin-top:10px;" onclick="phoneVerify()" data-i18n="verifyCode">Entrar</button>
+        <button class="linkbtn" style="width:100%;margin-top:6px;" onclick="phoneReset()" data-i18n="codeBack">‹ Cambiar número</button>
+      </div>
+    </div>
+    <!-- CORREO (dueños + estaciones capture/listing/packing+Sunmi) -->
+    <div id="login-email-box" class="hide">
+      <label data-i18n="email">Correo</label><input id="l-email" type="email" autocomplete="username">
+      <label data-i18n="pass">Contraseña</label><input id="l-pass" type="password" autocomplete="current-password">
+      <button class="btn" style="width:100%;margin-top:10px;" onclick="doLogin()" data-i18n="enter">Entrar</button>
+    </div>
+    <div id="l-err" style="color:var(--red);font-size:13px;min-height:18px;margin:10px 0 0;"></div>
+    <div id="recaptcha-container" style="display:flex;justify-content:center;margin-top:6px;"></div>
   </div>
 </div>
 
@@ -504,7 +528,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
@@ -527,6 +551,7 @@ let _messaging=null;
 const T={
   es:{ installApp:'📲 Instalar Pit Crew como app', teamAccess:'Acceso del equipo', email:'Correo', pass:'Contraseña', enter:'Entrar', logout:'Salir', logoutConfirm:'¿Cerrar sesión? Tendrás que volver a poner tu correo y contraseña.',
     needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Pit Crew.',
+    loginPhone:'📱 Teléfono', loginEmail:'✉️ Correo', phoneLbl:'Tu teléfono', sendCode:'Enviar código', codeLbl:'Código que te llegó por SMS', verifyCode:'Entrar', codeBack:'‹ Cambiar número', phoneBad:'Escribe un número de 10 dígitos.', codeSending:'📩 Enviando código…', codeSentTo:'Te mandamos un código a', codeNeed:'Escribe el código de 6 dígitos.', codeChecking:'Entrando…', codeBad:'Código incorrecto. Revísalo e intenta de nuevo.', phoneErr:'No se pudo enviar el código. Revisa el número e inténtalo otra vez.', phoneNoAccess:'Ese número no está registrado como empleado. Pídele a tu supervisor que te dé de alta.',
     roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque', roleMech:'Mecánico',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
     homeTitle:'Tus funciones', homeBack:'‹ Mi jornada', homeHi:'Hola', homeTapFn:'Toca una función para empezar.',
@@ -578,6 +603,7 @@ const T={
     alertPart:'Escribe qué parte es.', alertCar:'Pon al menos VIN o marca/modelo.', carNotFound:'Carro no encontrado.', vinShort:'El VIN se ve corto (deben ser ~17).', decoding:'Decodificando…', decodeOk:'✓ Datos rellenados — revisa y corrige si hace falta.', decodeNone:'No se encontró info de ese VIN; captura a mano.', decodeErr:'No se pudo decodificar (sin internet o VIN inválido). Captura a mano.', error:'Error: ' },
   en:{ installApp:'📲 Install Pit Crew as app', teamAccess:'Team access', email:'Email', pass:'Password', enter:'Sign in', logout:'Log out', logoutConfirm:'Log out? You\'ll have to enter your email and password again.',
     needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Pit Crew.',
+    loginPhone:'📱 Phone', loginEmail:'✉️ Email', phoneLbl:'Your phone', sendCode:'Send code', codeLbl:'Code you got by SMS', verifyCode:'Sign in', codeBack:'‹ Change number', phoneBad:'Enter a 10-digit number.', codeSending:'📩 Sending code…', codeSentTo:'We sent a code to', codeNeed:'Enter the 6-digit code.', codeChecking:'Signing in…', codeBad:'Wrong code. Check it and try again.', phoneErr:'Could not send the code. Check the number and try again.', phoneNoAccess:'That number is not registered as an employee. Ask your supervisor to add you.',
     roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing', roleMech:'Mechanic',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
     homeTitle:'Your functions', homeBack:'‹ My day', homeHi:'Hi', homeTapFn:'Tap a function to start.',
@@ -722,6 +748,48 @@ window.doLogin=async function(){
   catch(e){ err.textContent = (e.code==='auth/too-many-requests')?t('loginMany'):t('loginBad'); }
 };
 window.doLogout=function(){ if(confirm(t('logoutConfirm'))) signOut(auth); };
+
+// ===== 📱 LOGIN POR TELÉFONO (empleados) — SMS. Los correos (dueños/estaciones) quedan IGUAL. =====
+let _loginMode='phone', _recaptcha=null, _confirmRes=null;
+window.loginMode=function(m){ _loginMode=m; try{ localStorage.setItem('lmg_wh_loginmode',m); }catch(e){}
+  const pb=document.getElementById('login-phone-box'), eb=document.getElementById('login-email-box');
+  const tp=document.getElementById('login-tab-phone'), te=document.getElementById('login-tab-email');
+  if(pb) pb.classList.toggle('hide', m!=='phone'); if(eb) eb.classList.toggle('hide', m!=='email');
+  if(tp){ tp.className='btn'+(m==='phone'?'':' ghost'); } if(te){ te.className='btn'+(m==='email'?'':' ghost'); }
+  const err=document.getElementById('l-err'); if(err) err.textContent='';
+};
+function _normUSPhone(raw){ const d=String(raw||'').replace(/[^\d]/g,''); if(d.length===10) return '+1'+d; if(d.length===11 && d[0]==='1') return '+'+d; if(String(raw||'').trim()[0]==='+' && d.length>=8) return '+'+d; return ''; }
+function _ensureRecaptcha(){ if(_recaptcha) return _recaptcha; _recaptcha=new RecaptchaVerifier(auth,'recaptcha-container',{size:'invisible'}); return _recaptcha; }
+window.phoneSendCode=async function(){
+  const err=document.getElementById('l-err'); err.textContent='';
+  const e164=_normUSPhone(document.getElementById('l-phone').value);
+  if(!e164){ err.textContent=t('phoneBad'); return; }
+  const btn=document.getElementById('l-sendcode'); if(btn){ btn.disabled=true; btn.textContent=t('codeSending'); }
+  try{
+    const verifier=_ensureRecaptcha();
+    _confirmRes=await signInWithPhoneNumber(auth, e164, verifier);
+    document.getElementById('lp-step1').classList.add('hide');
+    document.getElementById('lp-step2').classList.remove('hide');
+    const to=document.getElementById('lp-sent-to'); if(to) to.textContent=t('codeSentTo')+' '+e164;
+    setTimeout(()=>{ try{ document.getElementById('l-code').focus(); }catch(e){} },150);
+  }catch(e){ err.textContent=t('phoneErr'); try{ if(_recaptcha){ _recaptcha.clear(); _recaptcha=null; } }catch(_){} }
+  if(btn){ btn.disabled=false; btn.textContent=t('sendCode'); }
+};
+window.phoneVerify=async function(){
+  const err=document.getElementById('l-err'); err.textContent='';
+  const code=(document.getElementById('l-code').value||'').replace(/[^\d]/g,'');
+  if(code.length<6){ err.textContent=t('codeNeed'); return; }
+  if(!_confirmRes){ phoneReset(); return; }
+  const btn=document.getElementById('l-verify'); if(btn){ btn.disabled=true; btn.textContent=t('codeChecking'); }
+  try{ await _confirmRes.confirm(code); /* onAuthStateChanged resuelve empMe y entra */ }
+  catch(e){ err.textContent=t('codeBad'); }
+  if(btn){ btn.disabled=false; btn.textContent=t('verifyCode'); }
+};
+window.phoneReset=function(){ _confirmRes=null; const err=document.getElementById('l-err'); if(err) err.textContent='';
+  const s1=document.getElementById('lp-step1'), s2=document.getElementById('lp-step2'); if(s1)s1.classList.remove('hide'); if(s2)s2.classList.add('hide');
+  const c=document.getElementById('l-code'); if(c) c.value='';
+};
+try{ const m=localStorage.getItem('lmg_wh_loginmode'); if(m==='email') setTimeout(()=>loginMode('email'),0); }catch(e){}
 
 // ===== 🕐 RELOJ (check-in/out con GPS) =====
 function _getGPS(){
@@ -919,7 +987,8 @@ onAuthStateChanged(auth, async (user)=>{
     document.getElementById('app').style.display='none';
     document.getElementById('login').style.display='flex';
     try{ const lp=document.getElementById('l-pass'); if(lp){ lp.disabled=false; lp.type='password'; lp.setAttribute('autocomplete','current-password'); } }catch(e){}   // restaura para el login
-    if(user && email && !role){ document.getElementById('l-err').textContent=t('noAccess'); signOut(auth); }   // solo correos sin acceso; a los de teléfono NO los sacamos (siguen en Pit Crew)
+    if(user && email && !role){ document.getElementById('l-err').textContent=t('noAccess'); signOut(auth); }   // correo sin acceso
+    else if(user && phone && !email){ loginMode('phone'); try{ phoneReset(); }catch(e){} document.getElementById('l-err').textContent=t('phoneNoAccess'); signOut(auth); }   // teléfono autenticado pero NO registrado como empleado
   }
 });
 function roleLabel(r){ return r==='owner'?t('roleOwner'):r==='warehouse'?t('roleWh'):r==='yard'?t('roleYard'):r==='lister'?t('roleLister'):r==='packager'?t('rolePack'):r==='mechanic'?t('roleMech'):''; }
