@@ -2019,6 +2019,41 @@ exports.carsInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
   return { ok: true, cars };
 });
 
+// 🧩 LÍNEA DISMANTLING para el Centro de Operaciones: carros en desmantelado + contador de partes (quedan/vendidas).
+// Un carro de dismantling NO termina su línea hasta vender la ÚLTIMA parte. Solo dueños.
+exports.disInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  // Partes por carro: total, vendidas, en almacén.
+  const byVeh = {};
+  try {
+    const ps = await db.collection("parts").get();
+    ps.forEach((d) => {
+      const p = d.data() || {}; const v = p.vehicleId; if (!v) return;
+      const b = byVeh[v] || (byVeh[v] = { total: 0, sold: 0 });
+      b.total += 1; if (p.status === "vendido") b.sold += 1;
+    });
+  } catch (e) {}
+  const cars = [];
+  try {
+    const snap = await db.collection("dismantle_vehicles").get();
+    snap.forEach((d) => {
+      const c = d.data() || {};
+      const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
+      const photo = (Array.isArray(c.photos) && c.photos[0]) || c.img || "";
+      const b = byVeh[d.id] || { total: 0, sold: 0 };
+      const left = Math.max(0, b.total - b.sold);
+      // La línea termina cuando se vendió la última parte: ocultar los que ya tienen partes y todas vendidas.
+      if (b.total > 0 && left === 0) return;
+      cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), status: String(c.status || "desmantelando"), partsTotal: b.total, partsSold: b.sold, partsLeft: left });
+    });
+  } catch (e) {}
+  cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
+  return { ok: true, cars };
+});
+
 // 🚗 Lista ligera de carros para apuntar una tarea suelta del Pit: inventario del dealer + carros para desmantelar (yarda). Solo dueños.
 exports.invCarsLite = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
