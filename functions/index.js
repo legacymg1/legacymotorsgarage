@@ -2305,8 +2305,9 @@ exports.empReport = onCall({ timeoutSeconds: 40 }, async (request) => {
   const empId = String(d.empId || "");
   if (!name && !empId) throw new HttpsError("invalid-argument", "Falta el empleado.");
   const db = admin.firestore();
-  const weekKey = _laMondayKey(new Date());                 // lunes de esta semana (LA)
-  const weekStart = weekKey + "T00:00:00.000-07:00";        // aprox inicio de semana
+  const weekKey = String(d.weekKey || "") || _laMondayKey(new Date());   // lunes de la semana elegida (o esta)
+  const weekStart = weekKey + "T00:00:00.000-07:00";        // aprox inicio de semana (LA)
+  const weekEnd = new Date(new Date(weekStart).getTime() + 7 * 86400000).toISOString();   // fin de esa semana
   // 1) LABOR (labor_log) — costo de su trabajo en carros, por línea
   let atMin = 0, atCost = 0, atTasks = 0; const atCars = new Set(); const byLineCost = {};
   let wkMin = 0, wkCost = 0, wkTasks = 0;
@@ -2319,7 +2320,7 @@ exports.empReport = onCall({ timeoutSeconds: 40 }, async (request) => {
       const mn = Number(e.minutes) || 0, cc = Number(e.costCents) || 0;
       atMin += mn; atCost += cc; atTasks++; if (e.carId) atCars.add(e.carId);
       const ln = e.line || "general"; byLineCost[ln] = (byLineCost[ln] || 0) + cc;
-      if ((e.at || "") >= weekStart) { wkMin += mn; wkCost += cc; wkTasks++; }
+      if ((e.at || "") >= weekStart && (e.at || "") < weekEnd) { wkMin += mn; wkCost += cc; wkTasks++; }
     });
   } catch (e) {}
   // 2) SERVICIOS (serviceOrders) — ingreso de servicios que atendió (precio plano del trabajo)
