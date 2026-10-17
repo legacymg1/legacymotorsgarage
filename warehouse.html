@@ -1337,7 +1337,9 @@ window.carAccountsSyncNet=async function(){
   const btn=document.getElementById('acct-sync-btn'); if(btn){ btn.disabled=true; btn.textContent='🔄 '+L2('Sincronizando… (puede tardar)','Syncing… (may take a bit)'); }
   try{ const r=await httpsCallable(functions,'ebaySyncNet',{timeout:300000})({}); const d=(r&&r.data)||{};
     if(d.needConsent){ whToast('⚠️ '+(d.error||L2('Falta reautorizar eBay (permiso de Finanzas).','eBay needs re-authorizing (Finances permission).')),true); if(btn){ btn.disabled=false; btn.textContent='🔄 '+L2('Sincronizar neto de eBay','Sync eBay net'); } return; }
-    whToast('✅ '+L2('Neto actualizado: '+(d.updated||0)+' de '+(d.matched||0)+' · '+(d.orders||0)+' órdenes','Net: '+(d.updated||0)+'/'+(d.matched||0)+' · '+(d.orders||0)+' orders'));
+    whToast('✅ '+L2('Neto: '+(d.updated||0)+' de '+(d.matched||0)+' · '+(d.orders||0)+' órdenes','Net: '+(d.updated||0)+'/'+(d.matched||0)+' · '+(d.orders||0)+' orders'));
+    // Si eBay no devolvió órdenes, muestra el diagnóstico para saber por qué
+    if((d.orders||0)===0){ try{ showMsg('🔄 SINCRONIZACIÓN eBay\n\nórdenes eBay: '+(d.orders||0)+'\ntransacciones vistas: '+(d.txSeen||0)+'\npartes con orden eBay: '+(d.matched||0)+'\nactualizadas: '+(d.updated||0)+'\ndías: '+(d.days||0)+'\nHTTP eBay: '+(d.firstStatus||'?')+'\nmuestra órdenes: '+JSON.stringify(d.sampleOrders||[])+'\nerror eBay: '+(d.errBody||'(ninguno)')); }catch(e){} }
     if(_acctVid) openCarAccounts(_acctVid);
   }catch(e){ whToast('⚠️ '+((e&&e.message)||t('jCouldnt')),true); if(btn){ btn.disabled=false; btn.textContent='🔄 '+L2('Sincronizar neto de eBay','Sync eBay net'); } }
 };
