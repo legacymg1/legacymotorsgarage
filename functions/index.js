@@ -1212,6 +1212,9 @@ exports.cfgSet = onCall({ timeoutSeconds: 30 }, async (request) => {
 const OWNER_EMAILS = ["ev@legacymotorsgarage.com", "ivan.garcia@legacymotorsgarage.com"];
 // Dueños reconocidos por default en el equipo (todas las funciones, SIN reloj). No son empleados que fichan.
 const OWNER_NAMES = { "ev@legacymotorsgarage.com": "Enrique", "ivan.garcia@legacymotorsgarage.com": "Ivan" };
+// 💵 Tarifa de LABOR de los dueños (Enrique/Ivan) SOLO para costo de labor (tiempo×tarifa → costo del carro).
+// NO es nómina: los dueños no fichan asistencia. Decidido por Enrique: $16.25/h (como Ayudante general).
+const OWNER_LABOR_RATE = 16.25;
 function _haversineM(aLat, aLng, bLat, bLng) {
   const R = 6371000, toR = (x) => x * Math.PI / 180;
   const dLat = toR(bLat - aLat), dLng = toR(bLng - aLng);
@@ -1270,7 +1273,7 @@ async function _actorIdentity(request) {
         }
       } catch (e) {}
     }
-    return { key: _emailKey(email), name: tok.name || email.split("@")[0], email, phone: "", empId: "", roles: [], rate: 0, photoURL: "", active: true, isOwner, notRegistered: false };
+    return { key: _emailKey(email), name: tok.name || email.split("@")[0], email, phone: "", empId: "", roles: [], rate: isOwner ? OWNER_LABOR_RATE : 0, photoURL: "", active: true, isOwner, notRegistered: false };
   }
   if (phone) {
     const key = "ph_" + phone.replace(/\D/g, "");
@@ -2184,7 +2187,7 @@ exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
     // Fuera del panel (ej. asignar servicios) NO se inyectan, para no meter ids "owner:" donde no van.
     if (d.withOwners === true) {
       emps = emps.filter((e) => !e.owner);   // los dueños no van como empleados que fichan
-      const owners = OWNER_EMAILS.map((em) => ({ id: "owner:" + em, name: OWNER_NAMES[em] || em.split("@")[0], email: em, phone: "", phoneE164: "", roles: ALL_EMP_ROLES.slice(), rate: 0, active: true, owner: true, synthetic: true, noClock: true, photoURL: "" }));
+      const owners = OWNER_EMAILS.map((em) => ({ id: "owner:" + em, name: OWNER_NAMES[em] || em.split("@")[0], email: em, phone: "", phoneE164: "", roles: ALL_EMP_ROLES.slice(), rate: OWNER_LABOR_RATE, active: true, owner: true, synthetic: true, noClock: true, photoURL: "" }));
       return { ok: true, emps: owners.concat(emps), roles: ALL_EMP_ROLES };
     }
     return { ok: true, emps, roles: ALL_EMP_ROLES };
