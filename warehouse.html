@@ -649,6 +649,7 @@ function _getGPS(){
 }
 function _clockErr(e){ return (e&&e.message)||(e&&e.details)||'Error'; }
 window.clockPunch = async function(action){
+  if(_vaReadOnly()) return;
   const msg=document.getElementById('clock-msg');
   const inB=document.getElementById('clock-in-btn'), outB=document.getElementById('clock-out-btn');
   if(inB) inB.disabled=true; if(outB) outB.disabled=true;
@@ -672,7 +673,7 @@ window.refreshClock = async function(){
   const bk=document.getElementById('clock-break-btn');
   const _loc=(L==='en')?'en-US':'es-MX';
   try{
-    const r=await httpsCallable(functions,'clockMine')({});
+    const r=await httpsCallable(functions,'clockMine')(vaData({}));
     const d=(r&&r.data)||{};
     _whClkOpen=d.open||null;
     if(wk) wk.textContent=(L==='en'?'Week: ':'Semana: ')+Number(d.hours||0).toFixed(2)+' h';
@@ -698,6 +699,7 @@ window.refreshClock = async function(){
 };
 // ☕ Descanso (sin GPS). El backend decide; aquí togglamos según el estado actual.
 window.punchBreak = async function(){
+  if(_vaReadOnly()) return;
   const bk=document.getElementById('clock-break-btn'); const msg=document.getElementById('clock-msg');
   const onBreak = !!(_whClkOpen && _whClkOpen.onBreak);
   if(bk) bk.disabled=true;
@@ -810,21 +812,43 @@ function setHeaderIdentity(){
 function updateLangBtns(){ const es=document.getElementById('acct-es'),en=document.getElementById('acct-en'); if(es)es.classList.toggle('on',L==='es'); if(en)en.classList.toggle('on',L==='en'); }
 window.toggleAcct=function(e){ if(e&&e.stopPropagation)e.stopPropagation(); const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(!m)return; if(!m.classList.contains('hide')){ m.classList.add('hide'); c.classList.add('hide'); } else { setHeaderIdentity(); updateLangBtns(); m.classList.remove('hide'); c.classList.remove('hide'); } };
 window.closeAcct=function(){ const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(m)m.classList.add('hide'); if(c)c.classList.add('hide'); };
-// 👁️ Dueño: ver la página como empleado (todas las funciones activas), sin acceso fake por fuera.
-function setWhLegacyActions(){ window.LEGACY_ACTIONS=[{ label:t('viewAsEmp'), ico:'👁️', fn:'whViewAsEmployee' }]; }
-window.whViewAsEmployee=function(){
+// 👁️ Dueño: VER COMO UN EMPLEADO ESPECÍFICO (su perfil real: sus funciones, sus tareas, su reloj). SOLO LECTURA.
+function setWhLegacyActions(){ window.LEGACY_ACTIONS=[{ label:t('viewAsEmp'), ico:'👁️', fn:'whViewAsPicker' }]; }
+let _viewAsEmpId='', _viewAsName='';
+// Inyecta asEmpId SOLO en las lecturas cuando el dueño ve como un empleado → las callables devuelven lo de ÉL.
+function vaData(d){ return _viewAsEmpId ? Object.assign({}, d||{}, {asEmpId:_viewAsEmpId}) : (d||{}); }
+function whEscA(s){ return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+function rolesToTabs(roles){ const out=[]; (roles||[]).forEach(r=>{ if(r==='Captura'||r==='Desmantelador'){ if(out.indexOf('yard')<0)out.push('yard'); } else if(r==='Listado'){ if(out.indexOf('lister')<0)out.push('lister'); } else if(r==='Empaque'){ if(out.indexOf('pack')<0)out.push('pack'); } }); return out; }
+window.whViewAsPicker=async function(){
+  if(role!=='owner') return; closeAcct();
+  let emps=[]; try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); emps=((r&&r.data)||{}).emps||[]; }catch(e){}
+  emps=emps.filter(e=>e.active!==false);
+  const ov=document.createElement('div'); ov.id='va-picker'; ov.style.cssText='position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.72);display:flex;align-items:flex-end;justify-content:center;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const list = emps.length ? emps.map(e=>{ const rs=(Array.isArray(e.roles)?e.roles:[]).join(' · ')||(L==='en'?'No roles':'Sin funciones'); return '<button onclick="whViewAsEmployee(\''+e.id+'\')" style="display:flex;width:100%;align-items:center;gap:12px;text-align:left;background:#121722;border:1px solid #273043;border-radius:12px;padding:12px 14px;margin-bottom:8px;color:#fff;cursor:pointer;"><span style="width:38px;height:38px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;">'+whInitials(e.name)+'</span><span style="min-width:0;"><div style="font-weight:800;">'+whEscA(e.name||'—')+'</div><div style="font-size:12px;color:#8a93a6;">'+whEscA(rs)+'</div></span><span style="margin-left:auto;color:#c9a84c;">👁️</span></button>'; }).join('') : '<div style="color:#8a93a6;text-align:center;padding:30px;">'+(L==='en'?'No employees.':'Sin empleados.')+'</div>';
+  const box=document.createElement('div'); box.style.cssText='background:#0d1119;border:1px solid #273043;border-top-left-radius:18px;border-top-right-radius:18px;max-width:520px;width:100%;max-height:82vh;overflow:auto;padding:18px;';
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;color:#fff;">👁️ '+(L==='en'?'View as employee':'Ver como empleado')+'</div><button onclick="var o=document.getElementById(\'va-picker\');if(o)o.remove();" style="background:transparent;border:none;color:#8a93a6;font-size:24px;cursor:pointer;">×</button></div><div style="font-size:12px;color:#8a93a6;margin-bottom:12px;">'+(L==='en'?'Open an employee to see exactly what they see (read-only).':'Entra a un empleado para ver justo lo que él ve (solo lectura).')+'</div>'+list;
+  ov.appendChild(box); document.body.appendChild(ov);
+};
+window.whViewAsEmployee=async function(empId){
   if(role!=='owner') return;
+  const p=document.getElementById('va-picker'); if(p) p.remove();
+  let emp=null; try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); emp=(((r&&r.data)||{}).emps||[]).find(e=>e.id===empId); }catch(e){}
+  if(!emp){ whToast(L==='en'?'Could not load employee.':'No se pudo cargar el empleado.', true); return; }
+  _viewAsEmpId=empId; _viewAsName=emp.name||'Empleado';
   _asEmp=true; _homeMode=true;
-  _myRoles=['Captura','Listado','Empaque','Desmantelador','Mecánico','Detallador'];
-  _allowedTabs=['yard','lister','pack'];
+  _myRoles=(Array.isArray(emp.roles)&&emp.roles.length)?emp.roles.slice():[];
+  _allowedTabs=rolesToTabs(_myRoles);
   const opc=document.getElementById('owner-op-card'); if(opc) opc.style.display='none';
   const co=document.getElementById('clock-owner'); if(co) co.style.display='none';
-  document.body.classList.add('wh-asemp');   // oculta la barra inferior de apps (para que no tape el banner)
-  const b=document.getElementById('asemp-banner'); if(b) b.style.display='flex';
+  document.body.classList.add('wh-asemp');
+  const b=document.getElementById('asemp-banner'); if(b){ b.style.display='flex'; const s=b.querySelector('span span[data-i18n]'); if(s) s.textContent=(L==='en'?'Viewing as ':'Viendo como ')+_viewAsName; }
   closeAcct(); setHeaderIdentity(); whGoHome();
   try{ window.scrollTo(0,0); }catch(e){}
 };
-window.whExitAsEmployee=function(){ try{ location.reload(); }catch(e){ _asEmp=false; document.body.classList.remove('wh-asemp'); const b=document.getElementById('asemp-banner'); if(b) b.style.display='none'; } };
+window.whExitAsEmployee=function(){ _viewAsEmpId=''; _viewAsName=''; try{ location.reload(); }catch(e){ _asEmp=false; document.body.classList.remove('wh-asemp'); const b=document.getElementById('asemp-banner'); if(b) b.style.display='none'; } };
+// 🔒 En "ver como empleado" las acciones de escritura quedan bloqueadas (solo lectura).
+function _vaReadOnly(){ if(_asEmp){ whToast(L==='en'?'Read-only — viewing as employee':'Solo lectura — viendo como empleado'); return true; } return false; }
 
 // ---- TABS ----
 let _view='yard';
@@ -911,7 +935,7 @@ function taskChip(o){ return (o && o.assignRole) ? funcChip(o.assignRole) : line
 let JOURNEY=[], JOB_CUR=null;
 window.loadJourney=async function(){
   const box=document.getElementById('journey-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
-  try{ const r=await httpsCallable(functions,'myTasks')({}); JOURNEY=((r&&r.data)||{}).tasks||[]; }
+  try{ const r=await httpsCallable(functions,'myTasks')(vaData({})); JOURNEY=((r&&r.data)||{}).tasks||[]; }
   catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadErr')+'</div>'; return; }
   renderJourney();
 };
@@ -950,17 +974,20 @@ function renderTaskDetail(){
     +'<button class="'+btnCls+'" style="width:100%;" '+btnDis+' onclick="taskDoComplete()">'+btnLabel+'</button>';
 }
 window.taskPause=async function(){
+  if(_vaReadOnly()) return;
   if(!JOB_CUR) return;
   const reason=prompt(t('jPauseReason')); if(reason===null) return;
   try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'pause', reason:String(reason||'').trim()}); JOB_CUR.status='pausada'; JOB_CUR.pausedReason=String(reason||'').trim(); renderTaskDetail(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 window.taskResume=async function(){
+  if(_vaReadOnly()) return;
   if(!JOB_CUR) return;
   try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'resume'}); JOB_CUR.status='en_proceso'; JOB_CUR.pausedReason=''; renderTaskDetail(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 window.taskReportProblem=async function(){
+  if(_vaReadOnly()) return;
   if(!JOB_CUR) return;
   const text=prompt(t('jProblemReason')); if(text===null) return;
   if(!String(text).trim()){ return; }
@@ -968,12 +995,14 @@ window.taskReportProblem=async function(){
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 window.taskToggleStep=async function(idx){
+  if(_vaReadOnly()) return;
   if(!JOB_CUR) return; const cl=JOB_CUR.checklist||[]; if(idx<0||idx>=cl.length) return;
   const nv=!cl[idx].done; cl[idx].done=nv; renderTaskDetail();
   try{ await httpsCallable(functions,'taskStep')({taskId:JOB_CUR.id, idx:idx, done:nv}); }
   catch(e){ cl[idx].done=!nv; renderTaskDetail(); whToast(t('jStepErr'),true); }
 };
 window.taskDoComplete=async function(){
+  if(_vaReadOnly()) return;
   if(!JOB_CUR) return; const cur=JOB_CUR;
   try{ await httpsCallable(functions,'taskComplete')({taskId:cur.id}); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); return; }
@@ -1140,13 +1169,13 @@ window.svcBack=function(){ document.getElementById('view-service').classList.add
 window.loadMyService=async function(){
   loadMechCars(); loadMechTasks();
   const box=document.getElementById('svc-emp-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
-  try{ const r=await httpsCallable(functions,'svcMyOrders')({}); SVC_MY=((r&&r.data)||{}).orders||[]; }
+  try{ const r=await httpsCallable(functions,'svcMyOrders')(vaData({})); SVC_MY=((r&&r.data)||{}).orders||[]; }
   catch(e){ if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadErr')+'</div>'; return; }
   renderMyService();
 };
 async function loadMechCars(){
   const box=document.getElementById('mech-cars-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
-  try{ const r=await httpsCallable(functions,'mechCars')({}); MECH_CARS=((r&&r.data)||{}).cars||[]; }
+  try{ const r=await httpsCallable(functions,'mechCars')(vaData({})); MECH_CARS=((r&&r.data)||{}).cars||[]; }
   catch(e){ MECH_CARS=[]; if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jCouldnt')+'</div>'; return; }
   renderMechCars();
 }
@@ -1178,6 +1207,7 @@ window.mechOpenIntake=function(carId){
 };
 window.mechCloseIntake=function(){ document.getElementById('mech-intake').classList.add('hide'); };
 window.mechStartInspection=async function(){
+  if(_vaReadOnly()) return;
   if(!MECH_CUR) return;
   const miles=(document.getElementById('mech-miles').value||'').trim();
   if(!miles){ whToast(L==='en'?'Enter the miles.':'Pon las millas.',true); return; }
@@ -1234,6 +1264,7 @@ function renderAddTaskForm(){
 window.mechPickAddCar=function(v){ MECH_ADDCAR = v||null; renderAddTaskForm(); };
 window.mechCloseAddTask=function(){ document.getElementById('mech-addtask').classList.add('hide'); };
 window.mechAddTaskSave=async function(){
+  if(_vaReadOnly()) return;
   const carId=MECH_ADDCAR||''; const title=(document.getElementById('mech-task-title').value||'').trim();
   if(!carId){ whToast(L==='en'?'Choose the car.':'Elige el carro.',true); return; }
   if(!title){ whToast(L==='en'?'Write what needs to be done.':'Escribe qué se le va a hacer.',true); return; }
@@ -1262,6 +1293,7 @@ function renderMyService(){
   }).join('');
 }
 window.svcAdvance=async function(orderId,status){
+  if(_vaReadOnly()) return;
   try{ await httpsCallable(functions,'svcOrderStatus')({orderId:orderId,status:status}); whToast(t('updated')||'✅'); loadMyService(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };

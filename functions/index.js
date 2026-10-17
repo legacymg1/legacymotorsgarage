@@ -1256,7 +1256,19 @@ async function _actorIdentity(request) {
   const email = String(tok.email || "").toLowerCase();
   const phone = String(tok.phone_number || "");
   if (email) {
-    return { key: _emailKey(email), name: tok.name || email.split("@")[0], email, phone: "", empId: "", roles: [], rate: 0, photoURL: "", active: true, isOwner: OWNER_EMAILS.includes(email), notRegistered: false };
+    const isOwner = OWNER_EMAILS.includes(email);
+    // 👁️ VER COMO EMPLEADO (solo dueño): si el dueño manda asEmpId, actúa como ESE empleado → todas las callables devuelven lo de él.
+    const asEmpId = isOwner ? String((request.data || {}).asEmpId || "") : "";
+    if (asEmpId) {
+      try {
+        const es = await admin.firestore().collection("employees").doc(asEmpId).get();
+        if (es.exists) {
+          const d = es.data() || {};
+          return { key: "emp_" + asEmpId, name: d.name || "Empleado", email: "", phone: d.phoneE164 || "", empId: asEmpId, roles: Array.isArray(d.roles) ? d.roles : [], rate: Number(d.rate) || 0, photoURL: d.photoURL || "", active: d.active !== false, isOwner: false, notRegistered: false, impersonatedBy: email };
+        }
+      } catch (e) {}
+    }
+    return { key: _emailKey(email), name: tok.name || email.split("@")[0], email, phone: "", empId: "", roles: [], rate: 0, photoURL: "", active: true, isOwner, notRegistered: false };
   }
   if (phone) {
     const key = "ph_" + phone.replace(/\D/g, "");
