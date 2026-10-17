@@ -910,10 +910,27 @@ function whTeamList(){
       +'</div></div>';
   }).join('') : '<div style="color:#8a93a6;text-align:center;padding:24px;">'+(L==='en'?'No employees yet.':'Aún no hay empleados.')+'</div>';
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;color:#fff;">👥 '+(L==='en'?'Team & payroll':'Equipo y nómina')+'</div><button onclick="whTeamClose()" style="background:transparent;border:none;color:#8a93a6;font-size:24px;cursor:pointer;">×</button></div>'
-    +'<button onclick="whTeamNew()" style="width:100%;background:#c9a84c;color:#0b0e14;border:none;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;margin-bottom:12px;">➕ '+(L==='en'?'New employee':'Nuevo empleado')+'</button>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px;"><button onclick="whTeamNew()" style="flex:1;background:#c9a84c;color:#0b0e14;border:none;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;">➕ '+(L==='en'?'New':'Nuevo')+'</button><button onclick="whOpenPayroll()" style="flex:1;background:transparent;border:1px solid #273043;color:#fff;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;">💵 '+(L==='en'?'Payroll / Hours':'Nómina / Horas')+'</button></div>'
     +cards
-    +'<div style="font-size:11px;color:#6b7280;margin-top:10px;line-height:1.5;">'+(L==='en'?'Photo, sensitive data & payroll: coming here soon (for now in Finanzas).':'Foto, datos sensibles y nómina: pronto aquí (por ahora en Finanzas).')+'</div>';
+    +'<div style="font-size:11px;color:#6b7280;margin-top:10px;line-height:1.5;">'+(L==='en'?'Photo & sensitive data: coming here soon (for now in Finanzas).':'Foto y datos sensibles: pronto aquí (por ahora en Finanzas).')+'</div>';
 }
+// 💵 NÓMINA / HORAS de la semana (dueño) — portado de crew (openPayroll). Reusa clockWeek.
+window.whOpenPayroll=async function(){
+  if(role!=='owner') return; closeAcct(); whTeamClose();
+  let ov=document.getElementById('wh-pay');
+  if(!ov){ ov=document.createElement('div'); ov.id='wh-pay'; ov.style.cssText='position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    const box=document.createElement('div'); box.style.cssText='background:#0d1119;border:1px solid #273043;border-radius:18px;max-width:560px;width:100%;max-height:100%;overflow:auto;padding:18px;box-sizing:border-box;margin:auto;';
+    box.innerHTML='<div id="wh-pay-body"></div>'; ov.appendChild(box); document.body.appendChild(ov);
+  }
+  const bd=document.getElementById('wh-pay-body'); bd.innerHTML='<div style="color:#8a93a6;text-align:center;padding:24px;">'+L2('Cargando…','Loading…')+'</div>';
+  let d={}; try{ const r=await httpsCallable(functions,'clockWeek')({}); d=(r&&r.data)||{}; }catch(e){ bd.innerHTML='<div style="color:#8a93a6;text-align:center;padding:24px;">'+L2('No se pudo cargar.','Could not load.')+'</div>'; return; }
+  const list=(d.list||[]).filter(e=>!e.owner);   // los dueños no están en nómina
+  const head='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;color:#fff;">💵 '+L2('Nómina / Horas','Payroll / Hours')+'</div><button onclick="var o=document.getElementById(\'wh-pay\');if(o)o.remove();" style="background:transparent;border:none;color:#8a93a6;font-size:24px;cursor:pointer;">×</button></div>'
+    +'<div style="background:#121722;border:1px solid #273043;border-radius:12px;padding:14px;text-align:center;margin-bottom:12px;"><div style="font-size:12px;color:#8a93a6;">'+L2('Total de la semana (estimado)','Week total (estimate)')+'</div><div style="font-size:28px;font-weight:900;color:var(--gold);">$'+(Number(d.totalPay)||0).toFixed(2)+'</div></div>';
+  const rows = list.length ? list.map(e=>{ const pay=Number(e.pay)||0, hrs=Number(e.hours)||0; return '<div style="background:#121722;border:1px solid #273043;border-radius:12px;padding:13px 14px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;"><div style="min-width:0;"><div style="font-weight:800;color:#fff;">'+whEscA(e.name||'')+(e.open?' <span style="color:#35c46a;font-size:11px;">● '+L2('en turno','on shift')+'</span>':'')+'</div><div style="font-size:12px;color:#8a93a6;margin-top:2px;">'+hrs.toFixed(2)+' '+L2('h','h')+(e.rate?(' · $'+Number(e.rate).toFixed(2)+'/h'):'')+'</div></div><div style="font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;">$'+pay.toFixed(2)+'</div></div>'; }).join('') : '<div style="color:#8a93a6;text-align:center;padding:24px;">'+L2('Nadie marcó entrada esta semana.','Nobody clocked in this week.')+'</div>';
+  bd.innerHTML=head+rows+'<div style="font-size:11px;color:#6b7280;margin-top:8px;line-height:1.5;">'+L2('Nómina = estimado por horas × tarifa. No es un pago ni un gasto registrado.','Payroll = estimate by hours × rate. Not a payment or a recorded expense.')+'</div>';
+};
 window.whTeamNew=function(){ _teamEditId=null; _teamSel=[]; whTeamForm({name:'',phone:'',rate:'',active:true,owner:false,roles:[]}); };
 window.whTeamEdit=function(id){ const e=_teamEmps.find(x=>x.id===id); if(!e) return; _teamEditId=id; _teamSel=(e.roles||[]).slice(); whTeamForm(e); };
 function whTeamRolesHtml(){
