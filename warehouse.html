@@ -266,6 +266,8 @@
     <div id="op-team" style="margin-bottom:14px;"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-done-h" style="font-weight:800;font-size:14px;">✅ Hoy se hizo</span></div>
     <div id="op-done" style="margin-bottom:14px;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-svc-h" style="font-weight:800;font-size:14px;">🔧 Órdenes de servicio</span></div>
+    <div id="op-svc" style="margin-bottom:14px;"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-tasks-h" style="font-weight:800;font-size:14px;">📋 Tareas</span>
       <div style="display:flex;gap:8px;"><button class="btn sm" onclick="jobAddOpen()" data-i18n="opAddTask" style="padding:6px 11px;font-size:12px;">➕ Tarea</button><button class="btn ghost sm" onclick="openCarsProc()" data-i18n="opCarsProc" style="padding:6px 11px;font-size:12px;">🚗 Carros</button></div>
     </div>
@@ -1206,6 +1208,18 @@ function renderOwnerPanel(){
     else donebox.innerHTML=OP_DONE.map(p=>{
       const items=(p.items||[]).map(it=>'<div style="font-size:12px;color:var(--text);padding:2px 0 2px 38px;">• '+esc(it.title||'')+' '+lineBadge(it.line)+(it.car?(' <span class="faint">· 🚗 '+esc(it.car)+'</span>'):'')+'</div>').join('');
       return '<div style="padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex:none;">'+whInitials(p.name)+'</span><div style="font-weight:700;font-size:14px;">'+esc(p.name||'—')+' <span style="color:#35c46a;font-size:12px;">· ✅ '+p.count+'</span></div></div>'+items+'</div>';
+    }).join('');
+  }
+  // 🔧 Órdenes de servicio abiertas (línea Service) — para que dueños las vean sin entrar como trabajador.
+  const sh=document.getElementById('op-svc-h'); if(sh) sh.textContent=L==='en'?'🔧 Service orders':'🔧 Órdenes de servicio';
+  const svcbox=document.getElementById('op-svc');
+  if(svcbox){
+    if(!OP_SVC.length){ svcbox.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No open service orders.':'Sin órdenes de servicio abiertas.')+'</div>'; }
+    else svcbox.innerHTML=OP_SVC.map(o=>{
+      const car=esc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
+      const stage=o.activeRole?('🚩 '+svcRoleLabel(o.activeRole)):('🏁 '+L2('Terminado','Done'));
+      const s=(o.services||[]).find(x=>x.role===o.activeRole && x.assignName); const who=s?(' · 👤 '+esc(s.assignName)):'';
+      return '<div style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+'</span></div><div class="faint" style="font-size:12px;margin-top:2px;">🚗 '+car+who+' · '+_opStatusLabel(o.status)+'</div></div>';
     }).join('');
   }
   // Tareas
