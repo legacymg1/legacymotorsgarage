@@ -180,15 +180,17 @@
   <div id="view-service" class="hide" style="position:fixed;inset:0;z-index:6300;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;"><div class="wrap" style="padding:16px;">
     <div class="topbar">
       <button class="linkbtn" onclick="svcBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
-      <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;" data-i18n="mechKicker">🔧 Mecánico</div><h2 style="font-size:20px;margin:0;" data-i18n="taller">Mi taller</h2></div>
+      <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;" id="svc-view-kicker"></div><h2 style="font-size:20px;margin:0;" id="svc-view-title">Mi trabajo</h2></div>
       <button class="linkbtn" onclick="loadMyService()" style="font-size:20px;padding:0 6px;">⟳</button>
     </div>
-    <button id="mech-addtask-btn" class="btn ghost hide" onclick="mechOpenAddTask()" style="margin-bottom:14px;" data-i18n="addJob">➕ Agregar trabajo a un carro</button>
-    <div class="sub" style="font-weight:800;font-size:15px;margin:2px 0 8px;" data-i18n="carsToInspect">🏁 Carros por inspeccionar</div>
-    <div id="mech-cars-list"></div>
-    <div class="sub" style="font-weight:800;font-size:15px;margin:20px 0 8px;" data-i18n="jobsQueue">🔧 Trabajos en cola</div>
-    <div id="mech-tasks-list"></div>
-    <div class="sub" style="font-weight:800;font-size:15px;margin:20px 0 8px;" data-i18n="svcOrdersClients">🔧 Órdenes de servicio (clientes)</div>
+    <div id="mech-sections">
+      <button id="mech-addtask-btn" class="btn ghost hide" onclick="mechOpenAddTask()" style="margin-bottom:14px;" data-i18n="addJob">➕ Agregar trabajo a un carro</button>
+      <div class="sub" style="font-weight:800;font-size:15px;margin:2px 0 8px;" data-i18n="carsToInspect">🏁 Carros por inspeccionar</div>
+      <div id="mech-cars-list"></div>
+      <div class="sub" style="font-weight:800;font-size:15px;margin:20px 0 8px;" data-i18n="jobsQueue">🔧 Trabajos en cola</div>
+      <div id="mech-tasks-list"></div>
+    </div>
+    <div class="sub" style="font-weight:800;font-size:15px;margin:20px 0 8px;" id="svc-orders-h">🔧 Órdenes de servicio</div>
     <div id="svc-emp-list"></div>
   </div></div>
   <!-- Recepción del carro (intake) -->
@@ -947,8 +949,8 @@ const WH_ROLE_TILES = {
   'Listado':      { ico:'🏷️', es:'Listado',          en:'Listing',        subEs:'Publicar en eBay',       subEn:'List on eBay',   act:function(){ whOpenTool('lister'); } },
   'Empaque':      { ico:'📦', es:'Empaque',          en:'Packing',        subEs:'Empacar pedidos',        subEn:'Pack orders',    act:function(){ whOpenTool('pack'); } },
   'Desmantelador':{ ico:'🚗', es:'Desmantelador',    en:'Dismantler',     subEs:'Desarmar carros',        subEn:'Dismantle cars', act:function(){ whOpenTool('yard'); } },
-  'Mecánico':     { ico:'🔧', es:'Mecánico',         en:'Mechanic',       subEs:'Mi taller',              subEn:'My shop',        act:function(){ openService(); } },
-  'Detallador':   { ico:'🧽', es:'Detallador',       en:'Detailer',       subEs:'Lavado y detallado',     subEn:'Wash & detail',  act:function(){ location.href='crew.html'; } },
+  'Mecánico':     { ico:'🔧', es:'Mecánico',         en:'Mechanic',       subEs:'Órdenes y carros',       subEn:'Orders & cars',  act:function(){ openService(); } },
+  'Detallador':   { ico:'🧽', es:'Detallado',        en:'Detailing',      subEs:'Lavado y detallado',     subEn:'Wash & detail',  act:function(){ openService(); } },
   'Fotos':        { ico:'📷', es:'Fotos',            en:'Photos',         subEs:'Fotos del carro',        subEn:'Car photos',     soon:true },
   'Limpieza':     { ico:'🧹', es:'Limpieza',         en:'Cleaning',       subEs:'Oficina, baño, basura',  subEn:'Office, restroom, trash', soon:true },
   'Ayudante general':{ ico:'🛠️', es:'Ayudante general', en:'General helper', subEs:'Apoyo general',       subEn:'General support', soon:true },
@@ -1276,7 +1278,16 @@ const SVC_ST={ agendado:{k:'svcAgendado',c:'#0a84ff'}, por_recibir:{k:'svcPorRec
 function svcStLabel(st){ const s=SVC_ST[st]; return s?t(s.k):st; }
 const MECH_TASK_ST={ cola:{k:'stCola',c:'#c9a84c'}, en_proceso:{k:'stProc',c:'#32d74b'}, hecho:{k:'stDone',c:'#8a8fa8'} };
 let SVC_MY=[], MECH_CARS=[], MECH_CUR=null, MECH_TASKS=[], MECH_PREP=[], MECH_ADDCAR=null;
-window.openService=function(){ document.getElementById('view-service').classList.remove('hide'); const b=document.getElementById('mech-addtask-btn'); if(b) b.classList.toggle('hide', role!=='owner'); loadMyService(); try{window.scrollTo(0,0);}catch(e){} };
+window.openService=function(){
+  document.getElementById('view-service').classList.remove('hide');
+  const isMech=(_myRoles&&_myRoles.indexOf('Mecánico')>=0)||(role==='owner'&&!_asEmp);
+  const ms=document.getElementById('mech-sections'); if(ms) ms.style.display=isMech?'':'none';
+  const b=document.getElementById('mech-addtask-btn'); if(b) b.classList.toggle('hide', role!=='owner');
+  const kk=document.getElementById('svc-view-kicker'); if(kk) kk.textContent=isMech?(L==='en'?'🔧 Mechanic':'🔧 Mecánico'):(L==='en'?'🧽 Detailing':'🧽 Detallado');
+  const tt=document.getElementById('svc-view-title'); if(tt) tt.textContent=L==='en'?'My work':'Mi trabajo';
+  const oh=document.getElementById('svc-orders-h'); if(oh) oh.textContent=L==='en'?'🔧 Service orders':'🔧 Órdenes de servicio';
+  loadMyService(); try{window.scrollTo(0,0);}catch(e){}
+};
 window.svcBack=function(){ document.getElementById('view-service').classList.add('hide'); };
 window.loadMyService=async function(){
   loadMechCars(); loadMechTasks();
@@ -1383,27 +1394,62 @@ window.mechAddTaskSave=async function(){
   try{ await httpsCallable(functions,'carTaskAdd')({ carId:carId, title:title }); whToast(L==='en'?'✅ Job added':'✅ Trabajo agregado'); mechCloseAddTask(); loadMechTasks(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
+// Roles de la LÍNEA de servicio (bilingüe) — para el relevo.
+function svcRoleLabel(r){ const m={'Mecánico':{es:'Mecánico',en:'Mechanic'},'Detallador':{es:'Detallador',en:'Detailer'},'Fotos':{es:'Fotos',en:'Photos'},'Limpieza':{es:'Limpieza',en:'Cleaning'}}; const o=m[r]; return o?(L==='en'?o.en:o.es):(r||''); }
 function renderMyService(){
   const box=document.getElementById('svc-emp-list'); if(!box) return;
-  if(!SVC_MY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:30px 20px;line-height:1.6;" data-i18n-html="svcNoOrders">'+t('svcNoOrders')+'</div>'; return; }
+  if(!SVC_MY.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:30px 20px;line-height:1.6;">'+t('svcNoOrders')+'</div>'; return; }
+  const ic={'Mecánico':'🔧','Detallador':'✨','Fotos':'📷','Limpieza':'🧽','Lavado':'🧽'};
+  const rk=r=>({'Mecánico':0,'Detallador':1,'Fotos':2}[r]!=null?{'Mecánico':0,'Detallador':1,'Fotos':2}[r]:9);
   box.innerHTML=SVC_MY.map(o=>{
     const s=SVC_ST[o.status]||{c:'#8a8fa8'};
     const when=o.scheduledAt?('📅 '+new Date(o.scheduledAt).toLocaleString(L==='en'?'en-US':'es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})):t('svcNow');
     const car=esc(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
     const idbits=[o.plate?('🪪 '+esc(o.plate)):'', o.vin?('VIN …'+esc((o.vin||'').slice(-6))):''].filter(Boolean).join(' · ');
     const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
+    const hasPipe=!!(o.services && o.services.length);
+    const myHere=(o.myServices||[]).filter(ms=>ms.role===o.activeRole);
+    const anyProg=myHere.some(ms=>ms.status==='en_proceso');
+    const anyPaused=myHere.some(ms=>ms.status==='pausado');
+    const allPend=myHere.length && myHere.every(ms=>ms.status==='pendiente');
     let actions='';
-    if(o.status==='por_recibir'||o.status==='agendado') actions='<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'recibido\')">'+t('svcReceiveCar')+'</button>';
-    else if(o.status==='recibido') actions='<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcStartWork')+'</button>';
-    else if(o.status==='en_proceso') actions='<div style="display:flex;gap:8px;"><button class="btn-ghost" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'pausado_partes\')">'+t('svcWaitParts')+'</button><button class="btn-gold" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'listo\')">'+t('svcReady')+'</button></div>';
-    else if(o.status==='pausado_partes') actions='<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcResume')+'</button>';
+    if(!hasPipe){
+      // Órdenes viejas sin línea por servicio → flujo anterior (nivel orden).
+      if(o.status==='por_recibir'||o.status==='agendado') actions='<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'recibido\')">'+t('svcReceiveCar')+'</button>';
+      else if(o.status==='recibido') actions='<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcStartWork')+'</button>';
+      else if(o.status==='en_proceso') actions='<div style="display:flex;gap:8px;"><button class="btn-ghost" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'pausado_partes\')">'+t('svcWaitParts')+'</button><button class="btn-gold" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'listo\')">'+t('svcReady')+'</button></div>';
+      else if(o.status==='pausado_partes') actions='<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcResume')+'</button>';
+    } else if(o.waitingFor && !o.myStageActive){
+      actions='<div class="btn-ghost" style="width:100%;text-align:center;opacity:.75;cursor:default;">⏳ '+(L==='en'?'Waiting for ':'Esperando a ')+svcRoleLabel(o.waitingFor)+'</div>';
+    } else if(o.status==='por_recibir'||o.status==='agendado'){
+      actions= o.canReceive ? '<button class="btn-gold" style="width:100%;" onclick="svcAdvance(\''+o.id+'\',\'recibido\')">'+t('svcReceiveCar')+'</button>' : '';
+    } else if(anyProg){
+      actions='<div style="display:flex;gap:8px;"><button class="btn-ghost" style="flex:1;" onclick="svcStage(\''+o.id+'\',\'pause\')">'+t('svcWaitParts')+'</button><button class="btn-gold" style="flex:1;" onclick="svcStage(\''+o.id+'\',\'finish\')">'+t('svcReady')+'</button></div>';
+    } else if(anyPaused){
+      actions='<button class="btn-gold" style="width:100%;" onclick="svcStage(\''+o.id+'\',\'resume\')">'+t('svcResume')+'</button>';
+    } else if(allPend || o.status==='recibido'){
+      actions='<button class="btn-gold" style="width:100%;" onclick="svcStage(\''+o.id+'\',\'start\')">'+t('svcStartWork')+'</button>';
+    }
+    let pipe='';
+    if(hasPipe){
+      const by={}; o.services.forEach(x=>{ (by[x.role]=by[x.role]||[]).push(x); });
+      const order=Object.keys(by).sort((a,b)=>rk(a)-rk(b));
+      pipe='<div style="display:flex;flex-wrap:wrap;gap:4px 6px;font-size:12px;align-items:center;background:var(--surface2);border-radius:9px;padding:7px 9px;margin-bottom:8px;">'+order.map(r=>{ const svs=by[r]; const done=svs.every(x=>x.status==='listo'); const act=(r===o.activeRole); const nm=[...new Set(svs.map(x=>x.assignName).filter(Boolean))].join(', '); const col=done?'#35c46a':(act?'var(--gold)':'#6b7280'); const mk=done?'✓':(act?(svs.some(x=>x.status==='en_proceso')?'🔧':'●'):'⏳'); return '<span style="color:'+col+';font-weight:'+(act?'800':'600')+';white-space:nowrap;">'+(ic[r]||'👤')+' '+svcRoleLabel(r)+(nm?(' · '+esc(nm)):'')+' '+mk+'</span>'; }).join('<span style="color:#4b5563;"> → </span>')+'</div>';
+    }
+    const myList=myHere.length?('<div style="font-size:13px;background:var(--surface2);border-radius:9px;padding:8px 10px;margin-bottom:8px;"><div class="faint" style="font-size:11px;font-weight:800;margin-bottom:3px;">'+(L==='en'?'Your part':'Lo que te toca')+'</div>'+myHere.map(ms=>'• '+esc((L==='en'?ms.descEn:ms.desc)||'')+(ms.status==='listo'?' ✓':(ms.status==='pausado'?' ⏸️':''))).join('<br>')+'</div>'):(hasPipe?'<div style="font-size:14px;background:var(--surface2);border-radius:9px;padding:8px 10px;line-height:1.4;margin-bottom:8px;">🔧 '+esc(o.reason||'')+'</div>':'<div style="font-size:14px;background:var(--surface2);border-radius:9px;padding:8px 10px;line-height:1.4;margin-bottom:8px;">🔧 '+esc(o.reason||'')+'</div>');
     return '<div class="card" style="padding:14px;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-weight:800;font-size:16px;">'+esc(o.clientName||'')+'</span><span style="font-size:11px;font-weight:800;color:'+s.c+';background:'+s.c+'22;padding:3px 9px;border-radius:999px;white-space:nowrap;">'+svcStLabel(o.status)+'</span></div>'
       +'<div style="font-size:14px;margin-bottom:3px;">🚗 '+car+'</div>'
       +(idbits?'<div class="faint" style="font-size:12px;margin-bottom:6px;">'+idbits+'</div>':'')
-      +'<div style="font-size:14px;background:var(--surface2);border-radius:9px;padding:8px 10px;line-height:1.4;margin-bottom:8px;">🔧 '+esc(o.reason||'')+'</div>'
+      +pipe+myList
       +'<div class="faint" style="font-size:12px;margin-bottom:10px;">'+when+(phone?(' · <a href="sms:'+phone+'" style="color:var(--gold);text-decoration:none;">'+t('svcMsg')+'</a>'):'')+'</div>'+actions+'</div>';
   }).join('');
 }
+// 🔧 RELEVO: el trabajador marca SU etapa; al terminar su rol, pasa al siguiente. (En "actuar como" escribe como el empleado.)
+window.svcStage=async function(orderId,action){
+  if(_vaReadOnly()) return;
+  try{ await httpsCallable(functions,'svcServiceDone')(vaData({orderId:orderId,action:action})); whToast(action==='finish'?(L==='en'?'Done! 🎉':'¡Listo! 🎉'):(t('updated')||'✅')); loadMyService(); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
 window.svcAdvance=async function(orderId,status){
   if(_vaReadOnly()) return;
   try{ await httpsCallable(functions,'svcOrderStatus')(vaData({orderId:orderId,status:status})); whToast(t('updated')||'✅'); loadMyService(); }
