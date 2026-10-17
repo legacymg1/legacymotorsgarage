@@ -130,6 +130,7 @@
     <div class="acct-row"><span data-i18n="profHours">Horas esta semana</span><b id="acct-hours">0 h</b></div>
     <div class="acct-sep"></div>
     <div class="acct-row"><span>🌐 <span data-i18n="profLang">Idioma</span></span><span style="display:flex;gap:4px;"><button class="langbtn" id="acct-es" onclick="setLang('es')">ES</button><button class="langbtn" id="acct-en" onclick="setLang('en')">EN</button></span></div>
+    <button id="acct-fn-btn" class="acct-signout" style="display:none;background:var(--surface2,rgba(255,255,255,.04));color:var(--text);" onclick="openFunctions()">🧰 <span data-i18n="homeTitle">Tus funciones</span></button>
     <button class="acct-signout" onclick="doLogout()">🚪 <span data-i18n="signOut">Cerrar sesión</span></button>
   </div>
 
@@ -155,8 +156,16 @@
       <!-- Mensaje de "nada pendiente": SOLO cuando no hay tareas NI órdenes -->
       <div id="journey-empty" class="faint" style="display:none;text-align:center;padding:26px 18px;line-height:1.6;"></div>
     </div>
-    <div class="sub" id="home-fn-h" style="font-weight:800;font-size:15px;margin:20px 0 10px;" data-i18n="homeTitle">Tus funciones</div>
-    <div id="home-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
+  </div>
+
+  <!-- 🧰 Funciones (mosaico) — ahora en overlay, se abre desde el menú. Mi jornada = solo cola. -->
+  <div id="fn-catch" class="hide" onclick="closeFunctions()" style="position:fixed;inset:0;z-index:6490;background:rgba(0,0,0,.55);cursor:pointer;"></div>
+  <div id="fn-overlay" class="hide" style="position:fixed;z-index:6491;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,460px);max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--surface);border:1px solid var(--border);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.6);padding:18px;padding-bottom:max(18px,env(safe-area-inset-bottom));">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div class="sub" style="font-weight:800;font-size:17px;" data-i18n="homeTitle">Tus funciones</div>
+      <button onclick="closeFunctions()" class="btn ghost sm" style="padding:6px 12px;">✕</button>
+    </div>
+    <div id="home-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;"></div>
     <div id="home-empty" class="sub" style="display:none;margin-top:10px;" data-i18n="homeTapFn">Toca una función para empezar.</div>
   </div>
 
@@ -940,6 +949,9 @@ function setHeaderIdentity(){
 function updateLangBtns(){ const es=document.getElementById('acct-es'),en=document.getElementById('acct-en'); if(es)es.classList.toggle('on',L==='es'); if(en)en.classList.toggle('on',L==='en'); }
 window.toggleAcct=function(e){ if(e&&e.stopPropagation)e.stopPropagation(); const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(!m)return; if(!m.classList.contains('hide')){ m.classList.add('hide'); c.classList.add('hide'); } else { setHeaderIdentity(); updateLangBtns(); m.classList.remove('hide'); c.classList.remove('hide'); } };
 window.closeAcct=function(){ const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(m)m.classList.add('hide'); if(c)c.classList.add('hide'); };
+// 🧰 FUNCIONES (mosaico en overlay) — se abre desde el menú. Mi jornada queda como pura cola.
+window.openFunctions=function(){ closeAcct(); try{ renderHomeTiles(); }catch(e){} const o=document.getElementById('fn-overlay'),c=document.getElementById('fn-catch'); if(o)o.classList.remove('hide'); if(c)c.classList.remove('hide'); };
+window.closeFunctions=function(){ const o=document.getElementById('fn-overlay'),c=document.getElementById('fn-catch'); if(o)o.classList.add('hide'); if(c)c.classList.add('hide'); };
 // 👥 EQUIPO Y NÓMINA (portado de Pit Crew) — solo dueño. Lista + editar (empAdmin) + Ver como / Actuar como.
 function setWhLegacyActions(){ window.LEGACY_ACTIONS=[{ label:(L==='en'?'Team & payroll':'Equipo y nómina'), ico:'👥', fn:'whOpenTeam' }]; }
 let _viewAsEmpId='', _viewAsName='', _actAs=false;
@@ -1124,6 +1136,8 @@ function renderHomeTiles(){
   const box=document.getElementById('home-tiles'); if(!box) return;
   const seen={}; const list=(_myRoles&&_myRoles.length?_myRoles:[]).filter(r=>{ if(seen[r])return false; seen[r]=1; return WH_ROLE_TILES[r]; });
   const emptyEl=document.getElementById('home-empty');
+  // 🧰 Botón "Funciones" en el menú: solo si el empleado tiene funciones que abrir
+  const fnBtn=document.getElementById('acct-fn-btn'); if(fnBtn) fnBtn.style.display = (list.length && _homeMode) ? '' : 'none';
   if(!list.length){ box.innerHTML=''; if(emptyEl) emptyEl.style.display='block'; return; }
   if(emptyEl) emptyEl.style.display='none';
   box.innerHTML=list.map(r=>{ const m=WH_ROLE_TILES[r]; const label=(L==='en'?m.en:m.es); const sub=(L==='en'?m.subEn:m.subEs);
@@ -1135,7 +1149,7 @@ function renderHomeTiles(){
       +'<div class="sub" style="font-size:12px;margin-top:2px;">'+sub+'</div></div>';
   }).join('');
 }
-window.whRoleTap=function(rid){ const key=Object.keys(WH_ROLE_TILES).find(k=>k.replace(/[^a-zA-ZÀ-ÿ ]/g,'')===rid); const m=key?WH_ROLE_TILES[key]:null; if(!m) return; if(m.soon){ whToast((L==='en'?'🚧 Coming soon: ':'🚧 Muy pronto: ')+(L==='en'?m.en:m.es)); return; } try{ m.act(); }catch(e){} };
+window.whRoleTap=function(rid){ const key=Object.keys(WH_ROLE_TILES).find(k=>k.replace(/[^a-zA-ZÀ-ÿ ]/g,'')===rid); const m=key?WH_ROLE_TILES[key]:null; if(!m) return; if(m.soon){ whToast((L==='en'?'🚧 Coming soon: ':'🚧 Muy pronto: ')+(L==='en'?m.en:m.es)); return; } try{ closeFunctions(); }catch(e){} try{ m.act(); }catch(e){} };
 window.whOpenTool=function(k){ document.body.classList.remove('wh-home'); setView(k); try{ window.scrollTo(0,0); }catch(e){} };
 
 // ===================== 📋 MI JORNADA (tareas guiadas, portado de crew) =====================
