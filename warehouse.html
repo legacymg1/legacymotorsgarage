@@ -316,7 +316,8 @@
       <span style="font-weight:800;font-size:17px;" id="op-title">📊 Centro de Operaciones</span>
       <button class="linkbtn" onclick="loadOwnerPanel()" style="font-size:18px;" title="↻">↻</button>
     </div>
-    <div id="op-summary" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;"></div>
+    <div id="op-summary" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+    <button onclick="whOwnerJornada()" class="btn ghost" style="width:100%;margin-bottom:14px;">👷 <span data-i18n="ownerMyDay">Mi jornada — trabajar algo de la lista</span></button>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-team-h" style="font-weight:800;font-size:14px;">👥 Equipo en vivo</span></div>
     <div id="op-team" style="margin-bottom:14px;"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-done-h" style="font-weight:800;font-size:14px;">✅ Hoy se hizo</span></div>
@@ -560,6 +561,7 @@ let _messaging=null;
 const T={
   es:{ installApp:'📲 Instalar Pit Crew como app', teamAccess:'Acceso del equipo', email:'Correo', pass:'Contraseña', enter:'Entrar', logout:'Salir', logoutConfirm:'¿Cerrar sesión? Tendrás que volver a poner tu correo y contraseña.',
     needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Pit Crew.',
+    ownerMyDay:'Mi jornada — trabajar algo de la lista',
     loginPhone:'👤 Miembro del equipo', loginEmail:'🔧 Service', phoneLbl:'Tu teléfono', sendCode:'Enviar código', codeLbl:'Código que te llegó por SMS', verifyCode:'Entrar', codeBack:'‹ Cambiar número', phoneBad:'Escribe un número de 10 dígitos.', codeSending:'📩 Enviando código…', codeSentTo:'Te mandamos un código a', codeNeed:'Escribe el código de 6 dígitos.', codeChecking:'Entrando…', codeBad:'Código incorrecto. Revísalo e intenta de nuevo.', phoneErr:'No se pudo enviar el código. Revisa el número e inténtalo otra vez.', phoneNoAccess:'Ese número no está registrado como empleado. Pídele a tu supervisor que te dé de alta.',
     roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque', roleMech:'Mecánico',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
@@ -612,6 +614,7 @@ const T={
     alertPart:'Escribe qué parte es.', alertCar:'Pon al menos VIN o marca/modelo.', carNotFound:'Carro no encontrado.', vinShort:'El VIN se ve corto (deben ser ~17).', decoding:'Decodificando…', decodeOk:'✓ Datos rellenados — revisa y corrige si hace falta.', decodeNone:'No se encontró info de ese VIN; captura a mano.', decodeErr:'No se pudo decodificar (sin internet o VIN inválido). Captura a mano.', error:'Error: ' },
   en:{ installApp:'📲 Install Pit Crew as app', teamAccess:'Team access', email:'Email', pass:'Password', enter:'Sign in', logout:'Log out', logoutConfirm:'Log out? You\'ll have to enter your email and password again.',
     needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Pit Crew.',
+    ownerMyDay:'My day — work something off the list',
     loginPhone:'👤 Team member', loginEmail:'🔧 Service', phoneLbl:'Your phone', sendCode:'Send code', codeLbl:'Code you got by SMS', verifyCode:'Sign in', codeBack:'‹ Change number', phoneBad:'Enter a 10-digit number.', codeSending:'📩 Sending code…', codeSentTo:'We sent a code to', codeNeed:'Enter the 6-digit code.', codeChecking:'Signing in…', codeBad:'Wrong code. Check it and try again.', phoneErr:'Could not send the code. Check the number and try again.', phoneNoAccess:'That number is not registered as an employee. Ask your supervisor to add you.',
     roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing', roleMech:'Mechanic',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
@@ -1219,7 +1222,7 @@ window.whGoHome=function(){
 };
 // 👑 HOME del DUEÑO = Centro de Operaciones (limpio, SIN reloj). Las herramientas se abren encima.
 window.whOwnerHome=function(){
-  _carView='';
+  _carView=''; _ownerJornada=false;
   ['view-yard','view-lister','view-pack','view-home'].forEach(v=>{ const e=document.getElementById(v); if(e) e.style.display='none'; });
   const opc=document.getElementById('owner-op-card'); if(opc) opc.style.display='block';
   const bb=document.getElementById('wh-home-back'); if(bb) bb.style.display='none';
@@ -1230,7 +1233,21 @@ window.whOwnerHome=function(){
   try{ window.scrollTo(0,0); }catch(e){}
 };
 // Botón "‹ volver": dueño → Centro de Operaciones; empleado → Mi jornada.
-window.whBack=function(){ if(role==='owner' && !_asEmp) whOwnerHome(); else whGoHome(); };
+window.whBack=function(){ if(role==='owner' && !_asEmp){ if(_ownerJornada){ _ownerJornada=false; whOwnerHome(); } else whOwnerHome(); } else whGoHome(); };
+// 👷 Dueño trabajando: abre SU jornada (tareas + órdenes que puede tomar) encima del Centro.
+let _ownerJornada=false;
+window.whOwnerJornada=function(){
+  _carView=''; _ownerJornada=true;
+  const opc=document.getElementById('owner-op-card'); if(opc) opc.style.display='none';
+  const cc=document.getElementById('clock-card'); if(cc) cc.style.display='none';
+  ['view-yard','view-lister','view-pack'].forEach(v=>{ const e=document.getElementById(v); if(e) e.style.display='none'; });
+  const vh=document.getElementById('view-home'); if(vh) vh.style.display='';
+  const bb=document.getElementById('wh-home-back'); if(bb){ bb.style.display='block'; bb.textContent='‹ '+(L==='en'?'Operations Center':'Centro de Operaciones'); }
+  const box=document.getElementById('tabs'); if(box) box.style.display='none';
+  try{ loadJourney(); }catch(e){}
+  try{ loadHomeSvc(); }catch(e){}
+  try{ window.scrollTo(0,0); }catch(e){}
+};
 // ⚙️ Ajustar GPS (geofence Dealer/Yonke) — movido del reloj al menú del logo (el dueño ya no ve el reloj).
 window.whOpenGps=function(){
   if(role!=='owner') return; try{ closeAcct(); }catch(e){}
@@ -1332,7 +1349,7 @@ function renderJourney(){
   }).join('');
 }
 window.openTaskDetail=function(taskId){ const o=JOURNEY.find(x=>x.id===taskId); if(!o) return; JOB_CUR=JSON.parse(JSON.stringify(o)); renderTaskDetail(); document.getElementById('task-detail').classList.remove('hide'); };
-window.taskDetailBack=function(){ document.getElementById('task-detail').classList.add('hide'); JOB_CUR=null; loadJourney(); };
+window.taskDetailBack=function(){ document.getElementById('task-detail').classList.add('hide'); JOB_CUR=null; if(_opFromCenter){ _opFromCenter=false; try{ loadOwnerPanel(); }catch(e){} } else { loadJourney(); } };
 function renderTaskDetail(){
   const cur=JOB_CUR; if(!cur) return; const body=document.getElementById('task-detail-body'); const cl=cur.checklist||[];
   const done=cl.filter(c=>c.done).length; const pend=cl.length>0 && done<cl.length;
@@ -1419,6 +1436,10 @@ function _opStatusLabel(s){
 let _opCollapse={ dealer:true, service:false, dis:true };
 window.opToggle=function(key){ _opCollapse[key]=!_opCollapse[key]; renderOwnerPanel(); };
 window.opJump=function(key){ _opCollapse[key]=false; renderOwnerPanel(); setTimeout(()=>{ const el=document.getElementById('op-'+key+'-h'); if(el&&el.parentElement) el.parentElement.scrollIntoView({behavior:'smooth',block:'start'}); },70); };
+// 👷 Dueño trabaja un item del Centro: click en la TARJETA = abrir como TRABAJADOR; el ✏️ = editar.
+let _opFromCenter=false;
+window.opWorkTask=function(id){ const o=(OP_TASKS||[]).find(x=>x.id===id); if(!o) return; JOB_CUR=JSON.parse(JSON.stringify(o)); _opFromCenter=true; try{ renderTaskDetail(); }catch(e){} const d=document.getElementById('task-detail'); if(d) d.classList.remove('hide'); try{ window.scrollTo(0,0); }catch(e){} };
+window.opWorkService=function(){ _opFromCenter=true; try{ openService(); }catch(e){} };   // abre la vista de trabajo de servicio/mecánico (relevo)
 // Encabezado clicable (minimiza/expande) + contador + flecha. listId = id del contenedor de la lista.
 function opHeader(key, headerId, listId, label, count){
   const el=document.getElementById(headerId); if(!el) return;
@@ -1479,7 +1500,7 @@ function renderOwnerPanel(){
       else if(c.reconStage==='mecanico' && c.inspStarted && !c.inspDone) dvi='<span style="color:var(--gold);">'+L2('En inspección','Inspecting')+'</span>';
       else if(c.inspDone) dvi='<span style="color:#35c46a;">✓ '+L2('Inspección lista','Inspection done')+'</span>';
       const tsk=c.tasks?(' · 🔧 '+c.tasks+' '+t('jobsN')):'';
-      return '<div style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+esc(stage)+'</span></div>'
+      return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+esc(stage)+'</span></div>'
         +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(dvi||'&nbsp;')+tsk+'</div>'+dealPipelineHtml(c.reconStage)+'</div>';
     }).join('');
   }
@@ -1492,7 +1513,7 @@ function renderOwnerPanel(){
       const car=esc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
       const stage=o.activeRole?('🚩 '+svcRoleLabel(o.activeRole)):('🏁 '+L2('Terminado','Done'));
       const s=(o.services||[]).find(x=>x.role===o.activeRole && x.assignName); const who=s?(' · 👤 '+esc(s.assignName)):'';
-      return '<div style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+'</span></div><div class="faint" style="font-size:12px;margin-top:2px;">🚗 '+car+who+' · '+_opStatusLabel(o.status)+'</div></div>';
+      return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+'</span></div><div class="faint" style="font-size:12px;margin-top:2px;">🚗 '+car+who+' · '+_opStatusLabel(o.status)+'</div></div>';
     }).join('');
   }
   // 🧩 LÍNEA DISMANTLING — carros en desmantelado + contador de partes (quedan / vendidas).
@@ -1516,7 +1537,7 @@ function renderOwnerPanel(){
     const total=x.steps||0, done=x.done||0, pr=total?(' · '+done+'/'+total):'';
     const who=x.assignName?('👤 '+esc(x.assignName)):t('unassigned');
     const car=x.carLabel?(' · 🚗 '+esc(x.carLabel)):'';
-    return '<div onclick="jobEditOpen(\''+x.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(x.title)+' '+lineBadge(x.line)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+taskChip(x)+'<span class="faint" style="font-size:13px;">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+_opStatusLabel(x.status)+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
+    return '<div onclick="opWorkTask(\''+x.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(x.title)+' '+lineBadge(x.line)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+taskChip(x)+'<span onclick="event.stopPropagation();jobEditOpen(\''+x.id+'\')" title="Editar" style="cursor:pointer;font-size:14px;padding:3px 5px;border-radius:7px;background:var(--surface2);">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+_opStatusLabel(x.status)+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
 
