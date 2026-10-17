@@ -1288,6 +1288,36 @@ exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
 // 🔧 SERVICE Fase 2: las órdenes asignadas al empleado que llama (mecánico/detallador/…).
 // Los empleados entran por TELÉFONO (no son staff), así que leen sus órdenes por aquí, no directo de Firestore.
 const SVC_ORDER_STATUSES = ["agendado", "por_recibir", "recibido", "en_proceso", "pausado_partes", "listo", "entregado"];
+// 🔧 LÍNEA DE PRODUCCIÓN (relevo por rol) — mismas reglas que admin.html. Orden fijo; configurable para reusar en inventario.
+const SVC_ROLE_PIPELINE = ["Mecánico", "Detallador"];
+function svcRoleRankSrv(r) { const i = SVC_ROLE_PIPELINE.indexOf(r); return i < 0 ? 99 : i; }
+// Etapa ACTIVA = el primer rol de la línea con servicios sin terminar (null = todo listo).
+function svcActiveRoleSrv(services) {
+  const by = {}; (services || []).forEach((s) => { const r = s.role || "Mecánico"; (by[r] = by[r] || []).push(s); });
+  const roles = Object.keys(by).sort((a, b) => svcRoleRankSrv(a) - svcRoleRankSrv(b));
+  for (const r of roles) { if (by[r].some((s) => (s.status || "pendiente") !== "listo")) return r; }
+  return null;
+}
+// Índices de servicios que le tocan a este trabajador (por persona asignada, o por rol si no hay persona fija).
+function svcWorkerServiceIdx(services, id) {
+  const out = [];
+  (services || []).forEach((s, i) => {
+    const byEmp = s.assignEmpId && id.empId && s.assignEmpId === id.empId;
+    const byRole = !s.assignEmpId && s.role && Array.isArray(id.roles) && id.roles.includes(s.role);
+    if (byEmp || byRole) out.push(i);
+  });
+  return out;
+}
+// Estatus general de la orden derivado de la línea (conserva recepción/entrega).
+function svcDeriveStatusSrv(o, svs) {
+  if (!svs.length) return o.status || "por_recibir";
+  const base = o.status || "por_recibir";
+  if (base === "por_recibir" || base === "agendado" || base === "entregado") return base; // aún sin recibir / ya entregado
+  if (!svcActiveRoleSrv(svs)) return "listo";
+  if (svs.some((s) => (s.status) === "en_proceso")) return "en_proceso";
+  if (svs.some((s) => (s.status) === "pausado")) return "pausado_partes";
+  return "recibido"; // recibido, etapa actual sin empezar
+}
 exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const id = await _actorIdentity(request);
@@ -1296,21 +1326,82 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
   let docs = [];
   try { const snap = await db.collection("serviceOrders").get(); docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) {}
   const open = docs.filter((o) => o.status !== "entregado");
+  const isStaff = (id.isOwner || id.email);
   let mine;
-  if (id.isOwner || id.email) { mine = open; } // dueño/staff: ve todas (para probar)
+  if (isStaff) { mine = open; } // dueño/staff: ve todas (para probar)
   else if (id.empId || (Array.isArray(id.roles) && id.roles.length)) {
-    mine = open.filter((o) => (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && o.assignRole && Array.isArray(id.roles) && id.roles.includes(o.assignRole)));
+    mine = open.filter((o) => {
+      const svs = Array.isArray(o.services) ? o.services : [];
+      if (svs.length) return svcWorkerServiceIdx(svs, id).length > 0;          // nuevo: por SERVICIO
+      return (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && o.assignRole && Array.isArray(id.roles) && id.roles.includes(o.assignRole)); // compat órdenes viejas
+    });
   } else { mine = []; }
   const rank = { por_recibir: 0, recibido: 1, en_proceso: 2, pausado_partes: 3, agendado: 4, listo: 5 };
   mine.sort((a, b) => ((rank[a.status] == null ? 9 : rank[a.status]) - (rank[b.status] == null ? 9 : rank[b.status])) || ((a.scheduledAt || a.createdAt || "") < (b.scheduledAt || b.createdAt || "") ? -1 : 1));
-  const out = mine.map((o) => ({
-    id: o.id, clientName: o.clientName || "", clientPhone: o.clientPhone || "",
-    vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
-    reason: o.reason || "", reasonEs: o.reasonEs || o.reason || "", reasonEn: o.reasonEn || o.reason || "",
-    scheduledAt: o.scheduledAt || null, status: o.status || "por_recibir",
-    assignRole: o.assignRole || "", assignName: o.assignName || "",
-  }));
+  const out = mine.map((o) => {
+    const svs = Array.isArray(o.services) ? o.services : [];
+    const activeRole = svcActiveRoleSrv(svs);
+    const myIdx = isStaff ? svs.map((s, i) => i) : svcWorkerServiceIdx(svs, id);
+    const myRoles = [...new Set(myIdx.map((i) => svs[i].role || "Mecánico"))];
+    const myStageActive = isStaff ? true : myRoles.includes(activeRole);
+    const isFirstRole = activeRole && svcRoleRankSrv(activeRole) === 0;
+    return {
+      id: o.id, clientName: o.clientName || "", clientPhone: o.clientPhone || "",
+      vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
+      reason: o.reason || "", reasonEs: o.reasonEs || o.reason || "", reasonEn: o.reasonEn || o.reason || "",
+      scheduledAt: o.scheduledAt || null, status: o.status || "por_recibir",
+      assignRole: o.assignRole || "", assignName: o.assignName || "",
+      // 🔧 línea / relevo
+      activeRole: activeRole || "", myStageActive, waitingFor: (!myStageActive && activeRole) ? activeRole : "",
+      canReceive: isStaff || (myRoles.includes(activeRole) && isFirstRole),
+      services: svs.map((s) => ({ role: s.role || "Mecánico", status: s.status || "pendiente", assignName: s.assignName || "", desc: s.desc || "", descEn: s.descEn || s.desc || "" })),
+      myServices: myIdx.map((i) => ({ index: i, role: svs[i].role || "Mecánico", status: svs[i].status || "pendiente", desc: svs[i].desc || "", descEn: svs[i].descEn || svs[i].desc || "" })),
+    };
+  });
   return { ok: true, orders: out, roles: id.roles || [], name: id.name || "" };
+});
+// 🔧 RELEVO: el trabajador marca SU etapa (empezar / pausar partes / reanudar / terminar). Al terminar su rol, el siguiente queda activo.
+exports.svcServiceDone = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  const action = String(d.action || "finish"); // start | pause | resume | finish
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const svs = Array.isArray(o.services) ? o.services : [];
+  if (!svs.length) throw new HttpsError("failed-precondition", "La orden no tiene servicios.");
+  const isStaff = (id.isOwner || id.email);
+  const activeRole = svcActiveRoleSrv(svs);
+  if (!activeRole) throw new HttpsError("failed-precondition", "La línea ya terminó.");
+  // ¿qué servicios toca? staff: todos los del rol activo (o d.role). trabajador: los suyos del rol activo.
+  let targetIdx;
+  if (isStaff) {
+    const role = d.role || activeRole;
+    targetIdx = svs.map((s, i) => i).filter((i) => (svs[i].role || "Mecánico") === role);
+  } else {
+    const myIdx = svcWorkerServiceIdx(svs, id);
+    const myRoles = [...new Set(myIdx.map((i) => svs[i].role || "Mecánico"))];
+    if (!myRoles.includes(activeRole)) throw new HttpsError("permission-denied", "Aún no es tu turno (espera a " + activeRole + ").");
+    targetIdx = myIdx.filter((i) => (svs[i].role || "Mecánico") === activeRole);
+  }
+  if (!targetIdx.length) throw new HttpsError("failed-precondition", "No hay servicios de esta etapa para ti.");
+  const now = new Date().toISOString();
+  targetIdx.forEach((i) => {
+    if (action === "start" || action === "resume") { svs[i].status = "en_proceso"; if (!svs[i].startedAt) svs[i].startedAt = now; }
+    else if (action === "pause") { svs[i].status = "pausado"; }
+    else if (action === "finish") { svs[i].status = "listo"; svs[i].finishedAt = now; }
+  });
+  const newStatus = svcDeriveStatusSrv(o, svs);
+  const patch = { services: svs, status: newStatus, updatedAt: now, updatedBy: id.email || id.name || id.empId || "" };
+  if (newStatus === "en_proceso" && !o.startedAt) patch.startedAt = now;
+  await ref.set(patch, { merge: true });
+  return { ok: true, status: newStatus, activeRole: svcActiveRoleSrv(svs) };
 });
 
 // 🔧 SERVICE: el empleado asignado (o el dueño) mueve el estatus de la orden.

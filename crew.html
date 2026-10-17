@@ -1178,23 +1178,60 @@ function renderMyService(){
     const car=svcEscE(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
     const idbits=[o.plate?('🪪 '+svcEscE(o.plate)):'', o.vin?('VIN …'+svcEscE((o.vin||'').slice(-6))):''].filter(Boolean).join(' · ');
     const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
+    // Solo MIS servicios de la etapa activa (lo que me toca a mí).
+    const myHere=(o.myServices||[]).filter(ms=>ms.role===o.activeRole);
+    const anyProg=myHere.some(ms=>ms.status==='en_proceso');
+    const anyPaused=myHere.some(ms=>ms.status==='pausado');
+    const allPend=myHere.length && myHere.every(ms=>ms.status==='pendiente');
+    const hasPipe=!!(o.services && o.services.length);
     let actions='';
-    if(o.status==='por_recibir'||o.status==='agendado') actions='<button class="btn btn-gold" onclick="svcOpenReception(\''+o.id+'\')">'+t('svcReceiveCar')+'</button>';
-    else if(o.status==='recibido') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcStartWork')+'</button>';
-    else if(o.status==='en_proceso') actions='<div style="display:flex;gap:8px;"><button class="btn btn-ghost" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'pausado_partes\')">'+t('svcWaitParts')+'</button><button class="btn btn-green" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'listo\')">'+t('svcReady')+'</button></div>';
-    else if(o.status==='pausado_partes') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcResume')+'</button>';
+    if(!hasPipe){
+      // Órdenes VIEJAS sin línea por servicio → flujo anterior (nivel orden).
+      if(o.status==='por_recibir'||o.status==='agendado') actions='<button class="btn btn-gold" onclick="svcOpenReception(\''+o.id+'\')">'+t('svcReceiveCar')+'</button>';
+      else if(o.status==='recibido') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcStartWork')+'</button>';
+      else if(o.status==='en_proceso') actions='<div style="display:flex;gap:8px;"><button class="btn btn-ghost" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'pausado_partes\')">'+t('svcWaitParts')+'</button><button class="btn btn-green" style="flex:1;" onclick="svcAdvance(\''+o.id+'\',\'listo\')">'+t('svcReady')+'</button></div>';
+      else if(o.status==='pausado_partes') actions='<button class="btn btn-gold" onclick="svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcResume')+'</button>';
+    } else if(o.waitingFor && !o.myStageActive){
+      // El que sigue (ej. detallador) ve la orden EN ESPERA hasta que el anterior termine.
+      actions='<div class="btn btn-ghost" style="opacity:.75;cursor:default;">⏳ '+L2('Esperando a ','Waiting for ')+roleLabel(o.waitingFor)+'</div>';
+    } else if(o.status==='por_recibir'||o.status==='agendado'){
+      actions= o.canReceive ? '<button class="btn btn-gold" onclick="svcOpenReception(\''+o.id+'\')">'+t('svcReceiveCar')+'</button>' : '';
+    } else if(anyProg){
+      actions='<div style="display:flex;gap:8px;"><button class="btn btn-ghost" style="flex:1;" onclick="svcStage(\''+o.id+'\',\'pause\')">'+t('svcWaitParts')+'</button><button class="btn btn-green" style="flex:1;" onclick="svcStage(\''+o.id+'\',\'finish\')">'+t('svcReady')+'</button></div>';
+    } else if(anyPaused){
+      actions='<button class="btn btn-gold" onclick="svcStage(\''+o.id+'\',\'resume\')">'+t('svcResume')+'</button>';
+    } else if(allPend || o.status==='recibido'){
+      actions='<button class="btn btn-gold" onclick="svcStage(\''+o.id+'\',\'start\')">'+t('svcStartWork')+'</button>';
+    }
+    // Tira de la línea (todas las etapas, etapa activa resaltada) + mis servicios.
+    const ic={'Mecánico':'🔧','Detallador':'✨','Fotos':'📷','Limpieza':'🧽','Lavado':'🧽'};
+    const rk=r=>({'Mecánico':0,'Detallador':1}[r]!=null?{'Mecánico':0,'Detallador':1}[r]:9);
+    const pipe=(o.services||[]).length?(function(){
+      const by={}; o.services.forEach(x=>{ (by[x.role]=by[x.role]||[]).push(x); });
+      const order=Object.keys(by).sort((a,b)=>rk(a)-rk(b));
+      return order.map(r=>{ const svs=by[r]; const done=svs.every(x=>x.status==='listo'); const act=(r===o.activeRole); const nm=[...new Set(svs.map(x=>x.assignName).filter(Boolean))].join(', ');
+        const col=done?'#35c46a':(act?'var(--gold,#c9a84c)':'#6b7280'); const mk=done?'✓':(act?(svs.some(x=>x.status==='en_proceso')?'🔧':'●'):'⏳');
+        return '<span style="color:'+col+';font-weight:'+(act?'800':'600')+';white-space:nowrap;">'+(ic[r]||'👤')+' '+roleLabel(r)+(nm?(' · '+svcEscE(nm)):'')+' '+mk+'</span>'; }).join('<span style="color:#4b5563;"> → </span>');
+    })():'';
+    const myList=myHere.length?('<div style="font-size:13px;background:var(--surface2,#1a1f2c);border-radius:9px;padding:8px 10px;margin-bottom:8px;"><div class="faint" style="font-size:11px;font-weight:800;margin-bottom:3px;">'+L2('Lo que te toca','Your part')+'</div>'+myHere.map(ms=>'• '+svcEscE((LANG==='en'?ms.descEn:ms.desc)||'')+(ms.status==='listo'?' ✓':(ms.status==='pausado'?' ⏸️':''))).join('<br>')+'</div>'):'';
     return '<div class="card" style="padding:14px;margin-bottom:12px;">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-weight:800;font-size:16px;">'+svcEscE(o.clientName||'')+'</span>'
       +'<span style="font-size:11px;font-weight:800;color:'+s.c+';background:'+s.c+'22;padding:3px 9px;border-radius:999px;white-space:nowrap;">'+svcStLabel(o.status)+'</span></div>'
       +'<div style="font-size:14px;margin-bottom:3px;">🚗 '+car+'</div>'
       +(idbits?'<div class="faint" style="font-size:12px;margin-bottom:6px;">'+idbits+'</div>':'')
-      +'<div style="font-size:14px;background:var(--surface2,#1a1f2c);border-radius:9px;padding:8px 10px;line-height:1.4;margin-bottom:8px;">🔧 '+svcEscE((LANG==='en'?(o.reasonEn||o.reason):(o.reasonEs||o.reason))||'')+'</div>'
+      +(pipe?'<div style="display:flex;flex-wrap:wrap;gap:4px 6px;font-size:12px;align-items:center;background:var(--surface2,#1a1f2c);border-radius:9px;padding:7px 9px;margin-bottom:8px;">'+pipe+'</div>':'')
+      +myList
       +'<div class="faint" style="font-size:12px;margin-bottom:10px;">'+when+(phone?(' · <a href="sms:'+phone+'" style="color:var(--gold,#c9a84c);text-decoration:none;">'+t('svcMsg')+'</a>'):'')+'</div>'
       +actions+'</div>';
   }).join('');
 }
 window.svcAdvance=async function(orderId,status){
   try{ await httpsCallable(functions,'svcOrderStatus')({orderId:orderId,status:status}); toast(t('updated')); loadMyService(); }
+  catch(e){ toast((e&&e.message)||t('couldntLoad'), true); }
+};
+// 🔧 RELEVO: el trabajador marca SU etapa (empezar/pausar/reanudar/terminar). Al terminar su rol, pasa al siguiente.
+window.svcStage=async function(orderId,action){
+  try{ await httpsCallable(functions,'svcServiceDone')({orderId:orderId,action:action}); toast(action==='finish'?L2('¡Listo! 🎉','Done! 🎉'):t('updated')); loadMyService(); }
   catch(e){ toast((e&&e.message)||t('couldntLoad'), true); }
 };
 // 📋 F3 — HOJA DE RECEPCIÓN: checklist corto al recibir el carro (protege de daños pre-existentes).
