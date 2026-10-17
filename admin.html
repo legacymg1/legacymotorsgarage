@@ -1450,6 +1450,22 @@ async function addVehicleToClient(clientId, veh){
 // ===================== SERVICE (TALLER) — Fase 1 =====================
 let svcOrders = [], svcRoster = [], svcRosterLoaded = false;
 const SVC_ROLES = ['Mecánico','Detallador'];
+// 🔧 Orden FIJO de la línea (relevo): mecánica primero, luego detallado. Si se agregan roles, van en este orden.
+const SVC_ROLE_PIPELINE = ['Mecánico','Detallador'];
+function svcRoleRank(r){ const i=SVC_ROLE_PIPELINE.indexOf(r); return i<0?99:i; }
+// Etapa ACTIVA de una orden = el primer rol (por el orden de la línea) que todavía tiene servicios sin terminar.
+function svcActiveRole(services){
+  const byRole={}; (services||[]).forEach(s=>{ const r=s.role||'Mecánico'; (byRole[r]=byRole[r]||[]).push(s); });
+  const roles=Object.keys(byRole).sort((a,b)=>svcRoleRank(a)-svcRoleRank(b));
+  for(const r of roles){ if(byRole[r].some(s=>(s.status||'pendiente')!=='listo')) return r; }
+  return null; // todo listo
+}
+function svcRoleOptions(sel){ return SVC_ROLES.map(r=>'<option value="'+r+'"'+((sel||'Mecánico')===r?' selected':'')+'>'+r+'</option>').join(''); }
+function svcEmpOptions(role, selEmp){
+  const emps=svcRoster.filter(e=>!role||(Array.isArray(e.roles)&&e.roles.includes(role)));
+  const busy=svcBusyByEmp();
+  return '<option value="">Cualquiera ('+(role||'rol')+')</option>'+emps.map(e=>{ const info=busy[e.id]; let tag=' — 🟢 libre'; if(info){ tag=(info.eta&&info.eta>Date.now())?(' — 🔧 ~'+svcHHMM(info.eta)):' — 🔧 ocupado'; } return '<option value="'+e.id+'"'+(String(selEmp)===String(e.id)?' selected':'')+'>'+svcEsc(e.name)+tag+'</option>'; }).join('');
+}
 const SVC_EST = [{m:30,l:'30 min'},{m:60,l:'1 hora'},{m:90,l:'1.5 horas'},{m:120,l:'2 horas'},{m:180,l:'3 horas'},{m:240,l:'4 horas'},{m:300,l:'Medio día'},{m:480,l:'1 día'}];
 function svcBusyByEmp(){
   const m={};
@@ -1543,6 +1559,29 @@ function svcRenderFilters(){
   ['por_recibir','agendado','en_proceso','pausado_partes','listo'].forEach(k=>{ if(counts[k]) html+=chip(k,SVC_STATUS[k].lbl,counts[k]); });
   box.innerHTML=html;
 }
+// Línea de producción de la orden: cada rol con su persona y en qué va (✓ listo · 🔧 activo · ⏳ en espera).
+const SVC_ROLE_ICON={'Mecánico':'🔧','Detallador':'✨','Fotos':'📷','Limpieza':'🧽','Lavado':'🧽','Ayudante general':'🙌','Oficina':'🗂️'};
+function svcPipelineHtml(o){
+  const services=Array.isArray(o.services)?o.services:[];
+  if(!services.length) return '';
+  const active=svcActiveRole(services);
+  const byRole={}; services.forEach(s=>{ const r=s.role||'Mecánico'; (byRole[r]=byRole[r]||[]).push(s); });
+  const roles=Object.keys(byRole).sort((a,b)=>svcRoleRank(a)-svcRoleRank(b));
+  const segs=roles.map(r=>{
+    const svs=byRole[r];
+    const allDone=svs.every(s=>(s.status||'pendiente')==='listo');
+    const anyProg=svs.some(s=>(s.status||'pendiente')==='en_proceso');
+    const isActive=(r===active);
+    const names=[...new Set(svs.map(s=>s.assignName).filter(Boolean))].join(', ');
+    let col='var(--faint)', mark='⏳';
+    if(allDone){ col='#28b463'; mark='✓'; }
+    else if(isActive){ col='var(--gold)'; mark=anyProg?'🔧':'●'; }
+    return '<span style="color:'+col+';font-weight:'+(isActive?'800':'600')+';white-space:nowrap;">'+(SVC_ROLE_ICON[r]||'👤')+' '+svcEsc(r)+(names?(' · '+svcEsc(names)):'')+' '+mark+'</span>';
+  });
+  const etapa = active ? ('🚩 Etapa: '+(SVC_ROLE_ICON[active]||'')+' '+svcEsc(active)) : '🏁 Línea terminada';
+  return '<div style="font-size:11px;font-weight:800;color:'+(active?'var(--gold)':'#28b463')+';">'+etapa+'</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:4px 7px;font-size:11.5px;align-items:center;background:var(--surface3);border-radius:9px;padding:6px 9px;">'+segs.join('<span style="color:var(--faint);">→</span>')+'</div>';
+}
 function svcCard(o){
   const s=SVC_STATUS[o.status]||{lbl:o.status,c:'#8a8fa8'};
   const when = o.scheduledAt ? ('📅 '+new Date(o.scheduledAt).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : '🕐 Ahora';
@@ -1557,6 +1596,7 @@ function svcCard(o){
     +'<div style="font-size:13px;color:var(--text);">🚗 '+car+'</div>'
     +(idbits?'<div style="font-size:12px;color:var(--muted);">'+idbits+'</div>':'')
     +'<div style="font-size:13px;color:var(--text);background:var(--surface3);border-radius:9px;padding:7px 10px;line-height:1.4;">🔧 '+svcEsc(o.reason||'')+'</div>'
+    +svcPipelineHtml(o)
     +((Number(o.laborTotalCents)||0)>0?'<div style="display:flex;justify-content:space-between;font-size:12px;gap:8px;"><span style="color:var(--muted);">Labor <b style="color:var(--text);">'+formatMoney((o.laborTotalCents||0)/100)+'</b>'+((Number(o.depositCents)||0)>0?(' · anticipo '+formatMoney((o.depositCents||0)/100)):'')+'</span><span style="color:var(--green);font-weight:700;">Saldo '+formatMoney((o.balanceCents!=null?o.balanceCents:(o.laborTotalCents||0)-(o.depositCents||0))/100)+'</span></div>':'')
     +(o.estimateStatus==='accepted'?'<div style="font-size:12px;font-weight:800;color:#28b463;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.35);border-radius:9px;padding:6px 9px;">✅ Cliente aceptó el estimado'+(o.estimateAcceptedAt?(' · '+new Date(o.estimateAcceptedAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'})):'')+'</div>':(o.estimateStatus==='sent'?'<div style="font-size:12px;color:var(--gold);background:rgba(232,182,74,.08);border:1px solid var(--border);border-radius:9px;padding:6px 9px;">🧾 Estimado enviado · esperando al cliente</div>':''))
     +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);gap:8px;"><span>'+when+'</span><span style="text-align:right;">👤 '+svcEsc(assign)+'</span></div>'
@@ -1753,7 +1793,7 @@ window.svcNewOrder=function(){
 // 👁️ Abrir una orden EXISTENTE para ver/editar (mismo formulario, modo editar).
 window.svcOpenOrder=function(id){
   const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
-  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0,price:(s.price!=null?Number(s.price):((Number(s.laborCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[])})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60,price:(Number(o.grandTotalCents)||0)/100,parts:[]}];
+  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0,price:(s.price!=null?Number(s.price):((Number(s.laborCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[]),role:s.role||o.assignRole||'Mecánico',assignEmpId:s.assignEmpId||'',assignName:s.assignName||'',status:s.status||'pendiente',estNote:s.estNote||''})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60,price:(Number(o.grandTotalCents)||0)/100,parts:[],role:o.assignRole||'Mecánico',assignEmpId:o.assignEmpId||'',assignName:o.assignName||'',status:'pendiente'}];
   // Migrar partes GLOBALES viejas (modelo anterior) al primer servicio, para no perderlas al editar.
   if(Array.isArray(o.parts)&&o.parts.length && !services.some(s=>s.parts&&s.parts.length)){ const _mig=o.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})); if(services[0]) services[0].parts=_mig; }
   window._svcDraft={ clientId:o.clientId||'', clientName:o.clientName||'', clientPhone:o.clientPhone||'', lang:o.lang||'es',
@@ -1781,8 +1821,10 @@ function svcCapture(){
   if(g('svc-labor-rate')) d.laborRate=Number(g('svc-labor-rate').value)||0;
   if(g('svc-deposit')) d.deposit=Number(g('svc-deposit').value)||0;
   svcCapServices();
-  if(g('svc-role')) d.assignRole=g('svc-role').value;
-  if(g('svc-emp')) d.assignEmpId=g('svc-emp').value;
+  // La asignación de la orden (compat/strip) se deriva de la ETAPA ACTIVA de la línea.
+  const _ar=svcActiveRole(d.services)||((d.services[0]||{}).role)||'Mecánico';
+  const _as=(d.services||[]).find(s=>(s.role||'Mecánico')===_ar && (s.status||'pendiente')!=='listo')||(d.services||[]).find(s=>(s.role||'Mecánico')===_ar)||{};
+  d.assignRole=_ar; d.assignEmpId=_as.assignEmpId||''; d.assignName=_as.assignName||'';
   if(g('svc-status')) d.status=g('svc-status').value;
   if(g('svc-received')) d.receivedAt=g('svc-received').value?new Date(g('svc-received').value).toISOString():'';
   if(g('svc-delivered')) d.deliveredAt=g('svc-delivered').value?new Date(g('svc-delivered').value).toISOString():'';
@@ -1816,11 +1858,17 @@ function svcCapServices(){
     const minutes=Number((document.getElementById('svc-svc-time-'+i)||{}).value)||0;
     const price=Number((document.getElementById('svc-svc-price-'+i)||{}).value)||0;
     const parts=(partsBySvc[i]||[]).filter(p=>p.desc||p.price);
-    arr.push({desc:desc, minutes:minutes, price:price, parts:parts, estNote:((prev[Number(i)]&&prev[Number(i)].estNote)||'')});
+    const role=(document.getElementById('svc-svc-role-'+i)||{}).value||'Mecánico';
+    const assignEmpId=(document.getElementById('svc-svc-emp-'+i)||{}).value||'';
+    const e=assignEmpId?svcRoster.find(x=>String(x.id)===String(assignEmpId)):null;
+    const pv=prev[Number(i)]||{};
+    arr.push({desc:desc, minutes:minutes, price:price, parts:parts, role:role, assignEmpId:assignEmpId, assignName:(e?e.name:''), status:(pv.status||'pendiente'), estNote:(pv.estNote||'')});
   });
-  d.services=arr.length?arr:[{desc:'',minutes:60,price:0,parts:[]}];
+  d.services=arr.length?arr:[{desc:'',minutes:60,price:0,parts:[],role:'Mecánico',assignEmpId:'',assignName:'',status:'pendiente'}];
 }
 window.svcCapture=svcCapture;
+// Al cambiar el ROL de un servicio, se limpia la persona (cambia la lista) y se re-dibuja ese selector.
+window.svcOnRoleChange=function(i){ svcCapServices(); const d=window._svcDraft; if(d&&d.services[Number(i)]){ d.services[Number(i)].assignEmpId=''; d.services[Number(i)].assignName=''; } svcRenderModal(); };
 window.svcCliSearch=function(){
   const q=(document.getElementById('svc-cli-search')?.value||'').toLowerCase().trim();
   const box=document.getElementById('svc-cli-results'); if(!box) return;
@@ -1898,6 +1946,7 @@ function svcRenderModal(){
       +'</div>'
       +'<button type="button" id="svc-est-btn-'+i+'" onclick="svcEstimateOne('+i+')" style="width:100%;margin-top:7px;background:rgba(240,192,64,0.12);border:1px solid var(--gold3);border-radius:9px;padding:7px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;">✨ Estimar tiempo y labor (IA)</button>'
       +(s.estNote?('<div style="font-size:11.5px;color:var(--gold);margin-top:5px;line-height:1.4;">'+svcEsc(s.estNote)+'</div>'):'')
+      +'<div style="margin-top:8px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px;">👤 Asignar este servicio a</div><div style="display:flex;gap:6px;"><select id="svc-svc-role-'+i+'" onchange="svcOnRoleChange('+i+')" title="Rol que hace este servicio" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcRoleOptions(s.role)+'</select><select id="svc-svc-emp-'+i+'" onchange="svcCapServices()" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcEmpOptions(s.role, s.assignEmpId)+'</select></div></div>'
       +'<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:7px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:2px;">🔩 Partes de este servicio</div>'+spartRows
       +'<button type="button" onclick="svcAddPart('+i+')" style="width:100%;margin-top:6px;background:transparent;border:1px dashed var(--border);border-radius:9px;padding:6px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;">➕ Agregar parte / cargo</button></div>'
       +'</div>';
@@ -1916,13 +1965,7 @@ function svcRenderModal(){
     +'<button onclick="svcCapture();window._svcDraft.when=\'now\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when!=='later'?'var(--gold)':'var(--border)')+';background:'+(d.when!=='later'?'var(--gold)':'transparent')+';color:'+(d.when!=='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">🕐 Ahora</button>'
     +'<button onclick="svcCapture();window._svcDraft.when=\'later\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">📅 Agendar</button></div>'
     +(d.when==='later'?'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" style="'+SVC_IN+';margin-top:8px;">':'');
-  // 4 · ASIGNAR
-  const roleOpts=SVC_ROLES.map(r=>'<option value="'+r+'" '+(d.assignRole===r?'selected':'')+'>'+r+'</option>').join('');
-  const emps=svcRoster.filter(e=>!d.assignRole || (Array.isArray(e.roles)&&e.roles.includes(d.assignRole)));
-  const busy=svcBusyByEmp();
-  const empOpts='<option value="">Cualquiera con ese rol</option>'+emps.map(e=>{ const info=busy[e.id]; let tag=' — 🟢 libre'; if(info){ tag=(info.eta&&info.eta>Date.now())?(' — 🔧 ocupado (~libre '+svcHHMM(info.eta)+')'):' — 🔧 ocupado'; } return '<option value="'+e.id+'" '+(String(d.assignEmpId)===String(e.id)?'selected':'')+'>'+svcEsc(e.name)+tag+'</option>'; }).join('');
-  const asgHtml='<div style="display:flex;gap:8px;"><select id="svc-role" onchange="svcCapture();window._svcDraft.assignEmpId=\'\';svcRenderModal()" style="'+SVC_IN+';flex:1;">'+roleOpts+'</select>'
-    +'<select id="svc-emp" style="'+SVC_IN+';flex:1;">'+empOpts+'</select></div>';
+  // (La asignación ahora es POR SERVICIO, dentro de cada tarjeta de servicio arriba.)
   // 5 · ESTATUS + FECHAS (solo al editar una orden existente)
   const _toLocal=iso=>{ if(!iso) return ''; try{ const dt=new Date(iso); if(isNaN(dt)) return ''; return new Date(dt.getTime()-dt.getTimezoneOffset()*60000).toISOString().slice(0,16); }catch(e){ return ''; } };
   let datesHtml='';
@@ -1938,8 +1981,8 @@ function svcRenderModal(){
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
     +'<h2 style="font-family:var(--font-display);font-size:21px;margin:0;">'+(isEdit?'Orden de servicio':'Nueva orden de servicio')+'</h2>'
     +'<button onclick="svcClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>'
-    +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio',svcHtml)+SVC_SEC('4 · Asignar a',asgHtml)
-    +(isEdit?SVC_SEC('5 · Estatus y fechas',datesHtml):'')
+    +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',svcHtml)
+    +(isEdit?SVC_SEC('4 · Estatus y fechas',datesHtml):'')
     +'<button onclick="svcGenEstimate()" style="width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 Generar estimado</button>'
     +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">'+(isEdit?'💾 Guardar cambios':'✅ Crear orden')+'</button>';
 }
@@ -2136,7 +2179,7 @@ window.svcSaveOrder=async function(opts){
   // 3 · servicios (cada uno con su labor = tiempo × tarifa) + partes — feed del invoice
   const rate=Number(d.laborRate)||0;
   const capF=s=>{ s=(s||'').trim(); return s?s.charAt(0).toUpperCase()+s.slice(1):s; };
-  const services=(d.services||[]).map(s=>({ desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, parts:(Array.isArray(s.parts)?s.parts:[]) })).filter(s=>s.desc);
+  const services=(d.services||[]).map(s=>{ const e=s.assignEmpId?svcRoster.find(x=>String(x.id)===String(s.assignEmpId)):null; return { desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, parts:(Array.isArray(s.parts)?s.parts:[]), role:s.role||'Mecánico', assignEmpId:s.assignEmpId||'', assignName:(e?e.name:(s.assignName||'')), status:(s.status||'pendiente') }; }).filter(s=>s.desc);
   if(!services.length){ alert('Agrega al menos un trabajo.'); return; }
   services.forEach(s=>{ s.priceCents=Math.round((Number(s.price)||0)*100); s.laborCents=s.priceCents; });   // el cobro es el PRECIO PLANO del trabajo (no tiempo × tarifa)
   // ✨ Corrector + bilingüe (IA): corrige ortografía ES/EN/mixto de cada trabajo y lo deja en los 2 idiomas (el trabajador lo verá en SU idioma).
@@ -2168,9 +2211,10 @@ window.svcSaveOrder=async function(opts){
   if(status==='entregado' && !deliveredAt) deliveredAt=new Date().toISOString();
   let startedAt=d.startedAt||'';
   if(status==='en_proceso' && !startedAt) startedAt=new Date().toISOString();
-  // 4 · asignar
-  const assignRole=d.assignRole||'Mecánico'; let assignEmpId=d.assignEmpId||'', assignName='';
-  if(assignEmpId){ const e=svcRoster.find(x=>String(x.id)===String(assignEmpId)); assignName=e?e.name:''; }
+  // 4 · asignar — la asignación de la orden (compat + strip "Taller" + svcMyOrders) se deriva de la ETAPA ACTIVA de la línea.
+  const activeRole=svcActiveRole(services)||((services[0]||{}).role)||'Mecánico';
+  const activeSvc=services.find(s=>(s.role||'Mecánico')===activeRole && (s.status||'pendiente')!=='listo')||services.find(s=>(s.role||'Mecánico')===activeRole)||{};
+  const assignRole=activeRole; let assignEmpId=activeSvc.assignEmpId||'', assignName=activeSvc.assignName||'';
   // 🔒 BLOQUEO SUAVE: si se va a asignar mecánico pero el cliente aún no acepta el estimado, avisa (por si lo autorizan en persona/teléfono).
   if(assignEmpId && !opts.silent){
     const o0 = d.editId ? (svcOrders.find(x=>x.id===d.editId)||{}) : {};
