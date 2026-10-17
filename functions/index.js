@@ -1232,7 +1232,7 @@ async function _addCarLabor(db, rawCarId, info) {
     try {
       await db.collection("labor_log").add({
         carId: docId, carKind: kind, carLabel: String(info.carLabel || ""),
-        workerKey: String(info.workerKey || ""), workerName: String(info.workerName || ""), role: String(info.role || ""),
+        workerKey: String(info.workerKey || ""), workerName: String(info.workerName || ""), empId: String(info.empId || ""), role: String(info.role || ""),
         line: String(info.line || ""), minutes: Math.round(minutes), rateCents: Math.round(rate * 100), costCents: costCents,
         source: String(info.source || ""), refId: String(info.refId || ""), title: String(info.title || ""),
         at: new Date().toISOString(),
@@ -1299,7 +1299,7 @@ async function _actorIdentity(request) {
         }
       } catch (e) {}
     }
-    return { key: _emailKey(email), name: tok.name || email.split("@")[0], email, phone: "", empId: "", roles: [], rate: isOwner ? OWNER_LABOR_RATE : 0, photoURL: "", active: true, isOwner, notRegistered: false };
+    return { key: _emailKey(email), name: (isOwner && OWNER_NAMES[email]) || tok.name || email.split("@")[0], email, phone: "", empId: "", roles: [], rate: isOwner ? OWNER_LABOR_RATE : 0, photoURL: "", active: true, isOwner, notRegistered: false };
   }
   if (phone) {
     const key = "ph_" + phone.replace(/\D/g, "");
@@ -1977,7 +1977,7 @@ exports.taskComplete = onCall({ timeoutSeconds: 20 }, async (request) => {
   // 💪 Costo de labor al CARRO (Dealer o Dismantling, según el prefijo del carId) — informativo, NO Finanzas.
   let laborCents = 0;
   if (t.carId && workedMs > 0) {
-    laborCents = await _addCarLabor(db, t.carId, { minutes: workedMs / 60000, rate: Number(id.rate) || 0, workerKey: id.key, workerName: id.name || id.email || id.empId || "", role: t.assignRole || "", line: t.line || "", carLabel: t.carLabel || "", source: "task", refId: taskId, title: t.title || "" });
+    laborCents = await _addCarLabor(db, t.carId, { minutes: workedMs / 60000, rate: Number(id.rate) || 0, workerKey: id.key, workerName: id.name || id.email || id.empId || "", empId: id.empId || "", role: t.assignRole || "", line: t.line || "", carLabel: t.carLabel || "", source: "task", refId: taskId, title: t.title || "" });
   }
   return { ok: true, workedMs: workedMs, laborCents: laborCents };
 });
@@ -2294,6 +2294,60 @@ async function _syncEmpPhone(db, empId) {
 }
 
 // 👑 Panel del dueño en Pit Crew: listar y gestionar el equipo desde el teléfono. Solo dueños.
+// 📊 REPORTE POR EMPLEADO (solo dueños): cuánto generó / cuánto costó su labor / cuántos carros y tareas.
+// Fuentes: labor_log (tiempo→costo por carro), serviceOrders (ingreso de servicios), timeclock (horas de asistencia).
+exports.empReport = onCall({ timeoutSeconds: 40 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const d = request.data || {};
+  const name = String(d.name || "").trim(); const nameLc = name.toLowerCase();
+  const empId = String(d.empId || "");
+  if (!name && !empId) throw new HttpsError("invalid-argument", "Falta el empleado.");
+  const db = admin.firestore();
+  const weekKey = _laMondayKey(new Date());                 // lunes de esta semana (LA)
+  const weekStart = weekKey + "T00:00:00.000-07:00";        // aprox inicio de semana
+  // 1) LABOR (labor_log) — costo de su trabajo en carros, por línea
+  let atMin = 0, atCost = 0, atTasks = 0; const atCars = new Set(); const byLineCost = {};
+  let wkMin = 0, wkCost = 0, wkTasks = 0;
+  try {
+    const ls = await db.collection("labor_log").get();
+    ls.forEach((doc) => {
+      const e = doc.data() || {};
+      const m = (empId && e.empId && e.empId === empId) || (nameLc && e.workerName && String(e.workerName).toLowerCase() === nameLc);
+      if (!m) return;
+      const mn = Number(e.minutes) || 0, cc = Number(e.costCents) || 0;
+      atMin += mn; atCost += cc; atTasks++; if (e.carId) atCars.add(e.carId);
+      const ln = e.line || "general"; byLineCost[ln] = (byLineCost[ln] || 0) + cc;
+      if ((e.at || "") >= weekStart) { wkMin += mn; wkCost += cc; wkTasks++; }
+    });
+  } catch (e) {}
+  // 2) SERVICIOS (serviceOrders) — ingreso de servicios que atendió (precio plano del trabajo)
+  let svcRev = 0, svcCount = 0;
+  try {
+    const ss = await db.collection("serviceOrders").get();
+    ss.forEach((doc) => {
+      const o = doc.data() || {};
+      (Array.isArray(o.services) ? o.services : []).forEach((s) => {
+        const mine = (empId && s.assignEmpId && s.assignEmpId === empId) || (nameLc && s.assignName && String(s.assignName).toLowerCase() === nameLc);
+        if (mine && (s.status === "listo" || s.status === "hecho")) { svcRev += Number(s.priceCents) || 0; svcCount++; }
+      });
+    });
+  } catch (e) {}
+  // 3) HORAS de asistencia esta semana (timeclock)
+  let wkHours = 0;
+  try {
+    const tc = await db.collection("timeclock").where("weekKey", "==", weekKey).get();
+    tc.forEach((doc) => { const x = doc.data() || {}; if ((empId && x.empId === empId) || (nameLc && String(x.name || "").toLowerCase() === nameLc)) wkHours += Number(x.hours) || 0; });
+  } catch (e) {}
+  return {
+    ok: true, name, empId, weekKey,
+    week: { minutes: wkMin, costCents: wkCost, tasks: wkTasks, hours: Math.round(wkHours * 100) / 100 },
+    allTime: { minutes: atMin, costCents: atCost, tasks: atTasks, cars: atCars.size, byLineCost },
+    service: { revenueCents: svcRev, count: svcCount },
+  };
+});
+
 exports.empAdmin = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const id = await _actorIdentity(request);

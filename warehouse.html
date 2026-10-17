@@ -1084,7 +1084,12 @@ function whTeamList(){
     const syn=!!e.synthetic;   // 👑 dueño por default: no se edita/borra, no ficha
     const rs = syn ? (L==='en'?'All functions':'Todas las funciones') : ((Array.isArray(e.roles)?e.roles:[]).join(' · ')||(L==='en'?'No functions':'Sin funciones'));
     const sub = syn ? ('👑 '+(L==='en'?'Owner · no clock':'Dueño · sin reloj')) : (whEscA(e.phone||(L==='en'?'no phone':'sin tel'))+(e.rate?(' · $'+e.rate+'/h'):''));
-    const btns = syn ? '' : ('<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
+    const _nm = whEscA(e.name||'').replace(/\x27/g,"");
+    const reportBtn = '<button onclick="whEmpReport(\''+e.id+'\',\''+_nm+'\')" style="flex:1;min-width:72px;background:transparent;border:1px solid #2e5a3a;color:#35c46a;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">📊 '+L2('Reporte','Report')+'</button>';
+    const btns = syn
+      ? ('<div style="display:flex;gap:6px;margin-top:10px;">'+reportBtn+'</div>')
+      : ('<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
+      +reportBtn
       +'<button onclick="whTeamEdit(\''+e.id+'\')" style="flex:1;min-width:72px;background:#1d2636;border:1px solid #273043;color:#fff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">✏️ '+(L==='en'?'Edit':'Editar')+'</button>'
       +'<button onclick="whViewAsEmployee(\''+e.id+'\')" style="flex:1;min-width:72px;background:transparent;border:1px solid #273043;color:#c9a84c;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">👁️ '+(L==='en'?'View as':'Ver como')+'</button>'
       +'<button onclick="whActAsEmployee(\''+e.id+'\')" style="flex:1;min-width:72px;background:transparent;border:1px solid #6b3fb0;color:#a98bff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">🎭 '+(L==='en'?'Act as':'Actuar como')+'</button>'
@@ -1100,6 +1105,51 @@ function whTeamList(){
     +'<div style="display:flex;gap:8px;margin-bottom:12px;"><button onclick="whTeamNew()" style="flex:1;background:#c9a84c;color:#0b0e14;border:none;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;">➕ '+(L==='en'?'New':'Nuevo')+'</button><button onclick="whOpenPayroll()" style="flex:1;background:transparent;border:1px solid #273043;color:#fff;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;">💵 '+(L==='en'?'Payroll / Hours':'Nómina / Horas')+'</button></div>'
     +cards
     +'<div style="font-size:11px;color:#6b7280;margin-top:10px;line-height:1.5;">'+(L==='en'?'Photo & sensitive data: coming here soon (for now in Finanzas).':'Foto y datos sensibles: pronto aquí (por ahora en Finanzas).')+'</div>';
+}
+// 📊 REPORTE POR EMPLEADO — cuánto generó / costó su labor / carros / tareas / horas.
+window.whEmpReport=async function(empId, name){
+  if(role!=='owner') return;
+  const realEmpId = (empId && empId.indexOf('owner:')===0) ? '' : (empId||'');
+  let ov=document.getElementById('wh-report');
+  if(!ov){ ov=document.createElement('div'); ov.id='wh-report'; ov.style.cssText='position:fixed;inset:0;z-index:100070;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    const box=document.createElement('div'); box.id='wh-report-box'; box.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:440px;width:100%;padding:18px;box-sizing:border-box;cursor:default;margin:auto;';
+    ov.appendChild(box); document.body.appendChild(ov);
+  } else ov.style.display='flex';
+  const box=document.getElementById('wh-report-box');
+  box.innerHTML='<div class="faint" style="text-align:center;padding:24px;">'+t('jLoadingTxt')+'</div>';
+  try{ const r=await httpsCallable(functions,'empReport')({empId:realEmpId, name:name||''}); renderEmpReport((r&&r.data)||{}, name); }
+  catch(e){ box.innerHTML='<div class="faint" style="text-align:center;padding:24px;">'+((e&&e.message)||t('jCouldnt'))+'</div><button class="btn ghost sm" style="width:100%;margin-top:8px;" onclick="document.getElementById(\'wh-report\').remove()">✕</button>'; }
+};
+function _hm(min){ min=Math.round(Number(min)||0); return min>=60?(Math.floor(min/60)+'h '+(min%60)+'m'):(min+'m'); }
+function renderEmpReport(d, name){
+  const box=document.getElementById('wh-report-box'); if(!box) return;
+  const m2=c=>'$'+((Number(c)||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const w=d.week||{}, a=d.allTime||{}, sv=d.service||{};
+  const row=(lbl,val,col)=>'<div style="display:flex;justify-content:space-between;align-items:center;font-size:13.5px;padding:4px 0;"><span style="color:var(--muted);">'+lbl+'</span><span style="font-weight:700;'+(col?('color:'+col+';'):'')+'">'+val+'</span></div>';
+  const card=(inner)=>'<div class="card" style="padding:12px 14px;margin-bottom:10px;">'+inner+'</div>';
+  const byLine=a.byLineCost||{};
+  const lineRows=Object.keys(byLine).length?Object.keys(byLine).map(ln=>row('• '+lineName(ln), m2(byLine[ln]))).join(''):'';
+  box.innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;min-width:0;">📊 '+L2('Reporte','Report')+' · '+esc(name||d.name||'')+'</div><button onclick="document.getElementById(\'wh-report\').remove()" class="btn ghost sm" style="padding:6px 12px;flex:none;">✕</button></div>'
+    // Esta semana
+    +card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+L2('Esta semana','This week')+'</div>'
+      +row('🕐 '+L2('Horas (asistencia)','Hours (clock)'), Number(w.hours||0).toFixed(1)+' h')
+      +row('✅ '+L2('Tareas hechas','Tasks done'), (w.tasks||0))
+      +row('⏱️ '+L2('Tiempo trabajado','Time worked'), _hm(w.minutes))
+      +row('💪 '+L2('Costo de su labor','Labor cost'), m2(w.costCents), '#8ab4ff'))
+    // Histórico
+    +card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+L2('Histórico (todo)','All-time')+'</div>'
+      +row('✅ '+L2('Tareas','Tasks'), (a.tasks||0))
+      +row('🚗 '+L2('Carros trabajados','Cars worked'), (a.cars||0))
+      +row('⏱️ '+L2('Tiempo total','Total time'), _hm(a.minutes))
+      +row('💪 '+L2('Costo total de labor','Total labor cost'), m2(a.costCents), '#8ab4ff')
+      +(lineRows?('<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;"><div class="faint" style="font-size:11px;margin-bottom:3px;">'+L2('Por línea:','By line:')+'</div>'+lineRows+'</div>'):''))
+    // Servicios
+    +(sv.count?card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+L2('Servicios atendidos','Services done')+'</div>'
+      +row('🔧 '+L2('Servicios','Services'), sv.count)
+      +row('💵 '+L2('Ingreso cobrado','Revenue charged'), m2(sv.revenueCents), '#35c46a')):'')
+    +'<div class="faint" style="font-size:10.5px;line-height:1.5;">'+L2('Costo de labor = su tiempo × su tarifa (interno, no es nómina). Ingreso de servicios = lo cobrado al cliente.','Labor cost = their time × rate (internal, not payroll). Service revenue = charged to the client.')+'</div>';
 }
 // 💵 NÓMINA / HORAS de la semana (dueño) — portado de crew (openPayroll). Reusa clockWeek.
 window.whOpenPayroll=async function(){
@@ -1464,6 +1514,10 @@ function renderTaskDetail(){
   const cl=cur.checklist||[]; const done=cl.filter(c=>c.done).length;
   const status=cur.status||'cola';
   const notStarted=(status==='cola'); const paused=(status==='pausada');
+  // 🏷️ Estado de la tarea (siempre visible): En cola → En proceso → En pausa
+  const stLbl = paused ? t('jPaused') : (status==='en_proceso' ? t('jInProc') : t('jToStart'));
+  const stCol = paused ? '#f0a030' : (status==='en_proceso' ? '#35c46a' : '#8a93a6');
+  const statusChip = '<span style="display:inline-block;background:'+stCol+'22;color:'+stCol+';border-radius:999px;padding:3px 11px;font-size:11.5px;font-weight:800;margin-left:6px;vertical-align:middle;">'+esc(stLbl)+'</span>';
   const mats=cur.materials||[]; const matDone=mats.filter(m=>m.done).length;
   const pausedBanner = paused ? '<div style="background:rgba(255,152,0,.12);border:1px solid rgba(255,152,0,.4);border-radius:12px;padding:11px 13px;margin-bottom:14px;font-size:13px;color:#ffb74d;line-height:1.4;">'+t('jPaused')+(cur.pausedReason?(': '+esc(cur.pausedReason)):'')+'</div>' : '';
   // 🧱 Materiales / partes que necesita (con check) — siempre disponible
@@ -1485,7 +1539,7 @@ function renderTaskDetail(){
       + '<button class="btn-green" style="width:100%;" onclick="taskDoComplete()">✅ '+L2('Terminar tarea','Finish task')+'</button>';
   }
   body.innerHTML='<div class="topbar"><button class="linkbtn" onclick="taskDetailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>'
-    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+taskChip(cur)+'</div><h2 style="font-size:20px;margin:0;">'+esc(cur.title)+'</h2>'+(cur.carLabel?'<div style="font-size:13.5px;font-weight:600;margin-top:2px;">🚗 '+esc(cur.carLabel)+'</div>':'')+'</div></div>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+taskChip(cur)+statusChip+'</div><h2 style="font-size:20px;margin:0;">'+esc(cur.title)+'</h2>'+(cur.carLabel?'<div style="font-size:13.5px;font-weight:600;margin-top:2px;">🚗 '+esc(cur.carLabel)+'</div>':'')+'</div></div>'
     +pausedBanner
     +(notStarted?'<div class="faint" style="font-size:13px;margin-bottom:12px;line-height:1.5;">'+L2('Anota los materiales que necesitas y toca Empezar cuando arranques.','List the materials you need and tap Start when you begin.')+'</div>':'')
     +stepsSection
@@ -1495,8 +1549,8 @@ function renderTaskDetail(){
 window.taskPause=async function(){
   if(_vaReadOnly()) return;
   if(!JOB_CUR) return;
-  const reason=prompt(t('jPauseReason')); if(reason===null) return;
-  try{ await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'pause', reason:String(reason||'').trim()})); JOB_CUR.status='pausada'; JOB_CUR.pausedReason=String(reason||'').trim(); renderTaskDetail(); }
+  // Pausa SIMPLE: sin preguntar motivo (el motivo va en "⚠️ Problema"). Solo pausa el cronómetro → muestra Reanudar.
+  try{ await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'pause'})); JOB_CUR.status='pausada'; JOB_CUR.pausedReason=''; renderTaskDetail(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 window.taskResume=async function(){
