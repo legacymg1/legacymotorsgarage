@@ -1311,28 +1311,35 @@ function renderCarAccounts(d){
       +(d.sinPrecio?('<div class="faint" style="font-size:11px;margin-top:5px;">⚠️ '+d.sinPrecio+' '+L2('sin precio capturado','without a price yet')+'</div>'):''))
     // Dinero
     +card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+L2('Dinero','Money')+'</div>'
+      // 💵 Neto de eBay
       +(d.ebayNetReady
-        ? (row('💵 '+L2('Generado (neto real eBay)','Earned (real eBay net)'), _m2(d.soldNetCents), '#35c46a')
-           +(d.netMissing?('<div class="faint" style="font-size:11px;margin:2px 0 4px;color:#f0a030;">⚠️ '+d.netMissing+' '+L2('vendida(s) sin neto aún — sincroniza','sold without net yet — sync')+'</div>'):'')
-           +'<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">'+row('<b>'+L2('Neto actual (neto − costo total)','Net so far (net − total cost)')+'</b>', '<b>'+_m2(d.netoActualCents)+'</b>', d.netoActualCents>=0?'#35c46a':'#ff6b6b')+'</div>')
-        : (row('💵 '+L2('Generado (neto real eBay)','Earned (real eBay net)'), '⏳ '+L2('pendiente','pending'), '#f0a030')
-           +'<div class="faint" style="font-size:11px;margin:2px 0 6px;line-height:1.5;">'+L2('Toca 🔄 para jalar lo que de verdad nos quedó, directo de eBay.','Tap 🔄 to pull the real net kept, straight from eBay.')+'</div>'))
+        ? row('💵 '+L2('Neto eBay','eBay net'), _m2(d.soldNetCents), '#35c46a')
+        : (row('💵 '+L2('Neto eBay','eBay net'), '⏳ '+L2('pendiente','pending'), '#f0a030')
+           +'<div class="faint" style="font-size:11px;margin:2px 0 4px;line-height:1.5;">'+L2('Toca 🔄 para jalar lo que nos quedó, directo de eBay.','Tap 🔄 to pull the net kept from eBay.')+'</div>'))
+      +(d.ebayNetReady && d.netMissing?('<div class="faint" style="font-size:11px;margin:2px 0 4px;color:#f0a030;">⚠️ '+d.netMissing+' '+L2('vendida(s) de eBay sin neto aún','eBay sale(s) without net yet')+'</div>'):'')
+      // 🧾 Ventas registradas en Finanzas ligadas a este carro (fuera de eBay)
+      +(d.finN?row('🧾 '+L2('Ventas en Finanzas','Finanzas sales')+' ('+d.finN+')', _m2(d.finNetCents), '#35c46a'):'')
+      // 💰 Generado total + neto
+      +'<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">'
+      +row('<b>💰 '+L2('Generado total','Total earned')+'</b>', '<b>'+_m2(d.generadoCents)+'</b>', '#35c46a')
+      +row('<b>'+L2('Neto actual (generado − costo total)','Net (earned − total cost)')+'</b>', '<b>'+_m2(d.netoActualCents)+'</b>', d.netoActualCents>=0?'#35c46a':'#ff6b6b')
+      +'</div>'
+      // Referencia a precio de lista
       +'<div style="border-top:1px solid var(--border);padding-top:7px;margin-top:6px;">'
       +'<div class="faint" style="font-size:11px;margin-bottom:4px;">'+L2('Referencia a precio de lista (no es el neto):','List-price reference (not the net):')+'</div>'
       +row(L2('Vendidas','Sold'), _m2(d.soldListCents))
-      +(d.pipelineListCents?row(L2('En envío','Shipping'), _m2(d.pipelineListCents)):'')
       +row(L2('Por vender (publicadas + por publicar)','Unsold (listed + to publish)'), _m2(d.availListCents))
       +row('<b>'+L2('Potencial total','Total potential')+'</b>', '<b>'+_m2(refList)+'</b>')
       +'</div>')
     +'<button class="btn ghost sm" id="acct-sync-btn" style="width:100%;margin-top:2px;" onclick="carAccountsSyncNet()">🔄 '+L2('Sincronizar neto de eBay','Sync eBay net')+'</button>';
 }
 window.carAccountsSyncNet=async function(){
-  const btn=document.getElementById('acct-sync-btn'); if(btn){ btn.disabled=true; btn.textContent='🔄 '+L2('Sincronizando…','Syncing…'); }
-  try{ const r=await httpsCallable(functions,'ebaySyncNet')({}); const d=(r&&r.data)||{};
-    if(d.needConsent){ whToast(L2('Falta reautorizar eBay (permiso de Finanzas).','eBay needs re-authorizing (Finances permission).'),true); }
-    else whToast('✅ '+L2('Neto actualizado: '+(d.updated||0)+' parte(s)','Net updated: '+(d.updated||0)+' part(s)'));
+  const btn=document.getElementById('acct-sync-btn'); if(btn){ btn.disabled=true; btn.textContent='🔄 '+L2('Sincronizando… (puede tardar)','Syncing… (may take a bit)'); }
+  try{ const r=await httpsCallable(functions,'ebaySyncNet',{timeout:300000})({}); const d=(r&&r.data)||{};
+    if(d.needConsent){ whToast('⚠️ '+(d.error||L2('Falta reautorizar eBay (permiso de Finanzas).','eBay needs re-authorizing (Finances permission).')),true); if(btn){ btn.disabled=false; btn.textContent='🔄 '+L2('Sincronizar neto de eBay','Sync eBay net'); } return; }
+    whToast('✅ '+L2('Neto actualizado: '+(d.updated||0)+' de '+(d.matched||0)+' · '+(d.orders||0)+' órdenes','Net: '+(d.updated||0)+'/'+(d.matched||0)+' · '+(d.orders||0)+' orders'));
     if(_acctVid) openCarAccounts(_acctVid);
-  }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); if(btn){ btn.disabled=false; btn.textContent='🔄 '+L2('Sincronizar neto de eBay','Sync eBay net'); } }
+  }catch(e){ whToast('⚠️ '+((e&&e.message)||t('jCouldnt')),true); if(btn){ btn.disabled=false; btn.textContent='🔄 '+L2('Sincronizar neto de eBay','Sync eBay net'); } }
 };
 // 👷 Dueño trabajando: abre SU jornada (tareas + órdenes que puede tomar) encima del Centro.
 let _ownerJornada=false;

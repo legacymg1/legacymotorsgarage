@@ -2161,15 +2161,30 @@ exports.carAccounts = onCall({ timeoutSeconds: 30 }, async (request) => {
     });
   } catch (e) {}
   const pipelineListCents = 0;   // (compatibilidad: ya no se separa, va dentro de vendidas)
+  // 🧾 Ventas de partes registradas en FINANZAS ligadas a este carro (dismantleCarId) — sobre todo ventas FUERA de eBay.
+  let finRevCents = 0, finN = 0, finRefCents = 0;
+  try {
+    const ts = await db.collection("transactions").where("dismantleCarId", "==", vid).get();
+    ts.forEach((d) => {
+      const tt = d.data() || {};
+      if (tt.type === "income") { finRevCents += Number(tt.amountCents) || 0; finN++; }
+      else if (tt.type === "expense" && tt.saleRefundOf) { finRefCents += Number(tt.amountCents) || 0; }
+    });
+  } catch (e) {}
+  const finNetCents = finRevCents - finRefCents;
   const costCents = Number(v.costCents) || 0, laborCents = Number(v.laborCents) || 0, laborMin = Number(v.laborMin) || 0;
-  const ebayNetReady = (counts.vendido > 0 && netMissing < counts.vendido);   // hay neto real para al menos una vendida
-  const netoActualCents = soldNetCents - (costCents + laborCents);
+  const ebayNetReady = (counts.vendido > 0 && netMissing < counts.vendido);   // hay neto real de eBay para al menos una vendida
+  const generadoCents = soldNetCents + finNetCents;   // 💰 generado total = neto eBay + ventas en Finanzas
+  const totalCostCents = costCents + laborCents;
+  const netoActualCents = generadoCents - totalCostCents;
   return {
     ok: true, label: [v.year, v.make, v.model].filter(Boolean).join(" ") || v.title || ("#" + (v.inventoryNum || "")),
     inventoryNum: String(v.inventoryNum || ""), vin: String(v.vin || ""),
-    costCents, laborCents, laborMin, totalCostCents: costCents + laborCents,
+    costCents, laborCents, laborMin, totalCostCents,
     counts, soldListCents, pipelineListCents, availListCents, sinPrecio,
-    ebayNetReady, soldNetCents, netMissing, netoActualCents,
+    ebayNetReady, soldNetCents, netMissing,
+    finRevCents, finN, finRefCents, finNetCents,
+    generadoCents, netoActualCents,
   };
 });
 
@@ -2974,17 +2989,21 @@ exports.ebaySyncNet = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_R
   if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
   const a = await ebayUserAccessToken(EBAY_FINANCES_SCOPE);
   if (!a.token) return { ok: false, needConsent: true, error: (a.raw && (a.raw.error_description || a.raw.error)) || "Sin token de finanzas. Reautoriza eBay." };
-  const days = Math.min(730, Math.max(1, Number((request.data || {}).days) || 180));
+  const days = Math.min(730, Math.max(1, Number((request.data || {}).days) || 365));
   const from = new Date(Date.now() - days * 86400000).toISOString();
+  const to = new Date(Date.now() + 86400000).toISOString();   // rango CERRADO (eBay a veces no acepta abierto)
   const net = {};   // orderId -> cents (suma firmada)
-  let offset = 0, pages = 0, authBad = false;
+  let offset = 0, pages = 0, authBad = false, firstStatus = 0, errBody = "", txSeen = 0;
   while (pages < 40) {
     const url = "https://apiz.ebay.com/sell/finances/v1/transaction?limit=200&offset=" + offset +
-      "&filter=" + encodeURIComponent("transactionDate:[" + from + "..]");
-    let r; try { r = await fetch(url, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json" } }); } catch (e) { break; }
+      "&filter=" + encodeURIComponent("transactionDate:[" + from + ".." + to + "]");
+    let r; try { r = await fetch(url, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json" }, signal: AbortSignal.timeout(25000) }); } catch (e) { errBody = "fetch: " + (e && e.message || e); break; }
+    if (!firstStatus) firstStatus = r.status;
     if (r.status === 401 || r.status === 403) { authBad = true; break; }
     const j = await r.json().catch(() => ({}));
+    if (r.status >= 400 && !errBody) { try { errBody = JSON.stringify(j).slice(0, 300); } catch (e) {} }
     const txs = Array.isArray(j.transactions) ? j.transactions : [];
+    txSeen += txs.length;
     txs.forEach((tx) => {
       const oid = tx.orderId || (Array.isArray(tx.references) && tx.references[0] && tx.references[0].referenceId) || "";
       if (!oid) return;
@@ -3014,7 +3033,7 @@ exports.ebaySyncNet = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_R
     }
     if (n > 0) await batch.commit();
   } catch (e) {}
-  return { ok: true, updated, matched, orders: Object.keys(net).length, days };
+  return { ok: true, updated, matched, orders: Object.keys(net).length, days, firstStatus, txSeen, errBody, sampleOrders: Object.keys(net).slice(0, 4) };
 });
 
 // 📦 Órdenes vendidas SIN enviar (Fulfillment API getOrders) → cola "Por enviar" para Empaque.
