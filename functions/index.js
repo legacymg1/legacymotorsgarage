@@ -2105,7 +2105,7 @@ exports.disInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
     ps.forEach((d) => {
       const p = d.data() || {}; const v = p.vehicleId; if (!v) return;
       const b = byVeh[v] || (byVeh[v] = { total: 0, sold: 0 });
-      b.total += 1; if (p.status === "vendido") b.sold += 1;
+      b.total += 1; const st = p.status || ""; if (st === "vendido" || st === "empaquetando" || st === "en_transito") b.sold += 1;
     });
   } catch (e) {}
   const cars = [];
@@ -2138,8 +2138,10 @@ exports.carAccounts = onCall({ timeoutSeconds: 30 }, async (request) => {
   const vs = await db.collection("dismantle_vehicles").doc(vid).get();
   if (!vs.exists) throw new HttpsError("not-found", "El carro no existe.");
   const v = vs.data() || {};
-  const counts = { total: 0, vendido: 0, proceso: 0, publicado: 0, disponible: 0, borrador: 0 };
-  let soldListCents = 0, pipelineListCents = 0, availListCents = 0, sinPrecio = 0;
+  // ⚠️ "Vendida" = empaquetando + en_transito + vendido (el estatus final "vendido" casi no se usa;
+  // las ventas reales viven en "empaquetando"). `shipping` = cuántas de esas aún en empaque/envío.
+  const counts = { total: 0, vendido: 0, shipping: 0, publicado: 0, disponible: 0, borrador: 0 };
+  let soldListCents = 0, availListCents = 0, sinPrecio = 0;
   let soldNetCents = 0, netMissing = 0;   // 💵 neto real de eBay (si ya se sincronizó)
   try {
     const ps = await db.collection("parts").get();
@@ -2148,16 +2150,17 @@ exports.carAccounts = onCall({ timeoutSeconds: 30 }, async (request) => {
       counts.total++;
       const pc = Number(p.priceCents) || 0; if (!pc) sinPrecio++;
       const st = p.status || "disponible";
-      if (st === "vendido") {
+      if (st === "vendido" || st === "empaquetando" || st === "en_transito") {
         counts.vendido++; soldListCents += pc;
+        if (st !== "vendido") counts.shipping++;
         if (p.ebayNetCents != null) soldNetCents += Number(p.ebayNetCents) || 0; else netMissing++;
       }
-      else if (st === "empaquetando" || st === "en_transito") { counts.proceso++; pipelineListCents += pc; }
       else if (st === "publicado" || st === "en_ebay") { counts.publicado++; availListCents += pc; }
       else if (st === "borrador") { counts.borrador++; availListCents += pc; }
       else { counts.disponible++; availListCents += pc; }
     });
   } catch (e) {}
+  const pipelineListCents = 0;   // (compatibilidad: ya no se separa, va dentro de vendidas)
   const costCents = Number(v.costCents) || 0, laborCents = Number(v.laborCents) || 0, laborMin = Number(v.laborMin) || 0;
   const ebayNetReady = (counts.vendido > 0 && netMissing < counts.vendido);   // hay neto real para al menos una vendida
   const netoActualCents = soldNetCents - (costCents + laborCents);
@@ -2994,7 +2997,7 @@ exports.ebaySyncNet = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_R
     const ps = await db.collection("parts").get();
     let batch = db.batch(), n = 0;
     for (const d of ps.docs) {
-      const p = d.data() || {}; if (p.status !== "vendido" || !p.ebayOrderId) continue;
+      const p = d.data() || {}; if (!p.ebayOrderId) continue;   // cualquier parte vendida en eBay (empaquetando/en_transito/vendido)
       matched++;
       if (net[p.ebayOrderId] != null) {
         batch.set(d.ref, { ebayNetCents: net[p.ebayOrderId], ebayNetAt: new Date().toISOString() }, { merge: true });

@@ -1306,7 +1306,7 @@ function renderCarAccounts(d){
     // Partes
     +card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+L2('Partes','Parts')+' ('+(c.total||0)+')</div>'
       +row('✅ '+L2('Vendidas','Sold'), (c.vendido||0))
-      +(c.proceso?row('🚚 '+L2('En envío','Shipping'), c.proceso):'')
+      +(c.shipping?('<div class="faint" style="font-size:11px;margin:-2px 0 4px;">🚚 '+c.shipping+' '+L2('en empaque/envío','packing/shipping')+'</div>'):'')
       +row('🏷️ '+L2('Publicadas','Listed'), (c.publicado||0))
       +row('📦 '+L2('Por publicar','To publish'), (c.disponible||0)+(c.borrador?(' (+'+c.borrador+' '+L2('borrador','draft')+')'):''))
       +(d.sinPrecio?('<div class="faint" style="font-size:11px;margin-top:5px;">⚠️ '+d.sinPrecio+' '+L2('sin precio capturado','without a price yet')+'</div>'):''))
