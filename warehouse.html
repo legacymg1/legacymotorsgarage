@@ -1521,7 +1521,9 @@ function renderOwnerPanel(){
     if(!OP_SVC.length){ svcbox.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No open service orders.':'Sin órdenes de servicio abiertas.')+'</div>'; }
     else svcbox.innerHTML=OP_SVC.map(o=>{
       const car=esc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
-      const stage=o.activeRole?('🚩 '+svcRoleLabel(o.activeRole)):('🏁 '+L2('Terminado','Done'));
+      // "Terminado" SOLO si la orden está realmente lista/entregada; si la revirtieron (por recibir/recibido) manda el status de la orden.
+      const doneSt=(o.status==='listo'||o.status==='entregado'||o.status==='hecho');
+      const stage = o.activeRole ? ('🚩 '+svcRoleLabel(o.activeRole)) : (doneSt ? ('🏁 '+L2('Terminado','Done')) : ('🚩 '+_opStatusLabel(o.status)));
       const s=(o.services||[]).find(x=>x.role===o.activeRole && x.assignName); const who=s?(' · 👤 '+esc(s.assignName)):'';
       return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+'</span></div><div class="faint" style="font-size:12px;margin-top:2px;">🚗 '+car+who+' · '+_opStatusLabel(o.status)+'</div></div>';
     }).join('');

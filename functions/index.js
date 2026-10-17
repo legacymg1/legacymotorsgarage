@@ -1443,6 +1443,12 @@ exports.svcOrderStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!(id.isOwner || id.email || mine)) throw new HttpsError("permission-denied", "No es tu orden.");
   const patch = { status, updatedAt: new Date().toISOString(), updatedBy: id.email || id.name || id.empId || "" };
   if (status === "en_proceso" && !o.startedAt) patch.startedAt = new Date().toISOString();
+  // ↩️ Si se REVIERTE a una etapa temprana (agendado/por recibir/recibido), reinicia los servicios a "pendiente"
+  // para que el trabajo se reabra de verdad (el relevo arranca otra vez). Conserva rol/persona/precio/partes.
+  const EARLY = ["agendado", "por_recibir", "recibido"];
+  if (EARLY.indexOf(status) >= 0 && Array.isArray(o.services) && o.services.length) {
+    patch.services = o.services.map((s) => Object.assign({}, s, { status: "pendiente" }));
+  }
   await ref.set(patch, { merge: true });
   return { ok: true };
 });
