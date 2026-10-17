@@ -800,14 +800,17 @@ let _asEmp=false;
 function whGreet(){ const h=new Date().getHours(); return h<12?t('morning'):(h<19?t('afternoon'):t('evening')); }
 function whInitials(name){ const p=String(name||'').trim().split(/\s+/).filter(Boolean); if(!p.length) return '?'; return ((p[0][0]||'')+(p.length>1?(p[p.length-1][0]||''):'')).toUpperCase(); }
 function setHeaderIdentity(){
-  const name = myName || whoLabel(myEmail,role) || '';
+  // Al "ver como empleado", el encabezado muestra a ESE empleado (para que se sienta su perfil).
+  const name = (_asEmp && _viewAsName) ? _viewAsName : (myName || whoLabel(myEmail,role) || '');
   const g=document.getElementById('who-greet'); if(g) g.textContent=whGreet();
   const w=document.getElementById('who'); if(w) w.textContent=name||'—';
-  const ini=whInitials(myName || (name.split(' ')[0]||''));
+  const ini=whInitials(name || '');
   const ab=document.getElementById('acct-btn'); if(ab && !ab.querySelector('img')) ab.textContent=ini;
   const av=document.getElementById('acct-ava'); if(av && !av.querySelector('img')) av.textContent=ini;
   const an=document.getElementById('acct-name'); if(an) an.textContent=name||'—';
-  const ar=document.getElementById('acct-roles'); if(ar) ar.textContent = _asEmp ? t('exitViewAsEmp') : (role==='owner'?t('roleOwner'):((_myRoles&&_myRoles.length)?_myRoles.join(' · '):(role?roleLabel(role):'')));
+  const roleTxt = _asEmp ? ((_myRoles&&_myRoles.length)?_myRoles.map(r=>roleLabel(r)).join(' · '):t('exitViewAsEmp')) : (role==='owner'?t('roleOwner'):((_myRoles&&_myRoles.length)?_myRoles.join(' · '):(role?roleLabel(role):'')));
+  const ar=document.getElementById('acct-roles'); if(ar) ar.textContent = roleTxt;
+  const wr=document.getElementById('who-role'); if(wr) wr.textContent = roleTxt;
 }
 function updateLangBtns(){ const es=document.getElementById('acct-es'),en=document.getElementById('acct-en'); if(es)es.classList.toggle('on',L==='es'); if(en)en.classList.toggle('on',L==='en'); }
 window.toggleAcct=function(e){ if(e&&e.stopPropagation)e.stopPropagation(); const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(!m)return; if(!m.classList.contains('hide')){ m.classList.add('hide'); c.classList.add('hide'); } else { setHeaderIdentity(); updateLangBtns(); m.classList.remove('hide'); c.classList.remove('hide'); } };
