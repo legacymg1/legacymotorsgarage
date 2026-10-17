@@ -1671,6 +1671,72 @@ exports.mechCarIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true };
 });
 
+// 🔧 DVI — Inspección paso a paso del mecánico. Guarda borrador por área y, al terminar,
+// escribe el REPORTE + LISTA DE PARTES en el carro y lo AVANZA en la línea Dealer
+// (mecanico → pintura/detalle) o lo deja en espera de partes. Solo callables (sin regla Firestore).
+exports.mechDvi = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const isMech = id.isOwner || id.email || (Array.isArray(id.roles) && id.roles.indexOf("Mecánico") >= 0);
+  if (!isMech) throw new HttpsError("permission-denied", "No autorizado.");
+  const d = request.data || {};
+  const op = String(d.op || "");
+  const carId = String(d.carId || ""); if (!carId) throw new HttpsError("invalid-argument", "Falta el carro.");
+  const db = admin.firestore();
+  const ref = db.collection("inventory").doc(carId);
+  const snap = await ref.get(); if (!snap.exists) throw new HttpsError("not-found", "El carro no existe.");
+  const car = snap.data() || {};
+  const existing = car.inspection || {};
+  const now = new Date().toISOString();
+  const S = (v, n) => String(v == null ? "" : v).slice(0, n || 200);
+
+  if (op === "get") {
+    return { ok: true, inspection: existing, reconStage: car.reconStage || "mecanico" };
+  }
+
+  if (op === "save") {   // guarda el borrador (no termina)
+    const draft = d.draft && typeof d.draft === "object" ? d.draft : {};
+    await ref.set({ inspection: { startedAt: existing.startedAt || now, by: existing.by || (id.name || id.empId || ""), draft, updatedAt: now } }, { merge: true });
+    return { ok: true };
+  }
+
+  if (op === "finish") {   // escribe el reporte final + avanza el carro
+    // report = [{key,title,items:[{label,state,measure,note,part,photo}]}]
+    const reportIn = Array.isArray(d.report) ? d.report : [];
+    const report = reportIn.slice(0, 40).map((a) => ({
+      key: S(a.key, 40), title: S(a.title, 80),
+      items: (Array.isArray(a.items) ? a.items : []).slice(0, 40).map((it) => ({
+        label: S(it.label, 120), state: S(it.state, 20), measure: S(it.measure, 40),
+        note: S(it.note, 400), part: S(it.part, 160), photo: S(it.photo, 600),
+      })),
+    }));
+    const partsIn = Array.isArray(d.parts) ? d.parts : [];
+    const parts = partsIn.slice(0, 60).map((p) => ({ label: S(p.label, 160), note: S(p.note, 300), photo: S(p.photo, 600), area: S(p.area, 80) }))
+      .filter((p) => p.label);
+    const nextStage = ["detalle", "pintura"].indexOf(String(d.nextStage || "")) >= 0 ? String(d.nextStage) : "";
+    const miles = String(d.miles || existing.byMiles || "").replace(/[^\d]/g, "");
+    const needsParts = parts.length > 0 && !nextStage;
+    const insp = {
+      startedAt: existing.startedAt || now,
+      by: existing.by || (id.name || id.empId || ""),
+      byMiles: miles, updatedAt: now,
+      reportAt: now, reportBy: (id.name || id.empId || id.email || ""),
+      report, parts,
+      outcome: needsParts ? "needs_parts" : "passed",
+      waitingParts: needsParts,
+      draft: null,
+    };
+    const patch = { inspection: insp };
+    if (nextStage) patch.reconStage = nextStage;   // avanza la línea Dealer
+    if (miles) patch.receivedMiles = miles;
+    await ref.set(patch, { merge: true });
+    return { ok: true, outcome: insp.outcome, nextStage, parts: parts.length };
+  }
+
+  throw new HttpsError("invalid-argument", "Operación inválida.");
+});
+
 // 🔧 TAREAS DE TRABAJO POR CARRO (car_tasks) — el admin pone el siguiente paso (ej. "reemplazar motor"),
 // se acumulan, y van a la cola del mecánico. Solo por callables (admin SDK) → sin regla Firestore.
 exports.invPrepList = onCall({ timeoutSeconds: 30 }, async (request) => {
@@ -1947,7 +2013,7 @@ exports.carsInProcess = onCall({ timeoutSeconds: 30 }, async (request) => {
     const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
     const photo = (Array.isArray(c.photos) && c.photos[0]) || c.img || "";
     const insp = c.inspection || {};
-    cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), reconStage: c.reconStage || "mecanico", receivedMiles: String(c.receivedMiles || ""), inspStarted: !!insp.startedAt, tasks: taskCount[d.id] || 0 });
+    cars.push({ id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""), photo: String(photo || ""), reconStage: c.reconStage || "mecanico", receivedMiles: String(c.receivedMiles || ""), inspStarted: !!insp.startedAt, inspDone: !!insp.reportAt, waitingParts: !!insp.waitingParts, partsNeeded: (Array.isArray(insp.parts) ? insp.parts.length : 0), tasks: taskCount[d.id] || 0 });
   });
   cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
   return { ok: true, cars };

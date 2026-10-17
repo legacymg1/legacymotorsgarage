@@ -263,6 +263,16 @@
     </div>
   </div></div>
 
+  <!-- 🔧 DVI — Inspección paso a paso del mecánico (gated por área) -->
+  <div id="view-dvi" class="hide" style="position:fixed;inset:0;z-index:6360;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;"><div class="wrap" style="padding:16px;">
+    <div class="topbar">
+      <button class="linkbtn" onclick="dviBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>
+      <div style="flex:1;min-width:0;"><div class="faint" style="font-size:13px;">🔧 <span id="dvi-kicker">Inspección (DVI)</span></div><h2 id="dvi-car" style="font-size:19px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</h2></div>
+    </div>
+    <div style="display:flex;gap:4px;margin:4px 0 16px;flex-wrap:wrap;" id="dvi-prog"></div>
+    <div id="dvi-body"></div>
+  </div></div>
+
   <!-- Recepción del carro (intake) -->
   <div id="mech-intake" class="hide" style="position:fixed;inset:0;z-index:6500;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)mechCloseIntake()">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));"><div id="mech-intake-body"></div></div>
@@ -543,7 +553,7 @@ const T={
     addJob:'➕ Agregar trabajo a un carro', noCars:'No hay carros esperando inspección.<br>Cuando se registra un carro, aparece aquí solo.',
     received:'Recibido', inspectBtn:'🔍 Inspeccionar', continueBtn:'Seguir', inspStarted:'● Inspección iniciada',
     vehReception:'Recepción del vehículo', milesReceive:'Millas con las que recibes el carro', milesPh:'Ej. 84250',
-    startInsp:'▶️ Empezar inspección', contInsp:'▶️ Continuar inspección', dviNote:'La certificación paso a paso (DVI) se abre al registrar las millas.<br>(La construimos en el siguiente paso.)',
+    startInsp:'▶️ Empezar inspección', contInsp:'▶️ Continuar inspección', dviNote:'Al registrar las millas se abre la inspección paso a paso (DVI): exterior, interior, motor, lift, fluidos y prueba de manejo.',
     invNumLbl:'Inventario #', recDate:'Fecha de recepción:', noJobs:'No hay trabajos en cola.', noJobsOwner:'<br>Toca <b>➕ Agregar trabajo a un carro</b>.',
     otherJob:'➕ otra tarea a este carro', whatToDo:'¿Qué se le va a hacer? (el paso)', whatToDoPh:'Ej. Reemplazar motor', addToQueue:'➕ Agregar a la cola', chooseCar:'— Elige el carro —', svcCar:'Carro',
     stCola:'🕐 En cola', stProc:'🔧 En proceso', stDone:'✅ Hecho',
@@ -594,7 +604,7 @@ const T={
     addJob:'➕ Add a job to a car', noCars:'No cars waiting for inspection.<br>When a car is registered, it shows here automatically.',
     received:'Received', inspectBtn:'🔍 Inspect', continueBtn:'Continue', inspStarted:'● Inspection started',
     vehReception:'Vehicle reception', milesReceive:'Miles you receive the car with', milesPh:'e.g. 84250',
-    startInsp:'▶️ Start inspection', contInsp:'▶️ Continue inspection', dviNote:'The step-by-step certification (DVI) opens after you log the miles.<br>(We build it in the next step.)',
+    startInsp:'▶️ Start inspection', contInsp:'▶️ Continue inspection', dviNote:'Logging the miles opens the step-by-step inspection (DVI): exterior, interior, engine, lift, fluids and road test.',
     invNumLbl:'Inventory #', recDate:'Received on:', noJobs:'No jobs in queue.', noJobsOwner:'<br>Tap <b>➕ Add a job to a car</b>.',
     otherJob:'➕ another job for this car', whatToDo:'What needs to be done? (the step)', whatToDoPh:'e.g. Replace engine', addToQueue:'➕ Add to queue', chooseCar:'— Choose the car —', svcCar:'Car',
     stCola:'🕐 Queued', stProc:'🔧 In progress', stDone:'✅ Done',
@@ -1525,8 +1535,9 @@ window.mechStartInspection=async function(){
   const miles=(document.getElementById('mech-miles').value||'').trim();
   if(!miles){ whToast(L==='en'?'Enter the miles.':'Pon las millas.',true); return; }
   try{ await httpsCallable(functions,'mechCarIntake')(vaData({ carId:MECH_CUR.id, receivedMiles:miles }));
-    whToast(L==='en'?'✅ Miles saved · inspection started':'✅ Millas registradas · inspección iniciada');
-    mechCloseIntake(); loadMechCars();
+    const car=Object.assign({}, MECH_CUR, {receivedMiles:miles});
+    mechCloseIntake();
+    dviOpen(car);   // 🔧 abre el DVI paso a paso
   }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 async function loadMechTasks(){
@@ -1716,6 +1727,162 @@ const TRIAGE=[
 function triLabel(o){ return (L==='en' && o.en) ? o.en : o.label; }
 function triQ(tr){ return (L==='en' && tr.qEn) ? tr.qEn : tr.q; }
 const TRI_BASE_MIN=40;
+
+// ===================== 🔧 DVI — Inspección paso a paso del mecánico =====================
+// Áreas gated (una a la vez). Cada ítem: Bien / Atención / Reparar; medida opcional; si no está bien → nota + pieza + foto.
+const DVI_SOP = [
+  { key:'ext', title:'Exterior / Carrocería', titleEn:'Exterior / Body', items:[
+    { id:'pintura', label:'Pintura y carrocería', labelEn:'Paint & body' },
+    { id:'cristales', label:'Parabrisas y cristales', labelEn:'Windshield & glass' },
+    { id:'luces-ext', label:'Luces exteriores (faros/calaveras/direccionales)', labelEn:'Exterior lights (head/tail/turn)' },
+    { id:'espejos', label:'Espejos y limpiabrisas', labelEn:'Mirrors & wipers' },
+  ]},
+  { key:'int', title:'Interior', titleEn:'Interior', items:[
+    { id:'testigos', label:'Luces del tablero / testigos (check engine, etc.)', labelEn:'Dash warning lights' },
+    { id:'ac', label:'A/C y calefacción', labelEn:'A/C & heater' },
+    { id:'estereo', label:'Estéreo / pantalla', labelEn:'Stereo / screen' },
+    { id:'ventanas-seguros', label:'Ventanas y seguros eléctricos', labelEn:'Power windows & locks' },
+    { id:'cinturones', label:'Cinturones de seguridad', labelEn:'Seat belts' },
+    { id:'claxon', label:'Claxon', labelEn:'Horn' },
+    { id:'asientos', label:'Asientos y vestiduras', labelEn:'Seats & upholstery' },
+  ]},
+  { key:'motor', title:'Motor (bajo el cofre)', titleEn:'Engine (under hood)', items:[
+    { id:'aceite-motor', label:'Aceite (nivel y estado)', labelEn:'Engine oil (level & condition)' },
+    { id:'refrigerante', label:'Refrigerante / anticongelante', labelEn:'Coolant' },
+    { id:'bateria', label:'Batería', labelEn:'Battery', measure:true, unit:'V' },
+    { id:'bandas', label:'Bandas (serpentina)', labelEn:'Belts' },
+    { id:'mangueras', label:'Mangueras', labelEn:'Hoses' },
+    { id:'filtro-aire', label:'Filtro de aire', labelEn:'Air filter' },
+    { id:'fugas-motor', label:'Fugas visibles en el motor', labelEn:'Visible engine leaks' },
+  ]},
+  { key:'lift', title:'Abajo (en el lift)', titleEn:'Underneath (on the lift)', items:[
+    { id:'balatas-del', label:'Balatas delanteras', labelEn:'Front brake pads', measure:true, unit:'mm' },
+    { id:'balatas-tras', label:'Balatas traseras', labelEn:'Rear brake pads', measure:true, unit:'mm' },
+    { id:'rotores', label:'Rotores / discos', labelEn:'Rotors / discs' },
+    { id:'llantas', label:'Llantas — dibujo', labelEn:'Tires — tread', measure:true, unit:'32nds' },
+    { id:'suspension', label:'Suspensión / amortiguadores', labelEn:'Suspension / shocks' },
+    { id:'escape', label:'Sistema de escape', labelEn:'Exhaust system' },
+    { id:'fugas-bajo', label:'Fugas por debajo', labelEn:'Leaks underneath' },
+    { id:'flechas', label:'Flechas / juntas homocinéticas', labelEn:'Axles / CV joints' },
+  ]},
+  { key:'fluidos', title:'Fluidos / Servicio', titleEn:'Fluids / Service', items:[
+    { id:'cambio-aceite', label:'¿Necesita cambio de aceite?', labelEn:'Needs oil change?' },
+    { id:'transmision', label:'Líquido de transmisión', labelEn:'Transmission fluid' },
+    { id:'frenos-liq', label:'Líquido de frenos', labelEn:'Brake fluid' },
+    { id:'direccion', label:'Dirección hidráulica', labelEn:'Power steering' },
+  ]},
+  { key:'manejo', title:'Prueba de manejo', titleEn:'Road test', items:[
+    { id:'arranque', label:'Arranque en frío', labelEn:'Cold start' },
+    { id:'frenado', label:'Frenado', labelEn:'Braking' },
+    { id:'direccion-manejo', label:'Dirección / alineación', labelEn:'Steering / alignment' },
+    { id:'cambios', label:'Cambios de transmisión', labelEn:'Transmission shifting' },
+    { id:'ruidos', label:'Ruidos / vibraciones', labelEn:'Noises / vibrations' },
+  ]},
+];
+function dviT(k){ const m={ insp:['Inspección (DVI)','Inspection (DVI)'], bien:['✅ Bien','✅ Good'], aten:['⚠️ Atención','⚠️ Watch'], malo:['❌ Reparar','❌ Repair'],
+  note:['Observación…','Note…'], part:['Pieza que necesita…','Part needed…'], photo:['📷 Foto','📷 Photo'], prev:['‹ Anterior','‹ Back'], next:['Siguiente área ›','Next area ›'],
+  finish:['Terminar inspección','Finish inspection'], area:['Área','Area'], review:['Revisar y enviar','Review & send'],
+  revH:['Resumen de la inspección','Inspection summary'], noFlags:['Todo salió bien. Sin pendientes.','All good. Nothing flagged.'],
+  partsH:['🧩 Partes que necesita','🧩 Parts needed'], outcomeH:['¿Qué sigue con el carro?','What is next for the car?'],
+  toDetalle:['🧽 Listo para detallado','🧽 Ready for detailing'], toPintura:['🎨 Mandar a pintura','🎨 Send to paint'],
+  waitParts:['🔧 Esperando partes','🔧 Waiting on parts'], sent:['✅ Reporte enviado','✅ Report sent'], measure:['Medida','Measure'] };
+  const a=m[k]||['','']; return L==='en'?a[1]:a[0]; }
+function dviField(it,f){ return (L==='en' && it[f+'En']!=null) ? it[f+'En'] : it[f]; }
+let DVI=null;
+window.dviBack=function(){ document.getElementById('view-dvi').classList.add('hide'); try{ loadMechCars(); }catch(e){} };
+window.dviOpen=async function(car){
+  if(!car) return;
+  DVI={ carId:car.id, label:car.label||'', inventoryNum:car.inventoryNum||'', vin:car.vin||'', miles:car.receivedMiles||'', areaIdx:0, data:{}, reviewing:false };
+  document.getElementById('dvi-car').textContent=DVI.label||('#'+DVI.inventoryNum);
+  document.getElementById('dvi-kicker').textContent=dviT('insp');
+  document.getElementById('view-dvi').classList.remove('hide');
+  // Reanuda borrador si existe
+  try{ const r=await httpsCallable(functions,'mechDvi')(vaData({op:'get', carId:car.id})); const insp=((r&&r.data)||{}).inspection||{}; if(insp.draft&&insp.draft.data){ DVI.data=insp.draft.data||{}; DVI.areaIdx=Math.min(insp.draft.areaIdx||0, DVI_SOP.length-1); } }catch(e){}
+  dviRender();
+};
+function dviRender(){ dviProg(); if(DVI.reviewing){ dviRenderReview(); } else { dviRenderArea(); } try{ window.scrollTo(0,0); }catch(e){} }
+function dviProg(){ const box=document.getElementById('dvi-prog'); if(!box) return;
+  box.innerHTML=DVI_SOP.map((a,i)=>{ const st=(!DVI.reviewing && i===DVI.areaIdx)?'var(--gold)':((DVI.reviewing||i<DVI.areaIdx)?'var(--green,#35c46a)':'var(--surface2)');
+    return '<div style="flex:1;min-width:14px;height:5px;border-radius:3px;background:'+st+';"></div>'; }).join('')
+    + '<div style="flex:1;min-width:14px;height:5px;border-radius:3px;background:'+(DVI.reviewing?'var(--gold)':'var(--surface2)')+';"></div>';
+}
+function dviRenderArea(){
+  const a=DVI_SOP[DVI.areaIdx]; const body=document.getElementById('dvi-body'); if(!a||!body) return;
+  const title=(L==='en'?a.titleEn:a.title);
+  const rows=a.items.map(it=>dviItemRow(it)).join('');
+  const isLast=DVI.areaIdx>=DVI_SOP.length-1;
+  body.innerHTML='<div class="faint" style="font-size:12px;font-weight:700;">'+dviT('area')+' '+(DVI.areaIdx+1)+'/'+DVI_SOP.length+'</div>'
+    +'<h2 style="font-size:23px;margin:4px 0 14px;">'+esc(title)+'</h2>'
+    +'<div id="dvi-items">'+rows+'</div>'
+    +'<div style="display:flex;gap:10px;margin-top:18px;">'
+    +(DVI.areaIdx>0?'<button class="btn ghost" onclick="dviPrev()" style="flex:1;">'+dviT('prev')+'</button>':'')
+    +'<button class="btn-gold" onclick="dviNext()" style="flex:2;">'+(isLast?dviT('review'):dviT('next'))+'</button></div>';
+}
+function dviItemRow(it){
+  const d=DVI.data[it.id]||{}; const st=d.state||'';
+  const lbl=dviField(it,'label');
+  const btn=(v,txt,col)=>'<button onclick="dviSetState(\''+it.id+'\',\''+v+'\')" style="flex:1;padding:8px 4px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid '+(st===v?col:'var(--border)')+';background:'+(st===v?col:'var(--surface2)')+';color:'+(st===v?'#0b0e14':'var(--text)')+';">'+txt+'</button>';
+  let extra='';
+  if(it.measure){ extra+='<input type="text" inputmode="decimal" value="'+esc(d.measure||'')+'" oninput="dviSet(\''+it.id+'\',\'measure\',this.value)" placeholder="'+dviT('measure')+(it.unit?(' ('+it.unit+')'):'')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;">'; }
+  if(st==='aten'||st==='malo'){
+    extra+='<textarea oninput="dviSet(\''+it.id+'\',\'note\',this.value)" placeholder="'+dviT('note')+'" rows="2" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;resize:vertical;">'+esc(d.note||'')+'</textarea>';
+    extra+='<input type="text" value="'+esc(d.part||'')+'" oninput="dviSet(\''+it.id+'\',\'part\',this.value)" placeholder="'+dviT('part')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;">';
+    extra+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center;">'
+      +(d.photo?'<img src="'+esc(d.photo)+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;">':'')
+      +'<label class="btn ghost sm" style="cursor:pointer;margin:0;">'+(d.photo? (L==='en'?'Change':'Cambiar') : dviT('photo'))+'<input type="file" accept="image/*" capture="environment" style="display:none;" onchange="dviPhoto(\''+it.id+'\',this)"></label>'
+      +'<span class="faint" id="dvi-ph-'+it.id+'" style="font-size:11px;"></span></div>';
+  }
+  return '<div class="card" style="padding:12px;margin-bottom:10px;"><div style="font-size:14.5px;font-weight:600;margin-bottom:9px;line-height:1.35;">'+esc(lbl)+'</div>'
+    +'<div style="display:flex;gap:6px;">'+btn('bien',dviT('bien'),'#35c46a')+btn('aten',dviT('aten'),'#ffc94d')+btn('malo',dviT('malo'),'#ff5a5a')+'</div>'
+    +extra+'</div>';
+}
+window.dviSetState=function(id,v){ const d=DVI.data[id]||(DVI.data[id]={}); d.state=v; const box=document.getElementById('dvi-items'); if(box){ // re-render solo esa fila
+    const a=DVI_SOP[DVI.areaIdx]; box.innerHTML=a.items.map(it=>dviItemRow(it)).join(''); } };
+window.dviSet=function(id,f,val){ const d=DVI.data[id]||(DVI.data[id]={}); d[f]=val; };
+window.dviPhoto=async function(id,inp){ const f=inp&&inp.files&&inp.files[0]; if(!f) return; const lab=document.getElementById('dvi-ph-'+id);
+  if(lab) lab.textContent=(L==='en'?'Uploading…':'Subiendo…');
+  try{ const jpg=await toJpeg(f); const r=ref(storage,'inventory/'+DVI.carId+'/dvi/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); const url=await getDownloadURL(r);
+    const d=DVI.data[id]||(DVI.data[id]={}); d.photo=url; const box=document.getElementById('dvi-items'); if(box){ const a=DVI_SOP[DVI.areaIdx]; box.innerHTML=a.items.map(it=>dviItemRow(it)).join(''); }
+  }catch(e){ if(lab) lab.textContent='⚠️'; whToast((L==='en'?'Photo failed':'Falló la foto'),true); }
+};
+window.dviPrev=function(){ if(DVI.reviewing){ DVI.reviewing=false; dviRender(); return; } if(DVI.areaIdx>0){ DVI.areaIdx--; dviRender(); } };
+window.dviNext=function(){ dviSaveDraft(); if(DVI.areaIdx>=DVI_SOP.length-1){ DVI.reviewing=true; dviRender(); } else { DVI.areaIdx++; dviRender(); } };
+function dviSaveDraft(){ if(_vaReadOnly()) return; try{ httpsCallable(functions,'mechDvi')(vaData({op:'save', carId:DVI.carId, draft:{data:DVI.data, areaIdx:DVI.areaIdx}})); }catch(e){} }
+function dviCollect(){ const flagged=[], parts=[]; const report=DVI_SOP.map(a=>({ key:a.key, title:(L==='en'?a.titleEn:a.title),
+    items:a.items.map(it=>{ const d=DVI.data[it.id]||{}; const row={ label:dviField(it,'label'), state:d.state||'', measure:(it.measure&&d.measure)?(d.measure+(it.unit?(' '+it.unit):'')):'', note:d.note||'', part:d.part||'', photo:d.photo||'' };
+      if(d.state==='aten'||d.state==='malo') flagged.push({area:(L==='en'?a.titleEn:a.title), ...row});
+      if((d.part||'').trim()) parts.push({ label:d.part.trim(), area:(L==='en'?a.titleEn:a.title), note:d.note||'', photo:d.photo||'' });
+      return row; }) })); return { report, flagged, parts }; }
+function dviRenderReview(){
+  const body=document.getElementById('dvi-body'); if(!body) return;
+  const c=dviCollect();
+  const flagHtml = c.flagged.length ? c.flagged.map(f=>{
+    const col=f.state==='malo'?'#ff5a5a':'#ffc94d';
+    return '<div class="card" style="padding:10px 12px;margin-bottom:8px;border-left:3px solid '+col+';"><div style="font-weight:700;font-size:14px;">'+(f.state==='malo'?'❌ ':'⚠️ ')+esc(f.label)+'</div>'
+      +'<div class="faint" style="font-size:11.5px;margin-top:2px;">'+esc(f.area)+(f.measure?(' · '+esc(f.measure)):'')+'</div>'
+      +(f.note?'<div style="font-size:13px;margin-top:5px;">'+esc(f.note)+'</div>':'')
+      +(f.part?'<div style="font-size:12.5px;margin-top:4px;color:var(--gold);">🧩 '+esc(f.part)+'</div>':'')
+      +(f.photo?'<img src="'+esc(f.photo)+'" style="margin-top:6px;width:72px;height:72px;object-fit:cover;border-radius:8px;">':'')+'</div>';
+  }).join('') : '<div class="faint" style="text-align:center;padding:18px;">'+dviT('noFlags')+'</div>';
+  const partsHtml = c.parts.length ? ('<div class="sub" style="font-weight:800;font-size:14px;margin:16px 0 8px;">'+dviT('partsH')+' ('+c.parts.length+')</div>'
+    + c.parts.map(p=>'<div style="font-size:13.5px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06);">🧩 '+esc(p.label)+' <span class="faint" style="font-size:11px;">· '+esc(p.area)+'</span></div>').join('')) : '';
+  body.innerHTML='<h2 style="font-size:22px;margin:0 0 4px;">'+dviT('revH')+'</h2>'
+    +'<div class="faint" style="font-size:13px;margin-bottom:14px;">'+esc(DVI.label)+(DVI.miles?(' · '+esc(DVI.miles)+' mi'):'')+'</div>'
+    +flagHtml+partsHtml
+    +'<div class="sub" style="font-weight:800;font-size:14px;margin:20px 0 10px;">'+dviT('outcomeH')+'</div>'
+    +(c.parts.length?'<button class="btn-gold" onclick="dviSubmit(\'\')" style="width:100%;margin-bottom:10px;background:#ff8a4c;">'+dviT('waitParts')+'</button>':'')
+    +'<button class="btn-gold" onclick="dviSubmit(\'detalle\')" style="width:100%;margin-bottom:10px;">'+dviT('toDetalle')+'</button>'
+    +'<button class="btn ghost" onclick="dviSubmit(\'pintura\')" style="width:100%;margin-bottom:10px;">'+dviT('toPintura')+'</button>'
+    +'<button class="linkbtn" onclick="dviPrev()" style="width:100%;">'+dviT('prev')+'</button>';
+}
+window.dviSubmit=async function(nextStage){
+  if(_vaReadOnly()) return;
+  const c=dviCollect();
+  try{ const r=await httpsCallable(functions,'mechDvi')(vaData({ op:'finish', carId:DVI.carId, report:c.report, parts:c.parts, nextStage:nextStage, miles:DVI.miles }));
+    whToast(dviT('sent')); document.getElementById('view-dvi').classList.add('hide'); try{ loadMechCars(); }catch(e){}
+  }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+
 let JOB=null, runIdx=0, stepStart=0, tickHandle=null, TRI={};
 function detailI18n(){
   const S=(id,es,en)=>{ const el=document.getElementById(id); if(el) el.textContent=L2(es,en); };
