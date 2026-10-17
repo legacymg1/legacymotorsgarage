@@ -2170,6 +2170,30 @@ exports.carAccounts = onCall({ timeoutSeconds: 30 }, async (request) => {
   };
 });
 
+// 🔍 DIAGNÓSTICO de partes (temporal, solo lectura, solo dueños): ¿las vendidas están ligadas a un carro?
+exports.partsDiag = onCall({ timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  const vs = await db.collection("dismantle_vehicles").get();
+  const validVeh = new Set(vs.docs.map((d) => d.id));
+  const ps = await db.collection("parts").get();
+  const r = { total: 0, byStatus: {}, soldTotal: 0, soldWithVehicle: 0, soldVehicleValid: 0, soldNoVehicle: 0, soldWarehouseOnly: 0, soldWithEbayOrder: 0, soldInPerson: 0, vehicles: vs.size };
+  ps.forEach((d) => {
+    const p = d.data() || {}; r.total++;
+    const st = p.status || "disponible"; r.byStatus[st] = (r.byStatus[st] || 0) + 1;
+    if (st === "vendido") {
+      r.soldTotal++;
+      if (p.vehicleId) { r.soldWithVehicle++; if (validVeh.has(p.vehicleId)) r.soldVehicleValid++; } else r.soldNoVehicle++;
+      if (p.warehouseOnly) r.soldWarehouseOnly++;
+      if (p.ebayOrderId) r.soldWithEbayOrder++;
+      if (p.soldInPerson) r.soldInPerson++;
+    }
+  });
+  return { ok: true, ...r };
+});
+
 // 🚗 Lista ligera de carros para apuntar una tarea suelta del Pit: inventario del dealer + carros para desmantelar (yarda). Solo dueños.
 exports.invCarsLite = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");

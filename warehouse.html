@@ -1050,7 +1050,8 @@ function setWhLegacyActions(){ window.LEGACY_ACTIONS=[
   { label:(L==='en'?'Operations Center':'Centro de Operaciones'), ico:'📊', fn:'whOwnerHome' },
   { label:(L==='en'?'Functions':'Funciones'), ico:'🧰', fn:'openFunctions' },
   { label:(L==='en'?'Team & payroll':'Equipo y nómina'), ico:'👥', fn:'whOpenTeam' },
-  { label:(L==='en'?'GPS locations':'Ubicaciones GPS'), ico:'⚙️', fn:'whOpenGps' }
+  { label:(L==='en'?'GPS locations':'Ubicaciones GPS'), ico:'⚙️', fn:'whOpenGps' },
+  { label:(L==='en'?'Parts diagnostic':'🔍 Diagnóstico partes'), ico:'🔍', fn:'whPartsDiag' }
 ]; }
 let _viewAsEmpId='', _viewAsName='', _actAs=false;
 // Inyecta asEmpId cuando el dueño ve/actúa como un empleado → las callables trabajan como ÉL.
@@ -1245,6 +1246,26 @@ window.whOwnerHome=function(){
 // Botón "‹ volver": dueño → Centro de Operaciones; empleado → Mi jornada.
 window.whBack=function(){ if(role==='owner' && !_asEmp){ if(_ownerJornada){ _ownerJornada=false; whOwnerHome(); } else whOwnerHome(); } else whGoHome(); };
 // 💰 CUENTAS DEL CARRO (Dismantling) — overlay SOLO INFORMATIVO. No toca Finanzas.
+// 🔍 Diagnóstico temporal de partes vendidas (¿ligadas a carro?)
+window.whPartsDiag=async function(){
+  try{ closeAcct(); }catch(e){}
+  whToast(L2('Revisando partes…','Checking parts…'));
+  try{ const r=await httpsCallable(functions,'partsDiag')({}); const d=(r&&r.data)||{};
+    const bs=Object.entries(d.byStatus||{}).map(([k,v])=>k+': '+v).join('\n');
+    const msg='🔍 DIAGNÓSTICO DE PARTES\n\n'
+      +'Total de partes: '+d.total+'\nCarros en dismantling: '+d.vehicles+'\n\n'
+      +'Por estatus:\n'+bs+'\n\n'
+      +'VENDIDAS: '+d.soldTotal+'\n'
+      +'  • con carro (vehicleId): '+d.soldWithVehicle+'\n'
+      +'  • con carro que EXISTE: '+d.soldVehicleValid+'\n'
+      +'  • SIN carro: '+d.soldNoVehicle+'\n'
+      +'  • artículo rápido (warehouseOnly): '+d.soldWarehouseOnly+'\n'
+      +'  • con orden de eBay: '+d.soldWithEbayOrder+'\n'
+      +'  • vendidas en persona: '+d.soldInPerson;
+    try{ alert(msg); }catch(e){ whToast('vendidas '+d.soldTotal+' · con carro '+d.soldWithVehicle+' · sin carro '+d.soldNoVehicle); }
+    console.log('partsDiag', d);
+  }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
 let _acctVid='';
 window.openCarAccounts=async function(vid){
   if(role!=='owner') return;
