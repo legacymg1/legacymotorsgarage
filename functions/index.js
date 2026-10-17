@@ -3036,6 +3036,27 @@ exports.ebaySyncNet = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_R
   return { ok: true, updated, matched, orders: Object.keys(net).length, days, firstStatus, txSeen, errBody, sampleOrders: Object.keys(net).slice(0, 4) };
 });
 
+// 🔍 TEMPORAL: diagnóstico directo de la API de Finanzas de eBay (gated por key). Sin montos (solo orderId/estatus).
+exports.ebayFinDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 60 }, async (req, res) => {
+  if (String(req.query.key || "") !== "lmgfin2026") { res.status(403).send("no"); return; }
+  try {
+    const a = await ebayUserAccessToken(EBAY_FINANCES_SCOPE);
+    if (!a.token) { res.json({ ok: false, step: "token", tokenErr: a.raw || "sin token" }); return; }
+    const from = new Date(Date.now() - 365 * 86400000).toISOString();
+    const to = new Date(Date.now() + 86400000).toISOString();
+    const url = "https://apiz.ebay.com/sell/finances/v1/transaction?limit=50&filter=" + encodeURIComponent("transactionDate:[" + from + ".." + to + "]");
+    const r = await fetch(url, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json", "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" }, signal: AbortSignal.timeout(25000) });
+    const status = r.status;
+    const j = await r.json().catch(() => ({}));
+    const txs = Array.isArray(j.transactions) ? j.transactions : [];
+    res.json({
+      ok: status < 300, step: "transaction", status, total: j.total, count: txs.length,
+      sample: txs.slice(0, 4).map((t) => ({ orderId: t.orderId || "", type: t.transactionType || "", booking: t.bookingEntry || "", hasAmount: !!(t.amount && t.amount.value) })),
+      errBody: status >= 400 ? JSON.stringify(j).slice(0, 600) : "",
+    });
+  } catch (e) { res.json({ ok: false, step: "catch", error: String(e && e.message || e) }); }
+});
+
 // 📦 Órdenes vendidas SIN enviar (Fulfillment API getOrders) → cola "Por enviar" para Empaque.
 // Devuelve datos crudos por orden (SKU, título, cantidad, fecha límite de envío, comprador); el front hace el match SKU→parte (bin/foto).
 const EBAY_FULFILL_SCOPE = "https://api.ebay.com/oauth/api_scope/sell.fulfillment";
