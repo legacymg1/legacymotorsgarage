@@ -105,8 +105,8 @@
     <div class="sub" style="margin-bottom:14px;text-align:center;" data-i18n="teamAccess">Acceso del equipo</div>
     <!-- Modo de entrada: equipo por TELÉFONO (default) / dueños y estaciones por CORREO -->
     <div style="display:flex;gap:6px;margin-bottom:14px;">
-      <button id="login-tab-phone" class="btn" style="flex:1;" onclick="loginMode('phone')" data-i18n="loginPhone">📱 Teléfono</button>
-      <button id="login-tab-email" class="btn ghost" style="flex:1;" onclick="loginMode('email')" data-i18n="loginEmail">✉️ Correo</button>
+      <button id="login-tab-phone" class="btn" style="flex:1;" onclick="loginMode('phone')" data-i18n="loginPhone">👤 Miembro del equipo</button>
+      <button id="login-tab-email" class="btn ghost" style="flex:1;" onclick="loginMode('email')" data-i18n="loginEmail">🔧 Service</button>
     </div>
     <!-- TELÉFONO (empleados) -->
     <div id="login-phone-box">
@@ -551,7 +551,7 @@ let _messaging=null;
 const T={
   es:{ installApp:'📲 Instalar Pit Crew como app', teamAccess:'Acceso del equipo', email:'Correo', pass:'Contraseña', enter:'Entrar', logout:'Salir', logoutConfirm:'¿Cerrar sesión? Tendrás que volver a poner tu correo y contraseña.',
     needEmailPass:'Escribe correo y contraseña', loginBad:'Correo o contraseña incorrectos', loginMany:'Demasiados intentos, espera.', noAccess:'Esta cuenta no tiene acceso a Pit Crew.',
-    loginPhone:'📱 Teléfono', loginEmail:'✉️ Correo', phoneLbl:'Tu teléfono', sendCode:'Enviar código', codeLbl:'Código que te llegó por SMS', verifyCode:'Entrar', codeBack:'‹ Cambiar número', phoneBad:'Escribe un número de 10 dígitos.', codeSending:'📩 Enviando código…', codeSentTo:'Te mandamos un código a', codeNeed:'Escribe el código de 6 dígitos.', codeChecking:'Entrando…', codeBad:'Código incorrecto. Revísalo e intenta de nuevo.', phoneErr:'No se pudo enviar el código. Revisa el número e inténtalo otra vez.', phoneNoAccess:'Ese número no está registrado como empleado. Pídele a tu supervisor que te dé de alta.',
+    loginPhone:'👤 Miembro del equipo', loginEmail:'🔧 Service', phoneLbl:'Tu teléfono', sendCode:'Enviar código', codeLbl:'Código que te llegó por SMS', verifyCode:'Entrar', codeBack:'‹ Cambiar número', phoneBad:'Escribe un número de 10 dígitos.', codeSending:'📩 Enviando código…', codeSentTo:'Te mandamos un código a', codeNeed:'Escribe el código de 6 dígitos.', codeChecking:'Entrando…', codeBad:'Código incorrecto. Revísalo e intenta de nuevo.', phoneErr:'No se pudo enviar el código. Revisa el número e inténtalo otra vez.', phoneNoAccess:'Ese número no está registrado como empleado. Pídele a tu supervisor que te dé de alta.',
     roleOwner:'Dueño', roleWh:'Almacén', roleYard:'Captura', roleLister:'Listado', rolePack:'Empaque', roleMech:'Mecánico',
     tabCapture:'🔧 Captura', tabList:'🏷️ Listado', tabPack:'📦 Empaque',
     homeTitle:'Tus funciones', homeBack:'‹ Mi jornada', homeHi:'Hola', homeTapFn:'Toca una función para empezar.',
@@ -603,7 +603,7 @@ const T={
     alertPart:'Escribe qué parte es.', alertCar:'Pon al menos VIN o marca/modelo.', carNotFound:'Carro no encontrado.', vinShort:'El VIN se ve corto (deben ser ~17).', decoding:'Decodificando…', decodeOk:'✓ Datos rellenados — revisa y corrige si hace falta.', decodeNone:'No se encontró info de ese VIN; captura a mano.', decodeErr:'No se pudo decodificar (sin internet o VIN inválido). Captura a mano.', error:'Error: ' },
   en:{ installApp:'📲 Install Pit Crew as app', teamAccess:'Team access', email:'Email', pass:'Password', enter:'Sign in', logout:'Log out', logoutConfirm:'Log out? You\'ll have to enter your email and password again.',
     needEmailPass:'Enter email and password', loginBad:'Wrong email or password', loginMany:'Too many attempts, wait.', noAccess:'This account has no access to Pit Crew.',
-    loginPhone:'📱 Phone', loginEmail:'✉️ Email', phoneLbl:'Your phone', sendCode:'Send code', codeLbl:'Code you got by SMS', verifyCode:'Sign in', codeBack:'‹ Change number', phoneBad:'Enter a 10-digit number.', codeSending:'📩 Sending code…', codeSentTo:'We sent a code to', codeNeed:'Enter the 6-digit code.', codeChecking:'Signing in…', codeBad:'Wrong code. Check it and try again.', phoneErr:'Could not send the code. Check the number and try again.', phoneNoAccess:'That number is not registered as an employee. Ask your supervisor to add you.',
+    loginPhone:'👤 Team member', loginEmail:'🔧 Service', phoneLbl:'Your phone', sendCode:'Send code', codeLbl:'Code you got by SMS', verifyCode:'Sign in', codeBack:'‹ Change number', phoneBad:'Enter a 10-digit number.', codeSending:'📩 Sending code…', codeSentTo:'We sent a code to', codeNeed:'Enter the 6-digit code.', codeChecking:'Signing in…', codeBad:'Wrong code. Check it and try again.', phoneErr:'Could not send the code. Check the number and try again.', phoneNoAccess:'That number is not registered as an employee. Ask your supervisor to add you.',
     roleOwner:'Owner', roleWh:'Warehouse', roleYard:'Capture', roleLister:'Listing', rolePack:'Packing', roleMech:'Mechanic',
     tabCapture:'🔧 Capture', tabList:'🏷️ Listing', tabPack:'📦 Packing',
     homeTitle:'Your functions', homeBack:'‹ My day', homeHi:'Hi', homeTapFn:'Tap a function to start.',
