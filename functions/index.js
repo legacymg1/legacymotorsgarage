@@ -2161,7 +2161,7 @@ exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
   const wk = _laMondayKey(new Date());
   const openSnap = await db.collection("timeclock_open").doc(id.key).get();
   const od = openSnap.exists ? (openSnap.data() || {}) : null;
-  const open = od ? { inAt: od.inAt, location: od.location, onBreak: !!od.onBreakSince, onBreakSince: od.onBreakSince || null } : null;
+  const open = od ? { inAt: od.inAt, location: od.location, onBreak: !!od.onBreakSince, onBreakSince: od.onBreakSince || null, breakTaken: ((Number(od.breakMs) || 0) > 0 || (Array.isArray(od.breaks) && od.breaks.length > 0)) } : null;
   const snap = await db.collection("timeclock").where("weekKey", "==", wk).get();
   const emailLc = (id.email || "").toLowerCase();
   let hours = 0;

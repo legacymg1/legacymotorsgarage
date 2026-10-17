@@ -116,6 +116,7 @@
       <div class="sub" id="who-greet" style="font-size:12px;line-height:1.2;"></div>
       <div id="who" style="font-size:21px;font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
     </div>
+    <button id="clk-pill" onclick="clkTap()" style="display:none;align-self:center;margin-right:10px;border:none;border-radius:999px;padding:9px 15px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;transition:transform .12s ease;color:#0b0e14;background:#35c46a;">Clock In</button>
     <button id="acct-btn" class="wh-avatar" onclick="toggleAcct(event)" aria-label="Perfil">?</button>
   </div>
 
@@ -740,6 +741,8 @@ window.refreshClock = async function(){
     const r=await httpsCallable(functions,'clockMine')(vaData({}));
     const d=(r&&r.data)||{};
     _whClkOpen=d.open||null;
+    updateClkPill(d);   // 🕐 reloj como pill en la barra superior (empleados)
+    const cc=document.getElementById('clock-card'); if(cc && _homeMode) cc.style.display='none';   // en Pit Crew el reloj es el pill, no la tarjeta
     if(wk) wk.textContent=(L==='en'?'Week: ':'Semana: ')+Number(d.hours||0).toFixed(2)+' h';
     const ah=document.getElementById('acct-hours'); if(ah) ah.textContent=Number(d.hours||0).toFixed(2)+' h';
     if(d.open){
@@ -761,6 +764,61 @@ window.refreshClock = async function(){
     }
   }catch(e){ if(st){ st.textContent='(No se pudo cargar el reloj)'; } }
 };
+// ===== 🕐 PILL del reloj en la barra superior (solo empleado por teléfono / Pit Crew) =====
+// Ciclo profesional EE.UU.: Clock In → Start Break → End Break → Clock Out.
+let _clkBusy=false;
+function updateClkPill(d){
+  const p=document.getElementById('clk-pill'); if(!p) return;
+  // Solo empleados en modo HOME (teléfono/Pit Crew). Dueño y correos/Sunmi usan la tarjeta de siempre.
+  if(!_homeMode){ p.style.display='none'; return; }
+  const o=(d&&d.open)||null;
+  let label,act,bg,fg='#0b0e14';
+  if(!o){ label='Clock In'; act='in'; bg='#35c46a'; }
+  else if(o.onBreak){ label='End Break'; act='break_end'; bg='#f0a030'; }
+  else if(o.breakTaken){ label='Clock Out'; act='out'; bg='#ff5a5a'; fg='#fff'; }
+  else { label='Start Break'; act='break_start'; bg='#ffc94d'; }
+  p.textContent=label; p.dataset.act=act; p.style.background=bg; p.style.color=fg;
+  // Si ya está dentro y aún no toma descanso, un toque largo permite salir directo (saltar descanso).
+  p.dataset.canOut = (o && !o.onBreak && !o.breakTaken) ? '1' : '';
+  p.title = p.dataset.canOut ? 'Mantén presionado para salir sin descanso / Hold to clock out' : '';
+  p.style.display='inline-block';
+}
+function _clkPulse(p){ try{ p.style.transform='scale(0.9)'; setTimeout(()=>{ p.style.transform='scale(1.08)'; },90); setTimeout(()=>{ p.style.transform='scale(1)'; },220); }catch(e){} }
+async function clkDoPunch(action){
+  if(_vaReadOnly()) return;
+  if(_clkBusy) return; _clkBusy=true;
+  const p=document.getElementById('clk-pill'); if(p){ p.disabled=true; p.style.opacity='0.6'; }
+  try{
+    if(action==='in' || action==='out'){
+      whToast(action==='in'?'📍 Leyendo ubicación…':'📍 Leyendo ubicación…');
+      const g=await _getGPS();
+      const r=await httpsCallable(functions,'clockPunch')(vaData({action, lat:g.lat, lng:g.lng}));
+      const d=(r&&r.data)||{};
+      whToast(action==='in' ? '✅ Clocked in' : ('✅ Clocked out — '+(d.hours||0)+' h'));
+    } else {
+      await httpsCallable(functions,'clockPunch')(vaData({action}));
+      whToast(action==='break_start'?'☕ Break started':'▶️ Back to work');
+    }
+    await refreshClock();
+  }catch(e){ whToast('⚠️ '+_clockErr(e), true); }
+  if(p){ p.disabled=false; p.style.opacity='1'; }
+  _clkBusy=false;
+}
+let _clkHold=null, _clkHeld=false;
+window.clkTap=function(ev){
+  const p=document.getElementById('clk-pill'); if(!p) return;
+  if(_clkHeld){ _clkHeld=false; return; }   // ya lo resolvió el toque largo
+  _clkPulse(p);
+  clkDoPunch(p.dataset.act||'in');
+};
+// Toque largo = salir sin descanso (solo cuando el pill ofrece "Start Break")
+(function(){
+  const p=document.getElementById('clk-pill'); if(!p) return;
+  const start=()=>{ if(p.dataset.canOut!=='1') return; _clkHold=setTimeout(()=>{ _clkHeld=true; _clkPulse(p); clkDoPunch('out'); },650); };
+  const cancel=()=>{ if(_clkHold){ clearTimeout(_clkHold); _clkHold=null; } };
+  p.addEventListener('touchstart', start, {passive:true}); p.addEventListener('touchend', cancel); p.addEventListener('touchmove', cancel);
+  p.addEventListener('mousedown', start); p.addEventListener('mouseup', cancel); p.addEventListener('mouseleave', cancel);
+})();
 // ☕ Descanso (sin GPS). El backend decide; aquí togglamos según el estado actual.
 window.punchBreak = async function(){
   if(_vaReadOnly()) return;
