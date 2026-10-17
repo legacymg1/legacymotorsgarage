@@ -1150,8 +1150,29 @@ function renderEmpReport(d, name, weekKey){
   const card=(inner)=>'<div class="card" style="padding:12px 14px;margin-bottom:10px;">'+inner+'</div>';
   const byLine=a.byLineCost||{};
   const lineRows=Object.keys(byLine).length?Object.keys(byLine).map(ln=>row('• '+lineName(ln), m2(byLine[ln]))).join(''):'';
+  // 🪪 Ficha JARVIS: desde cuándo es miembro + antigüedad + histórico rápido
+  const tn=d.tenure||{};
+  const fmtLong=(iso)=>{ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return '—'; } };
+  const fmtShort=(iso)=>{ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'numeric',month:'short'}); }catch(e){ return '—'; } };
+  const dSince=(iso)=>{ if(!iso) return 0; try{ return Math.max(0,Math.floor((Date.now()-new Date(iso).getTime())/86400000)); }catch(e){ return 0; } };
+  const since=tn.memberSince||''; const td=dSince(since);
+  const tenureTxt = td>=365 ? (Math.floor(td/365)+' '+L2('año(s)','yr')+(Math.floor((td%365)/30)?(' '+Math.floor((td%365)/30)+' '+L2('mes','mo')):'')) : td>=30 ? (Math.floor(td/30)+' '+L2('mes(es)','mo')+(td%30?(' '+(td%30)+' d'):'')) : (td+' '+L2('días','days'));
+  const mini=(l,v,col)=>'<div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 4px;text-align:center;"><div style="font-weight:800;font-size:16px;'+(col?('color:'+col+';'):'color:#fff;')+'">'+v+'</div><div style="font-size:10px;color:var(--muted);margin-top:1px;">'+l+'</div></div>';
+  const tenureCard=card('<div style="display:flex;align-items:center;gap:12px;">'
+      +'<span style="width:48px;height:48px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:17px;flex:none;">'+whInitials(name||d.name)+'</span>'
+      +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-weight:800;color:#fff;font-size:15.5px;">'+(tn.active===false?'⚪ ':'🟢 ')+esc(name||d.name||'')+'</div>'
+        +'<div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 '+L2('Miembro desde','Member since')+' <b style="color:#f0d680;">'+fmtLong(since)+'</b></div>'
+        +'<div style="font-size:11.5px;color:var(--muted);margin-top:1px;">⏳ '+tenureTxt+' '+L2('con Legacy','with Legacy')+(tn.roles&&tn.roles.length?(' · '+esc(tn.roles.join(', '))):'')+'</div>'
+      +'</div></div>'
+      +'<div style="display:flex;gap:7px;margin-top:11px;">'
+        +mini(L2('Horas totales','Total hrs'), Number(a.hours||0).toFixed(0))
+        +mini(L2('Turnos','Shifts'), (a.shifts||0))
+        +mini(L2('Último día','Last day'), fmtShort(tn.lastClockIn), '#35c46a')
+      +'</div>');
   box.innerHTML=
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;min-width:0;">📊 '+L2('Reporte','Report')+' · '+esc(name||d.name||'')+'</div><button onclick="document.getElementById(\'wh-report\').remove()" class="btn ghost sm" style="padding:6px 12px;flex:none;">✕</button></div>'
+    +tenureCard
     // Esta semana
     +card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+weekTitle+'</div>'
       +row('🕐 '+L2('Horas (asistencia)','Hours (clock)'), Number(w.hours||0).toFixed(1)+' h')
@@ -1175,10 +1196,10 @@ function renderEmpReport(d, name, weekKey){
 function _weekKeyOf(dt){ const x=new Date(dt); const day=(x.getDay()+6)%7; x.setHours(0,0,0,0); x.setDate(x.getDate()-day); const y=x.getFullYear(), m=String(x.getMonth()+1).padStart(2,'0'), d=String(x.getDate()).padStart(2,'0'); return y+'-'+m+'-'+d; }
 function _weekRange(weekKey){ const s=new Date(weekKey+'T12:00:00'); const e=new Date(s.getTime()+6*86400000); const mo=L==='en'?'en-US':'es-MX'; const f=(dt)=>dt.toLocaleDateString(mo,{day:'numeric',month:'short'}); return f(s)+' – '+f(e); }
 function _dayStr(dt){ const x=new Date(dt); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
-let _payWeek='', _payCalMonth=null, _payData=null;
+let _payWeek='', _payCalMonth=null, _payData=null, _payDay='', _payDayData=null;
 window.whOpenPayroll=async function(){
   if(role!=='owner') return; try{ closeAcct(); whTeamClose(); }catch(e){}
-  _payWeek=_weekKeyOf(new Date()); _payCalMonth=new Date(); _payData=null;
+  _payWeek=_weekKeyOf(new Date()); _payCalMonth=new Date(); _payData=null; _payDay=_dayStr(new Date()); _payDayData=null;
   let ov=document.getElementById('wh-pay');
   if(!ov){ ov=document.createElement('div'); ov.id='wh-pay'; ov.style.cssText='position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
     ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
@@ -1187,14 +1208,19 @@ window.whOpenPayroll=async function(){
   } else ov.style.display='flex';
   whPayLoad();
 };
-async function whPayLoad(){
-  _payData=null; whPayRender();
-  try{ const r=await httpsCallable(functions,'clockWeek')({weekKey:_payWeek}); _payData=(r&&r.data)||{}; }catch(e){ _payData={__err:true}; }
+async function whPayLoad(dayOnly){
+  if(!dayOnly) _payData=null;
+  _payDayData=null; whPayRender();
+  const jobs=[];
+  if(!dayOnly) jobs.push(httpsCallable(functions,'clockWeek')({weekKey:_payWeek}).then(r=>{_payData=(r&&r.data)||{};}).catch(()=>{_payData={__err:true};}));
+  jobs.push(httpsCallable(functions,'clockDay')({dateStr:_payDay}).then(r=>{_payDayData=(r&&r.data)||{};}).catch(()=>{_payDayData={__err:true};}));
+  await Promise.all(jobs);
   whPayRender();
 }
 window.whPayCalPrev=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()-1, 1); whPayRender(); };
 window.whPayCalNext=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()+1, 1); whPayRender(); };
-window.whPayPickDay=function(ds){ const nw=_weekKeyOf(new Date(ds+'T12:00:00')); if(nw!==_payWeek){ _payWeek=nw; whPayLoad(); } };
+window.whPayPickDay=function(ds){ _payDay=ds; const nw=_weekKeyOf(new Date(ds+'T12:00:00')); if(nw!==_payWeek){ _payWeek=nw; whPayLoad(false); } else { whPayLoad(true); } };
+function _dayLong(ds){ try{ return new Date(ds+'T12:00:00').toLocaleDateString(L==='en'?'en-US':'es-MX',{weekday:'long',day:'numeric',month:'long'}); }catch(e){ return ds; } }
 function _payCalHtml(){
   const m=_payCalMonth||new Date(); const y=m.getFullYear(), mo=m.getMonth();
   const monthName=new Date(y,mo,1).toLocaleDateString(L==='en'?'en-US':'es-MX',{month:'long',year:'numeric'});
@@ -1204,11 +1230,11 @@ function _payCalHtml(){
   const head=wd.map(x=>'<div style="text-align:center;font-size:10px;color:#6b7280;font-weight:800;padding:3px 0;">'+x+'</div>').join('');
   let cells='';
   for(let i=0;i<42;i++){ const dd=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i);
-    const ds=_dayStr(dd); const inM=(dd.getMonth()===mo); const sel=(_weekKeyOf(dd)===_payWeek); const isT=(ds===todayS);
+    const ds=_dayStr(dd); const inM=(dd.getMonth()===mo); const sel=(_weekKeyOf(dd)===_payWeek); const isDay=(ds===_payDay); const isT=(ds===todayS);
     cells+='<div onclick="whPayPickDay(\''+ds+'\')" style="text-align:center;padding:8px 0;font-size:13px;cursor:pointer;border-radius:9px;'
-      +(sel?'background:rgba(201,168,76,.18);':'')
-      +'color:'+(inM?(sel?'#f0d680':'#fff'):'#434a57')+';font-weight:'+(sel?'800':'500')+';'
-      +(isT?'box-shadow:inset 0 0 0 1.5px #c9a84c;':'')
+      +(isDay?'background:#c9a84c;':(sel?'background:rgba(201,168,76,.18);':''))
+      +'color:'+(isDay?'#0b0e14':(inM?(sel?'#f0d680':'#fff'):'#434a57'))+';font-weight:'+(isDay?'900':(sel?'800':'500'))+';'
+      +(isT&&!isDay?'box-shadow:inset 0 0 0 1.5px #c9a84c;':'')
       +'">'+dd.getDate()+'</div>';
   }
   return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:12px;margin:14px 0 10px;">'
@@ -1220,12 +1246,35 @@ function _payCalHtml(){
     +'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">'+head+cells+'</div>'
   +'</div>';
 }
+function _payDayHtml(){
+  const isToday=(_payDay===_dayStr(new Date()));
+  const title='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><div style="font-weight:800;font-size:14px;color:#fff;text-transform:capitalize;">📅 '+(isToday?L2('Hoy · ','Today · '):'')+_dayLong(_payDay)+'</div></div>';
+  let inner;
+  if(_payDayData===null){ inner='<div style="color:#8a93a6;text-align:center;padding:14px;font-size:13px;">'+L2('Cargando el día…','Loading day…')+'</div>'; }
+  else if(_payDayData.__err){ inner='<div style="color:#8a93a6;text-align:center;padding:14px;font-size:13px;">'+L2('No se pudo cargar el día.','Could not load the day.')+'</div>'; }
+  else {
+    const rws=_payDayData.rows||[];
+    if(!rws.length){ inner='<div style="color:#8a93a6;text-align:center;padding:16px 10px;font-size:13px;">'+L2('Nadie fichó este día.','Nobody clocked in this day.')+'</div>'; }
+    else {
+      inner=rws.map(r=>{ const _nm=whEscA(r.name||'').replace(/\x27/g,""); const dur=Number(r.hours||0);
+        return '<div onclick="whEmpReport(\''+(r.empId||'')+'\',\''+_nm+'\',\''+_payWeek+'\')" style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;">'
+          +'<span style="width:32px;height:32px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:11px;flex:none;">'+whInitials(r.name)+'</span>'
+          +'<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#fff;font-size:14px;">'+whEscA(r.name||'')+(r.open?' <span style="color:#35c46a;font-size:10.5px;">● '+L2('en turno','on shift')+'</span>':'')+'</div>'
+            +'<div style="font-size:11.5px;color:#8a93a6;margin-top:1px;">🕐 '+whEscA(r.in||'—')+' → '+(r.out?whEscA(r.out):L2('ahora','now'))+(r.location?(' · '+(r.location==='dealer'?'Dealer':(r.location==='yonke'?'Yonke':whEscA(r.location)))):'')+(Number(r.breakHours)>0?(' · ☕ '+Math.round(Number(r.breakHours)*60)+'m'):'')+'</div></div>'
+          +'<div style="font-weight:800;color:#fff;font-size:14px;flex:none;">'+dur.toFixed(1)+'h</div></div>';
+      }).join('');
+      inner+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 2px 2px;font-size:12px;color:#8a93a6;"><span>'+_payDayData.count+' '+L2('persona(s)','people')+'</span><span style="font-weight:800;color:#f0d680;">'+Number(_payDayData.totalHours||0).toFixed(1)+' h</span></div>';
+    }
+  }
+  return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:14px;">'+title+inner+'</div>';
+}
 function whPayRender(){
   const box=document.getElementById('wh-pay-box'); if(!box) return;
   const header='<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-weight:800;font-size:21px;color:#fff;">💵 '+L2('Nómina','Payroll')+'</div><button onclick="var o=document.getElementById(\'wh-pay\');if(o)o.remove();" style="background:transparent;border:none;color:#8a93a6;font-size:26px;cursor:pointer;line-height:1;padding:0;">×</button></div>';
   const cal=_payCalHtml();
+  const dayCard=_payDayHtml();
   const isCurrent=(_payWeek===_weekKeyOf(new Date()));
-  const weekLbl='<div style="text-align:center;font-weight:800;color:#fff;font-size:15px;margin-bottom:12px;">'+(isCurrent?L2('Esta semana · ','This week · '):'')+_weekRange(_payWeek)+'</div>';
+  const weekLbl='<div style="text-align:center;font-weight:800;color:#fff;font-size:15px;margin:2px 0 12px;">'+(isCurrent?L2('Esta semana · ','This week · '):'')+_weekRange(_payWeek)+'</div>';
   let bodyHtml;
   if(_payData===null){ bodyHtml='<div style="color:#8a93a6;text-align:center;padding:26px;">'+L2('Cargando…','Loading…')+'</div>'; }
   else if(_payData.__err){ bodyHtml='<div style="color:#8a93a6;text-align:center;padding:26px;">'+L2('No se pudo cargar.','Could not load.')+'</div>'; }
@@ -1246,9 +1295,9 @@ function whPayRender(){
       +cnt(L2('Miembros','Members'), list.length)
       +cnt(L2('En turno','On shift'), onShift, '#35c46a')
     +'</div></div>';
-    bodyHtml='<div>'+rows+'</div>'+totals+'<div style="font-size:11px;color:#6b7280;margin-top:12px;line-height:1.5;">'+L2('Toca un día del calendario para cambiar de semana · toca un miembro para su reporte. Nómina = horas × tarifa (estimado, no es pago).','Tap a calendar day to change week · tap a member for their report. Payroll = hours × rate (estimate).')+'</div>';
+    bodyHtml='<div style="font-weight:800;font-size:13px;color:#fff;margin-bottom:4px;">'+L2('Resumen de la semana','Week summary')+'</div><div>'+rows+'</div>'+totals+'<div style="font-size:11px;color:#6b7280;margin-top:12px;line-height:1.5;">'+L2('Toca un día del calendario para ver quién trabajó ese día · toca un miembro para su ficha completa. Nómina = horas × tarifa (estimado, no es pago).','Tap a calendar day to see who worked that day · tap a member for their full profile. Payroll = hours × rate (estimate).')+'</div>';
   }
-  box.innerHTML=header+cal+weekLbl+bodyHtml;
+  box.innerHTML=header+cal+dayCard+weekLbl+bodyHtml;
 }
 window.whTeamNew=function(){ _teamEditId=null; _teamSel=[]; whTeamForm({name:'',phone:'',rate:'',active:true,owner:false,roles:[]}); };
 window.whTeamEdit=function(id){ const e=_teamEmps.find(x=>x.id===id); if(!e) return; _teamEditId=id; _teamSel=(e.roles||[]).slice(); whTeamForm(e); };

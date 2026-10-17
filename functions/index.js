@@ -2335,17 +2335,39 @@ exports.empReport = onCall({ timeoutSeconds: 40 }, async (request) => {
       });
     });
   } catch (e) {}
-  // 3) HORAS de asistencia esta semana (timeclock)
-  let wkHours = 0;
+  // 3) ASISTENCIA (timeclock) — horas de la semana + histórico + desde cuándo ingresó
+  let wkHours = 0, atHours = 0, atShifts = 0, firstClockIn = "", lastClockIn = "";
   try {
-    const tc = await db.collection("timeclock").where("weekKey", "==", weekKey).get();
-    tc.forEach((doc) => { const x = doc.data() || {}; if ((empId && x.empId === empId) || (nameLc && String(x.name || "").toLowerCase() === nameLc)) wkHours += Number(x.hours) || 0; });
+    const tc = await db.collection("timeclock").get();
+    tc.forEach((doc) => {
+      const x = doc.data() || {};
+      const mine = (empId && x.empId === empId) || (nameLc && String(x.name || "").toLowerCase() === nameLc);
+      if (!mine) return;
+      const h = Number(x.hours) || 0; atHours += h; atShifts++;
+      if ((x.weekKey || "") === weekKey) wkHours += h;
+      const ia = x.inAt || x.createdAt || "";
+      if (ia) { if (!firstClockIn || ia < firstClockIn) firstClockIn = ia; if (!lastClockIn || ia > lastClockIn) lastClockIn = ia; }
+    });
   } catch (e) {}
+  // 4) MIEMBRO DESDE — alta del empleado (o su primera entrada si no hay alta)
+  let memberSince = "", empPhone = "", empRoles = [], empRate = 0, empActive = true;
+  try {
+    let ref = null;
+    if (empId) ref = db.collection("employees").doc(empId);
+    let es = ref ? await ref.get() : null;
+    if (!es || !es.exists) {   // buscar por nombre si no vino empId
+      const all = await db.collection("employees").get();
+      all.forEach((e) => { if (!es || !es.exists) { const dd = e.data() || {}; if (nameLc && String(dd.name || "").toLowerCase() === nameLc) es = e; } });
+    }
+    if (es && es.exists) { const dd = es.data() || {}; memberSince = dd.createdAt || ""; empPhone = dd.phone || ""; empRoles = Array.isArray(dd.roles) ? dd.roles : []; empRate = Number(dd.rate) || 0; empActive = dd.active !== false; }
+  } catch (e) {}
+  if (!memberSince) memberSince = firstClockIn;
   return {
     ok: true, name, empId, weekKey,
     week: { minutes: wkMin, costCents: wkCost, tasks: wkTasks, hours: Math.round(wkHours * 100) / 100 },
-    allTime: { minutes: atMin, costCents: atCost, tasks: atTasks, cars: atCars.size, byLineCost },
+    allTime: { minutes: atMin, costCents: atCost, tasks: atTasks, cars: atCars.size, byLineCost, hours: Math.round(atHours * 100) / 100, shifts: atShifts },
     service: { revenueCents: svcRev, count: svcCount },
+    tenure: { memberSince, firstClockIn, lastClockIn, phone: empPhone, roles: empRoles, rate: empRate, active: empActive },
   };
 });
 
@@ -2550,6 +2572,38 @@ exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
   }).sort((a, b) => b.hours - a.hours);
   const totalPay = list.reduce((s, r) => s + r.pay, 0);
   return { ok: true, weekKey: wk, rates, config: { dealer: cfg.dealer || null, yonke: cfg.yonke || null, radiusM: Number(cfg.radiusM) || 150 }, list, totalPay: Math.round(totalPay * 100) / 100 };
+});
+
+// 📅 Detalle de UN día: quién fichó ese día, con entrada→salida, horas, descanso y ubicación. Solo dueños.
+exports.clockDay = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const _wid = await _actorIdentity(request);
+  if (!_wid || !_wid.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const ds = String((request.data && request.data.dateStr) || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) throw new HttpsError("invalid-argument", "Fecha inválida.");
+  const db = admin.firestore();
+  const wk = _laMondayKey(new Date(ds + "T12:00:00-07:00"));   // lunes de esa semana → una sola consulta
+  const localDay = (iso) => { try { return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }); } catch (e) { return ""; } };
+  const hm = (iso) => { try { return new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } };
+  const rows = [];
+  const snap = await db.collection("timeclock").where("weekKey", "==", wk).get();
+  snap.forEach((d) => {
+    const x = d.data() || {};
+    if (localDay(x.inAt) !== ds) return;
+    rows.push({ name: x.name || (x.email || "").split("@")[0] || "Empleado", empId: x.empId || "", location: x.location || "", inAt: x.inAt || "", outAt: x.outAt || "", in: hm(x.inAt), out: x.outAt ? hm(x.outAt) : "", hours: Number(x.hours) || 0, breakHours: Number(x.breakHours) || 0, open: false });
+  });
+  // turnos abiertos que empezaron ese día (aún sin salida)
+  const openSnap = await db.collection("timeclock_open").get();
+  openSnap.forEach((d) => {
+    const x = d.data() || {};
+    if (localDay(x.inAt) !== ds) return;
+    let el = Date.now() - new Date(x.inAt).getTime(); el -= (Number(x.breakMs) || 0);
+    if (x.onBreakSince) el -= Math.max(0, Date.now() - new Date(x.onBreakSince).getTime());
+    rows.push({ name: x.name || "Empleado", empId: x.empId || "", location: x.location || "", inAt: x.inAt || "", outAt: "", in: hm(x.inAt), out: "", hours: Math.max(0, el / 3600000), breakHours: (Number(x.breakMs) || 0) / 3600000, open: true });
+  });
+  rows.sort((a, b) => String(a.inAt || "").localeCompare(String(b.inAt || "")));
+  const totalHours = rows.reduce((s, r) => s + r.hours, 0);
+  return { ok: true, dateStr: ds, weekKey: wk, rows, count: rows.length, totalHours: Math.round(totalHours * 100) / 100 };
 });
 
 // 🧽 Trabajos de detallado (SOP guiado). op:'save' guarda/actualiza; op:'mine' trae los míos (7 días).
