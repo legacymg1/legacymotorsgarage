@@ -2797,7 +2797,8 @@ function renderCarDetail(){
   // 📄 Título/papeles + 📄 Documentación + 💵 costo — SOLO dueños (tú e Ivan), no el empleado de captura
   const titleBtn = (role==='owner') ? `<button class="btn ghost sm" onclick="openTitleModal('${v.id}')">${t('titleBtn')}${(v.titleURLs&&v.titleURLs.length)?' ✓':''}</button>` : '';
   const docsBtn = (role==='owner') ? `<button class="btn ghost sm" onclick="openDocsModal('${v.id}')">📄 ${t('carDocsBtn')}${(v.docURLs&&v.docURLs.length)?' ('+v.docURLs.length+')':''}</button>` : '';
-  const costTag = (role==='owner' && v.costCents) ? `<div class="sub" style="margin:6px 2px 0;">💵 ${t('carCost')}: $${(v.costCents/100).toFixed(2)}${v.costBolsa?' · '+(v.costBolsa==='parts'?'Partes':v.costBolsa==='ebay'?'eBay':'Dealer'):''}</div>` : '';
+  const _vCost=(Number(v.costCents)||0)/100, _vLabor=(Number(v.laborCents)||0)/100;
+  const costTag = (role==='owner' && (v.costCents||v.laborCents)) ? `<div class="sub" style="margin:6px 2px 0;line-height:1.6;">💵 ${t('carCost')}: $${_vCost.toFixed(2)}${v.costBolsa?' · '+(v.costBolsa==='parts'?'Partes':v.costBolsa==='ebay'?'eBay':'Dealer'):''}${_vLabor>0?` · <span style="color:#8ab4ff;">💪 Labor $${_vLabor.toFixed(2)}</span> · <b>Total $${(_vCost+_vLabor).toFixed(2)}</b> <span style="color:#777;font-size:11px;">(${L2('labor no afecta Finanzas','labor not in Finanzas')})</span>`:''}</div>` : '';
   const btnRow = (specBtn||titleBtn||docsBtn) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">${specBtn}${titleBtn}${docsBtn}</div>` : '';
   const canEditCar = (role==='owner');
   box.innerHTML=`
