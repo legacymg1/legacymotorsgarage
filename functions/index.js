@@ -3043,6 +3043,26 @@ exports.ebayFinDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUT
   try {
     const a = await ebayUserAccessToken(EBAY_FINANCES_SCOPE);
     if (!a.token) { res.json({ ok: false, step: "token", tokenErr: a.raw || "sin token" }); return; }
+    // 💸 MODO FEES: comisiones (NON_SALE_CHARGE) de los últimos N días — para ver insertion fees / store fee.
+    if (String(req.query.mode || "") === "fees") {
+      const fdays = Math.min(120, Math.max(1, Number(req.query.days) || 40));
+      const ffrom = new Date(Date.now() - fdays * 86400000).toISOString();
+      const fto = new Date(Date.now() + 86400000).toISOString();
+      const byType = {}; let total = 0, cnt = 0, off = 0, pg = 0, fstatus = 0, ferr = "";
+      while (pg < 40) {
+        const u = "https://apiz.ebay.com/sell/finances/v1/transaction?limit=200&offset=" + off + "&filter=" + encodeURIComponent("transactionType:{NON_SALE_CHARGE},transactionDate:[" + ffrom + ".." + fto + "]");
+        let rr; try { rr = await fetch(u, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json" }, signal: AbortSignal.timeout(25000) }); } catch (e) { ferr = "fetch " + (e && e.message); break; }
+        if (!fstatus) fstatus = rr.status;
+        const jj = await rr.json().catch(() => ({}));
+        if (rr.status >= 400) { ferr = JSON.stringify(jj).slice(0, 300); break; }
+        const tx = Array.isArray(jj.transactions) ? jj.transactions : [];
+        tx.forEach((t) => { const c = Math.round((Number(t.amount && t.amount.value) || 0) * 100); total += c; cnt++; const ft = t.feeType || (t.references && t.references[0] && t.references[0].referenceType) || "OTRO"; byType[ft] = (byType[ft] || 0) + c; });
+        pg++; if (tx.length < 200) break; off += 200;
+      }
+      const byTypeUsd = {}; Object.keys(byType).forEach((k) => { byTypeUsd[k] = +(byType[k] / 100).toFixed(2); });
+      res.json({ ok: true, mode: "fees", days: fdays, status: fstatus, count: cnt, totalUsd: +(total / 100).toFixed(2), byType: byTypeUsd, err: ferr });
+      return;
+    }
     const from = new Date(Date.now() - 365 * 86400000).toISOString();
     const to = new Date(Date.now() + 86400000).toISOString();
     const url = "https://apiz.ebay.com/sell/finances/v1/transaction?limit=50&filter=" + encodeURIComponent("transactionType:{SALE},transactionDate:[" + from + ".." + to + "]");
@@ -3055,7 +3075,8 @@ exports.ebayFinDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUT
     try {
       const ai = await ebayUserAccessToken("https://api.ebay.com/oauth/api_scope/sell.inventory");
       if (ai.token) {
-        const ri = await fetch("https://api.ebay.com/sell/inventory/v1/inventory_item?limit=1", { headers: { "Authorization": "Bearer " + ai.token, "Accept": "application/json" }, signal: AbortSignal.timeout(25000) });
+        const ih = { "Authorization": "Bearer " + ai.token, "Accept": "application/json", "Accept-Language": "en-US", "Content-Language": "en-US" };
+        const ri = await fetch("https://api.ebay.com/sell/inventory/v1/inventory_item?limit=1", { headers: ih, signal: AbortSignal.timeout(25000) });
         const ji = await ri.json().catch(() => ({}));
         invTotal = (ji.total != null) ? ji.total : null;
         if (ri.status >= 400) invErr = "inv " + ri.status + ": " + JSON.stringify(ji).slice(0, 200);
