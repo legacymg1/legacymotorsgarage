@@ -1261,7 +1261,13 @@ window.whPartsDiag=async function(){
       +'  • SIN carro: '+d.soldNoVehicle+'\n'
       +'  • artículo rápido (warehouseOnly): '+d.soldWarehouseOnly+'\n'
       +'  • con orden de eBay: '+d.soldWithEbayOrder+'\n'
-      +'  • vendidas en persona: '+d.soldInPerson;
+      +'  • vendidas en persona: '+d.soldInPerson
+      +'\n\nVENDIDAS REALES (empaquetando+en_transito+vendido): '+((d.soldish&&d.soldish.total)||0)+'\n'
+      +'  • con carro que EXISTE: '+((d.soldish&&d.soldish.vehicleValid)||0)+'\n'
+      +'  • SIN carro: '+((d.soldish&&d.soldish.noVehicle)||0)+'\n'
+      +'  • artículo rápido: '+((d.soldish&&d.soldish.warehouseOnly)||0)+'\n'
+      +'  • con orden de eBay: '+((d.soldish&&d.soldish.withEbayOrder)||0)+'\n'
+      +'  • con precio: '+((d.soldish&&d.soldish.withPrice)||0);
     try{ showMsg(msg); }catch(e){ try{ alert(msg); }catch(_){ whToast('vendidas '+d.soldTotal+' · con carro '+d.soldWithVehicle+' · sin carro '+d.soldNoVehicle); } }
     console.log('partsDiag', d);
   }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }

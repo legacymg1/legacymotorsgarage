@@ -2180,6 +2180,9 @@ exports.partsDiag = onCall({ timeoutSeconds: 60 }, async (request) => {
   const validVeh = new Set(vs.docs.map((d) => d.id));
   const ps = await db.collection("parts").get();
   const r = { total: 0, byStatus: {}, soldTotal: 0, soldWithVehicle: 0, soldVehicleValid: 0, soldNoVehicle: 0, soldWarehouseOnly: 0, soldWithEbayOrder: 0, soldInPerson: 0, vehicles: vs.size };
+  // "Vendidas reales" = TODO lo que ya se vendió sin importar la etapa de envío: empaquetando + en_transito + vendido.
+  const soldish = { total: 0, withVehicle: 0, vehicleValid: 0, noVehicle: 0, warehouseOnly: 0, withEbayOrder: 0, withPrice: 0 };
+  const SOLDISH = ["empaquetando", "en_transito", "vendido"];
   ps.forEach((d) => {
     const p = d.data() || {}; r.total++;
     const st = p.status || "disponible"; r.byStatus[st] = (r.byStatus[st] || 0) + 1;
@@ -2190,8 +2193,15 @@ exports.partsDiag = onCall({ timeoutSeconds: 60 }, async (request) => {
       if (p.ebayOrderId) r.soldWithEbayOrder++;
       if (p.soldInPerson) r.soldInPerson++;
     }
+    if (SOLDISH.indexOf(st) >= 0) {
+      soldish.total++;
+      if (p.vehicleId) { soldish.withVehicle++; if (validVeh.has(p.vehicleId)) soldish.vehicleValid++; } else soldish.noVehicle++;
+      if (p.warehouseOnly) soldish.warehouseOnly++;
+      if (p.ebayOrderId) soldish.withEbayOrder++;
+      if (Number(p.priceCents) > 0) soldish.withPrice++;
+    }
   });
-  return { ok: true, ...r };
+  return { ok: true, ...r, soldish };
 });
 
 // 🚗 Lista ligera de carros para apuntar una tarea suelta del Pit: inventario del dealer + carros para desmantelar (yarda). Solo dueños.
