@@ -1174,10 +1174,11 @@ function renderEmpReport(d, name, weekKey){
 // 💵 NÓMINA — vista propia (logo), con navegador de semana (calendario) + reporte por empleado de esa semana.
 function _weekKeyOf(dt){ const x=new Date(dt); const day=(x.getDay()+6)%7; x.setHours(0,0,0,0); x.setDate(x.getDate()-day); const y=x.getFullYear(), m=String(x.getMonth()+1).padStart(2,'0'), d=String(x.getDate()).padStart(2,'0'); return y+'-'+m+'-'+d; }
 function _weekRange(weekKey){ const s=new Date(weekKey+'T12:00:00'); const e=new Date(s.getTime()+6*86400000); const mo=L==='en'?'en-US':'es-MX'; const f=(dt)=>dt.toLocaleDateString(mo,{day:'numeric',month:'short'}); return f(s)+' – '+f(e); }
-let _payWeek='';
+function _dayStr(dt){ const x=new Date(dt); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
+let _payWeek='', _payCalMonth=null, _payData=null;
 window.whOpenPayroll=async function(){
   if(role!=='owner') return; try{ closeAcct(); whTeamClose(); }catch(e){}
-  _payWeek=_weekKeyOf(new Date());
+  _payWeek=_weekKeyOf(new Date()); _payCalMonth=new Date(); _payData=null;
   let ov=document.getElementById('wh-pay');
   if(!ov){ ov=document.createElement('div'); ov.id='wh-pay'; ov.style.cssText='position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
     ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
@@ -1186,32 +1187,68 @@ window.whOpenPayroll=async function(){
   } else ov.style.display='flex';
   whPayLoad();
 };
-window.whPayWeek=function(delta){ const s=new Date(_payWeek+'T12:00:00'); s.setDate(s.getDate()+7*delta); _payWeek=_weekKeyOf(s); whPayLoad(); };
-window.whPayJump=function(dateStr){ if(!dateStr) return; _payWeek=_weekKeyOf(new Date(dateStr+'T12:00:00')); whPayLoad(); };
 async function whPayLoad(){
-  const box=document.getElementById('wh-pay-box'); if(!box) return;
-  const isCurrent = (_payWeek===_weekKeyOf(new Date()));
-  const nav='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div style="font-weight:800;font-size:21px;color:#fff;">💵 '+L2('Nómina','Payroll')+'</div><button onclick="var o=document.getElementById(\'wh-pay\');if(o)o.remove();" style="background:transparent;border:none;color:#8a93a6;font-size:26px;cursor:pointer;line-height:1;padding:0;">×</button></div>'
-    +'<div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:8px 10px;margin:14px 0 12px;">'
-      +'<button onclick="whPayWeek(-1)" style="background:transparent;border:none;color:#c9a84c;font-size:22px;cursor:pointer;flex:none;line-height:1;padding:4px 8px;">‹</button>'
-      +'<label style="flex:1;text-align:center;cursor:pointer;position:relative;"><div style="font-size:11px;color:#8a93a6;">'+(isCurrent?L2('Esta semana','This week'):L2('Semana','Week'))+'</div><div style="font-weight:800;color:#fff;font-size:15px;">'+_weekRange(_payWeek)+' 📅</div><input type="date" value="'+_payWeek+'" onchange="whPayJump(this.value)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;"></label>'
-      +'<button onclick="whPayWeek(1)" style="background:transparent;border:none;color:'+(isCurrent?'#3a3f4b':'#c9a84c')+';font-size:22px;cursor:pointer;flex:none;line-height:1;padding:4px 8px;" '+(isCurrent?'disabled':'')+'>›</button>'
-    +'</div>';
-  box.innerHTML=nav+'<div style="color:#8a93a6;text-align:center;padding:30px;">'+L2('Cargando…','Loading…')+'</div>';
-  let d={}; try{ const r=await httpsCallable(functions,'clockWeek')({weekKey:_payWeek}); d=(r&&r.data)||{}; }catch(e){ box.innerHTML=nav+'<div style="color:#8a93a6;text-align:center;padding:30px;">'+L2('No se pudo cargar.','Could not load.')+'</div>'; return; }
-  const list=(d.list||[]).filter(e=>!e.owner).sort((a,b)=>(Number(b.pay)||0)-(Number(a.pay)||0));
-  const totalHrs=list.reduce((s,e)=>s+(Number(e.hours)||0),0);
-  const totals='<div style="display:flex;gap:8px;margin-bottom:14px;">'
-    +'<div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:#8a93a6;">'+L2('Total a pagar','Total pay')+'</div><div style="font-size:24px;font-weight:900;color:var(--gold);">$'+(Number(d.totalPay)||0).toFixed(2)+'</div></div>'
-    +'<div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;"><div style="font-size:11px;color:#8a93a6;">'+L2('Horas','Hours')+'</div><div style="font-size:24px;font-weight:900;color:#fff;">'+totalHrs.toFixed(1)+'</div></div>'
+  _payData=null; whPayRender();
+  try{ const r=await httpsCallable(functions,'clockWeek')({weekKey:_payWeek}); _payData=(r&&r.data)||{}; }catch(e){ _payData={__err:true}; }
+  whPayRender();
+}
+window.whPayCalPrev=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()-1, 1); whPayRender(); };
+window.whPayCalNext=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()+1, 1); whPayRender(); };
+window.whPayPickDay=function(ds){ const nw=_weekKeyOf(new Date(ds+'T12:00:00')); if(nw!==_payWeek){ _payWeek=nw; whPayLoad(); } };
+function _payCalHtml(){
+  const m=_payCalMonth||new Date(); const y=m.getFullYear(), mo=m.getMonth();
+  const monthName=new Date(y,mo,1).toLocaleDateString(L==='en'?'en-US':'es-MX',{month:'long',year:'numeric'});
+  const first=new Date(y,mo,1); const fdow=(first.getDay()+6)%7; const start=new Date(y,mo,1-fdow);
+  const todayS=_dayStr(new Date());
+  const wd=(L==='en'?['M','T','W','T','F','S','S']:['L','M','M','J','V','S','D']);
+  const head=wd.map(x=>'<div style="text-align:center;font-size:10px;color:#6b7280;font-weight:800;padding:3px 0;">'+x+'</div>').join('');
+  let cells='';
+  for(let i=0;i<42;i++){ const dd=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i);
+    const ds=_dayStr(dd); const inM=(dd.getMonth()===mo); const sel=(_weekKeyOf(dd)===_payWeek); const isT=(ds===todayS);
+    cells+='<div onclick="whPayPickDay(\''+ds+'\')" style="text-align:center;padding:8px 0;font-size:13px;cursor:pointer;border-radius:9px;'
+      +(sel?'background:rgba(201,168,76,.18);':'')
+      +'color:'+(inM?(sel?'#f0d680':'#fff'):'#434a57')+';font-weight:'+(sel?'800':'500')+';'
+      +(isT?'box-shadow:inset 0 0 0 1.5px #c9a84c;':'')
+      +'">'+dd.getDate()+'</div>';
+  }
+  return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:12px;margin:14px 0 10px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
+      +'<button onclick="whPayCalPrev()" style="background:transparent;border:none;color:#c9a84c;font-size:22px;cursor:pointer;line-height:1;padding:2px 12px;">‹</button>'
+      +'<div style="font-weight:800;color:#fff;font-size:15px;text-transform:capitalize;">'+monthName+'</div>'
+      +'<button onclick="whPayCalNext()" style="background:transparent;border:none;color:#c9a84c;font-size:22px;cursor:pointer;line-height:1;padding:2px 12px;">›</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">'+head+cells+'</div>'
   +'</div>';
-  const rows = list.length ? list.map(e=>{ const pay=Number(e.pay)||0, hrs=Number(e.hours)||0; const _nm=whEscA(e.name||'').replace(/\x27/g,"");
-    return '<div onclick="whEmpReport(\''+(e.empId||'')+'\',\''+_nm+'\',\''+_payWeek+'\')" style="display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
-      +'<span style="width:38px;height:38px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:13px;flex:none;">'+whInitials(e.name)+'</span>'
-      +'<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#fff;font-size:15px;">'+whEscA(e.name||'')+(e.open?' <span style="color:#35c46a;font-size:11px;">●</span>':'')+'</div><div style="font-size:12px;color:#8a93a6;margin-top:1px;">'+hrs.toFixed(2)+' h'+(e.rate?(' · $'+Number(e.rate).toFixed(2)+'/h'):'')+'</div></div>'
-      +'<div style="font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;flex:none;">$'+pay.toFixed(2)+'</div></div>';
-  }).join('') : '<div style="color:#8a93a6;text-align:center;padding:30px 10px;line-height:1.6;">'+L2('Nadie fichó esta semana.','Nobody clocked in this week.')+'</div>';
-  box.innerHTML=nav+totals+'<div>'+rows+'</div><div style="font-size:11px;color:#6b7280;margin-top:12px;line-height:1.5;">'+L2('Toca un miembro para ver su reporte de la semana. Nómina = estimado horas × tarifa (no es pago ni gasto).','Tap a member for their weekly report. Payroll = estimate hours × rate (not a payment).')+'</div>';
+}
+function whPayRender(){
+  const box=document.getElementById('wh-pay-box'); if(!box) return;
+  const header='<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-weight:800;font-size:21px;color:#fff;">💵 '+L2('Nómina','Payroll')+'</div><button onclick="var o=document.getElementById(\'wh-pay\');if(o)o.remove();" style="background:transparent;border:none;color:#8a93a6;font-size:26px;cursor:pointer;line-height:1;padding:0;">×</button></div>';
+  const cal=_payCalHtml();
+  const isCurrent=(_payWeek===_weekKeyOf(new Date()));
+  const weekLbl='<div style="text-align:center;font-weight:800;color:#fff;font-size:15px;margin-bottom:12px;">'+(isCurrent?L2('Esta semana · ','This week · '):'')+_weekRange(_payWeek)+'</div>';
+  let bodyHtml;
+  if(_payData===null){ bodyHtml='<div style="color:#8a93a6;text-align:center;padding:26px;">'+L2('Cargando…','Loading…')+'</div>'; }
+  else if(_payData.__err){ bodyHtml='<div style="color:#8a93a6;text-align:center;padding:26px;">'+L2('No se pudo cargar.','Could not load.')+'</div>'; }
+  else {
+    const list=(_payData.list||[]).filter(e=>!e.owner).sort((a,b)=>(Number(b.pay)||0)-(Number(a.pay)||0));
+    const totalHrs=list.reduce((s,e)=>s+(Number(e.hours)||0),0);
+    const onShift=list.filter(e=>e.open).length;
+    const rows = list.length ? list.map(e=>{ const pay=Number(e.pay)||0, hrs=Number(e.hours)||0; const _nm=whEscA(e.name||'').replace(/\x27/g,"");
+      return '<div onclick="whEmpReport(\''+(e.empId||'')+'\',\''+_nm+'\',\''+_payWeek+'\')" style="display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
+        +'<span style="width:38px;height:38px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:13px;flex:none;">'+whInitials(e.name)+'</span>'
+        +'<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#fff;font-size:15px;">'+whEscA(e.name||'')+(e.open?' <span style="color:#35c46a;font-size:11px;">● '+L2('en turno','on shift')+'</span>':'')+'</div><div style="font-size:12px;color:#8a93a6;margin-top:1px;">'+hrs.toFixed(2)+' h'+(e.rate?(' · $'+Number(e.rate).toFixed(2)+'/h'):'')+'</div></div>'
+        +'<div style="text-align:right;flex:none;"><div style="font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;">$'+pay.toFixed(2)+'</div><div style="color:#4b5563;font-size:11px;">'+L2('ver ›','view ›')+'</div></div></div>';
+    }).join('') : '<div style="color:#8a93a6;text-align:center;padding:26px 10px;line-height:1.6;">'+L2('Nadie fichó esta semana.','Nobody clocked in this week.')+'</div>';
+    const cnt=(lbl,val,col)=>'<div style="flex:1;min-width:66px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 6px;text-align:center;"><div style="font-size:21px;font-weight:900;'+(col?('color:'+col+';'):'color:#fff;')+'">'+val+'</div><div style="font-size:10px;color:#8a93a6;margin-top:1px;">'+lbl+'</div></div>';
+    const totals='<div style="margin-top:16px;"><div style="font-weight:800;font-size:13px;color:#fff;margin-bottom:8px;">'+L2('Totales de la semana','Week totals')+'</div><div style="display:flex;gap:7px;flex-wrap:wrap;">'
+      +cnt(L2('A pagar','To pay'), '$'+(Number(_payData.totalPay)||0).toFixed(0), 'var(--gold)')
+      +cnt(L2('Horas','Hours'), totalHrs.toFixed(1))
+      +cnt(L2('Miembros','Members'), list.length)
+      +cnt(L2('En turno','On shift'), onShift, '#35c46a')
+    +'</div></div>';
+    bodyHtml='<div>'+rows+'</div>'+totals+'<div style="font-size:11px;color:#6b7280;margin-top:12px;line-height:1.5;">'+L2('Toca un día del calendario para cambiar de semana · toca un miembro para su reporte. Nómina = horas × tarifa (estimado, no es pago).','Tap a calendar day to change week · tap a member for their report. Payroll = hours × rate (estimate).')+'</div>';
+  }
+  box.innerHTML=header+cal+weekLbl+bodyHtml;
 }
 window.whTeamNew=function(){ _teamEditId=null; _teamSel=[]; whTeamForm({name:'',phone:'',rate:'',active:true,owner:false,roles:[]}); };
 window.whTeamEdit=function(id){ const e=_teamEmps.find(x=>x.id===id); if(!e) return; _teamEditId=id; _teamSel=(e.roles||[]).slice(); whTeamForm(e); };
