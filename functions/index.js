@@ -2995,8 +2995,9 @@ exports.ebaySyncNet = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_R
   const net = {};   // orderId -> cents (suma firmada)
   let offset = 0, pages = 0, authBad = false, firstStatus = 0, errBody = "", txSeen = 0;
   while (pages < 40) {
+    // Solo VENTAS (SALE) — el neto de la venta ya viene con las comisiones descontadas (pagos gestionados). Ignora las ~17mil comisiones sueltas.
     const url = "https://apiz.ebay.com/sell/finances/v1/transaction?limit=200&offset=" + offset +
-      "&filter=" + encodeURIComponent("transactionDate:[" + from + ".." + to + "]");
+      "&filter=" + encodeURIComponent("transactionType:{SALE},transactionDate:[" + from + ".." + to + "]");
     let r; try { r = await fetch(url, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json" }, signal: AbortSignal.timeout(25000) }); } catch (e) { errBody = "fetch: " + (e && e.message || e); break; }
     if (!firstStatus) firstStatus = r.status;
     if (r.status === 401 || r.status === 403) { authBad = true; break; }
@@ -3044,14 +3045,26 @@ exports.ebayFinDiag = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUT
     if (!a.token) { res.json({ ok: false, step: "token", tokenErr: a.raw || "sin token" }); return; }
     const from = new Date(Date.now() - 365 * 86400000).toISOString();
     const to = new Date(Date.now() + 86400000).toISOString();
-    const url = "https://apiz.ebay.com/sell/finances/v1/transaction?limit=50&filter=" + encodeURIComponent("transactionDate:[" + from + ".." + to + "]");
+    const url = "https://apiz.ebay.com/sell/finances/v1/transaction?limit=50&filter=" + encodeURIComponent("transactionType:{SALE},transactionDate:[" + from + ".." + to + "]");
     const r = await fetch(url, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json", "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" }, signal: AbortSignal.timeout(25000) });
     const status = r.status;
     const j = await r.json().catch(() => ({}));
     const txs = Array.isArray(j.transactions) ? j.transactions : [];
+    // 📦 Conteo real de lo que SUBIMOS a eBay (Inventory API): items de inventario.
+    let invTotal = null, invErr = "";
+    try {
+      const ai = await ebayUserAccessToken("https://api.ebay.com/oauth/api_scope/sell.inventory");
+      if (ai.token) {
+        const ri = await fetch("https://api.ebay.com/sell/inventory/v1/inventory_item?limit=1", { headers: { "Authorization": "Bearer " + ai.token, "Accept": "application/json" }, signal: AbortSignal.timeout(25000) });
+        const ji = await ri.json().catch(() => ({}));
+        invTotal = (ji.total != null) ? ji.total : null;
+        if (ri.status >= 400) invErr = "inv " + ri.status + ": " + JSON.stringify(ji).slice(0, 200);
+      } else { invErr = "sin token inventory"; }
+    } catch (e) { invErr = String(e && e.message || e); }
     res.json({
-      ok: status < 300, step: "transaction", status, total: j.total, count: txs.length,
+      ok: status < 300, step: "transaction", status, salesTotal: j.total, salesInPage: txs.length,
       sample: txs.slice(0, 4).map((t) => ({ orderId: t.orderId || "", type: t.transactionType || "", booking: t.bookingEntry || "", hasAmount: !!(t.amount && t.amount.value) })),
+      ebayInventoryItems: invTotal, invErr,
       errBody: status >= 400 ? JSON.stringify(j).slice(0, 600) : "",
     });
   } catch (e) { res.json({ ok: false, step: "catch", error: String(e && e.message || e) }); }
