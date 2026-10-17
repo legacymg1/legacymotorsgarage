@@ -657,7 +657,7 @@ window.clockPunch = async function(action){
   try{
     const g=await _getGPS();
     if(msg) msg.textContent='Registrando…';
-    const r=await httpsCallable(functions,'clockPunch')({action, lat:g.lat, lng:g.lng});
+    const r=await httpsCallable(functions,'clockPunch')(vaData({action, lat:g.lat, lng:g.lng}));
     const d=(r&&r.data)||{};
     if(msg){ msg.style.color='#3ecf8e'; msg.textContent = action==='in'
       ? ('✅ Entrada registrada'+(d.location&&d.location!=='(sin ubicación)'?(' ('+(d.location==='dealer'?'Dealer':'Yonke')+')'):''))
@@ -705,7 +705,7 @@ window.punchBreak = async function(){
   if(bk) bk.disabled=true;
   if(msg){ msg.style.color=''; msg.textContent=t('clkBreakReg'); }
   try{
-    await httpsCallable(functions,'clockPunch')({ action: onBreak?'break_end':'break_start' });
+    await httpsCallable(functions,'clockPunch')(vaData({ action: onBreak?'break_end':'break_start' }));
     if(msg){ msg.style.color='#3ecf8e'; msg.textContent='✅'; }
     refreshClock();
   }catch(e){ if(msg){ msg.style.color='#ff6b6b'; msg.textContent='⚠️ '+((e&&e.message)||t('jCouldnt')); } }
@@ -815,43 +815,101 @@ function setHeaderIdentity(){
 function updateLangBtns(){ const es=document.getElementById('acct-es'),en=document.getElementById('acct-en'); if(es)es.classList.toggle('on',L==='es'); if(en)en.classList.toggle('on',L==='en'); }
 window.toggleAcct=function(e){ if(e&&e.stopPropagation)e.stopPropagation(); const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(!m)return; if(!m.classList.contains('hide')){ m.classList.add('hide'); c.classList.add('hide'); } else { setHeaderIdentity(); updateLangBtns(); m.classList.remove('hide'); c.classList.remove('hide'); } };
 window.closeAcct=function(){ const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(m)m.classList.add('hide'); if(c)c.classList.add('hide'); };
-// 👁️ Dueño: VER COMO UN EMPLEADO ESPECÍFICO (su perfil real: sus funciones, sus tareas, su reloj). SOLO LECTURA.
-function setWhLegacyActions(){ window.LEGACY_ACTIONS=[{ label:t('viewAsEmp'), ico:'👁️', fn:'whViewAsPicker' }]; }
-let _viewAsEmpId='', _viewAsName='';
-// Inyecta asEmpId SOLO en las lecturas cuando el dueño ve como un empleado → las callables devuelven lo de ÉL.
+// 👥 EQUIPO Y NÓMINA (portado de Pit Crew) — solo dueño. Lista + editar (empAdmin) + Ver como / Actuar como.
+function setWhLegacyActions(){ window.LEGACY_ACTIONS=[{ label:(L==='en'?'Team & payroll':'Equipo y nómina'), ico:'👥', fn:'whOpenTeam' }]; }
+let _viewAsEmpId='', _viewAsName='', _actAs=false;
+// Inyecta asEmpId cuando el dueño ve/actúa como un empleado → las callables trabajan como ÉL.
 function vaData(d){ return _viewAsEmpId ? Object.assign({}, d||{}, {asEmpId:_viewAsEmpId}) : (d||{}); }
 function whEscA(s){ return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function rolesToTabs(roles){ const out=[]; (roles||[]).forEach(r=>{ if(r==='Captura'||r==='Desmantelador'){ if(out.indexOf('yard')<0)out.push('yard'); } else if(r==='Listado'){ if(out.indexOf('lister')<0)out.push('lister'); } else if(r==='Empaque'){ if(out.indexOf('pack')<0)out.push('pack'); } }); return out; }
-window.whViewAsPicker=async function(){
+let _teamEmps=[], _teamRoles=[], _teamEditId=null, _teamSel=[];
+window.whOpenTeam=async function(){
   if(role!=='owner') return; closeAcct();
-  let emps=[]; try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); emps=((r&&r.data)||{}).emps||[]; }catch(e){}
-  emps=emps.filter(e=>e.active!==false);
-  const ov=document.createElement('div'); ov.id='va-picker'; ov.style.cssText='position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;';
-  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  const list = emps.length ? emps.map(e=>{ const rs=(Array.isArray(e.roles)?e.roles:[]).join(' · ')||(L==='en'?'No roles':'Sin funciones'); return '<button onclick="whViewAsEmployee(\''+e.id+'\')" style="display:flex;width:100%;align-items:center;gap:12px;text-align:left;background:#121722;border:1px solid #273043;border-radius:12px;padding:12px 14px;margin-bottom:8px;color:#fff;cursor:pointer;"><span style="width:38px;height:38px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;">'+whInitials(e.name)+'</span><span style="min-width:0;"><div style="font-weight:800;">'+whEscA(e.name||'—')+'</div><div style="font-size:12px;color:#8a93a6;">'+whEscA(rs)+'</div></span><span style="margin-left:auto;color:#c9a84c;">👁️</span></button>'; }).join('') : '<div style="color:#8a93a6;text-align:center;padding:30px;">'+(L==='en'?'No employees.':'Sin empleados.')+'</div>';
-  const box=document.createElement('div'); box.style.cssText='background:#0d1119;border:1px solid #273043;border-radius:18px;max-width:520px;width:100%;max-height:100%;overflow:auto;padding:18px;box-sizing:border-box;margin:auto;';
-  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;color:#fff;">👁️ '+(L==='en'?'View as employee':'Ver como empleado')+'</div><button onclick="var o=document.getElementById(\'va-picker\');if(o)o.remove();" style="background:transparent;border:none;color:#8a93a6;font-size:24px;cursor:pointer;">×</button></div><div style="font-size:12px;color:#8a93a6;margin-bottom:12px;">'+(L==='en'?'Open an employee to see exactly what they see (read-only).':'Entra a un empleado para ver justo lo que él ve (solo lectura).')+'</div>'+list;
-  ov.appendChild(box); document.body.appendChild(ov);
+  let ov=document.getElementById('wh-team');
+  if(!ov){ ov=document.createElement('div'); ov.id='wh-team'; ov.style.cssText='position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    const box=document.createElement('div'); box.style.cssText='background:#0d1119;border:1px solid #273043;border-radius:18px;max-width:560px;width:100%;max-height:100%;overflow:auto;padding:18px;box-sizing:border-box;margin:auto;';
+    box.innerHTML='<div id="wh-team-body"></div>'; ov.appendChild(box); document.body.appendChild(ov);
+  }
+  const bd=document.getElementById('wh-team-body'); if(bd) bd.innerHTML='<div style="color:#8a93a6;text-align:center;padding:24px;">'+(L==='en'?'Loading…':'Cargando…')+'</div>';
+  try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); const d=(r&&r.data)||{}; _teamEmps=d.emps||[]; _teamRoles=d.roles||[]; }catch(e){ _teamEmps=[]; }
+  whTeamList();
 };
-window.whViewAsEmployee=async function(empId){
+function whTeamClose(){ const o=document.getElementById('wh-team'); if(o) o.remove(); }
+function whTeamList(){
+  const body=document.getElementById('wh-team-body'); if(!body) return;
+  const emps=_teamEmps.slice().sort((a,b)=>Number(b.active!==false)-Number(a.active!==false)||(a.name||'').localeCompare(b.name||''));
+  const cards = emps.length ? emps.map(e=>{
+    const rs=(Array.isArray(e.roles)?e.roles:[]).join(' · ')||(L==='en'?'No functions':'Sin funciones');
+    return '<div style="background:#121722;border:1px solid #273043;border-radius:14px;padding:13px;margin-bottom:9px;'+(e.active!==false?'':'opacity:.55;')+'">'
+      +'<div style="display:flex;align-items:center;gap:10px;"><span style="width:38px;height:38px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;color:#fff;">'+whInitials(e.name)+'</span>'
+      +'<div style="min-width:0;flex:1;"><div style="font-weight:800;color:#fff;">'+(e.owner?'👑 ':'')+whEscA(e.name||'—')+(e.active!==false?'':' <span style="color:#8a93a6;font-size:11px;">('+(L==='en'?'inactive':'inactivo')+')</span>')+'</div>'
+      +'<div style="font-size:12px;color:#8a93a6;">'+whEscA(e.phone||(L==='en'?'no phone':'sin tel'))+(e.rate?(' · $'+e.rate+'/h'):'')+'</div><div style="font-size:11px;color:#8a93a6;margin-top:3px;">'+whEscA(rs)+'</div></div></div>'
+      +'<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">'
+      +'<button onclick="whTeamEdit(\''+e.id+'\')" style="flex:1;min-width:80px;background:#1d2636;border:1px solid #273043;color:#fff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">✏️ '+(L==='en'?'Edit':'Editar')+'</button>'
+      +'<button onclick="whViewAsEmployee(\''+e.id+'\')" style="flex:1;min-width:80px;background:transparent;border:1px solid #273043;color:#c9a84c;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">👁️ '+(L==='en'?'View as':'Ver como')+'</button>'
+      +'<button onclick="whActAsEmployee(\''+e.id+'\')" style="flex:1;min-width:80px;background:transparent;border:1px solid #6b3fb0;color:#a98bff;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">🎭 '+(L==='en'?'Act as':'Actuar como')+'</button>'
+      +'</div></div>';
+  }).join('') : '<div style="color:#8a93a6;text-align:center;padding:24px;">'+(L==='en'?'No employees yet.':'Aún no hay empleados.')+'</div>';
+  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;color:#fff;">👥 '+(L==='en'?'Team & payroll':'Equipo y nómina')+'</div><button onclick="whTeamClose()" style="background:transparent;border:none;color:#8a93a6;font-size:24px;cursor:pointer;">×</button></div>'
+    +'<button onclick="whTeamNew()" style="width:100%;background:#c9a84c;color:#0b0e14;border:none;border-radius:11px;padding:11px;font-weight:800;cursor:pointer;margin-bottom:12px;">➕ '+(L==='en'?'New employee':'Nuevo empleado')+'</button>'
+    +cards
+    +'<div style="font-size:11px;color:#6b7280;margin-top:10px;line-height:1.5;">'+(L==='en'?'Photo, sensitive data & payroll: coming here soon (for now in Finanzas).':'Foto, datos sensibles y nómina: pronto aquí (por ahora en Finanzas).')+'</div>';
+}
+window.whTeamNew=function(){ _teamEditId=null; _teamSel=[]; whTeamForm({name:'',phone:'',rate:'',active:true,owner:false,roles:[]}); };
+window.whTeamEdit=function(id){ const e=_teamEmps.find(x=>x.id===id); if(!e) return; _teamEditId=id; _teamSel=(e.roles||[]).slice(); whTeamForm(e); };
+function whTeamRolesHtml(){
+  const list=_teamRoles.length?_teamRoles:['Detallador','Fotos','Limpieza','Mecánico','Empaque','Captura','Listado','Desmantelador','Ayudante general','Oficina','Ventas'];
+  return list.map(r=>{ const on=_teamSel.indexOf(r)>=0; return '<button type="button" onclick="whTeamToggleRole(\''+r.replace(/'/g,"\\'")+'\')" style="border:1px solid '+(on?'#c9a84c':'#273043')+';background:'+(on?'rgba(201,168,76,.13)':'#121722')+';color:'+(on?'#c9a84c':'#fff')+';border-radius:999px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer;">'+whEscA(r)+'</button>'; }).join('');
+}
+window.whTeamToggleRole=function(r){ const i=_teamSel.indexOf(r); if(i>=0)_teamSel.splice(i,1); else _teamSel.push(r); const rb=document.getElementById('wh-team-roles'); if(rb) rb.innerHTML=whTeamRolesHtml(); };
+function whTeamForm(e){
+  const body=document.getElementById('wh-team-body'); if(!body) return;
+  const IN='width:100%;box-sizing:border-box;background:#121722;border:1px solid #273043;border-radius:10px;padding:11px;color:#fff;font-size:15px;margin:3px 0 10px;';
+  body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><div style="font-weight:800;font-size:17px;color:#fff;">'+(_teamEditId?(L==='en'?'Edit employee':'Editar empleado'):(L==='en'?'New employee':'Nuevo empleado'))+'</div><button onclick="whTeamList()" style="background:transparent;border:none;color:#8a93a6;font-size:24px;cursor:pointer;">‹</button></div>'
+    +'<label style="font-size:12px;color:#8a93a6;">'+(L==='en'?'Name':'Nombre')+'</label><input id="wh-emp-name" value="'+whEscA(e.name||'')+'" style="'+IN+'">'
+    +'<label style="font-size:12px;color:#8a93a6;">'+(L==='en'?'Phone':'Teléfono')+'</label><input id="wh-emp-phone" value="'+whEscA(e.phone||'')+'" inputmode="tel" style="'+IN+'">'
+    +'<label style="font-size:12px;color:#8a93a6;">'+(L==='en'?'Rate $/hour':'Tarifa $/hora')+'</label><input id="wh-emp-rate" type="number" inputmode="decimal" value="'+(e.rate||'')+'" style="'+IN+'">'
+    +'<label style="font-size:12px;color:#8a93a6;">'+(L==='en'?'Functions (can have several)':'Funciones (puede tener varias)')+'</label><div id="wh-team-roles" style="display:flex;flex-wrap:wrap;gap:7px;margin:5px 0 12px;">'+whTeamRolesHtml()+'</div>'
+    +'<label style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;color:#fff;"><input type="checkbox" id="wh-emp-active" '+(e.active!==false?'checked':'')+' style="width:20px;height:20px;"> '+(L==='en'?'Active':'Activo')+'</label>'
+    +'<label style="display:flex;align-items:center;gap:10px;margin-bottom:14px;cursor:pointer;color:#fff;"><input type="checkbox" id="wh-emp-owner" '+(e.owner===true?'checked':'')+' style="width:20px;height:20px;"> 👑 '+(L==='en'?'Owner (full access)':'Dueño (acceso total)')+'</label>'
+    +'<button onclick="whTeamSave()" id="wh-emp-save" style="width:100%;background:#c9a84c;color:#0b0e14;border:none;border-radius:11px;padding:12px;font-weight:800;cursor:pointer;">💾 '+(L==='en'?'Save':'Guardar')+'</button>'
+    +(_teamEditId?'<button onclick="whTeamDeactivate()" style="width:100%;background:transparent;color:#ef6b6b;border:none;padding:10px;font-size:13px;cursor:pointer;margin-top:6px;">'+(L==='en'?'Deactivate':'Desactivar')+'</button>':'');
+}
+window.whTeamSave=async function(){
+  const name=(document.getElementById('wh-emp-name').value||'').trim(); if(!name){ whToast(L==='en'?'Enter the name.':'Pon el nombre.',true); return; }
+  const btn=document.getElementById('wh-emp-save'); if(btn){ btn.disabled=true; btn.textContent=L==='en'?'Saving…':'Guardando…'; }
+  const payload={ op:'save', name, phone:(document.getElementById('wh-emp-phone').value||'').trim(), rate:Number(document.getElementById('wh-emp-rate').value)||0, active:document.getElementById('wh-emp-active').checked, owner:document.getElementById('wh-emp-owner').checked, roles:_teamSel };
+  if(_teamEditId) payload.id=_teamEditId;
+  try{ await httpsCallable(functions,'empAdmin')(payload); whToast('✅ '+(L==='en'?'Saved':'Guardado')); await whOpenTeam(); }
+  catch(e){ whToast((e&&e.message)||(L==='en'?'Could not save.':'No se pudo guardar.'),true); if(btn){ btn.disabled=false; btn.textContent='💾 '+(L==='en'?'Save':'Guardar'); } }
+};
+window.whTeamDeactivate=async function(){
+  if(!_teamEditId) return; if(!confirm(L==='en'?'Deactivate this employee?':'¿Desactivar este empleado?')) return;
+  try{ await httpsCallable(functions,'empAdmin')({op:'setActive', id:_teamEditId, active:false}); whToast('✅'); await whOpenTeam(); }catch(e){ whToast((e&&e.message)||'Error',true); }
+};
+// ---- Ver como (lectura) / Actuar como (escritura, para testear) ----
+async function _whEnterAs(empId, act){
   if(role!=='owner') return;
-  const p=document.getElementById('va-picker'); if(p) p.remove();
+  whTeamClose();
   let emp=null; try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); emp=(((r&&r.data)||{}).emps||[]).find(e=>e.id===empId); }catch(e){}
   if(!emp){ whToast(L==='en'?'Could not load employee.':'No se pudo cargar el empleado.', true); return; }
-  _viewAsEmpId=empId; _viewAsName=emp.name||'Empleado';
+  _viewAsEmpId=empId; _viewAsName=emp.name||'Empleado'; _actAs=!!act;
   _asEmp=true; _homeMode=true;
   _myRoles=(Array.isArray(emp.roles)&&emp.roles.length)?emp.roles.slice():[];
   _allowedTabs=rolesToTabs(_myRoles);
   const opc=document.getElementById('owner-op-card'); if(opc) opc.style.display='none';
   const co=document.getElementById('clock-owner'); if(co) co.style.display='none';
   document.body.classList.add('wh-asemp');
-  const b=document.getElementById('asemp-banner'); if(b){ b.style.display='flex'; const s=b.querySelector('span span[data-i18n]'); if(s) s.textContent=(L==='en'?'Viewing as ':'Viendo como ')+_viewAsName; }
+  const b=document.getElementById('asemp-banner'); if(b){ b.style.display='flex'; b.style.background=act?'linear-gradient(90deg,#4c2a86,#6b3fb0)':''; b.style.color=act?'#fff':''; const s=b.querySelector('span span[data-i18n]'); if(s) s.textContent=(act?(L==='en'?'🎭 Acting as ':'🎭 Actuando como '):(L==='en'?'Viewing as ':'Viendo como '))+_viewAsName; }
   closeAcct(); setHeaderIdentity(); whGoHome();
   try{ window.scrollTo(0,0); }catch(e){}
-};
-window.whExitAsEmployee=function(){ _viewAsEmpId=''; _viewAsName=''; try{ location.reload(); }catch(e){ _asEmp=false; document.body.classList.remove('wh-asemp'); const b=document.getElementById('asemp-banner'); if(b) b.style.display='none'; } };
-// 🔒 En "ver como empleado" las acciones de escritura quedan bloqueadas (solo lectura).
-function _vaReadOnly(){ if(_asEmp){ whToast(L==='en'?'Read-only — viewing as employee':'Solo lectura — viendo como empleado'); return true; } return false; }
+}
+window.whViewAsEmployee=function(empId){ return _whEnterAs(empId, false); };
+window.whActAsEmployee=function(empId){ return _whEnterAs(empId, true); };
+window.whExitAsEmployee=function(){ _viewAsEmpId=''; _viewAsName=''; _actAs=false; try{ location.reload(); }catch(e){ _asEmp=false; document.body.classList.remove('wh-asemp'); const b=document.getElementById('asemp-banner'); if(b) b.style.display='none'; } };
+// 🔒 "Ver como" = solo lectura; "Actuar como" = escritura habilitada.
+function _vaReadOnly(){ if(_asEmp && !_actAs){ whToast(L==='en'?'Read-only — viewing as employee':'Solo lectura — viendo como empleado'); return true; } return false; }
 
 // ---- TABS ----
 let _view='yard';
@@ -980,13 +1038,13 @@ window.taskPause=async function(){
   if(_vaReadOnly()) return;
   if(!JOB_CUR) return;
   const reason=prompt(t('jPauseReason')); if(reason===null) return;
-  try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'pause', reason:String(reason||'').trim()}); JOB_CUR.status='pausada'; JOB_CUR.pausedReason=String(reason||'').trim(); renderTaskDetail(); }
+  try{ await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'pause', reason:String(reason||'').trim()})); JOB_CUR.status='pausada'; JOB_CUR.pausedReason=String(reason||'').trim(); renderTaskDetail(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 window.taskResume=async function(){
   if(_vaReadOnly()) return;
   if(!JOB_CUR) return;
-  try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'resume'}); JOB_CUR.status='en_proceso'; JOB_CUR.pausedReason=''; renderTaskDetail(); }
+  try{ await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'resume'})); JOB_CUR.status='en_proceso'; JOB_CUR.pausedReason=''; renderTaskDetail(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 window.taskReportProblem=async function(){
@@ -994,20 +1052,20 @@ window.taskReportProblem=async function(){
   if(!JOB_CUR) return;
   const text=prompt(t('jProblemReason')); if(text===null) return;
   if(!String(text).trim()){ return; }
-  try{ await httpsCallable(functions,'taskAction')({taskId:JOB_CUR.id, op:'problem', text:String(text).trim()}); whToast(t('jReported')); }
+  try{ await httpsCallable(functions,'taskAction')(vaData({taskId:JOB_CUR.id, op:'problem', text:String(text).trim()})); whToast(t('jReported')); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 window.taskToggleStep=async function(idx){
   if(_vaReadOnly()) return;
   if(!JOB_CUR) return; const cl=JOB_CUR.checklist||[]; if(idx<0||idx>=cl.length) return;
   const nv=!cl[idx].done; cl[idx].done=nv; renderTaskDetail();
-  try{ await httpsCallable(functions,'taskStep')({taskId:JOB_CUR.id, idx:idx, done:nv}); }
+  try{ await httpsCallable(functions,'taskStep')(vaData({taskId:JOB_CUR.id, idx:idx, done:nv})); }
   catch(e){ cl[idx].done=!nv; renderTaskDetail(); whToast(t('jStepErr'),true); }
 };
 window.taskDoComplete=async function(){
   if(_vaReadOnly()) return;
   if(!JOB_CUR) return; const cur=JOB_CUR;
-  try{ await httpsCallable(functions,'taskComplete')({taskId:cur.id}); }
+  try{ await httpsCallable(functions,'taskComplete')(vaData({taskId:cur.id})); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); return; }
   document.getElementById('task-detail').classList.add('hide');
   const sub=document.getElementById('task-gold-sub'); if(sub) sub.textContent=cur.title;
@@ -1214,7 +1272,7 @@ window.mechStartInspection=async function(){
   if(!MECH_CUR) return;
   const miles=(document.getElementById('mech-miles').value||'').trim();
   if(!miles){ whToast(L==='en'?'Enter the miles.':'Pon las millas.',true); return; }
-  try{ await httpsCallable(functions,'mechCarIntake')({ carId:MECH_CUR.id, receivedMiles:miles });
+  try{ await httpsCallable(functions,'mechCarIntake')(vaData({ carId:MECH_CUR.id, receivedMiles:miles }));
     whToast(L==='en'?'✅ Miles saved · inspection started':'✅ Millas registradas · inspección iniciada');
     mechCloseIntake(); loadMechCars();
   }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
@@ -1297,7 +1355,7 @@ function renderMyService(){
 }
 window.svcAdvance=async function(orderId,status){
   if(_vaReadOnly()) return;
-  try{ await httpsCallable(functions,'svcOrderStatus')({orderId:orderId,status:status}); whToast(t('updated')||'✅'); loadMyService(); }
+  try{ await httpsCallable(functions,'svcOrderStatus')(vaData({orderId:orderId,status:status})); whToast(t('updated')||'✅'); loadMyService(); }
   catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 
