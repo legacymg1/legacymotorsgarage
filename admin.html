@@ -1793,7 +1793,7 @@ window.svcNewOrder=function(){
 // 👁️ Abrir una orden EXISTENTE para ver/editar (mismo formulario, modo editar).
 window.svcOpenOrder=function(id){
   const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
-  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0,price:(s.price!=null?Number(s.price):((Number(s.laborCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[]),role:s.role||o.assignRole||'Mecánico',assignEmpId:s.assignEmpId||'',assignName:s.assignName||'',status:s.status||'pendiente',estNote:s.estNote||''})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60,price:(Number(o.grandTotalCents)||0)/100,parts:[],role:o.assignRole||'Mecánico',assignEmpId:o.assignEmpId||'',assignName:o.assignName||'',status:'pendiente'}];
+  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0,price:(s.price!=null?Number(s.price):((Number(s.laborCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[]),role:s.role||o.assignRole||'Mecánico',assignEmpId:s.assignEmpId||'',assignName:s.assignName||'',status:s.status||'pendiente',estNote:s.estNote||'',_collapsed:true})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60,price:(Number(o.grandTotalCents)||0)/100,parts:[],role:o.assignRole||'Mecánico',assignEmpId:o.assignEmpId||'',assignName:o.assignName||'',status:'pendiente'}];
   // Migrar partes GLOBALES viejas (modelo anterior) al primer servicio, para no perderlas al editar.
   if(Array.isArray(o.parts)&&o.parts.length && !services.some(s=>s.parts&&s.parts.length)){ const _mig=o.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})); if(services[0]) services[0].parts=_mig; }
   window._svcDraft={ clientId:o.clientId||'', clientName:o.clientName||'', clientPhone:o.clientPhone||'', lang:o.lang||'es',
@@ -1853,7 +1853,9 @@ function svcCapServices(){
   });
   const prev=d.services||[];
   const arr=[];
-  rows.forEach(row=>{ const i=row.getAttribute('data-svc-row');
+  rows.forEach(row=>{ const i=row.getAttribute('data-svc-row'); const pv=prev[Number(i)]||{};
+    // Servicio COLAPSADO: no tiene inputs en el DOM → se conserva tal cual.
+    if(!document.getElementById('svc-svc-desc-'+i)){ arr.push(pv); return; }
     const desc=(document.getElementById('svc-svc-desc-'+i)||{}).value||'';
     const minutes=Number((document.getElementById('svc-svc-time-'+i)||{}).value)||0;
     const price=Number((document.getElementById('svc-svc-price-'+i)||{}).value)||0;
@@ -1861,14 +1863,15 @@ function svcCapServices(){
     const role=(document.getElementById('svc-svc-role-'+i)||{}).value||'Mecánico';
     const assignEmpId=(document.getElementById('svc-svc-emp-'+i)||{}).value||'';
     const e=assignEmpId?svcRoster.find(x=>String(x.id)===String(assignEmpId)):null;
-    const pv=prev[Number(i)]||{};
-    arr.push({desc:desc, minutes:minutes, price:price, parts:parts, role:role, assignEmpId:assignEmpId, assignName:(e?e.name:''), status:(pv.status||'pendiente'), estNote:(pv.estNote||'')});
+    arr.push({desc:desc, minutes:minutes, price:price, parts:parts, role:role, assignEmpId:assignEmpId, assignName:(e?e.name:''), status:(pv.status||'pendiente'), estNote:(pv.estNote||''), _collapsed:false});
   });
   d.services=arr.length?arr:[{desc:'',minutes:60,price:0,parts:[],role:'Mecánico',assignEmpId:'',assignName:'',status:'pendiente'}];
 }
 window.svcCapture=svcCapture;
 // Al cambiar el ROL de un servicio, se limpia la persona (cambia la lista) y se re-dibuja ese selector.
 window.svcOnRoleChange=function(i){ svcCapServices(); const d=window._svcDraft; if(d&&d.services[Number(i)]){ d.services[Number(i)].assignEmpId=''; d.services[Number(i)].assignName=''; } svcRenderModal(); };
+// 🗜️ Plegar/expandir un servicio (un renglón ↔ editor completo).
+window.svcToggleService=function(i){ svcCapServices(); const d=window._svcDraft; if(d&&d.services[Number(i)]){ d.services[Number(i)]._collapsed=!d.services[Number(i)]._collapsed; } svcRenderModal(); };
 window.svcCliSearch=function(){
   const q=(document.getElementById('svc-cli-search')?.value||'').toLowerCase().trim();
   const box=document.getElementById('svc-cli-results'); if(!box) return;
@@ -1937,8 +1940,20 @@ function svcRenderModal(){
     const timeOpts=SVC_EST.map(o=>'<option value="'+o.m+'" '+(String(mins)===String(o.m)?'selected':'')+'>'+o.l+'</option>').join('');
     const sparts=(s.parts&&s.parts.length)?s.parts:[];
     const spartRows=sparts.map((p,pi)=>'<div data-spart-row="'+i+'-'+pi+'" style="display:flex;gap:6px;align-items:center;margin-top:6px;"><input id="svc-spart-desc-'+i+'-'+pi+'" value="'+svcEsc(p.desc||'')+'" oninput="svcDescCap(this)" placeholder="Parte / cargo" autocapitalize="sentences" autocomplete="off" autocorrect="off" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;"><div style="position:relative;flex:0 0 90px;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;">$</span><input id="svc-spart-price-'+i+'-'+pi+'" type="number" inputmode="decimal" value="'+(p.price||'')+'" oninput="svcRecalc()" placeholder="0.00" style="'+SVC_IN+';width:100%;box-sizing:border-box;padding-left:17px;text-align:right;margin:0;font-size:13px;"></div><span onclick="svcRemovePart('+i+','+pi+')" style="cursor:pointer;color:var(--faint);font-size:15px;flex:0 0 auto;">🗑️</span></div>').join('');
-    return '<div data-svc-row="'+i+'" style="background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;">'
+    // 🗜️ PLEGABLE: colapsado = un renglón resumen (click para abrir); expandido = editor completo.
+    if(s._collapsed){
+      const sumPartes=(s.parts||[]).reduce((x,p)=>x+(Number(p.price)||0),0);
+      const who=(s.role||'Mecánico')+(s.assignName?(' · '+svcEsc(s.assignName)):'');
+      return '<div data-svc-row="'+i+'" style="background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
+        +'<div onclick="svcToggleService('+i+')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;">'
+        +'<div style="min-width:0;overflow:hidden;"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+svcEsc((s.desc||'').trim()||('Servicio '+(i+1)))+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+svcEsc(who)+(mins?(' · '+svcFmtMin(mins)):'')+(sumPartes?(' · 🔩 '+formatMoney(sumPartes)):'')+'</div></div>'
+        +'<div style="white-space:nowrap;font-weight:800;color:var(--gold);">'+(price?formatMoney(price):'')+' <span style="color:var(--muted);font-weight:400;font-size:13px;">▸ abrir</span></div></div>'
+        +'</div>';
+    }
+    return '<div data-svc-row="'+i+'" style="background:var(--surface3);border:1px solid var(--gold3);border-radius:10px;padding:10px;margin-bottom:8px;">'
       +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:7px;"><input id="svc-svc-desc-'+i+'" value="'+svcEsc(s.desc||'')+'" oninput="svcDescCap(this)" onblur="svcFixDescNow(this,'+i+')" placeholder="Servicio (ej. Cambiar turbo, Detallada interior)" autocapitalize="sentences" autocomplete="off" autocorrect="off" style="'+SVC_IN+';flex:1;margin:0;">'
+      +'<span onclick="svcToggleService('+i+')" title="Minimizar" style="cursor:pointer;color:var(--muted);font-size:17px;flex:0 0 auto;">▾</span>'
       +(svcList.length>1?'<span onclick="svcRemoveService('+i+')" style="cursor:pointer;color:var(--faint);font-size:18px;flex:0 0 auto;">🗑️</span>':'')+'</div>'
       +'<div style="display:flex;gap:8px;align-items:center;">'
       +'<div style="position:relative;flex:1;"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);">$</span><input id="svc-svc-price-'+i+'" type="number" inputmode="decimal" value="'+(price||'')+'" oninput="svcRecalc()" placeholder="Labor" style="'+SVC_IN+';width:100%;box-sizing:border-box;padding-left:20px;text-align:right;margin:0;font-weight:700;"></div>'
@@ -1949,6 +1964,7 @@ function svcRenderModal(){
       +'<div style="margin-top:8px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px;">👤 Asignar este servicio a</div><div style="display:flex;gap:6px;"><select id="svc-svc-role-'+i+'" onchange="svcOnRoleChange('+i+')" title="Rol que hace este servicio" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcRoleOptions(s.role)+'</select><select id="svc-svc-emp-'+i+'" onchange="svcCapServices()" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcEmpOptions(s.role, s.assignEmpId)+'</select></div></div>'
       +'<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:7px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:2px;">🔩 Partes de este servicio</div>'+spartRows
       +'<button type="button" onclick="svcAddPart('+i+')" style="width:100%;margin-top:6px;background:transparent;border:1px dashed var(--border);border-radius:9px;padding:6px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;">➕ Agregar parte / cargo</button></div>'
+      +'<button type="button" onclick="svcToggleService('+i+')" style="width:100%;margin-top:8px;background:transparent;border:none;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">▴ Minimizar servicio</button>'
       +'</div>';
   }).join('');
   const totMin=svcList.reduce((a,s)=>a+(Number(s.minutes)||0),0);
@@ -2054,7 +2070,7 @@ window.svcEstimateOne=async function(si){
     svcRenderModal(); try{ svcRecalc(); }catch(e){}
   }catch(e){ if(btn){ btn.disabled=false; btn.innerHTML='✨ Estimar tiempo y labor (IA)'; } alert('No se pudo estimar: '+((e&&e.message)||e)); }
 };
-window.svcAddService=function(){ svcCapture(); (window._svcDraft.services=window._svcDraft.services||[]).push({desc:'',minutes:60,price:0,parts:[]}); svcRenderModal(); };
+window.svcAddService=function(){ svcCapture(); const arr=(window._svcDraft.services=window._svcDraft.services||[]); arr.forEach(s=>{ s._collapsed=true; }); arr.push({desc:'',minutes:60,price:0,parts:[],role:'Mecánico',assignEmpId:'',assignName:'',status:'pendiente',_collapsed:false}); svcRenderModal(); };
 window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.services||[]; a.splice(i,1); if(!a.length) a.push({desc:'',minutes:60,price:0,parts:[]}); svcRenderModal(); };
 window.svcAddPart=function(si){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s){ (s.parts=s.parts||[]).push({desc:'',price:0}); } svcRenderModal(); };
 window.svcRemovePart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s&&Array.isArray(s.parts)){ s.parts.splice(pi,1); } svcRenderModal(); };
