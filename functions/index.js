@@ -2140,6 +2140,7 @@ exports.carAccounts = onCall({ timeoutSeconds: 30 }, async (request) => {
   const v = vs.data() || {};
   const counts = { total: 0, vendido: 0, proceso: 0, publicado: 0, disponible: 0, borrador: 0 };
   let soldListCents = 0, pipelineListCents = 0, availListCents = 0, sinPrecio = 0;
+  let soldNetCents = 0, netMissing = 0;   // 💵 neto real de eBay (si ya se sincronizó)
   try {
     const ps = await db.collection("parts").get();
     ps.forEach((d) => {
@@ -2147,7 +2148,10 @@ exports.carAccounts = onCall({ timeoutSeconds: 30 }, async (request) => {
       counts.total++;
       const pc = Number(p.priceCents) || 0; if (!pc) sinPrecio++;
       const st = p.status || "disponible";
-      if (st === "vendido") { counts.vendido++; soldListCents += pc; }
+      if (st === "vendido") {
+        counts.vendido++; soldListCents += pc;
+        if (p.ebayNetCents != null) soldNetCents += Number(p.ebayNetCents) || 0; else netMissing++;
+      }
       else if (st === "empaquetando" || st === "en_transito") { counts.proceso++; pipelineListCents += pc; }
       else if (st === "publicado" || st === "en_ebay") { counts.publicado++; availListCents += pc; }
       else if (st === "borrador") { counts.borrador++; availListCents += pc; }
@@ -2155,12 +2159,14 @@ exports.carAccounts = onCall({ timeoutSeconds: 30 }, async (request) => {
     });
   } catch (e) {}
   const costCents = Number(v.costCents) || 0, laborCents = Number(v.laborCents) || 0, laborMin = Number(v.laborMin) || 0;
+  const ebayNetReady = (counts.vendido > 0 && netMissing < counts.vendido);   // hay neto real para al menos una vendida
+  const netoActualCents = soldNetCents - (costCents + laborCents);
   return {
     ok: true, label: [v.year, v.make, v.model].filter(Boolean).join(" ") || v.title || ("#" + (v.inventoryNum || "")),
     inventoryNum: String(v.inventoryNum || ""), vin: String(v.vin || ""),
     costCents, laborCents, laborMin, totalCostCents: costCents + laborCents,
     counts, soldListCents, pipelineListCents, availListCents, sinPrecio,
-    ebayNetReady: false,
+    ebayNetReady, soldNetCents, netMissing, netoActualCents,
   };
 });
 
@@ -2900,17 +2906,71 @@ exports.ebayOauthTest = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH
 
 // 🔗 Re-autorización eBay con TODOS los permisos que usamos (inventario + cuenta + ÓRDENES/fulfillment).
 // Abre este enlace UNA vez, inicia sesión en eBay, acepta → el callback te da un refresh token NUEVO con permiso de leer órdenes.
+const EBAY_FINANCES_SCOPE = "https://api.ebay.com/oauth/api_scope/sell.finances";
 const EBAY_ALL_SCOPES = [
   "https://api.ebay.com/oauth/api_scope",
   "https://api.ebay.com/oauth/api_scope/sell.inventory",
   "https://api.ebay.com/oauth/api_scope/sell.account",
   "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
+  EBAY_FINANCES_SCOPE,   // 💵 para leer el NETO real por orden (lo que nos quedó) — API de Finanzas
 ].join(" ");
 exports.ebayConsent = onRequest({ secrets: [EBAY_APP_ID] }, (req, res) => {
   const url = "https://auth.ebay.com/oauth2/authorize?client_id=" + encodeURIComponent(EBAY_APP_ID.value()) +
     "&redirect_uri=" + encodeURIComponent(EBAY_RUNAME) +
     "&response_type=code&prompt=login&scope=" + encodeURIComponent(EBAY_ALL_SCOPES);
   res.redirect(302, url);
+});
+
+// 💵 NETO REAL de eBay por parte vendida ("lo que nos quedó"): API de Finanzas (getTransactions).
+// Suma por orden CRÉDITO − DÉBITO (venta − comisiones − envío − reembolsos) = neto real, y lo guarda en cada parte (ebayNetCents).
+// Solo dueños. Requiere el scope sell.finances (reautorizar eBay una vez).
+exports.ebaySyncNet = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 180 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const a = await ebayUserAccessToken(EBAY_FINANCES_SCOPE);
+  if (!a.token) return { ok: false, needConsent: true, error: (a.raw && (a.raw.error_description || a.raw.error)) || "Sin token de finanzas. Reautoriza eBay." };
+  const days = Math.min(730, Math.max(1, Number((request.data || {}).days) || 180));
+  const from = new Date(Date.now() - days * 86400000).toISOString();
+  const net = {};   // orderId -> cents (suma firmada)
+  let offset = 0, pages = 0, authBad = false;
+  while (pages < 40) {
+    const url = "https://apiz.ebay.com/sell/finances/v1/transaction?limit=200&offset=" + offset +
+      "&filter=" + encodeURIComponent("transactionDate:[" + from + "..]");
+    let r; try { r = await fetch(url, { headers: { "Authorization": "Bearer " + a.token, "Accept": "application/json" } }); } catch (e) { break; }
+    if (r.status === 401 || r.status === 403) { authBad = true; break; }
+    const j = await r.json().catch(() => ({}));
+    const txs = Array.isArray(j.transactions) ? j.transactions : [];
+    txs.forEach((tx) => {
+      const oid = tx.orderId || (Array.isArray(tx.references) && tx.references[0] && tx.references[0].referenceId) || "";
+      if (!oid) return;
+      const val = Math.round((Number(tx.amount && tx.amount.value) || 0) * 100);
+      const sign = (String(tx.bookingEntry || "").toUpperCase() === "CREDIT") ? 1 : -1;
+      net[oid] = (net[oid] || 0) + sign * val;
+    });
+    pages++;
+    if (txs.length < 200) break;
+    offset += 200;
+  }
+  if (authBad) return { ok: false, needConsent: true, error: "eBay negó el permiso de Finanzas (reautoriza con sell.finances)." };
+  // Guarda el neto en cada parte vendida con ebayOrderId. (Órdenes de 1 parte = exacto; multi-parte = neto de la orden, afinar después.)
+  const db = admin.firestore();
+  let matched = 0, updated = 0;
+  try {
+    const ps = await db.collection("parts").get();
+    let batch = db.batch(), n = 0;
+    for (const d of ps.docs) {
+      const p = d.data() || {}; if (p.status !== "vendido" || !p.ebayOrderId) continue;
+      matched++;
+      if (net[p.ebayOrderId] != null) {
+        batch.set(d.ref, { ebayNetCents: net[p.ebayOrderId], ebayNetAt: new Date().toISOString() }, { merge: true });
+        updated++; n++;
+        if (n >= 400) { await batch.commit(); batch = db.batch(); n = 0; }
+      }
+    }
+    if (n > 0) await batch.commit();
+  } catch (e) {}
+  return { ok: true, updated, matched, orders: Object.keys(net).length, days };
 });
 
 // 📦 Órdenes vendidas SIN enviar (Fulfillment API getOrders) → cola "Por enviar" para Empaque.

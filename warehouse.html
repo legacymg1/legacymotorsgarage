@@ -1245,8 +1245,10 @@ window.whOwnerHome=function(){
 // Botón "‹ volver": dueño → Centro de Operaciones; empleado → Mi jornada.
 window.whBack=function(){ if(role==='owner' && !_asEmp){ if(_ownerJornada){ _ownerJornada=false; whOwnerHome(); } else whOwnerHome(); } else whGoHome(); };
 // 💰 CUENTAS DEL CARRO (Dismantling) — overlay SOLO INFORMATIVO. No toca Finanzas.
+let _acctVid='';
 window.openCarAccounts=async function(vid){
   if(role!=='owner') return;
+  _acctVid=vid;
   let ov=document.getElementById('wh-acct');
   if(!ov){ ov=document.createElement('div'); ov.id='wh-acct'; ov.style.cssText='position:fixed;inset:0;z-index:100060;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
     ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
@@ -1283,16 +1285,29 @@ function renderCarAccounts(d){
       +(d.sinPrecio?('<div class="faint" style="font-size:11px;margin-top:5px;">⚠️ '+d.sinPrecio+' '+L2('sin precio capturado','without a price yet')+'</div>'):''))
     // Dinero
     +card('<div style="font-weight:800;font-size:13px;margin-bottom:6px;">'+L2('Dinero','Money')+'</div>'
-      +row('💵 '+L2('Generado (neto real de eBay)','Earned (real eBay net)'), '⏳ '+L2('pendiente','pending'), '#f0a030')
-      +'<div class="faint" style="font-size:11px;margin:2px 0 8px;line-height:1.5;">'+L2('El neto real (lo que nos quedó) se conecta en el siguiente paso con la API de Finanzas de eBay.','The real net kept connects next via eBay\'s Finances API.')+'</div>'
-      +'<div style="border-top:1px solid var(--border);padding-top:7px;">'
+      +(d.ebayNetReady
+        ? (row('💵 '+L2('Generado (neto real eBay)','Earned (real eBay net)'), _m2(d.soldNetCents), '#35c46a')
+           +(d.netMissing?('<div class="faint" style="font-size:11px;margin:2px 0 4px;color:#f0a030;">⚠️ '+d.netMissing+' '+L2('vendida(s) sin neto aún — sincroniza','sold without net yet — sync')+'</div>'):'')
+           +'<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;">'+row('<b>'+L2('Neto actual (neto − costo total)','Net so far (net − total cost)')+'</b>', '<b>'+_m2(d.netoActualCents)+'</b>', d.netoActualCents>=0?'#35c46a':'#ff6b6b')+'</div>')
+        : (row('💵 '+L2('Generado (neto real eBay)','Earned (real eBay net)'), '⏳ '+L2('pendiente','pending'), '#f0a030')
+           +'<div class="faint" style="font-size:11px;margin:2px 0 6px;line-height:1.5;">'+L2('Toca 🔄 para jalar lo que de verdad nos quedó, directo de eBay.','Tap 🔄 to pull the real net kept, straight from eBay.')+'</div>'))
+      +'<div style="border-top:1px solid var(--border);padding-top:7px;margin-top:6px;">'
       +'<div class="faint" style="font-size:11px;margin-bottom:4px;">'+L2('Referencia a precio de lista (no es el neto):','List-price reference (not the net):')+'</div>'
       +row(L2('Vendidas','Sold'), _m2(d.soldListCents))
       +(d.pipelineListCents?row(L2('En envío','Shipping'), _m2(d.pipelineListCents)):'')
       +row(L2('Por vender (publicadas + por publicar)','Unsold (listed + to publish)'), _m2(d.availListCents))
       +row('<b>'+L2('Potencial total','Total potential')+'</b>', '<b>'+_m2(refList)+'</b>')
-      +'</div>');
+      +'</div>')
+    +'<button class="btn ghost sm" id="acct-sync-btn" style="width:100%;margin-top:2px;" onclick="carAccountsSyncNet()">🔄 '+L2('Sincronizar neto de eBay','Sync eBay net')+'</button>';
 }
+window.carAccountsSyncNet=async function(){
+  const btn=document.getElementById('acct-sync-btn'); if(btn){ btn.disabled=true; btn.textContent='🔄 '+L2('Sincronizando…','Syncing…'); }
+  try{ const r=await httpsCallable(functions,'ebaySyncNet')({}); const d=(r&&r.data)||{};
+    if(d.needConsent){ whToast(L2('Falta reautorizar eBay (permiso de Finanzas).','eBay needs re-authorizing (Finances permission).'),true); }
+    else whToast('✅ '+L2('Neto actualizado: '+(d.updated||0)+' parte(s)','Net updated: '+(d.updated||0)+' part(s)'));
+    if(_acctVid) openCarAccounts(_acctVid);
+  }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); if(btn){ btn.disabled=false; btn.textContent='🔄 '+L2('Sincronizar neto de eBay','Sync eBay net'); } }
+};
 // 👷 Dueño trabajando: abre SU jornada (tareas + órdenes que puede tomar) encima del Centro.
 let _ownerJornada=false;
 window.whOwnerJornada=function(){
