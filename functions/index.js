@@ -2772,11 +2772,15 @@ exports.ebayOAuthCallback = onRequest({ secrets: [EBAY_APP_ID, EBAY_CERT_ID] }, 
     const j = await r.json();
     if (j.refresh_token) {
       const days = Math.round((j.refresh_token_expires_in || 0) / 86400);
+      // 💾 AUTO-GUARDA el refresh token en la base → todas las funciones de eBay lo usan sin tocar el secreto ni redeploy.
+      let saved = false;
+      try { await admin.firestore().collection("config").doc("ebay").set({ refreshToken: j.refresh_token, refreshAt: new Date().toISOString(), expiresDays: days }, { merge: true }); saved = true; } catch (e) {}
       res.status(200).send(`<!doctype html><html><body style="font-family:-apple-system,sans-serif;max-width:640px;margin:40px auto;padding:0 20px;">
         <h2>✅ Autorización exitosa</h2>
-        <p>Copia este <b>refresh token</b> y pégalo en <b>Secret Manager</b> con el nombre <code>EBAY_OAUTH_REFRESH</code>:</p>
-        <textarea readonly style="width:100%;height:120px;font-size:12px;" onclick="this.select()">${j.refresh_token}</textarea>
-        <p style="color:#666;">Válido ~${days} días. No lo compartas.</p>`);
+        ${saved ? '<p style="color:#0a7d2c;font-weight:700;">💾 Token guardado automáticamente. ¡Ya quedó — no tienes que hacer nada más!</p>' : '<p style="color:#b00;">⚠️ No se pudo guardar solo. Copia el token de abajo y pégalo en Secret Manager (EBAY_OAUTH_REFRESH).</p>'}
+        <details><summary style="cursor:pointer;color:#666;">Ver token (respaldo)</summary>
+        <textarea readonly style="width:100%;height:120px;font-size:12px;" onclick="this.select()">${j.refresh_token}</textarea></details>
+        <p style="color:#666;">Válido ~${days} días.</p>`);
     } else {
       res.status(200).send("<pre style='white-space:pre-wrap;'>" + JSON.stringify(j, null, 2) + "</pre>");
     }
@@ -2909,7 +2913,10 @@ const EBAY_SECRETS = [EBAY_APP_ID, EBAY_DEV_ID, EBAY_CERT_ID, EBAY_AUTH_TOKEN];
 
 // 🔑 Access token de USUARIO (refresh_token grant) — para las APIs REST de vender (Inventory/Account). Scopes sell.inventory + sell.account.
 async function ebayUserAccessToken(scope){
-  const rt = (EBAY_OAUTH_REFRESH.value() || "").trim();  // limpia espacios/saltos si se pegó con basura
+  // 🔁 Prefiere el refresh token GUARDADO en la base (lo escribe el callback al autorizar) → sin tocar el secreto ni redeploy.
+  let rt = "";
+  try { const s = await admin.firestore().collection("config").doc("ebay").get(); if (s.exists) rt = String((s.data() || {}).refreshToken || "").trim(); } catch (e) {}
+  if (!rt) rt = (EBAY_OAUTH_REFRESH.value() || "").trim();   // fallback al secreto (compatibilidad)
   const basic = Buffer.from(EBAY_APP_ID.value() + ":" + EBAY_CERT_ID.value()).toString("base64");
   const scopes = scope || "https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account";
   const r = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
