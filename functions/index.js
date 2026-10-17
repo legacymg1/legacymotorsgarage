@@ -1344,8 +1344,9 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
   else if (id.empId || (Array.isArray(id.roles) && id.roles.length)) {
     mine = open.filter((o) => {
       const svs = Array.isArray(o.services) ? o.services : [];
-      if (svs.length) return svcWorkerServiceIdx(svs, id).length > 0;          // nuevo: por SERVICIO
-      return (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && o.assignRole && Array.isArray(id.roles) && id.roles.includes(o.assignRole)); // compat órdenes viejas
+      const bySvc = svs.length && svcWorkerServiceIdx(svs, id).length > 0;     // por SERVICIO
+      const byOrder = (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && o.assignRole && Array.isArray(id.roles) && id.roles.includes(o.assignRole)); // por orden (compat / respaldo)
+      return bySvc || byOrder;
     });
   } else { mine = []; }
   const rank = { por_recibir: 0, recibido: 1, en_proceso: 2, pausado_partes: 3, agendado: 4, listo: 5 };
@@ -1356,7 +1357,9 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
     const myIdx = isStaff ? svs.map((s, i) => i) : svcWorkerServiceIdx(svs, id);
     const myRoles = [...new Set(myIdx.map((i) => svs[i].role || "Mecánico"))];
     const myStageActive = isStaff ? true : myRoles.includes(activeRole);
-    const isFirstRole = activeRole && svcRoleRankSrv(activeRole) === 0;
+    // La PRIMERA etapa de ESTA orden (no siempre Mecánico): la primera función presente según el orden de la línea.
+    const presentRoles = [...new Set(svs.map((s) => s.role || "Mecánico"))].sort((a, b) => svcRoleRankSrv(a) - svcRoleRankSrv(b));
+    const isFirstRole = activeRole && presentRoles[0] === activeRole;
     return {
       id: o.id, clientName: o.clientName || "", clientPhone: o.clientPhone || "",
       vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
