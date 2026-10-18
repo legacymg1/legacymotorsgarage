@@ -1482,6 +1482,47 @@ exports.svcOrderStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true };
 });
 
+// 🔢 FOLIO de orden de servicio: contador ATÓMICO (counters/serviceOrders). Primer folio = #1001.
+// Lo llama admin.html al CREAR una orden nueva. Owner o estación por correo o empleado con empId.
+exports.svcNextNum = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !(id.isOwner || id.email || id.empId)) throw new HttpsError("permission-denied", "Sin permiso.");
+  const db = admin.firestore();
+  const ref = db.collection("counters").doc("serviceOrders");
+  const num = await db.runTransaction(async (tx) => {
+    const s = await tx.get(ref);
+    const n = ((s.exists ? Number(s.data().n) : 0) || 1000) + 1;
+    tx.set(ref, { n }, { merge: true });
+    return n;
+  });
+  return { ok: true, num };
+});
+
+// 🔢 Backfill TEMPORAL de folios para órdenes viejas (por orden de creación). Un solo uso: ?key=lmgfin2026
+exports.svcBackfillNums = onRequest(async (req, res) => {
+  if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
+  try {
+    const db = admin.firestore();
+    const snap = await db.collection("serviceOrders").get();
+    const docs = []; snap.forEach((d) => docs.push({ id: d.id, data: d.data() || {} }));
+    docs.sort((a, b) => String(a.data.createdAt || "").localeCompare(String(b.data.createdAt || "")));
+    const ref = db.collection("counters").doc("serviceOrders");
+    const cs = await ref.get();
+    let n = (cs.exists ? Number(cs.data().n) : 0) || 1000;
+    const toSet = [];
+    for (const o of docs) {
+      if (o.data.orderNum) { if (Number(o.data.orderNum) > n) n = Number(o.data.orderNum); continue; }
+      n += 1; toSet.push({ id: o.id, num: n });
+    }
+    const bw = db.batch();
+    toSet.forEach((w) => bw.update(db.collection("serviceOrders").doc(w.id), { orderNum: w.num }));
+    await bw.commit();
+    await ref.set({ n }, { merge: true });
+    res.json({ ok: true, assigned: toSet.length, counter: n, total: docs.length });
+  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
+});
+
 // 📋 F3 — HOJA DE RECEPCIÓN del carro de servicio (checklist corto al recibir). Guarda el estado AL RECIBIRLO (protege de daños pre-existentes) y avanza a 'recibido'.
 exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
@@ -1541,12 +1582,14 @@ function _estPayload(o, en) {
     parts: (Array.isArray(s.parts) ? s.parts : []).map((p) => ({ desc: p.desc || "", price: c(p.priceCents != null ? p.priceCents : Math.round((Number(p.price) || 0) * 100)) })),
   }));
   return {
-    id: o.id, vehicleLabel: o.vehicleLabel || "", vin: o.vin || "", plate: o.plate || "",
+    id: o.id, orderNum: o.orderNum || null, vehicleLabel: o.vehicleLabel || "", vin: o.vin || "", plate: o.plate || "",
     status: o.status || "", estimateStatus: o.estimateStatus || "",
     services,
     laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
     deposit: c(o.depositCents), balance: c(o.balanceCents),
+    paid: !!o.paid, paidCents: Number(o.paidCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
     sentAt: o.estimateSentAt || "", acceptedAt: o.estimateAcceptedAt || "", createdAt: o.createdAt || "",
+    scheduledAt: o.scheduledAt || "", receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", promisedAt: o.promisedAt || "", deliveredAt: o.deliveredAt || "",
   };
 }
 // El PORTAL del cliente lee sus estimados por aquí (no puede leer serviceOrders directo: no es staff).

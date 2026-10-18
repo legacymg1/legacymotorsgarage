@@ -873,7 +873,7 @@ function estimateCardHTML(o){
   return `
   <div class="info-card" id="est-${o.id}" style="margin-top:16px;${focus?'border:1px solid var(--gold);box-shadow:0 0 0 2px rgba(200,162,74,.25);':''}">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-      <div class="section-title" style="margin:0;">${es?'Estimado de servicio':'Service estimate'}</div><span style="font-size:20px;">🧾</span>
+      <div class="section-title" style="margin:0;">${es?'Estimado de servicio':'Service estimate'}${o.orderNum?` <span style="color:var(--gold);font-weight:800;">#${o.orderNum}</span>`:''}</div><span style="font-size:20px;">🧾</span>
     </div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">🚗 ${escPortal(o.vehicleLabel||o.vin||'')}${o.plate?(' · '+escPortal(o.plate)):''}</div>
     ${rows}

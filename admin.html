@@ -1590,8 +1590,9 @@ function svcCard(o){
   const assign = o.assignName ? ((o.assignRole||'')+' · '+svcEsc(o.assignName)) : (o.assignRole||'');
   const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
   const stOpts=Object.keys(SVC_STATUS).map(k=>'<option value="'+k+'" '+(k===o.status?'selected':'')+'>'+SVC_STATUS[k].lbl+'</option>').join('');
+  const folio = o.orderNum ? ('<span style="font-size:12px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;">#'+o.orderNum+'</span>') : '';
   return '<div onclick="svcOpenOrder(\''+o.id+'\')" style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer;">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:800;font-size:15px;">'+svcEsc(o.clientName||'Cliente')+'</span>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:800;font-size:15px;min-width:0;">'+(folio?folio+' · ':'')+svcEsc(o.clientName||'Cliente')+'</span>'
     +'<span style="font-size:11px;font-weight:800;color:'+s.c+';background:'+s.c+'22;padding:3px 9px;border-radius:999px;white-space:nowrap;">'+s.lbl+'</span></div>'
     +'<div style="font-size:13px;color:var(--text);">🚗 '+car+'</div>'
     +(idbits?'<div style="font-size:12px;color:var(--muted);">'+idbits+'</div>':'')
@@ -1702,7 +1703,8 @@ function c360SvcHistory(c, v){
     const svcList=Array.isArray(o.services)?o.services.map(s=>s&&s.desc).filter(Boolean):[];
     const photos=(Array.isArray(o.photos)&&o.photos.length)?o.photos:((Array.isArray(o.workPhotos)&&o.workPhotos.length)?o.workPhotos:[]);
     let row='<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">';
-    row+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="min-width:0;"><div style="font-size:13px;font-weight:700;">'+esc(o.reason||'Servicio')+'</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">'+when+(hasInvoice?(' · '+tot):'')+'</div></div><span style="flex:0 0 auto;background:'+ss.c+'22;color:'+ss.c+';border:1px solid '+ss.c+';border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">'+ss.lbl+'</span></div>';
+    const folioH=o.orderNum?('<span style="color:var(--gold);font-weight:800;">#'+o.orderNum+'</span> · '):'';
+    row+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="min-width:0;"><div style="font-size:13px;font-weight:700;">'+folioH+esc(o.reason||'Servicio')+'</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">'+when+(hasInvoice?(' · '+tot):'')+'</div></div><span style="flex:0 0 auto;background:'+ss.c+'22;color:'+ss.c+';border:1px solid '+ss.c+';border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">'+ss.lbl+'</span></div>';
     if(done && svcList.length){ row+='<div style="font-size:12px;color:var(--text);margin-top:7px;">🛠️ Se hizo: '+svcList.map(esc).join(' · ')+'</div>'; }
     if(photos.length){ row+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;">'+photos.slice(0,8).map((u,i)=>'<span onclick="showPhoto(\''+u+'\',\'Trabajo realizado\')" style="font-size:11px;color:var(--gold);cursor:pointer;">📷 Foto '+(i+1)+'</span>').join('')+'</div>'; }
     const docLbl = done ? '🧾 invoice ›' : '📄 estimado ›';   // antes de entregar = ESTIMADO; al entregar = INVOICE
@@ -1801,7 +1803,7 @@ window.svcOpenOrder=function(id){
     when:o.scheduledAt?'later':'now', scheduledAt:o.scheduledAt?new Date(o.scheduledAt).toISOString().slice(0,16):'',
     estMin:Number(o.estMinutes)||60, assignRole:o.assignRole||'Mecánico', assignEmpId:o.assignEmpId||'', assignName:o.assignName||'',
     services, laborRate:(Number(o.laborRateCents)||10000)/100, deposit:(Number(o.depositCents)||0)/100,
-    editId:id, status:o.status||'por_recibir',
+    editId:id, status:o.status||'por_recibir', orderNum:o.orderNum||null,
     createdAt:o.createdAt||'', receivedAt:o.receivedAt||'', deliveredAt:o.deliveredAt||'', startedAt:o.startedAt||'' };
   svcRenderModal();
   document.getElementById('svc-modal').style.display='flex';
@@ -1995,7 +1997,7 @@ function svcRenderModal(){
   }
   const isEdit=!!d.editId;
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
-    +'<h2 style="font-family:var(--font-display);font-size:21px;margin:0;">'+(isEdit?'Orden de servicio':'Nueva orden de servicio')+'</h2>'
+    +'<h2 style="font-family:var(--font-display);font-size:21px;margin:0;">'+(isEdit?('Orden de servicio'+(d.orderNum?(' <span style="color:var(--gold);">#'+d.orderNum+'</span>'):'')):'Nueva orden de servicio')+'</h2>'
     +'<button onclick="svcClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>'
     +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',svcHtml)
     +(isEdit?SVC_SEC('4 · Estatus y fechas',datesHtml):'')
@@ -2238,8 +2240,12 @@ window.svcSaveOrder=async function(opts){
       if(!confirm('⚠️ El cliente aún no acepta el estimado.\n¿Asignar al mecánico de todos modos?')) return;
     }
   }
+  // 🔢 Folio de orden: secuencial (#1001…). Al CREAR pide uno nuevo al servidor; al EDITAR conserva el que ya tiene.
+  let orderNum = d.editId ? ((svcOrders.find(x=>x.id===d.editId)||{}).orderNum || null) : null;
+  if(!d.editId){ try{ const _n=await httpsCallable(functions,'svcNextNum')({}); orderNum=(_n&&_n.data&&_n.data.num)||null; }catch(e){ console.warn('svcNextNum', e); } }
   // guardar
   const payload={ clientId, clientName, clientPhone, lang, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, estMinutes, assignRole, assignEmpId, assignName, status };
+  if(orderNum) payload.orderNum=orderNum;
   const wasEdit=!!d.editId; let orderId=d.editId||'';
   try{
     if(d.editId){ await updateDoc(doc(db,'serviceOrders',d.editId), Object.assign(payload,{ updatedAt:new Date().toISOString() })); }
