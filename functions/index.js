@@ -1495,10 +1495,11 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
     const presentRoles = [...new Set(svs.map((s) => s.role || defRole))].sort((a, b) => svcRoleRankSrv(a) - svcRoleRankSrv(b));
     const isFirstRole = activeRole && presentRoles[0] === activeRole;
     return {
-      id: o.id, clientName: o.clientName || "", clientPhone: o.clientPhone || "",
+      id: o.id, orderNum: o.orderNum || null, clientName: o.clientName || "", clientPhone: o.clientPhone || "",
       vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
       reason: o.reason || "", reasonEs: o.reasonEs || o.reason || "", reasonEn: o.reasonEn || o.reason || "",
-      scheduledAt: o.scheduledAt || null, status: o.status || "por_recibir",
+      scheduledAt: o.scheduledAt || null, receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", deliveredAt: o.deliveredAt || "",
+      status: o.status || "por_recibir", paid: !!o.paid,
       assignRole: o.assignRole || "", assignName: o.assignName || "",
       // 🔧 línea / relevo
       activeRole: activeRole || "", myStageActive, waitingFor: (!myStageActive && activeRole) ? activeRole : "",
