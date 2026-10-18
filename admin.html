@@ -1639,7 +1639,15 @@ window.svcChargeDo=async function(id, method){
   try{
     const r=await httpsCallable(functions,'svcCharge')({ orderId:id, method });
     const dd=(r&&r.data)||{};
-    if(method==='cash'){ const ov=document.getElementById('svc-caja'); if(ov) ov.remove(); alert('✅ Cobro registrado. La orden quedó pagada y entró a Finanzas como ingreso de Servicio.'); }
+    if(method==='cash'){
+      const o=svcOrders.find(x=>x.id===id)||{}; const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
+      const ov=document.getElementById('svc-caja'); if(ov) ov.remove();
+      const link='https://legacymotorsgarage.com/portal.html?order='+id;
+      if(phone && confirm('✅ Cobro registrado y entró a Finanzas.\n\n¿Enviar el recibo por SMS al cliente?')){
+        const body=((o.lang==='en')?('Thank you! Your Legacy service receipt'+(o.orderNum?(' #'+o.orderNum):'')+': '):('¡Gracias! Tu recibo de servicio Legacy'+(o.orderNum?(' #'+o.orderNum):'')+': '))+link;
+        location.href='sms:'+phone+'?body='+encodeURIComponent(body);
+      } else { alert('✅ Cobro registrado. La orden quedó pagada y entró a Finanzas como ingreso de Servicio.'); }
+    }
     else {
       const url=dd.url||'';
       if(!url){ if(msg) msg.textContent='No se pudo crear el link.'; return; }

@@ -862,8 +862,38 @@ window.portalFocusVehicle=function(vin){
     if(card){ const prev=card.style.boxShadow; card.style.boxShadow='0 0 0 2px var(--gold)'; setTimeout(()=>{ card.style.boxShadow=prev; },1600); }
   }
 };
+// 🟢 Rastreador de estatus tipo Tesla: línea de tiempo con palomita en lo hecho y la etapa actual resaltada.
+function svcTrackerHTML(o){
+  const es=L!=='en';
+  const R={agendado:0,por_recibir:0,recibido:1,en_proceso:2,pausado_partes:2,listo:3,entregado:4};
+  let cur=(R[o.status]!=null)?R[o.status]:0; if(o.paid) cur=5;
+  const waiting=(o.status==='pausado_partes');
+  const steps=[
+    {es:'Recibido',en:'Checked in',ic:'🚗',at:o.receivedAt,r:1},
+    {es:'En reparación',en:'In repair',ic:'🔧',at:o.startedAt,r:2},
+    {es:'Listo para entrega',en:'Ready for pickup',ic:'✅',at:'',r:3},
+    {es:'Entregado',en:'Delivered',ic:'🏁',at:o.deliveredAt,r:4},
+    {es:'Pagado',en:'Paid',ic:'💳',at:o.paidAt,r:5},
+  ];
+  const rows=steps.map((s,i)=>{
+    const done=cur>=s.r && (s.r<5 || o.paid);
+    const active=(s.r===cur) || (waiting && s.r===2);
+    const col=done?'#28b463':(active?'var(--gold)':'var(--muted)');
+    const dot=done?'✓':(active?'●':'○');
+    const last=i===steps.length-1;
+    const when=s.at?`<div style="font-size:11px;color:var(--muted);">${formatDate((s.at||'').slice(0,10))}</div>`:'';
+    const note=(waiting && s.r===2)?`<div style="font-size:11px;color:var(--gold);">⏸️ ${es?'Esperando partes':'Waiting on parts'}</div>`:'';
+    return `<div style="display:flex;gap:10px;align-items:flex-start;">
+      <div style="display:flex;flex-direction:column;align-items:center;"><span style="width:22px;height:22px;border-radius:50%;background:${done?'rgba(40,180,99,.15)':(active?'rgba(232,182,74,.15)':'transparent')};border:1.5px solid ${col};color:${col};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 auto;">${dot}</span>${!last?`<span style="width:2px;flex:1;min-height:14px;background:${cur>s.r?'#28b463':'var(--border)'};"></span>`:''}</div>
+      <div style="padding-bottom:${last?'0':'10px'};"><div style="font-weight:700;font-size:13px;color:${done||active?'var(--white)':'var(--muted)'};">${s.ic} ${es?s.es:s.en}</div>${when}${note}</div>
+    </div>`;
+  }).join('');
+  return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:14px;margin:10px 0;">
+    <div style="font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--muted);margin-bottom:10px;">${es?'ESTADO DE LA ORDEN':'ORDER STATUS'}</div>${rows}</div>`;
+}
 function estimateCardHTML(o){
   const es=L!=='en'; const accepted=o.estimateStatus==='accepted';
+  const showTrack=(o.receivedAt||o.paid||['recibido','en_proceso','pausado_partes','listo','entregado'].indexOf(o.status)>=0||accepted);
   let rows='';
   (o.services||[]).forEach(s=>{
     rows+=`<div class="info-row" style="border:none;padding:6px 0 2px;"><span class="ir-label" style="font-weight:700;color:var(--white);">${escPortal(s.desc||'')}</span><span class="ir-value">${formatMoney(s.price)}</span></div>`;
@@ -873,9 +903,10 @@ function estimateCardHTML(o){
   return `
   <div class="info-card" id="est-${o.id}" style="margin-top:16px;${focus?'border:1px solid var(--gold);box-shadow:0 0 0 2px rgba(200,162,74,.25);':''}">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-      <div class="section-title" style="margin:0;">${es?'Estimado de servicio':'Service estimate'}${o.orderNum?` <span style="color:var(--gold);font-weight:800;">#${o.orderNum}</span>`:''}</div><span style="font-size:20px;">🧾</span>
+      <div class="section-title" style="margin:0;">${o.paid?(es?'Recibo de servicio':'Service receipt'):(es?'Estimado de servicio':'Service estimate')}${o.orderNum?` <span style="color:var(--gold);font-weight:800;">#${o.orderNum}</span>`:''}</div><span style="font-size:20px;">${o.paid?'✅':'🧾'}</span>
     </div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">🚗 ${escPortal(o.vehicleLabel||o.vin||'')}${o.plate?(' · '+escPortal(o.plate)):''}</div>
+    ${showTrack?svcTrackerHTML(o):''}
     ${rows}
     <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
       <div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label">${es?'Mano de obra':'Labor'}</span><span class="ir-value">${formatMoney(o.laborTotal)}</span></div>
@@ -883,7 +914,9 @@ function estimateCardHTML(o){
       <div class="info-row" style="border:none;padding:4px 0;"><span class="ir-label" style="font-weight:800;color:var(--white);">Total</span><span class="ir-value" style="font-weight:800;color:var(--gold);">${formatMoney(o.total)}</span></div>
       ${o.deposit>0?`<div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label">${es?'Anticipo':'Deposit'}</span><span class="ir-value">−${formatMoney(o.deposit)}</span></div><div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label" style="font-weight:700;">${es?'Saldo':'Balance'}</span><span class="ir-value" style="font-weight:700;">${formatMoney(o.balance)}</span></div>`:''}
     </div>
-    ${accepted
+    ${o.paid
+      ? `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:800;text-align:center;">✅ ${es?'PAGADO':'PAID'} · ${formatMoney((o.paidCents||0)/100||o.total)}${o.payMethod==='cash'?(es?' · efectivo':' · cash'):((o.payMethod||'').indexOf('square')===0?(es?' · tarjeta':' · card'):'')}${o.paidAt?(' · '+formatDate((o.paidAt||'').slice(0,10))):''}<div style="font-size:11px;font-weight:600;color:#49d17f;margin-top:4px;">${es?'Gracias — este es tu recibo.':'Thank you — this is your receipt.'}</div></div>`
+      : accepted
       ? `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:700;text-align:center;">✅ ${es?'Aceptaste este estimado':'You approved this estimate'}${o.acceptedAt?(' · '+formatDate((o.acceptedAt||'').slice(0,10))):''}</div>`
       : `<div style="margin-top:12px;">
           <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
