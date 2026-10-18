@@ -678,6 +678,10 @@ async function _sqRecordOrderId(orderId) {
   if (!r.ok) { console.error("square retrieve", JSON.stringify(j)); return { ok: false, error: "square_error" }; }
   const order = (j.orders && j.orders[0]) || null;
   if (!order) { return { ok: false, error: "order" }; }
+  // 🔧 CAJA DE SERVICIO: si el link es de una orden de servicio, se registra como ingreso de Servicio (no abono del dealer).
+  if (order.metadata && order.metadata.kind === "service" && order.metadata.serviceOrderId) {
+    return await _sqRecordServiceCharge(order);
+  }
   const tenders = Array.isArray(order.tenders) ? order.tenders : [];
   const paid = order.state === "COMPLETED" || (order.net_amount_due_money && Number(order.net_amount_due_money.amount) === 0 && tenders.length);
   if (!paid) { return { ok: false, status: order.state || "PENDING" }; }
@@ -716,6 +720,102 @@ async function _sqRecordOrderId(orderId) {
   });
   return { ok: true, amount, clientName };
 }
+
+// 🔧 Registra el cobro de una ORDEN DE SERVICIO pagada por Square (idempotente por id del pago).
+async function _sqRecordServiceCharge(order) {
+  const tenders = Array.isArray(order.tenders) ? order.tenders : [];
+  const paid = order.state === "COMPLETED" || (order.net_amount_due_money && Number(order.net_amount_due_money.amount) === 0 && tenders.length);
+  if (!paid) return { ok: false, status: order.state || "PENDING" };
+  const orderId = String(order.metadata.serviceOrderId || "");
+  if (!orderId) return { ok: false, error: "no_ref" };
+  let amountCents = 0;
+  try { amountCents = parseInt(order.metadata.baseCents, 10) || 0; } catch (e) {}
+  if (!amountCents) amountCents = Math.round((order.net_amounts && order.net_amounts.line_item_total_money && order.net_amounts.line_item_total_money.amount) || (order.total_money && order.total_money.amount) || 0);
+  const payId = (tenders[0] && tenders[0].id) || order.id;
+  const db = admin.firestore();
+  const snap = await db.collection("serviceOrders").doc(orderId).get();
+  if (!snap.exists) return { ok: false, error: "order" };
+  await _postServiceIncome(db, snap.data() || {}, orderId, amountCents, "square", "sq_" + payId, "square");
+  return { ok: true, amount: Math.round(amountCents) / 100 };
+}
+
+// Postea el ingreso de SERVICIO (bolsa dealer, category Servicio) + marca la orden pagada/entregada. Idempotente por entryId.
+async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, who) {
+  const nowISO = new Date().toISOString();
+  const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const txRef = db.doc("transactions/" + entryId);
+  const oref = db.collection("serviceOrders").doc(orderId);
+  await db.runTransaction(async (tx) => {
+    const ts = await tx.get(txRef);
+    if (ts.exists) return;   // ya registrado (idempotente)
+    const os = await tx.get(oref);
+    const cur = os.exists ? (os.data() || {}) : o;
+    const total = Number(cur.grandTotalCents) || 0;
+    const newPaid = (Number(cur.paidCents) || 0) + Math.round(amountCents);
+    tx.set(txRef, {
+      entryId, type: "income", dept: "dealer", category: "Servicio", saleType: "servicio",
+      clientId: cur.clientId || "", clientName: cur.clientName || "",
+      serviceOrderId: orderId, orderNum: cur.orderNum || null, carLabel: cur.vehicleLabel || "",
+      amountCents: Math.round(amountCents), method: method || "cash", date: dateStr,
+      note: "Orden de servicio #" + (cur.orderNum || orderId), createdAt: nowISO, createdBy: who || method || "service-caja", source: "service-caja",
+    });
+    const patch = { paidCents: newPaid, paid: (newPaid >= total && total > 0), paidAt: nowISO, payMethod: method || "cash", updatedAt: nowISO };
+    if (patch.paid) { patch.status = "entregado"; if (!cur.deliveredAt) patch.deliveredAt = nowISO; }
+    tx.set(oref, patch, { merge: true });
+  });
+}
+
+// 💵 CAJA DE SERVICIO: cobra una orden. method 'cash' = registra YA (ingreso + marca pagada); 'square' = crea link de pago y lo regresa.
+exports.svcCharge = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !(id.isOwner || id.email)) throw new HttpsError("permission-denied", "Solo staff/dueños cobran.");
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  const method = String(d.method || "cash");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const oref = db.collection("serviceOrders").doc(orderId);
+  const snap = await oref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const total = Number(o.grandTotalCents) || 0;
+  const already = Number(o.paidCents) || 0;
+  const defaultDue = Math.max(0, total - already);
+  const amountCents = d.amountCents != null ? Math.round(Number(d.amountCents)) : defaultDue;
+  if (!(amountCents > 0)) throw new HttpsError("invalid-argument", "Monto inválido.");
+  if (amountCents > 2000000) throw new HttpsError("invalid-argument", "Monto demasiado alto.");
+  if (method === "cash") {
+    await _postServiceIncome(db, o, orderId, amountCents, "cash", "svc_" + orderId + "_" + Date.now().toString(36), id.email || id.name || "");
+    const fresh = (await oref.get()).data() || {};
+    return { ok: true, paid: !!fresh.paid, paidCents: Number(fresh.paidCents) || 0 };
+  }
+  if (method === "square") {
+    const carLabel = o.vehicleLabel || "Servicio";
+    const payload = {
+      idempotency_key: (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)),
+      order: {
+        location_id: SQUARE_LOCATION_ID, reference_id: o.clientId || orderId,
+        line_items: [{ name: "Orden de servicio #" + (o.orderNum || "") + " — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
+        service_charges: [{ name: "Cargo por servicio / Service fee (2.9%)", percentage: "2.9", calculation_phase: "SUBTOTAL_PHASE" }],
+        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents) },
+      },
+      checkout_options: {
+        redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1",
+        ask_for_shipping_address: false,
+        accepted_payment_methods: { apple_pay: true, google_pay: true, cash_app_pay: true, afterpay_clearpay: false },
+      },
+    };
+    const r = await fetch(SQUARE_API + "/v2/online-checkout/payment-links", { method: "POST", headers: _sqHeaders(), body: JSON.stringify(payload) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { console.error("svcCharge square", JSON.stringify(j)); throw new HttpsError("internal", (j.errors && j.errors[0] && j.errors[0].detail) || "square_error"); }
+    const link = j.payment_link || {};
+    const url = link.url || link.long_url || "";
+    await oref.set({ squarePayUrl: url, squareOrderId: link.order_id || "", payMethod: "square-pending", updatedAt: new Date().toISOString() }, { merge: true });
+    return { ok: true, url, squareOrderId: link.order_id || "" };
+  }
+  throw new HttpsError("invalid-argument", "Método inválido.");
+});
 
 // Tras el pago, Square regresa al portal con el orderId. Esto RE-VERIFICA con Square que sí se pagó
 // y lo registra en la cuenta del cliente + Finanzas (idempotente por el id del pago de Square).
