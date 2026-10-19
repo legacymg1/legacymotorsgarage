@@ -1757,20 +1757,38 @@ window.taskDoComplete=async function(){
 
 // 👑 Panel de operación del dueño — todas las tareas abiertas (allTasks) con resumen + scroll.
 let OP_TASKS=[], OP_TEAM=[], OP_DEALER=[], OP_SVC=[], OP_DONE=[], OP_CLOCK=null, OP_DIS=[];
-// 📊 CENTRO DE OPERACIONES (dueño) — Resumen de hoy + Equipo en vivo + Hoy se hizo + Tareas. Reusa callables existentes.
-window.loadOwnerPanel=async function(){
-  const tb=document.getElementById('op-team'); if(tb) tb.innerHTML='<div class="faint" style="text-align:center;padding:12px;">'+t('jLoadingTxt')+'</div>';
-  const box=document.getElementById('op-tasks'); if(box) box.innerHTML='';
-  const call=(n)=>httpsCallable(functions,n)({}).then(r=>(r&&r.data)||{}).catch(()=>({}));
-  const [a,c,cars,svc,done,dis]=await Promise.all([ call('allTasks'), call('clockWeek'), call('carsInProcess'), call('svcMyOrders'), call('opsDoneToday'), call('disInProcess') ]);
-  OP_TASKS=a.tasks||[]; OP_CLOCK=c; OP_DEALER=cars.cars||[]; OP_SVC=(svc.orders||[]).filter(o=>o.status!=='entregado'); OP_DONE=done.people||[]; OP_DIS=dis.cars||[];
-  // 👥 Equipo en vivo = quién está TRABAJANDO ahora. Reloj (asistencia) = empleados; tiempo de tarea/servicio = TODOS (incl. dueños) para el COSTO.
+// 👥 Equipo en vivo = quién está TRABAJANDO ahora (reloj = empleados; tarea/servicio activo = todos, incl. dueños).
+function _opRebuildTeam(){
   const live={}; const keyN=n=>(String(n||'').trim().toLowerCase());
-  (c.list||[]).filter(e=>!e.owner && e.open).forEach(e=>{ const k=keyN(e.name)||e.key; if(!live[k]) live[k]={name:e.name, open:true, hours:(e.hours||0), task:null}; else { live[k].open=true; live[k].hours+=(e.hours||0); } });
+  ((OP_CLOCK&&OP_CLOCK.list)||[]).filter(e=>!e.owner && e.open).forEach(e=>{ const k=keyN(e.name)||e.key; if(!live[k]) live[k]={name:e.name, open:true, hours:(e.hours||0), task:null}; else { live[k].open=true; live[k].hours+=(e.hours||0); } });
   (OP_TASKS||[]).filter(tk=>tk.status==='en_proceso' && tk.assignName).forEach(tk=>{ const k=keyN(tk.assignName); if(!live[k]) live[k]={name:tk.assignName, open:false, hours:0, task:null}; if(!live[k].task) live[k].task={title:tk.title, line:tk.line||'general'}; });
   (OP_SVC||[]).forEach(o=>{ (o.services||[]).forEach(sv=>{ if(sv.status==='en_proceso' && sv.assignName){ const k=keyN(sv.assignName); if(!live[k]) live[k]={name:sv.assignName, open:false, hours:0, task:null}; if(!live[k].task) live[k].task={title:sv.desc||'', line:'service'}; } }); });
   OP_TEAM=Object.values(live);
-  renderOwnerPanel();
+}
+// 📊 CENTRO DE OPERACIONES (dueño). Pinta YA desde caché (refresco instantáneo) y va LLENANDO cada sección en cuanto su dato llega (no espera a las 6 funciones).
+let _opLoadSeq=0;
+window.loadOwnerPanel=async function(){
+  const seq=(++_opLoadSeq);
+  // 1) PINTAR AL INSTANTE desde la última foto (sessionStorage) → cero espera al refrescar.
+  let hadCache=false;
+  try{ const cx=JSON.parse(sessionStorage.getItem('lmg_op_cache')||'null'); if(cx){ OP_TASKS=cx.OP_TASKS||[]; OP_CLOCK=cx.OP_CLOCK||null; OP_DEALER=cx.OP_DEALER||[]; OP_SVC=cx.OP_SVC||[]; OP_DONE=cx.OP_DONE||[]; OP_DIS=cx.OP_DIS||[]; OP_TEAM=cx.OP_TEAM||[]; renderOwnerPanel(); hadCache=true; } }catch(e){}
+  if(!hadCache){ const tb=document.getElementById('op-team'); if(tb) tb.innerHTML='<div class="faint" style="text-align:center;padding:12px;">'+t('jLoadingTxt')+'</div>'; }
+  const call=(n)=>httpsCallable(functions,n)({}).then(r=>(r&&r.data)||{}).catch(()=>({}));
+  const paint=()=>{ if(seq!==_opLoadSeq) return; _opRebuildTeam(); renderOwnerPanel(); };
+  // 2) Las 6 en paralelo; cada una repinta SU parte al resolver.
+  const jobs=[
+    call('allTasks').then(a=>{ OP_TASKS=a.tasks||[]; paint(); }),
+    call('clockWeek').then(c=>{ OP_CLOCK=c; paint(); }),
+    call('carsInProcess').then(x=>{ OP_DEALER=x.cars||[]; paint(); }),
+    call('svcMyOrders').then(x=>{ OP_SVC=(x.orders||[]).filter(o=>o.status!=='entregado'); paint(); }),
+    call('opsDoneToday').then(x=>{ OP_DONE=x.people||[]; paint(); }),
+    call('disInProcess').then(x=>{ OP_DIS=x.cars||[]; paint(); }),
+  ];
+  await Promise.allSettled(jobs);
+  if(seq!==_opLoadSeq) return;   // se disparó otra carga más nueva
+  _opRebuildTeam(); renderOwnerPanel();
+  // 3) Guardar la foto para el próximo refresco instantáneo.
+  try{ sessionStorage.setItem('lmg_op_cache', JSON.stringify({OP_TASKS,OP_CLOCK,OP_DEALER,OP_SVC,OP_DONE,OP_DIS,OP_TEAM})); }catch(e){}
 };
 // Normaliza cualquier estatus interno a los términos UNIFICADOS: En cola → En proceso → En pausa → Terminado.
 function _opStatusLabel(s){
