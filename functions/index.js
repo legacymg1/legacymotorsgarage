@@ -1,5 +1,5 @@
 // Legacy DMS — backend (Cloud Functions v2)
-// redeploy marker: push onMoneyIn trigger (tras conceder IAM eventarc/pubsub/run)
+// redeploy marker: push onMoneyIn trigger (IAM + eventarc service agent concedidos)
 const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
