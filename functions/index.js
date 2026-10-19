@@ -735,12 +735,13 @@ async function _sqRecordServiceCharge(order) {
   const db = admin.firestore();
   const snap = await db.collection("serviceOrders").doc(orderId).get();
   if (!snap.exists) return { ok: false, error: "order" };
-  await _postServiceIncome(db, snap.data() || {}, orderId, amountCents, "square", "sq_" + payId, "square");
+  await _postServiceIncome(db, snap.data() || {}, orderId, amountCents, "square", "sq_" + payId, "square", order.metadata.priv === "1");
   return { ok: true, amount: Math.round(amountCents) / 100 };
 }
 
 // Postea el ingreso de SERVICIO (bolsa dealer, category Servicio) + marca la orden pagada/entregada. Idempotente por entryId.
-async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, who) {
+// priv=true → transacción PRIVADA ("fuera de Legacy"): entra a Finanzas pero NO cuenta en los números de Legacy.
+async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, who, priv) {
   const nowISO = new Date().toISOString();
   const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const txRef = db.doc("transactions/" + entryId);
@@ -753,14 +754,16 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
     const total = Number(cur.grandTotalCents) || 0;
     const newPaid = (Number(cur.paidCents) || 0) + Math.round(amountCents);
     tx.set(txRef, {
-      entryId, type: "income", dept: "dealer", category: "Servicio", saleType: "servicio",
+      entryId, type: "income", dept: "dealer", category: "Servicio", saleType: "servicio", private: !!priv,
       clientId: cur.clientId || "", clientName: cur.clientName || "",
       serviceOrderId: orderId, orderNum: cur.orderNum || null, carLabel: cur.vehicleLabel || "",
       amountCents: Math.round(amountCents), method: method || "cash", date: dateStr,
-      note: "Orden de servicio #" + (cur.orderNum || orderId), createdAt: nowISO, createdBy: who || method || "service-caja", source: "service-caja",
+      note: "Orden de servicio #" + (cur.orderNum || orderId) + (newPaid < total ? " (abono)" : ""), createdAt: nowISO, createdBy: who || method || "service-caja", source: "service-caja",
     });
-    const patch = { paidCents: newPaid, paid: (newPaid >= total && total > 0), paidAt: nowISO, payMethod: method || "cash", updatedAt: nowISO };
-    if (patch.paid) { patch.status = "entregado"; if (!cur.deliveredAt) patch.deliveredAt = nowISO; }
+    const fullyPaid = (newPaid >= total && total > 0);
+    const patch = { paidCents: newPaid, paid: fullyPaid, paidAt: nowISO, payMethod: method || "cash", updatedAt: nowISO };
+    if (priv) patch.private = true;
+    if (fullyPaid) { patch.status = "entregado"; if (!cur.deliveredAt) patch.deliveredAt = nowISO; }
     tx.set(oref, patch, { merge: true });
   });
 }
@@ -783,10 +786,11 @@ exports.svcCharge = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 
   const already = Number(o.paidCents) || 0;
   const defaultDue = Math.max(0, total - already);
   const amountCents = d.amountCents != null ? Math.round(Number(d.amountCents)) : defaultDue;
+  const priv = !!d.private;   // 🔒 "fuera de Legacy": entra a Finanzas pero privado (no cuenta en los números de Legacy)
   if (!(amountCents > 0)) throw new HttpsError("invalid-argument", "Monto inválido.");
   if (amountCents > 2000000) throw new HttpsError("invalid-argument", "Monto demasiado alto.");
   if (method === "cash") {
-    await _postServiceIncome(db, o, orderId, amountCents, "cash", "svc_" + orderId + "_" + Date.now().toString(36), id.email || id.name || "");
+    await _postServiceIncome(db, o, orderId, amountCents, "cash", "svc_" + orderId + "_" + Date.now().toString(36), id.email || id.name || "", priv);
     const fresh = (await oref.get()).data() || {};
     return { ok: true, paid: !!fresh.paid, paidCents: Number(fresh.paidCents) || 0 };
   }
@@ -798,7 +802,7 @@ exports.svcCharge = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 
         location_id: SQUARE_LOCATION_ID, reference_id: o.clientId || orderId,
         line_items: [{ name: "Orden de servicio #" + (o.orderNum || "") + " — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
         service_charges: [{ name: "Cargo por servicio / Service fee (2.9%)", percentage: "2.9", calculation_phase: "SUBTOTAL_PHASE" }],
-        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents) },
+        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents), priv: priv ? "1" : "" },
       },
       checkout_options: {
         redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1",

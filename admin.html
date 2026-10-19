@@ -1602,8 +1602,10 @@ function svcCard(o){
     +(o.estimateStatus==='accepted'?'<div style="font-size:12px;font-weight:800;color:#28b463;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.35);border-radius:9px;padding:6px 9px;">✅ Cliente aceptó el estimado'+(o.estimateAcceptedAt?(' · '+new Date(o.estimateAcceptedAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'})):'')+'</div>':(o.estimateStatus==='sent'?'<div style="font-size:12px;color:var(--gold);background:rgba(232,182,74,.08);border:1px solid var(--border);border-radius:9px;padding:6px 9px;">🧾 Estimado enviado · esperando al cliente</div>':''))
     +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);gap:8px;"><span>'+when+'</span><span style="text-align:right;">👤 '+svcEsc(assign)+'</span></div>'
     +((Number(o.grandTotalCents)||0)>0 ? (o.paid
-        ? '<div style="font-size:12px;font-weight:800;color:#28b463;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.35);border-radius:9px;padding:6px 9px;">✅ Pagado · '+formatMoney((o.paidCents||o.grandTotalCents||0)/100)+(o.payMethod==='cash'?' · efectivo':(o.payMethod&&o.payMethod.indexOf('square')===0?' · tarjeta':''))+'</div>'
-        : '<button onclick="event.stopPropagation();svcChargeOpen(\''+o.id+'\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💵 Cobrar '+formatMoney(((o.grandTotalCents||0)-(o.paidCents||0))/100)+'</button>') : '')
+        ? '<div style="display:flex;gap:7px;align-items:center;"><div style="flex:1;font-size:12px;font-weight:800;color:#28b463;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.35);border-radius:9px;padding:6px 9px;">✅ Pagado · '+formatMoney((o.paidCents||o.grandTotalCents||0)/100)+(o.payMethod==='cash'?' · efectivo':(o.payMethod&&o.payMethod.indexOf('square')===0?' · tarjeta':''))+(o.private?' · 🔒':'')+'</div><button onclick="event.stopPropagation();svcOpenReceipt(\''+o.id+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🧾 Recibo</button></div>'
+        : ((Number(o.paidCents)||0)>0
+            ? '<div style="font-size:11px;color:var(--muted);margin-bottom:5px;">💵 Abonado '+formatMoney((o.paidCents||0)/100)+' de '+formatMoney((o.grandTotalCents||0)/100)+'</div><button onclick="event.stopPropagation();svcChargeOpen(\''+o.id+'\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💵 Cobrar saldo '+formatMoney(((o.grandTotalCents||0)-(o.paidCents||0))/100)+'</button>'
+            : '<button onclick="event.stopPropagation();svcChargeOpen(\''+o.id+'\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💵 Cobrar '+formatMoney((o.grandTotalCents||0)/100)+'</button>')) : '')
     +'<div style="display:flex;gap:7px;align-items:center;margin-top:3px;">'
     +'<select onclick="event.stopPropagation()" onchange="event.stopPropagation();svcSetStatus(\''+o.id+'\',this.value)" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-family:inherit;">'+stOpts+'</select>'
     +(phone?'<a href="sms:'+phone+'" onclick="event.stopPropagation()" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:7px 11px;font-size:13px;">💬</a>':'')
@@ -1612,41 +1614,56 @@ function svcCard(o){
 window.svcSetStatus=async function(id,st){ const patch={status:st, updatedAt:new Date().toISOString()}; if(st==='en_proceso'){ const o=svcOrders.find(x=>x.id===id); if(o && !o.startedAt) patch.startedAt=new Date().toISOString(); } try{ await updateDoc(doc(db,'serviceOrders',id),patch); }catch(e){ alert('No se pudo actualizar.'); } };
 
 // 💵 CAJA DE SERVICIO — cobrar una orden (efectivo o tarjeta Square). Marca pagada + postea a Finanzas (ingreso Servicio).
+// Permite ABONO (monto parcial editable) y "🔒 fuera de Legacy" (privado: entra a Finanzas pero no cuenta en Legacy).
 window.svcChargeOpen=function(id){
   const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
   const total=(Number(o.grandTotalCents)||0)/100, paid=(Number(o.paidCents)||0)/100, due=Math.max(0,total-paid);
+  const IN='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--text);font-size:16px;';
   let ov=document.getElementById('svc-caja');
   if(!ov){ ov=document.createElement('div'); ov.id='svc-caja'; ov.style.cssText='position:fixed;inset:0;z-index:100080;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) ov.remove(); }; document.body.appendChild(ov); }
-  ov.innerHTML='<div id="svc-caja-box" onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:380px;width:100%;padding:20px;cursor:default;">'
+  ov.innerHTML='<div id="svc-caja-box" onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:390px;width:100%;padding:20px;cursor:default;max-height:92vh;overflow:auto;">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:18px;">💵 Cobrar orden'+(o.orderNum?(' <span style="color:var(--gold);">#'+o.orderNum+'</span>'):'')+'</div><button onclick="document.getElementById(\'svc-caja\').remove()" style="background:transparent;border:none;color:var(--muted);font-size:24px;cursor:pointer;">×</button></div>'
     +'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;font-size:14px;">'
       +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Cliente</span><b>'+svcEsc(o.clientName||'')+'</b></div>'
       +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Total</span><b>'+formatMoney(total)+'</b></div>'
-      +(paid>0?'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Pagado</span><b>'+formatMoney(paid)+'</b></div>':'')
+      +(paid>0?'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Abonado</span><b>'+formatMoney(paid)+'</b></div>':'')
       +'<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid var(--border);margin-top:4px;"><span style="font-weight:700;">Saldo</span><b style="color:var(--gold);">'+formatMoney(due)+'</b></div>'
     +'</div>'
     +(due>0
-      ? '<button onclick="svcChargeDo(\''+id+'\',\'cash\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💵 Efectivo — cobrar '+formatMoney(due)+'</button>'
+      ? '<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">💵 Cobrar ahora (puedes cobrar todo o un abono)</label>'
+        +'<input id="svc-caja-amt" type="number" inputmode="decimal" step="0.01" value="'+due.toFixed(2)+'" style="'+IN+'margin-bottom:10px;">'
+        +'<label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;cursor:pointer;color:var(--text);font-size:13px;"><input type="checkbox" id="svc-caja-priv" style="width:18px;height:18px;"> 🔒 Fuera de Legacy (privado — entra a Finanzas, no cuenta en Legacy)</label>'
+        +'<button onclick="svcChargeDo(\''+id+'\',\'cash\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💵 Efectivo</button>'
         +'<button onclick="svcChargeDo(\''+id+'\',\'square\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💳 Tarjeta (link de Square)</button>'
         +'<div id="svc-caja-msg" style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;"></div>'
-      : '<div style="text-align:center;color:#28b463;font-weight:800;padding:10px;">✅ Ya está pagada.</div>')
+      : '<div style="text-align:center;color:#28b463;font-weight:800;padding:8px 0 14px;">✅ Ya está pagada.</div>'
+        +'<button onclick="document.getElementById(\'svc-caja\').remove();svcOpenReceipt(\''+id+'\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;">🧾 Ver recibo</button>')
   +'</div>';
 };
 window.svcChargeDo=async function(id, method){
   const msg=document.getElementById('svc-caja-msg');
-  if(method==='cash'){ if(!confirm('¿Registrar el cobro EN EFECTIVO? Se marca pagada y entra a Finanzas como ingreso de Servicio.')) return; }
+  const o0=svcOrders.find(x=>x.id===id)||{};
+  const total=(Number(o0.grandTotalCents)||0)/100, paid=(Number(o0.paidCents)||0)/100, due=Math.max(0,total-paid);
+  const amtEl=document.getElementById('svc-caja-amt');
+  let amt = amtEl ? Number(amtEl.value) : due; if(!(amt>0)) amt=due;
+  if(amt>due+0.004){ amt=due; }   // no cobrar de más
+  const amountCents=Math.round(amt*100);
+  const priv=!!(document.getElementById('svc-caja-priv') && document.getElementById('svc-caja-priv').checked);
+  const partial=(amountCents < Math.round(due*100)-1);
+  if(method==='cash'){ if(!confirm('¿Registrar '+formatMoney(amt)+' EN EFECTIVO'+(priv?' (PRIVADO, fuera de Legacy)':'')+'?\n'+(partial?'Es un ABONO; queda saldo.':'Se marca pagada y entregada.')+'\nEntra a Finanzas como ingreso de Servicio.')) return; }
   if(msg) msg.textContent='Procesando…';
   try{
-    const r=await httpsCallable(functions,'svcCharge')({ orderId:id, method });
+    const r=await httpsCallable(functions,'svcCharge')({ orderId:id, method, amountCents, private:priv });
     const dd=(r&&r.data)||{};
     if(method==='cash'){
       const o=svcOrders.find(x=>x.id===id)||{}; const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
       const ov=document.getElementById('svc-caja'); if(ov) ov.remove();
+      const nowPaid=!!dd.paid;
       const link='https://legacymotorsgarage.com/portal.html?order='+id;
-      if(phone && confirm('✅ Cobro registrado y entró a Finanzas.\n\n¿Enviar el recibo por SMS al cliente?')){
+      if(nowPaid && phone && confirm('✅ Cobro registrado y entró a Finanzas.\n\n¿Enviar el recibo por SMS al cliente?')){
         const body=((o.lang==='en')?('Thank you! Your Legacy service receipt'+(o.orderNum?(' #'+o.orderNum):'')+': '):('¡Gracias! Tu recibo de servicio Legacy'+(o.orderNum?(' #'+o.orderNum):'')+': '))+link;
         location.href='sms:'+phone+'?body='+encodeURIComponent(body);
-      } else { alert('✅ Cobro registrado. La orden quedó pagada y entró a Finanzas como ingreso de Servicio.'); }
+      } else { alert(nowPaid?'✅ Cobro registrado. La orden quedó pagada y entró a Finanzas.':'✅ Abono registrado y entró a Finanzas. Queda saldo pendiente.'); }
     }
     else {
       const url=dd.url||'';
@@ -1761,8 +1778,10 @@ function c360SvcHistory(c, v){
     row+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="min-width:0;"><div style="font-size:13px;font-weight:700;">'+folioH+esc(o.reason||'Servicio')+'</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">'+when+(hasInvoice?(' · '+tot):'')+'</div></div><span style="flex:0 0 auto;background:'+ss.c+'22;color:'+ss.c+';border:1px solid '+ss.c+';border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">'+ss.lbl+'</span></div>';
     if(done && svcList.length){ row+='<div style="font-size:12px;color:var(--text);margin-top:7px;">🛠️ Se hizo: '+svcList.map(esc).join(' · ')+'</div>'; }
     if(photos.length){ row+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;">'+photos.slice(0,8).map((u,i)=>'<span onclick="showPhoto(\''+u+'\',\'Trabajo realizado\')" style="font-size:11px;color:var(--gold);cursor:pointer;">📷 Foto '+(i+1)+'</span>').join('')+'</div>'; }
-    const docLbl = done ? '🧾 invoice ›' : '📄 estimado ›';   // antes de entregar = ESTIMADO; al entregar = INVOICE
-    row+='<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;"><a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">ver orden ›</a>'+(hasInvoice?('<a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">'+docLbl+'</a>'):'')+'</div></div>';
+    const isPaid=(o.paid===true);
+    const docLbl = isPaid ? '🧾 recibo ›' : (done ? '🧾 invoice ›' : '📄 estimado ›');   // pagada = RECIBO; entregada = invoice; antes = estimado
+    const docFn = isPaid ? ('svcOpenReceipt(\''+o.id+'\')') : ('svcOpenOrder(\''+o.id+'\')');
+    row+='<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;"><a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">ver orden ›</a>'+(hasInvoice?('<a href="#" onclick="event.preventDefault();c360Close();'+docFn+'" style="color:var(--gold);text-decoration:none;font-size:12px;">'+docLbl+'</a>'):'')+'</div></div>';
     return row;
   }).join('');
 }
@@ -2131,7 +2150,8 @@ window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.serv
 window.svcAddPart=function(si){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s){ (s.parts=s.parts||[]).push({desc:'',price:0}); } svcRenderModal(); };
 window.svcRemovePart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s&&Array.isArray(s.parts)){ s.parts.splice(pi,1); } svcRenderModal(); };
 // 📄 GENERAR ESTIMADO bonito (tipo cotizador), bien desglosado por servicio + sus partes.
-function svcEstimateSheetHTML(d, services){
+function svcEstimateSheetHTML(d, services, opts){
+  opts=opts||{}; const o=opts.order||{}; const receipt=!!opts.receipt;
   const en=(d.lang==='en'); const money=formatMoney;
   const dstr=new Date().toLocaleString(en?'en-US':'es-MX',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
   let laborSub=0, partsSub=0, rows='';
@@ -2140,7 +2160,11 @@ function svcEstimateSheetHTML(d, services){
     (s.parts||[]).forEach(p=>{ const pp=Number(p.price)||0; partsSub+=pp; rows+='<tr class="prow"><td>• '+svcEsc((p.desc||'').trim()||(en?'Part':'Parte'))+'</td><td class="r">'+money(pp)+'</td></tr>'; });
   });
   const grand=laborSub+partsSub, dep=Number(d.deposit)||0, bal=Math.max(0,grand-dep);
-  const L=en?{sub:'SERVICE ESTIMATE',cust:'Customer',date:'Date',veh:'Vehicle',labor:'Labor',parts:'Parts',total:'TOTAL',dep:'Deposit',bal:'Balance',disc:'<b>Estimate only — subject to your authorization.</b> Final amounts may change after inspection; we will notify you before any additional work.'}:{sub:'ESTIMADO DE SERVICIO',cust:'Cliente',date:'Fecha',veh:'Vehículo',labor:'Mano de obra',parts:'Partes',total:'TOTAL',dep:'Anticipo',bal:'Saldo',disc:'<b>Estimado informativo — sujeto a su autorización.</b> Los montos finales pueden cambiar tras la inspección; le avisamos antes de cualquier trabajo adicional.'};
+  const paidAmt=(Number(o.paidCents)||0)/100, dueAmt=Math.max(0,grand-paidAmt);
+  const payMethodTxt=(o.payMethod==='cash')?(en?'Cash':'Efectivo'):((o.payMethod||'').indexOf('square')===0?(en?'Card':'Tarjeta'):'');
+  const paidDate=o.paidAt?new Date(o.paidAt).toLocaleDateString(en?'en-US':'es-MX',{year:'numeric',month:'long',day:'numeric'}):'';
+  const folio=o.orderNum?('#'+o.orderNum):'';
+  const L=en?{sub:receipt?'SERVICE RECEIPT':'SERVICE ESTIMATE',cust:'Customer',date:'Date',ord:'Order',veh:'Vehicle',labor:'Labor',parts:'Parts',total:'TOTAL',dep:'Deposit',bal:'Balance',paid:'Paid',due:'Balance due',disc:receipt?'<b>Thank you for your business.</b> This is your service receipt. Keep it for your records and warranty.':'<b>Estimate only — subject to your authorization.</b> Final amounts may change after inspection; we will notify you before any additional work.'}:{sub:receipt?'RECIBO DE SERVICIO':'ESTIMADO DE SERVICIO',cust:'Cliente',date:'Fecha',ord:'Orden',veh:'Vehículo',labor:'Mano de obra',parts:'Partes',total:'TOTAL',dep:'Anticipo',bal:'Saldo',paid:'Pagado',due:'Saldo',disc:receipt?'<b>Gracias por su preferencia.</b> Este es su recibo de servicio. Consérvelo para su garantía.':'<b>Estimado informativo — sujeto a su autorización.</b> Los montos finales pueden cambiar tras la inspección; le avisamos antes de cualquier trabajo adicional.'};
   const style='.estsheet{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1a1a1a;padding:26px;max-width:620px;margin:0 auto;background:#fff;}'
     +'.estsheet .h{text-align:center;border-bottom:3px solid #c9a24a;padding-bottom:14px;margin-bottom:10px;}'
     +'.estsheet .h h1{font-size:22px;letter-spacing:1.5px;color:#0b0e14;margin:0;}'
@@ -2157,11 +2181,15 @@ function svcEstimateSheetHTML(d, services){
     +'.estsheet .disc{font-size:10.5px;color:#888;border-top:1px solid #ddd;margin-top:16px;padding-top:10px;line-height:1.5;}'
     +'.estsheet .foot{text-align:center;font-size:12px;color:#555;margin-top:12px;line-height:1.6;}'
     +'@media print{body{padding:0;}}';
-  const body='<div class="estsheet"><div class="h"><h1>LEGACY MOTORS GARAGE</h1><div class="s">'+L.sub+'</div></div>'
-    +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(d.clientName||'—')+(d.clientPhone?(' · '+svcEsc(d.clientPhone)):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+dstr+'</div>'
+  const stamp=(receipt && o.paid)?('<div style="text-align:center;margin:10px 0 2px;"><span style="display:inline-block;border:2.5px solid #0a7a35;color:#0a7a35;font-weight:900;letter-spacing:2px;font-size:15px;padding:5px 16px;border-radius:8px;transform:rotate(-4deg);">✓ '+(en?'PAID':'PAGADO')+(payMethodTxt?(' · '+payMethodTxt):'')+'</span></div>'):'';
+  const body='<div class="estsheet"><div class="h"><h1>LEGACY MOTORS GARAGE</h1><div class="s">'+L.sub+(folio?(' · '+folio):'')+'</div></div>'
+    +stamp
+    +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(d.clientName||'—')+(d.clientPhone?(' · '+svcEsc(d.clientPhone)):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+(receipt&&paidDate?paidDate:dstr)+(folio?('<br><b>'+L.ord+':</b> '+folio):'')+'</div>'
     +'<table>'+rows+'</table>'
     +'<div class="tot"><div class="line"><span style="color:#777;">'+L.labor+'</span><b>'+money(laborSub)+'</b></div><div class="line"><span style="color:#777;">'+L.parts+'</span><b>'+money(partsSub)+'</b></div><div class="line grand"><span>'+L.total+'</span><span>'+money(grand)+'</span></div>'
-    +(dep>0?('<div class="line"><span style="color:#777;">'+L.dep+'</span><b>−'+money(dep)+'</b></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.bal+'</span><span>'+money(bal)+'</span></div>'):'')+'</div>'
+    +(receipt
+        ? ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):''))
+        : (dep>0?('<div class="line"><span style="color:#777;">'+L.dep+'</span><b>−'+money(dep)+'</b></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.bal+'</span><span>'+money(bal)+'</span></div>'):''))+'</div>'
     +'<div class="disc">'+L.disc+'</div>'
     +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California Dealer License No. 83177</div></div>';
   return '<style>'+style+'</style>'+body;
@@ -2181,7 +2209,31 @@ window.svcGenEstimate=function(){
     +'</div><div>'+window._svcEstHtml+'</div>';
   ov.appendChild(box); document.body.appendChild(ov);
 };
-window.svcEstPrint=function(){ const html=window._svcEstHtml||''; const w=window.open('','_blank'); if(!w){ alert('Permite las ventanas emergentes para imprimir.'); return; } w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Estimado — Legacy Motors Garage</title></head><body>'+html+'</body></html>'); w.document.close(); w.focus(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400); };
+window.svcEstPrint=function(){ const html=window._svcEstHtml||''; const w=window.open('','_blank'); if(!w){ alert('Permite las ventanas emergentes para imprimir.'); return; } w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Legacy Motors Garage</title></head><body>'+html+'</body></html>'); w.document.close(); w.focus(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400); };
+// 🧾 RECIBO de una orden (pagada o no): misma hoja, modo recibo (sello PAGADO + pagado/saldo). Imprimir o enviar link del portal.
+window.svcOpenReceipt=function(orderId){
+  const o=svcOrders.find(x=>x.id===orderId); if(!o){ alert('Orden no encontrada.'); return; }
+  const d={ lang:o.lang||'es', clientName:o.clientName||'', clientPhone:o.clientPhone||'', vehicleLabel:o.vehicleLabel||'', vin:o.vin||'', plate:o.plate||'', deposit:(Number(o.depositCents)||0)/100 };
+  const services=(Array.isArray(o.services)&&o.services.length)?o.services.map(s=>({desc:s.desc||'',price:(s.price!=null?Number(s.price):((Number(s.laborCents!=null?s.laborCents:s.priceCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[])})):[{desc:o.reason||'Servicio',price:(Number(o.grandTotalCents)||0)/100,parts:[]}];
+  window._svcEstHtml=svcEstimateSheetHTML(d, services, {receipt:true, order:o}); window._svcRcptOrder=o.id;
+  const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100001;display:flex;align-items:center;justify-content:center;padding:14px;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const box=document.createElement('div'); box.style.cssText='background:#fff;color:#111;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow:auto;';
+  box.innerHTML='<div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;z-index:2;">'
+    +'<button onclick="var o=document.getElementById(\'svc-est-overlay\');if(o)o.remove();" style="background:#eee;border:none;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;">Cerrar</button>'
+    +'<button onclick="svcEstPrint()" style="background:#0b0e14;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;">🖨 Imprimir</button>'
+    +'<button onclick="svcReceiptSend()" style="background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;">💬 Enviar</button>'
+    +'</div><div>'+window._svcEstHtml+'</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+};
+window.svcReceiptSend=function(){
+  const o=svcOrders.find(x=>x.id===window._svcRcptOrder); if(!o) return;
+  const phone=(o.clientPhone||'').replace(/[^0-9+]/g,''); const link=PORTAL_URL+'?order='+o.id; const en=(o.lang==='en');
+  const body=(en?('Thank you! Your Legacy service receipt'+(o.orderNum?(' #'+o.orderNum):'')+': '):('¡Gracias! Tu recibo de servicio Legacy'+(o.orderNum?(' #'+o.orderNum):'')+': '))+link;
+  if(phone){ location.href='sms:'+phone+'?body='+encodeURIComponent(body); }
+  else if(navigator.share){ navigator.share({text:body}).catch(()=>{}); }
+  else { try{ navigator.clipboard.writeText(body); alert('Recibo copiado.'); }catch(e){} }
+};
 window.svcEstSend=async function(){
   const d=window._svcDraft; const en=(d.lang==='en');
   // 1) Guarda la orden (silencioso) para tener su ID → el cliente la abre y acepta en su teléfono.
