@@ -1,6 +1,7 @@
 // Legacy DMS — backend (Cloud Functions v2)
 // redeploy marker: ebay oauth refresh v5-fulfillment (token nuevo con permiso de ordenes)
 const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
@@ -978,6 +979,51 @@ exports.sendChatPush = onCall({ timeoutSeconds: 30 }, async (request) => {
   } catch (e) { console.log("sendChatPush err", e); return { ok: false, err: String(e && e.message || e) }; }
 });
 
+// 🔔 Push a los DUEÑOS (cha-ching + avisos). Lee push_tokens por correo (OWNER_EMAILS) y manda data-only (lo muestra el SW).
+async function _pushToOwners(payload) {
+  try {
+    const db = admin.firestore();
+    const snap = await db.collection("push_tokens").where("email", "in", OWNER_EMAILS).get();
+    const grp = { es: { t: [], r: [] }, en: { t: [], r: [] } };
+    snap.forEach((d) => { const dd = d.data() || {}; if (dd.token) { const lg = (dd.lang === "en") ? "en" : "es"; grp[lg].t.push(dd.token); grp[lg].r.push(d.ref); } });
+    const dead = [];
+    for (const lg of ["es", "en"]) {
+      if (!grp[lg].t.length) continue;
+      const title = ((lg === "en" ? payload.titleEn : payload.title) || payload.title || "Legacy").slice(0, 80);
+      const body = ((lg === "en" ? payload.bodyEn : payload.body) || payload.body || "").slice(0, 180);
+      const res = await admin.messaging().sendEachForMulticast({
+        tokens: grp[lg].t,
+        data: { title, body, url: payload.url || "/warehouse.html" },
+        webpush: { headers: { Urgency: "high", TTL: "86400" } },
+      });
+      res.responses.forEach((r, i) => { if (!r.success) { const c = r.error && r.error.code; if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token") dead.push(grp[lg].r[i]); } });
+    }
+    await Promise.all(dead.map((ref) => ref.delete().catch(() => {})));
+  } catch (e) { console.log("_pushToOwners", e); }
+}
+
+// 💰 CHA-CHING: cada vez que ENTRA dinero (cualquier ingreso en `transactions`) → avisa a los dueños al teléfono.
+// Cubre TODO sin huecos: Finanzas, venta de carro (Clientes), caja de Servicio, Square y efectivo (todos postean aquí).
+const _MONEY_IN_TYPES = ["income", "payment", "down", "cash_sale"];
+exports.onMoneyIn = onDocumentCreated("transactions/{id}", async (event) => {
+  try {
+    const t = (event.data && event.data.data()) || null; if (!t) return;
+    if (_MONEY_IN_TYPES.indexOf(t.type) < 0) return;            // solo dinero que entra (no gastos/retiros/transferencias)
+    const cents = Number(t.amountCents) || 0; if (cents <= 0) return;
+    const amt = "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const who = t.clientName || "";
+    const deptLbl = ({ dealer: "Dealer", parts: "Partes", ebay: "eBay" })[t.dept] || "";
+    const label = t.category || (t.saleType === "servicio" ? "Servicio" : "") || deptLbl || "Ingreso";
+    const priv = (t.private === true) ? " 🔒" : "";
+    const url = (t.source === "service-caja") ? "/admin.html" : "/finanzas.html";
+    await _pushToOwners({
+      title: "💰 Entró dinero" + priv, body: amt + " · " + label + (who ? (" · " + who) : ""),
+      titleEn: "💰 Money in" + priv, bodyEn: amt + " · " + label + (who ? (" · " + who) : ""),
+      url,
+    });
+  } catch (e) { console.log("onMoneyIn", e); }
+});
+
 // 🌐 BOT DE VENTAS de la página web (Claude). Contesta a visitantes y los empuja a venir en persona.
 const SITE_BOT_MODEL = "claude-sonnet-5";   // buen balance calidad/costo (mismo que el bot de eBay). Se puede subir a opus.
 function buildSitePrompt(inv, todayStr) {
@@ -1725,6 +1771,9 @@ exports.svcClientAccept = onCall({ timeoutSeconds: 20 }, async (request) => {
   const now = new Date().toISOString();
   await ref.set({ estimateStatus: "accepted", estimateAcceptedAt: now, estimateAcceptedBy: cli.phone, updatedAt: now }, { merge: true });
   // NOTA: el consentimiento SMS lo maneja el sistema que YA existe en el portal (writeConsent → objeto smsConsent + bitácora inmutable clients/{id}/consents). Aquí NO lo tocamos.
+  // 🔔 cha-ching a los dueños: el cliente aceptó el estimado.
+  const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";
+  await _pushToOwners({ title: "✅ Estimado aceptado", body: _nm + " aceptó el estimado" + _fol + (o.vehicleLabel ? (" · " + o.vehicleLabel) : ""), titleEn: "✅ Estimate approved", bodyEn: _nm + " approved the estimate" + _fol, url: "/admin.html" });
   return { ok: true };
 });
 
