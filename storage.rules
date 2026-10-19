@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// Legacy Motors Garage — reglas de Firebase Storage.
+// Herramienta INTERNA: todos los que entran están autenticados (dueños/estaciones por CORREO
+// o empleados por TELÉFONO, o clientes del portal por teléfono). Permitimos leer/escribir a
+// cualquier usuario autenticado. Lo anónimo queda fuera.
+// NOTA: estas reglas se publican en la consola de Firebase (Storage → Rules → Publish),
+// o con `firebase deploy --only storage` (requiere agregar "storage" en firebase.json).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
