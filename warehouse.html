@@ -102,6 +102,14 @@
   <button onclick="dismissInstall(event)" title="Cerrar" style="position:absolute;top:50%;right:8px;transform:translateY(-50%);background:rgba(0,0,0,.18);color:#0b0e14;border:none;border-radius:50%;width:26px;height:26px;font-size:14px;font-weight:800;cursor:pointer;line-height:1;">✕</button>
 </div>
 
+<!-- 🔔 Aviso AUTOMÁTICO para activar notificaciones (sale solo si no están aceptadas) -->
+<div id="push-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9001;background:linear-gradient(135deg,#d9b85a,#9a7420);color:#0b0e14;border-radius:14px;padding:12px 13px;box-shadow:0 8px 24px rgba(0,0,0,.45);align-items:center;gap:10px;">
+  <span style="font-size:22px;flex:none;">🔔</span>
+  <div style="flex:1;min-width:0;font-weight:800;font-size:13px;line-height:1.3;" id="push-bar-txt">Activa las notificaciones</div>
+  <button onclick="pushBarEnable(this)" style="background:#0b0e14;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;flex:none;">Activar</button>
+  <button onclick="document.getElementById('push-bar').style.display='none'" title="Ahora no" style="background:rgba(0,0,0,.14);color:#0b0e14;border:none;border-radius:50%;width:26px;height:26px;font-size:14px;font-weight:800;cursor:pointer;line-height:1;flex:none;">✕</button>
+</div>
+
 <div id="login">
   <div class="card" style="max-width:360px;width:100%;">
     <div style="text-align:right;margin-bottom:2px;"><button class="btn ghost sm" id="login-lang-toggle" onclick="toggleLang()">EN</button></div>
@@ -198,7 +206,7 @@
   </div>
 
   <!-- 📋 Detalle de tarea (overlay) -->
-  <div id="task-detail" class="hide" style="position:fixed;inset:0;z-index:6300;background:var(--bg,#0b0e14);overflow-y:auto;-webkit-overflow-scrolling:touch;"><div class="wrap" style="padding:16px;"><div id="task-detail-body"></div></div></div>
+  <div id="task-detail" class="hide" style="position:fixed;inset:0;z-index:6300;background:var(--bg,#0b0e14);overflow-y:auto;-webkit-overflow-scrolling:touch;"><div class="wrap" style="padding:16px;padding-top:calc(14px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom));"><div id="task-detail-body"></div></div></div>
   <!-- ✅ Confirmación dorada -->
   <div id="task-gold" class="hide" style="position:fixed;inset:0;z-index:6400;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;">
     <div style="text-align:center;padding:30px;">
@@ -997,6 +1005,7 @@ onAuthStateChanged(auth, async (user)=>{
     // 👑 Panel de operación: solo dueño.
     const _opc=document.getElementById('owner-op-card');
     if(_opc){ if(role==='owner'){ _opc.style.display='block'; try{ loadOwnerPanel(); }catch(e){} } else _opc.style.display='none'; }
+    try{ maybePushPrompt(); }catch(e){}   // 🔔 aviso automático si no están activadas las notificaciones
   } else {
     _carView=''; document.body.classList.remove('owner-nav'); const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
     const fc=document.getElementById('fab-chat'); if(fc) fc.style.display='none'; closeChat();
@@ -1704,8 +1713,8 @@ function renderTaskDetail(){
       : '<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn-ghost" style="flex:1;" onclick="taskPause()">'+t('jPause')+'</button><button class="btn-ghost" style="flex:1;" onclick="taskReportProblem()">'+t('jProblem')+'</button></div>')
       + '<button class="btn-green" style="width:100%;" onclick="taskDoComplete()">✅ '+L2('Terminar tarea','Finish task')+'</button>';
   }
-  body.innerHTML='<div class="topbar"><button class="linkbtn" onclick="taskDetailBack()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button>'
-    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+taskChip(cur)+statusChip+'</div><h2 style="font-size:20px;margin:0;">'+esc(cur.title)+'</h2>'+(cur.carLabel?'<div style="font-size:13.5px;font-weight:600;margin-top:2px;">🚗 '+esc(cur.carLabel)+'</div>':'')+'</div></div>'
+  body.innerHTML='<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;"><button onclick="taskDetailBack()" style="background:var(--surface2);border:1px solid var(--border);border-radius:11px;color:var(--text);font-size:15px;font-weight:800;padding:10px 15px;cursor:pointer;flex:none;line-height:1;white-space:nowrap;">‹ '+L2('Atrás','Back')+'</button>'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:13px;margin-bottom:2px;">'+taskChip(cur)+statusChip+'</div><h2 style="font-size:20px;margin:0;line-height:1.2;">'+esc(cur.title)+'</h2>'+(cur.carLabel?'<div style="font-size:13.5px;font-weight:600;margin-top:2px;">🚗 '+esc(cur.carLabel)+'</div>':'')+'</div></div>'
     +pausedBanner
     +(notStarted?'<div class="faint" style="font-size:13px;margin-bottom:12px;line-height:1.5;">'+L2('Anota los materiales que necesitas y toca Empezar cuando arranques.','List the materials you need and tap Start when you begin.')+'</div>':'')
     +stepsSection
@@ -2835,7 +2844,7 @@ async function ensurePushToken(){
     _pushReg=await navigator.serviceWorker.ready;        // el registro de sw-warehouse.js (controla "/")
     if(!_messaging) _messaging=getMessaging(app);
     const tok=await getToken(_messaging,{vapidKey:VAPID_KEY, serviceWorkerRegistration:_pushReg});
-    if(tok){ await setDoc(doc(db,'push_tokens',tok),{ token:tok, email:myEmail, role:role, lang:L, ts:new Date().toISOString() }); return true; }
+    if(tok){ const _ph=(auth.currentUser&&auth.currentUser.phoneNumber)||''; await setDoc(doc(db,'push_tokens',tok),{ token:tok, email:myEmail||'', phone:_ph, empId:myEmpId||'', role:role||'', lang:L, ts:new Date().toISOString() }); return true; }
     _lastPushErr='sin token';
   }catch(e){ _lastPushErr=(e&&(e.message||e.code))||String(e); console.log('push token',e); }
   return false;
@@ -2852,6 +2861,16 @@ window.enablePush=async function(btn){
   }catch(e){ alert(t('error')+((e&&e.message)||e)); }
 };
 function pushEnabled(){ return ('Notification' in window) && Notification.permission==='granted'; }
+// 🔔 Aviso automático: sale solo si NO están aceptadas las notificaciones (y el dispositivo las soporta).
+window.pushBarEnable=async function(btn){ try{ await window.enablePush(btn); }catch(e){} try{ if(pushEnabled()){ const b=document.getElementById('push-bar'); if(b) b.style.display='none'; } }catch(e){} };
+function maybePushPrompt(){
+  try{
+    const b=document.getElementById('push-bar'); if(!b) return;
+    if(!pushConfigured() || !('Notification' in window)){ b.style.display='none'; return; }
+    if(Notification.permission==='granted'){ b.style.display='none'; return; }
+    isSupported().then(function(ok){ if(!ok){ b.style.display='none'; return; } const txt=document.getElementById('push-bar-txt'); if(txt) txt.textContent=(role==='owner')?L2('Activa las notificaciones — te avisamos cada venta 💰','Turn on notifications — we alert you on every sale 💰'):L2('Activa las notificaciones — no te pierdas lo que te toca','Turn on notifications — never miss your tasks'); b.style.display='flex'; }).catch(function(){});
+  }catch(e){}
+}
 // Al entrar, si ya dio permiso, refresca el token calladito. Foreground: refresca la lista.
 function initPush(){
   if(!pushConfigured()) return;   // apagado hasta configurar la VAPID key
