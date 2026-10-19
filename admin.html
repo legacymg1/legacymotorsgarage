@@ -1658,12 +1658,24 @@ window.svcChargeDo=async function(id, method){
     if(method==='cash'){
       const o=svcOrders.find(x=>x.id===id)||{}; const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
       const ov=document.getElementById('svc-caja'); if(ov) ov.remove();
-      const nowPaid=!!dd.paid;
+      const nowPaid=!!dd.paid; const en=(o.lang==='en');
       const link='https://legacymotorsgarage.com/portal.html?order='+id;
-      if(nowPaid && phone && confirm('✅ Cobro registrado y entró a Finanzas.\n\n¿Enviar el recibo por SMS al cliente?')){
-        const body=((o.lang==='en')?('Thank you! Your Legacy service receipt'+(o.orderNum?(' #'+o.orderNum):'')+': '):('¡Gracias! Tu recibo de servicio Legacy'+(o.orderNum?(' #'+o.orderNum):'')+': '))+link;
-        location.href='sms:'+phone+'?body='+encodeURIComponent(body);
-      } else { alert(nowPaid?'✅ Cobro registrado. La orden quedó pagada y entró a Finanzas.':'✅ Abono registrado y entró a Finanzas. Queda saldo pendiente.'); }
+      const abonoTxt=formatMoney(amountCents/100);
+      const saldoTxt=formatMoney(Math.max(0,((Number(o.grandTotalCents)||0)-(Number(dd.paidCents)||0)))/100);
+      const fol=o.orderNum?(' #'+o.orderNum):'';
+      if(nowPaid){
+        if(phone && confirm('✅ Cobro registrado y entró a Finanzas.\n\n¿Enviar el recibo por SMS al cliente?')){
+          const body=(en?('Thank you! Your Legacy service receipt'+fol+': '):('¡Gracias! Tu recibo de servicio Legacy'+fol+': '))+link;
+          location.href='sms:'+phone+'?body='+encodeURIComponent(body);
+        } else { alert('✅ Cobro registrado. La orden quedó pagada y entró a Finanzas.'); }
+      } else {
+        if(phone && confirm('✅ Abono registrado y entró a Finanzas.\n\n¿Enviar al cliente "abonaste '+abonoTxt+', saldo '+saldoTxt+'" por SMS?')){
+          const body=en
+            ? ('Legacy Motors Garage'+fol+': you paid '+abonoTxt+'. Remaining balance '+saldoTxt+'. '+link)
+            : ('Legacy Motors Garage'+fol+': abonaste '+abonoTxt+'. Saldo pendiente '+saldoTxt+'. '+link);
+          location.href='sms:'+phone+'?body='+encodeURIComponent(body);
+        } else { alert('✅ Abono registrado y entró a Finanzas. Saldo pendiente '+saldoTxt+'.'); }
+      }
     }
     else {
       const url=dd.url||'';
