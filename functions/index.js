@@ -1,5 +1,5 @@
 // Legacy DMS — backend (Cloud Functions v2)
-// redeploy marker: ebay oauth refresh v5-fulfillment (token nuevo con permiso de ordenes)
+// redeploy marker: push onMoneyIn trigger (tras conceder IAM eventarc/pubsub/run)
 const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
