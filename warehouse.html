@@ -166,6 +166,7 @@
     <div class="acct-row"><span data-i18n="profHours">Horas esta semana</span><b id="acct-hours">0 h</b></div>
     <div class="acct-sep"></div>
     <div class="acct-row"><span>🌐 <span data-i18n="profLang">Idioma</span></span><span style="display:flex;gap:4px;"><button class="langbtn" id="acct-es" onclick="setLang('es')">ES</button><button class="langbtn" id="acct-en" onclick="setLang('en')">EN</button></span></div>
+    <div class="acct-row" id="acct-push-row" onclick="acctTogglePush(event)" style="cursor:pointer;"><span id="acct-push-lbl">🔔 Notificaciones</span><b id="acct-push-state" style="font-size:12px;white-space:nowrap;">—</b></div>
     <button id="acct-fn-btn" class="acct-signout" style="display:none;background:var(--surface2,rgba(255,255,255,.04));color:var(--text);" onclick="openFunctions()">🧰 <span data-i18n="homeTitle">Tus funciones</span></button>
     <button class="acct-signout" onclick="doLogout()">🚪 <span data-i18n="signOut">Cerrar sesión</span></button>
   </div>
@@ -1053,7 +1054,7 @@ function setHeaderIdentity(){
   const wr=document.getElementById('who-role'); if(wr) wr.textContent = roleTxt;
 }
 function updateLangBtns(){ const es=document.getElementById('acct-es'),en=document.getElementById('acct-en'); if(es)es.classList.toggle('on',L==='es'); if(en)en.classList.toggle('on',L==='en'); }
-window.toggleAcct=function(e){ if(e&&e.stopPropagation)e.stopPropagation(); const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(!m)return; if(!m.classList.contains('hide')){ m.classList.add('hide'); c.classList.add('hide'); } else { setHeaderIdentity(); updateLangBtns(); m.classList.remove('hide'); c.classList.remove('hide'); } };
+window.toggleAcct=function(e){ if(e&&e.stopPropagation)e.stopPropagation(); const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(!m)return; if(!m.classList.contains('hide')){ m.classList.add('hide'); c.classList.add('hide'); } else { setHeaderIdentity(); updateLangBtns(); try{ refreshPushRow(); }catch(e){} m.classList.remove('hide'); c.classList.remove('hide'); } };
 window.closeAcct=function(){ const m=document.getElementById('acct-menu'),c=document.getElementById('acct-catch'); if(m)m.classList.add('hide'); if(c)c.classList.add('hide'); };
 // 🧰 FUNCIONES (mosaico en overlay) — se abre desde el menú. Mi jornada queda como pura cola.
 window.openFunctions=function(){ closeAcct(); try{ renderHomeTiles(); }catch(e){} const o=document.getElementById('fn-overlay'),c=document.getElementById('fn-catch'); if(o)o.classList.remove('hide'); if(c)c.classList.remove('hide'); };
@@ -2863,6 +2864,25 @@ window.enablePush=async function(btn){
 function pushEnabled(){ return ('Notification' in window) && Notification.permission==='granted'; }
 // 🔔 Aviso automático: sale solo si NO están aceptadas las notificaciones (y el dispositivo las soporta).
 window.pushBarEnable=async function(btn){ try{ await window.enablePush(btn); }catch(e){} try{ if(pushEnabled()){ const b=document.getElementById('push-bar'); if(b) b.style.display='none'; } }catch(e){} };
+// 🔔 Campanita en el menú del perfil: muestra el estado y activa al tocar.
+function refreshPushRow(){
+  const st=document.getElementById('acct-push-state'), lbl=document.getElementById('acct-push-lbl'); if(!st) return;
+  if(lbl) lbl.textContent='🔔 '+L2('Notificaciones','Notifications');
+  const set=function(txt,col){ st.textContent=txt; st.style.color=col||'var(--text)'; };
+  if(!('Notification' in window) || !pushConfigured()){ set(L2('No disponible','Unavailable'),'#8a93a6'); return; }
+  if(Notification.permission==='granted'){ set('✅ '+L2('Activadas','On'),'#35c46a'); return; }
+  if(Notification.permission==='denied'){ set('🔕 '+L2('Bloqueadas','Blocked'),'#e0683a'); return; }
+  set('🔴 '+L2('No activadas','Off'),'#f0a030');
+  try{ isSupported().then(function(ok){ if(!ok) set(L2('Instala la app','Install app'),'#8a93a6'); }).catch(function(){}); }catch(e){}
+}
+window.acctTogglePush=async function(e){
+  if(e&&e.stopPropagation)e.stopPropagation();
+  if(('Notification' in window) && Notification.permission==='granted'){ whToast(L2('Ya están activadas ✅','Already on ✅')); return; }
+  if(('Notification' in window) && Notification.permission==='denied'){ alert(L2('Están bloqueadas. Actívalas en Ajustes del iPhone → Notificaciones → Pit Crew.','Blocked. Turn them on in iPhone Settings → Notifications → Pit Crew.')); return; }
+  try{ await window.enablePush(); }catch(e2){}
+  refreshPushRow();
+  try{ var b=document.getElementById('push-bar'); if(b && pushEnabled()) b.style.display='none'; }catch(e3){}
+};
 function maybePushPrompt(){
   try{
     const b=document.getElementById('push-bar'); if(!b) return;
