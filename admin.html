@@ -943,6 +943,7 @@
     <button onclick="svcNewOrder()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:11px 18px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">➕ Nueva orden de servicio</button>
     <input id="svc-search" oninput="svcRenderOrders()" placeholder="🔍 Buscar cliente, carro, placa o VIN…" style="flex:1 1 220px;max-width:420px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;">
   </div>
+  <div id="svc-tabs" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;"></div>
   <div id="svc-filters" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;"></div>
   <div id="svc-orders"><div class="faint" style="padding:40px;text-align:center;">Cargando…</div></div>
 </div>
@@ -1527,38 +1528,71 @@ async function svcLoadRoster(){
   return svcRoster;
 }
 
+// 🧭 Clasifica una orden: completadas (pagada/entregada) · activas (aceptada o en trabajo) · estimados (cotización por aceptar).
+function svcBucket(o){
+  if(o.paid===true || o.status==='entregado') return 'completadas';
+  if(o.estimateStatus==='accepted' || ['recibido','en_proceso','pausado_partes','listo'].indexOf(o.status)>=0) return 'activas';
+  return 'estimados';
+}
+window._svcTab=window._svcTab||'activas';
+window.svcSetTab=function(t){ window._svcTab=t; svcRenderOrders(); };
+function svcRenderTabs(){
+  const box=document.getElementById('svc-tabs'); if(!box) return;
+  const cnt={activas:0,estimados:0,completadas:0}; const cli=new Set();
+  svcOrders.forEach(o=>{ cnt[svcBucket(o)]++; if(o.clientId) cli.add(o.clientId); });
+  const cur=window._svcTab||'activas';
+  const tabs=[['activas','🔧 Activas',cnt.activas],['estimados','🧾 Estimados',cnt.estimados],['completadas','✅ Completadas',cnt.completadas],['clientes','👥 Clientes',cli.size]];
+  box.innerHTML=tabs.map(t=>'<button onclick="svcSetTab(\''+t[0]+'\')" style="padding:9px 14px;border-radius:999px;border:1px solid '+(cur===t[0]?'var(--gold)':'var(--border)')+';background:'+(cur===t[0]?'var(--gold)':'transparent')+';color:'+(cur===t[0]?'var(--navy3)':'var(--text)')+';font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;">'+t[1]+' <span style="opacity:.7;">'+t[2]+'</span></button>').join('');
+}
+// Lista tipo TABLA (folio · cliente/carro · estado · total). Toca una fila → abre la orden (o el recibo si está pagada).
+function svcTableHtml(list){
+  const head='<div style="display:flex;gap:10px;padding:9px 12px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border);background:var(--surface2);"><div style="width:48px;">#</div><div style="flex:1;">Cliente / Carro</div><div style="width:94px;text-align:center;">Estado</div><div style="width:72px;text-align:right;">Total</div></div>';
+  const rows=list.map(o=>{
+    const s=SVC_STATUS[o.status]||{lbl:o.status,c:'#8a8fa8'}; const bk=svcBucket(o);
+    const badge = bk==='completadas' ? (o.paid?'✅ Pagado':'🏁 Entregado') : bk==='estimados' ? '🧾 Estimado' : ('🔧 '+(s.lbl||''));
+    const col = bk==='completadas' ? '#28b463' : bk==='estimados' ? '#e8b64a' : s.c;
+    const car=svcEsc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
+    const tot=(Number(o.grandTotalCents)||0)>0?formatMoney(o.grandTotalCents/100):'—';
+    const when=(o.scheduledAt||o.createdAt)?new Date(o.scheduledAt||o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):'';
+    const fn=(bk==='completadas'&&o.paid)?('svcOpenReceipt(\''+o.id+'\')'):('svcOpenOrder(\''+o.id+'\')');
+    return '<div onclick="'+fn+'" style="display:flex;gap:10px;align-items:center;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
+      +'<div style="width:48px;font-weight:800;color:var(--gold);font-size:13px;font-variant-numeric:tabular-nums;">'+(o.orderNum?('#'+o.orderNum):'—')+'</div>'
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+svcEsc(o.clientName||'Cliente')+'</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚗 '+car+(when?(' · '+when):'')+'</div></div>'
+      +'<div style="width:94px;text-align:center;"><span style="font-size:10px;font-weight:800;color:'+col+';background:'+col+'1f;border:1px solid '+col+';padding:3px 6px;border-radius:999px;white-space:nowrap;display:inline-block;">'+badge+'</span></div>'
+      +'<div style="width:72px;text-align:right;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;">'+tot+'</div></div>';
+  }).join('');
+  return '<div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">'+head+rows+'</div>';
+}
+function svcRenderClientsTab(box,q){
+  const byId={};
+  svcOrders.forEach(o=>{ if(!o.clientId) return; const b=byId[o.clientId]||(byId[o.clientId]={id:o.clientId,name:o.clientName||'Cliente',phone:o.clientPhone||'',n:0,last:''}); b.n++; const dt=o.scheduledAt||o.createdAt||''; if(dt>b.last)b.last=dt; });
+  let arr=Object.values(byId);
+  if(q) arr=arr.filter(c=>((c.name||'')+' '+(c.phone||'')).toLowerCase().includes(q));
+  arr.sort((a,b)=>String(b.last).localeCompare(String(a.last)));
+  if(!arr.length){ box.innerHTML='<div class="faint" style="padding:36px;text-align:center;">Sin clientes de servicio.</div>'; return; }
+  const ini=n=>{ const p=String(n||'').trim().split(/\s+/).filter(Boolean); return (((p[0]||'')[0]||'?')+((p[1]||'')[0]||'')).toUpperCase(); };
+  box.innerHTML='<div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">'+arr.map(c=>{
+    const last=c.last?new Date(c.last).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'';
+    return '<div onclick="openClient360(\''+c.id+'\')" style="display:flex;gap:11px;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
+      +'<span style="width:38px;height:38px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;">'+ini(c.name)+'</span>'
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+svcEsc(c.name)+'</div><div style="font-size:12px;color:var(--muted);">'+svcEsc(c.phone||'')+' · '+c.n+' orden(es)'+(last?(' · últ. '+last):'')+'</div></div>'
+      +'<span style="color:var(--gold);font-size:18px;flex:none;">›</span></div>';
+  }).join('')+'</div>';
+}
 window.svcRenderOrders = function(){
   const box=document.getElementById('svc-orders'); if(!box) return;
-  const q=(document.getElementById('svc-search')?.value||'').toLowerCase().trim();
-  let list=svcOrders.filter(o=>o.status!=='entregado');
-  if(window._svcFilter && window._svcFilter!=='all') list=list.filter(o=>o.status===window._svcFilter);
-  if(q){ list=list.filter(o=>((o.clientName||'')+' '+(o.clientPhone||'')+' '+(o.vehicleLabel||'')+' '+(o.vin||'')+' '+(o.plate||'')+' '+(o.reason||'')+' '+(o.assignName||'')).toLowerCase().includes(q)); }
-  const rank={por_recibir:0,recibido:1,en_proceso:2,pausado_partes:3,agendado:4,listo:5};
-  list.sort((a,b)=> (rank[a.status]??9)-(rank[b.status]??9) || ((a.scheduledAt||a.createdAt||'')<(b.scheduledAt||b.createdAt||'')?-1:1));
-  svcRenderFilters();
+  const tab=window._svcTab||'activas';
+  svcRenderTabs();
+  const fbox=document.getElementById('svc-filters'); if(fbox) fbox.style.display='none';   // las pestañas reemplazan los filtros viejos
   if(!svcRosterLoaded){ svcLoadRoster().then(()=>{ const sv=document.getElementById('service-view'); if(sv && sv.style.display!=='none') svcRenderOrders(); }); }
-  // Strip "Taller": estado libre/ocupado de cada mecánico/detallador
-  let strip='';
-  if(svcRosterLoaded){
-    const mechs=svcRoster.filter(e=> Array.isArray(e.roles) && (e.roles.includes('Mecánico')||e.roles.includes('Detallador')) && e.active!==false);
-    if(mechs.length){
-      const busy=svcBusyByEmp();
-      strip='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'+mechs.map(e=>{ const info=busy[e.id]; const free=!info; const col=free?'#32d74b':'#ff9800'; const txt=free?'🟢 libre':('🔧 '+((info.eta&&info.eta>Date.now())?('~libre '+svcHHMM(info.eta)):'ocupado')); const car=(info&&info.order)?(' · '+svcEsc(info.order.vehicleLabel||info.order.plate||'')):''; return '<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid '+col+';border-radius:10px;padding:7px 11px;font-size:12px;"><b>'+svcEsc(e.name)+'</b> · '+txt+car+'</div>'; }).join('')+'</div>';
-    }
-  }
-  if(!list.length){ box.innerHTML=strip+'<div class="faint" style="padding:40px 20px;text-align:center;line-height:1.6;">Sin órdenes de servicio abiertas.<br>Toca <b>➕ Nueva orden de servicio</b> para empezar.</div>'; return; }
-  box.innerHTML=strip+'<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">'+list.map(svcCard).join('')+'</div>';
+  const q=(document.getElementById('svc-search')?.value||'').toLowerCase().trim();
+  if(tab==='clientes'){ svcRenderClientsTab(box,q); return; }
+  let list=svcOrders.filter(o=>svcBucket(o)===tab);
+  if(q){ list=list.filter(o=>((o.orderNum?('#'+o.orderNum+' '):'')+(o.clientName||'')+' '+(o.clientPhone||'')+' '+(o.vehicleLabel||'')+' '+(o.vin||'')+' '+(o.plate||'')+' '+(o.reason||'')+' '+(o.assignName||'')).toLowerCase().includes(q)); }
+  list.sort((a,b)=> String(b.scheduledAt||b.createdAt||'').localeCompare(String(a.scheduledAt||a.createdAt||'')));
+  if(!list.length){ box.innerHTML='<div class="faint" style="padding:36px 20px;text-align:center;line-height:1.6;">'+(tab==='estimados'?'Sin estimados. 🧾':tab==='completadas'?'Sin órdenes completadas.':'Sin órdenes activas.<br>Toca <b>➕ Nueva orden de servicio</b>.')+'</div>'; return; }
+  box.innerHTML=svcTableHtml(list);
 };
-function svcRenderFilters(){
-  const box=document.getElementById('svc-filters'); if(!box) return;
-  const cur=window._svcFilter||'all';
-  const open=svcOrders.filter(o=>o.status!=='entregado'); const counts={};
-  open.forEach(o=>{counts[o.status]=(counts[o.status]||0)+1;});
-  const chip=(k,lbl,n)=>'<button onclick="window._svcFilter=\''+k+'\';svcRenderOrders()" style="padding:6px 12px;border-radius:999px;border:1px solid '+(cur===k?'var(--gold)':'var(--border)')+';background:'+(cur===k?'var(--gold)':'transparent')+';color:'+(cur===k?'var(--navy3)':'var(--muted)')+';font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;">'+lbl+(n!=null?(' '+n):'')+'</button>';
-  let html=chip('all','Todas',open.length);
-  ['por_recibir','agendado','en_proceso','pausado_partes','listo'].forEach(k=>{ if(counts[k]) html+=chip(k,SVC_STATUS[k].lbl,counts[k]); });
-  box.innerHTML=html;
-}
 // Línea de producción de la orden: cada rol con su persona y en qué va (✓ listo · 🔧 activo · ⏳ en espera).
 const SVC_ROLE_ICON={'Mecánico':'🔧','Detallador':'✨','Fotos':'📷','Limpieza':'🧽','Lavado':'🧽','Ayudante general':'🙌','Oficina':'🗂️'};
 function svcPipelineHtml(o){
@@ -1840,7 +1874,7 @@ window.renderClient360=function(id){
   // 2) Vehículos
   h+=sec('🚗 Vehículos', vehicles.length?vehicles.map((v,i)=>'<div onclick="openVehicle360(\''+id+'\','+i+')" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;"><div style="min-width:0;"><div style="font-weight:700;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN …'+esc(String(v.vin).slice(-6))):'')+'</div></div><span style="color:var(--gold);">›</span></div>').join(''):empty('Sin vehículos registrados.'));
   // 3) Servicio: EN CURSO (+ agendar) y ✅ ÓRDENES COMPLETADAS (pagadas → abren el recibo)
-  const _svcRow=(o,done)=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; const stl=done?'✅ Pagado':((SVC_STATUS[o.status]||{}).lbl||o.status||''); const tot=o.grandTotalCents!=null?M(o.grandTotalCents/100):''; const fol=o.orderNum?('<span style="color:var(--gold);font-weight:800;">#'+o.orderNum+'</span> · '):''; const saldo=(!done && Number(o.balanceCents))?(' · saldo '+M(o.balanceCents/100)):''; const fn=done?('svcOpenReceipt(\''+o.id+'\')'):('svcOpenOrder(\''+o.id+'\')'); return '<div onclick="c360Close();'+fn+'" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+fol+esc(o.reason||'Servicio')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:'+(done?'#28b463':'var(--muted)')+';margin-top:3px;">'+stl+(tot?(' · '+tot):'')+saldo+(done?' · 🧾 recibo':'')+'</div></div>'; };
+  const _svcRow=(o,done)=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; const _bk=(typeof svcBucket==='function')?svcBucket(o):(done?'completadas':'activas'); const stl=done?'✅ Servicio realizado':(_bk==='estimados'?'🧾 Estimado':('🔧 '+((SVC_STATUS[o.status]||{}).lbl||o.status||''))); const tot=o.grandTotalCents!=null?M(o.grandTotalCents/100):''; const fol=o.orderNum?('<span style="color:var(--gold);font-weight:800;">#'+o.orderNum+'</span> · '):''; const saldo=(!done && Number(o.balanceCents))?(' · saldo '+M(o.balanceCents/100)):''; const fn=done?('svcOpenReceipt(\''+o.id+'\')'):('svcOpenOrder(\''+o.id+'\')'); return '<div onclick="c360Close();'+fn+'" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+fol+esc(o.reason||'Servicio')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:'+(done?'#28b463':'var(--muted)')+';margin-top:3px;">'+stl+(tot?(' · '+tot):'')+saldo+(done?' · 🧾 recibo':'')+'</div></div>'; };
   const _svcActive=sOrders.filter(o=>o.paid!==true), _svcDone=sOrders.filter(o=>o.paid===true);
   h+=sec('🔧 Servicio', _svcActive.length?_svcActive.map(o=>_svcRow(o,false)).join(''):empty('Sin órdenes abiertas.'), addBtn('➕ Agendar servicio','c360NewService(\''+id+'\')'));
   if(_svcDone.length) h+=sec('✅ Órdenes completadas ('+_svcDone.length+')', _svcDone.map(o=>_svcRow(o,true)).join(''));
