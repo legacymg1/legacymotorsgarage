@@ -2103,7 +2103,7 @@ function svcRenderModal(){
     +'<button onclick="svcClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>'
     +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',svcHtml)
     +(isEdit?SVC_SEC('4 · Estatus y fechas',datesHtml):'')
-    +'<button onclick="svcGenEstimate()" style="width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 Generar estimado</button>'
+    +'<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 Generar estimado</button>'
     +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">'+(isEdit?'💾 Guardar cambios':'✅ Crear orden')+'</button>'
     +(isEdit?'<button onclick="svcDeleteOrder()" style="width:100%;margin-top:10px;padding:11px;border-radius:12px;border:1px solid #c0392b;background:transparent;color:#e0683a;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">🗑️ Eliminar orden</button>':'');
 }
@@ -2227,11 +2227,16 @@ function svcEstimateSheetHTML(d, services, opts){
     +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California Dealer License No. 83177</div></div>';
   return '<style>'+style+'</style>'+body;
 }
-window.svcGenEstimate=function(){
+window.svcGenEstimate=async function(btn){
   svcCapture(); const d=window._svcDraft;
   const services=(d.services||[]).filter(s=>(s.desc||'').trim()||(s.parts||[]).length);
   if(!services.length){ alert('Agrega al menos un servicio.'); return; }
-  window._svcEstHtml=svcEstimateSheetHTML(d, services);
+  // 💾 GUARDA la orden (silencioso) para que NO se pierda. Rápido: la IA del save tiene timeout. Si la tocas otra vez, ACTUALIZA la misma (no duplica, por d.editId).
+  if(btn){ try{ btn.disabled=true; btn.dataset._t=btn.textContent; btn.textContent='Guardando…'; }catch(e){} }
+  try{ await window.svcSaveOrder({silent:true}); }catch(e){ console.warn('save on genEstimate', e); }
+  if(btn){ try{ btn.disabled=false; if(btn.dataset._t) btn.textContent=btn.dataset._t; }catch(e){} }
+  const d2=window._svcDraft; const services2=(d2.services||[]).filter(s=>(s.desc||'').trim()||(s.parts||[]).length);
+  window._svcEstHtml=svcEstimateSheetHTML(d2, services2);
   const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100001;display:flex;align-items:center;justify-content:center;padding:14px;';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
   const box=document.createElement('div'); box.style.cssText='background:#fff;color:#111;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow:auto;';
@@ -2339,13 +2344,14 @@ window.svcSaveOrder=async function(opts){
   const services=(d.services||[]).map(s=>{ const e=s.assignEmpId?svcRoster.find(x=>String(x.id)===String(s.assignEmpId)):null; return { desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, parts:(Array.isArray(s.parts)?s.parts:[]), role:s.role||'Mecánico', assignEmpId:s.assignEmpId||'', assignName:(e?e.name:(s.assignName||'')), status:(s.status||'pendiente') }; }).filter(s=>s.desc);
   if(!services.length){ alert('Agrega al menos un trabajo.'); return; }
   services.forEach(s=>{ s.priceCents=Math.round((Number(s.price)||0)*100); s.laborCents=s.priceCents; });   // el cobro es el PRECIO PLANO del trabajo (no tiempo × tarifa)
-  // ✨ Corrector + bilingüe (IA): corrige ortografía ES/EN/mixto de cada trabajo y lo deja en los 2 idiomas (el trabajador lo verá en SU idioma).
+  // ✨ Corrector + bilingüe (IA): corrige ortografía ES/EN/mixto. OPCIONAL — con TIMEOUT de 3.5s para NO atorar el guardado si la IA está lenta/fría.
   let reasonEn='';
   try{
-    const _r=await httpsCallable(functions,'svcFixText')({ items: services.map(s=>s.desc) });
-    const _dd=(_r&&_r.data)||{}; const _es=_dd.es||[], _en=_dd.en||[];
-    services.forEach((s,i)=>{ if(_es[i]) s.desc=_es[i]; s.descEn=_en[i]||_es[i]||s.desc; });
-    reasonEn=services.map(s=>s.descEn||s.desc).join(' · ');
+    const _p=httpsCallable(functions,'svcFixText')({ items: services.map(s=>s.desc) });
+    const _r=await Promise.race([_p, new Promise(res=>setTimeout(()=>res(null),3500))]);
+    if(_r){ const _dd=(_r&&_r.data)||{}; const _es=_dd.es||[], _en=_dd.en||[];
+      services.forEach((s,i)=>{ if(_es[i]) s.desc=_es[i]; s.descEn=_en[i]||_es[i]||s.desc; });
+      reasonEn=services.map(s=>s.descEn||s.desc).join(' · '); }
   }catch(e){ console.warn('svcFixText', e); }
   const reason=services.map(s=>s.desc).join(' · ');   // ya corregido (ES) si la IA respondió
   const reasonEs=reason; if(!reasonEn) reasonEn=reason;
