@@ -2186,18 +2186,18 @@ function svcRenderModal(){
     +'<div style="padding:6px 0;"><span style="color:var(--muted);font-size:12px;">⏱️ Tiempo estimado (interno): <b id="svc-tot-time">'+svcFmtMin(totMin)+'</b></span></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;"><label style="font-size:13px;color:var(--muted);">💵 Anticipo / Apartado $</label><input id="svc-deposit" type="number" inputmode="decimal" value="'+((Number(d.deposit)||0)?(Number(d.deposit)):'')+'" placeholder="0.00" oninput="svcRecalc()" style="'+SVC_IN+';width:120px;text-align:right;margin:0;"></div>'
     +'<div id="svc-bill">'+svcBillHtml(svcList, Number(d.deposit)||0)+'</div>'
-    // 📅 Agendar SOLO cuando el estimado ya está aprobado (secuencia: cotizar→enviar→aprobar→agendar).
-    +(_svcAccepted
-      ? ('<label style="display:block;font-size:12px;color:var(--muted);margin:14px 0 5px;">📅 ¿Cuándo se trabaja?</label><div style="display:flex;gap:8px;">'
-        +'<button onclick="svcCapture();window._svcDraft.when=\'now\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when!=='later'?'var(--gold)':'var(--border)')+';background:'+(d.when!=='later'?'var(--gold)':'transparent')+';color:'+(d.when!=='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">🕐 Ahora</button>'
-        +'<button onclick="svcCapture();window._svcDraft.when=\'later\';if(!window._svcDraft.scheduledAt)window._svcDraft.scheduledAt=_svcDefaultWhen();svcRenderModal();setTimeout(function(){var s=document.getElementById(\'svc-sched\');if(s&&s.focus)s.focus();},60)" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">📅 Agendar</button></div>'
-        +(d.when==='later'
-          ? '<label style="display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;">📅 Elige el día y la hora</label>'
-            +'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" onchange="window._svcDraft.scheduledAt=this.value;var p=document.getElementById(\'svc-sched-pretty\');if(p)p.textContent=_svcPrettyWhen(this.value);" style="'+SVC_IN+';font-size:16px;padding:14px;cursor:pointer;">'
-            +'<div id="svc-sched-pretty" style="font-size:13.5px;color:var(--gold);font-weight:800;margin-top:7px;">'+_svcPrettyWhen(d.scheduledAt)+'</div>'
-            +'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Toca el campo para abrir el calendario del teléfono.</div>'
-          : ''))
-      : '<div style="margin-top:12px;background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--muted);line-height:1.5;">🧾 <b style="color:var(--text);">Esto es un estimado.</b> Mándaselo al cliente para que lo apruebe. Cuando lo <b style="color:var(--text);">apruebe</b>, aquí podrás agendar la fecha (ahora o un día) y asignar al mecánico.</div>');
+    // 📅 La CITA (cuándo trae el carro) está SIEMPRE disponible — aunque el estimado aún no se apruebe.
+    // (El asignar mecánico / empezar trabajo sí espera a la aprobación; eso es por servicio.)
+    +(!_svcAccepted ? '<div style="margin-top:12px;background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted);line-height:1.5;">🧾 Esto es un <b style="color:var(--text);">estimado</b>. Mándaselo al cliente para que lo apruebe. Puedes <b style="color:var(--text);">agendar la cita</b> de una vez aquí abajo; el mecánico se asigna cuando lo apruebe.</div>' : '')
+    +'<label style="display:block;font-size:12px;color:var(--muted);margin:14px 0 5px;">📅 '+(_svcAccepted?'¿Cuándo se trabaja?':'Cita — ¿cuándo trae el carro?')+'</label><div style="display:flex;gap:8px;">'
+    +'<button onclick="svcCapture();window._svcDraft.when=\'now\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when!=='later'?'var(--gold)':'var(--border)')+';background:'+(d.when!=='later'?'var(--gold)':'transparent')+';color:'+(d.when!=='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">'+(_svcAccepted?'🕐 Ahora':'🕐 Sin cita fija')+'</button>'
+    +'<button onclick="svcCapture();window._svcDraft.when=\'later\';if(!window._svcDraft.scheduledAt)window._svcDraft.scheduledAt=_svcDefaultWhen();svcRenderModal();setTimeout(function(){var s=document.getElementById(\'svc-sched\');if(s&&s.focus)s.focus();},60)" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">📅 Agendar día</button></div>'
+    +(d.when==='later'
+      ? '<label style="display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;">📅 Elige el día y la hora</label>'
+        +'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" onchange="window._svcDraft.scheduledAt=this.value;var p=document.getElementById(\'svc-sched-pretty\');if(p)p.textContent=_svcPrettyWhen(this.value);" style="'+SVC_IN+';font-size:16px;padding:14px;cursor:pointer;">'
+        +'<div id="svc-sched-pretty" style="font-size:13.5px;color:var(--gold);font-weight:800;margin-top:7px;">'+_svcPrettyWhen(d.scheduledAt)+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Toca el campo para abrir el calendario del teléfono.</div>'
+      : '');
   // (La asignación ahora es POR SERVICIO, dentro de cada tarjeta de servicio arriba.)
   // 5 · ESTATUS + FECHAS (solo al editar una orden existente)
   const _toLocal=iso=>{ if(!iso) return ''; try{ const dt=new Date(iso); if(isNaN(dt)) return ''; return new Date(dt.getTime()-dt.getTimezoneOffset()*60000).toISOString().slice(0,16); }catch(e){ return ''; } };
@@ -2211,9 +2211,21 @@ function svcRenderModal(){
       +'<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">📤 Fecha de salida (cuándo se entregó)</label><input id="svc-delivered" type="datetime-local" value="'+_toLocal(d.deliveredAt)+'" style="'+SVC_IN+';">';
   }
   const isEdit=!!d.editId;
+  // 🏷️ BANNER DE ESTADO (al editar): etapa actual + "cuánto pagó" + ver recibo. Reusa svcStatusLabel.
+  let bannerHtml='';
+  if(isEdit){
+    const sl=(typeof svcStatusLabel==='function')?svcStatusLabel(_svcOrd):{txt:'',col:'var(--muted)'};
+    const paidBit=_svcOrd.paid?('✅ Pagado '+formatMoney((_svcOrd.paidCents||_svcOrd.grandTotalCents||0)/100)+(_svcOrd.payMethod==='cash'?' · efectivo':((_svcOrd.payMethod||'').indexOf('square')===0?' · tarjeta':''))+(_svcOrd.private?' · 🔒':'')+(_svcOrd.paidAt?(' · '+new Date(_svcOrd.paidAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})):'')):'';
+    bannerHtml='<div style="background:'+sl.col+'1f;border:1px solid '+sl.col+';border-radius:12px;padding:10px 13px;margin-bottom:'+(paidBit?'8px':'14px')+';display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">'
+      +'<span style="font-weight:800;color:'+sl.col+';font-size:14px;">'+sl.txt+'</span>'
+      +(_svcOrd.paid?'<button onclick="svcOpenReceipt(\''+d.editId+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🧾 Ver recibo</button>':'')
+      +'</div>'
+      +(paidBit?'<div style="margin-bottom:14px;font-size:12.5px;color:#28b463;font-weight:700;">'+paidBit+'</div>':'');
+  }
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
     +'<h2 style="font-family:var(--font-display);font-size:21px;margin:0;">'+(isEdit?('Orden de servicio'+(d.orderNum?(' <span style="color:var(--gold);">#'+d.orderNum+'</span>'):'')):'Nueva orden de servicio')+'</h2>'
     +'<button onclick="svcClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>'
+    +bannerHtml
     +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',svcHtml)
     +(isEdit?SVC_SEC('4 · Estatus y fechas',datesHtml):'')
     +(_svcAccepted
