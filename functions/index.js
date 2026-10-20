@@ -1142,6 +1142,14 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
     } else if (before.status !== after.status && after.status === "listo") {
       // 🚗 auto listo para recoger
       p = { title: "🚗 Tu auto está listo", body: "Ya puedes pasar por " + veh + fol + ".", titleEn: "🚗 Your car is ready", bodyEn: vehEn + fol + " is ready for pickup." };
+    } else if (!before.partsReadyAt && after.partsReadyAt) {
+      // 🎉 llegaron TODAS las refacciones → a coordinar la cita
+      p = { title: "🎉 ¡Llegaron tus refacciones!", body: "Ya tenemos todo para " + veh + fol + ". Vamos a coordinar tu cita.", titleEn: "🎉 Your parts arrived!", bodyEn: "We have everything for " + vehEn + fol + ". Let's set your appointment." };
+    } else if (!before.scheduledAt && after.scheduledAt) {
+      // 🗓️ cita agendada (se puso fecha)
+      const dt = (function () { try { return new Date(after.scheduledAt).toLocaleString("es-MX", { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } })();
+      const dtEn = (function () { try { return new Date(after.scheduledAt).toLocaleString("en-US", { weekday: "long", month: "long", day: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } })();
+      p = { title: "🗓️ Tu cita quedó agendada", body: "Te esperamos" + (dt ? (" el " + dt) : "") + " para " + veh + fol + ".", titleEn: "🗓️ Your appointment is set", bodyEn: "See you" + (dtEn ? (" on " + dtEn) : "") + " for " + vehEn + fol + "." };
     }
     if (!p) return;
     p.url = "/portal.html?order=" + event.params.id;
@@ -1937,7 +1945,7 @@ function _estPayload(o, en) {
     laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
     deposit: c(o.depositCents), balance: c(o.balanceCents),
     paid: !!o.paid, paidCents: Number(o.paidCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
-    sentAt: o.estimateSentAt || "", acceptedAt: o.estimateAcceptedAt || "", createdAt: o.createdAt || "",
+    sentAt: o.estimateSentAt || "", acceptedAt: o.estimateAcceptedAt || "", createdAt: o.createdAt || "", partsReadyAt: o.partsReadyAt || "", partsPaidAt: o.partsPaidAt || "",
     scheduledAt: o.scheduledAt || "", receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", promisedAt: o.promisedAt || "", deliveredAt: o.deliveredAt || "",
   };
 }

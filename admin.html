@@ -2244,6 +2244,7 @@ function svcRenderModal(){
     +bannerHtml
     +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',svcHtml)
     +(isEdit?SVC_SEC('4 · Estatus y fechas',datesHtml):'')
+    +(((_svcAccepted||_svcOrd.status==='arrancado') && svcPartsChecklist(_svcOrd))?SVC_SEC('📦 Refacciones',svcPartsChecklist(_svcOrd)):'')
     +(docsHtml?SVC_SEC('📁 Documentos',docsHtml):'')
     +(_svcAccepted
       ? ('<button id="svc-save-btn" onclick="svcSaveQuick(event)" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">💾 Guardar cambios</button>'
@@ -2433,6 +2434,34 @@ window.svcViewDoc=function(orderId, kind){
     +'<button onclick="svcEstPrint()" style="background:#0b0e14;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;">🖨 Imprimir</button></span>'
     +'</div><div>'+window._svcEstHtml+'</div>';
   ov.appendChild(box); document.body.appendChild(ov);
+};
+// 📦 CHECKLIST DE REFACCIONES: cada parte Pendiente/Recibida. Cuando están TODAS → invita a agendar la cita.
+function svcPartsChecklist(o){
+  const parts=[]; (Array.isArray(o.services)?o.services:[]).forEach(s=>{ (Array.isArray(s.parts)?s.parts:[]).forEach(p=>{ if((p.desc||'').trim()||p.priceCents||p.price) parts.push(p); }); });
+  if(!parts.length) return '';
+  const recv=o.partsRecv||{};
+  const key=p=>((p.desc||'')+'|'+(p.priceCents!=null?p.priceCents:Math.round((Number(p.price)||0)*100)));
+  let got=0;
+  const rows=parts.map(p=>{ const k=key(p); const on=!!recv[k]; if(on)got++;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;">'
+      +'<span style="font-size:13px;'+(on?'color:#28b463;':'color:var(--text);')+'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(on?'✅':'⏳')+' '+svcEsc(p.desc||'Parte')+'</span>'
+      +'<button onclick="svcTogglePart(\''+o.id+'\',\''+encodeURIComponent(k)+'\')" style="background:'+(on?'rgba(40,180,99,.15)':'var(--surface3)')+';border:1px solid '+(on?'#28b463':'var(--border)')+';color:'+(on?'#28b463':'var(--muted)')+';border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;flex:none;">'+(on?'Recibida ✓':'Marcar recibida')+'</button></div>';
+  }).join('');
+  const all=(got===parts.length);
+  const head='<div style="font-size:12px;color:'+(all?'#28b463':'var(--muted)')+';margin-bottom:8px;font-weight:700;">📦 '+got+' de '+parts.length+' refacciones recibidas'+(all?' · ✅ COMPLETAS':'')+'</div>';
+  const cta=all?'<div style="margin-top:8px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);border-radius:10px;padding:11px;font-size:12.5px;color:#49d17f;font-weight:700;text-align:center;line-height:1.5;">✅ ¡Todas las refacciones llegaron!<br>Ya puedes <b>agendar la cita</b> aquí abajo 🗓️</div>':'';
+  return head+rows+cta;
+}
+window.svcTogglePart=async function(orderId, kEnc){
+  const k=decodeURIComponent(kEnc);
+  const o=svcOrders.find(x=>x.id===orderId); if(!o) return;
+  const recv=Object.assign({}, o.partsRecv||{}); recv[k]=!recv[k];
+  const parts=[]; (o.services||[]).forEach(s=>{ (s.parts||[]).forEach(p=>{ if((p.desc||'').trim()||p.priceCents||p.price) parts.push(p); }); });
+  const key=p=>((p.desc||'')+'|'+(p.priceCents!=null?p.priceCents:Math.round((Number(p.price)||0)*100)));
+  const all=parts.length>0 && parts.every(p=>recv[key(p)]);
+  const patch={ partsRecv:recv, updatedAt:new Date().toISOString() };
+  if(all && !o.partsReadyAt) patch.partsReadyAt=new Date().toISOString();   // 🔔 dispara aviso al cliente (onServiceStatus)
+  try{ await updateDoc(doc(db,'serviceOrders',orderId), patch); if(window._svcDraft) svcRenderModal(); }catch(e){ alert('No se pudo actualizar: '+((e&&e.message)||e)); }
 };
 window.svcEstPrint=function(){ const html=window._svcEstHtml||''; const w=window.open('','_blank'); if(!w){ alert('Permite las ventanas emergentes para imprimir.'); return; } w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Legacy Motors Garage</title></head><body>'+html+'</body></html>'); w.document.close(); w.focus(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400); };
 // 🧾 RECIBO de una orden (pagada o no): misma hoja, modo recibo (sello PAGADO + pagado/saldo). Imprimir o enviar link del portal.
