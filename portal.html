@@ -552,7 +552,36 @@ window.verifyCode = async function(){
 };
 
 // Al verificar el SMS cargamos SOLO su expediente (las reglas solo permiten el que coincide con su teléfono)
+// 👁️ Banner fijo de vista previa (solo dueño). Avisa que es lo que VE el cliente, solo lectura.
+function _showPreviewBanner(){
+  if(document.getElementById('preview-banner')) return;
+  const b=document.createElement('div'); b.id='preview-banner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483646;background:linear-gradient(135deg,#6b4ea8,#8a63c9);color:#fff;font-weight:800;font-size:13px;text-align:center;padding:9px 12px;box-shadow:0 2px 10px rgba(0,0,0,.3);';
+  b.innerHTML='👁️ Vista previa — esto es lo que ve <b>'+((currentClient&&currentClient.name)?String(currentClient.name):'el cliente')+'</b> (solo lectura)';
+  document.body.appendChild(b);
+  try{ document.body.style.paddingTop='38px'; }catch(e){}
+}
 onAuthStateChanged(auth, async (user)=>{
+  // 👁️ VISTA PREVIA DE DUEÑO: portal.html?preview=<clientId> abierto desde admin por un staff (mismo origen, misma sesión).
+  const _prevId=new URLSearchParams(location.search).get('preview');
+  const _STAFF=['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];
+  if(_prevId && user && user.email && _STAFF.indexOf(String(user.email).toLowerCase())>=0){
+    try{
+      const cs=await getDoc(doc(db,'clients',_prevId));
+      if(!cs.exists()){ showLoginError('Cliente no encontrado para la vista previa.'); document.getElementById('login-screen').style.display='flex'; document.getElementById('app').style.display='none'; return; }
+      currentClient={ id:cs.id, ...cs.data() };
+      window._previewMode=true;
+      setLang(currentClient.lang==='en'?'en':'es');
+      try{ const aq=await getDocs(query(collection(db,'appointments'), where('clientId','==',cs.id))); serviceAppointments=aq.docs.map(d=>d.data()); }catch(e){ serviceAppointments=[]; }
+      showLoginError('');
+      document.getElementById('login-screen').style.display='none';
+      document.getElementById('app').style.display='block';
+      renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay();
+      loadPortalEstimates();
+      _showPreviewBanner();
+    }catch(e){ showLoginError('No se pudo abrir la vista previa: '+((e&&e.message)||e)); }
+    return;
+  }
   if(!user || !user.phoneNumber){
     document.getElementById('app').style.display='none';
     document.getElementById('login-screen').style.display='flex';
@@ -839,7 +868,7 @@ let portalEstimates = [];
 const focusOrderId = (new URLSearchParams(location.search).get('order') || '');
 function escPortal(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 async function loadPortalEstimates(){
-  try{ const r = await httpsCallable(functions,'svcPortalEstimates')({}); portalEstimates = (r&&r.data&&r.data.orders)||[]; }
+  try{ const _pl = (window._previewMode && currentClient) ? { previewClientId: currentClient.id } : {}; const r = await httpsCallable(functions,'svcPortalEstimates')(_pl); portalEstimates = (r&&r.data&&r.data.orders)||[]; }
   catch(e){ portalEstimates = []; }
   try{ if(currentClient){ renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); } }catch(e){}
 }

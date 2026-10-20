@@ -1885,9 +1885,18 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
 // 🔧 SERVICE Fase 6 — identidad del CLIENTE del portal (entra por TELÉFONO, NO es staff). Lo buscamos por phoneE164.
 async function _portalClient(request) {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const db = admin.firestore();
+  // 👁️ VISTA PREVIA DE DUEÑO: staff (por correo) puede ver el portal de un cliente por id (solo lectura).
+  const _email = String((request.auth.token || {}).email || "").toLowerCase();
+  const _prev = String(((request.data || {}).previewClientId) || "");
+  if (_prev && OWNER_EMAILS.indexOf(_email) >= 0) {
+    const cs = await db.collection("clients").doc(_prev).get();
+    if (!cs.exists) throw new HttpsError("not-found", "Cliente no encontrado.");
+    const cd = cs.data() || {};
+    return { id: cs.id, phone: cd.phoneE164 || cd.phone || "", data: cd, preview: true };
+  }
   const phone = String((request.auth.token || {}).phone_number || "");
   if (!phone) throw new HttpsError("permission-denied", "Sin teléfono verificado.");
-  const db = admin.firestore();
   let snap;
   try { snap = await db.collection("clients").where("phoneE164", "==", phone).limit(1).get(); }
   catch (e) { snap = { empty: true }; }

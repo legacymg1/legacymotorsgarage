@@ -1778,6 +1778,8 @@ window.c360Search=async function(){
   leads.forEach(qz=>{ const car=(qz.options&&qz.options[0]&&qz.options[0].car)||''; html+='<div onclick="openLead360(\''+qz.id+'\')" style="padding:11px 13px;border-bottom:1px solid var(--border);cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span style="font-weight:700;">'+esc(qz.customer||'(sin nombre)')+'</span><span style="color:var(--muted);font-size:12px;white-space:nowrap;">'+esc(qz.phone||'')+'</span></div><div style="margin-top:5px;">'+c360BadgeHtml({quote:true})+(car?'<span style="color:var(--muted);font-size:11px;"> · '+esc(car)+'</span>':'')+'</div></div>'; });
   box.innerHTML=html||'<div style="padding:16px;color:var(--muted);font-size:13px;text-align:center;">Sin resultados.</div>'; box.style.display='';
 };
+// 👁️ Abrir el PORTAL tal como lo ve el cliente (vista previa de dueño, solo lectura). Mismo origen = usa tu sesión de staff.
+window.viewAsClient=function(id){ try{ window.open('portal.html?preview='+encodeURIComponent(id), '_blank'); }catch(e){ location.href='portal.html?preview='+encodeURIComponent(id); } };
 window.openClient360=async function(id){
   const c=clients.find(x=>x.id===id); if(!c){ alert('Cliente no encontrado.'); return; }
   _c360Cur=id; c360Clear();
@@ -1887,6 +1889,7 @@ window.renderClient360=function(id){
     +(f.buyer?'<button onclick="c360Close();openPayModal(\''+id+'\')" style="flex:1 1 auto;background:var(--green,#16a34a);color:#042;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:800;cursor:pointer;">💵 Pago</button>':'')
     +(phone?'<a href="sms:'+phone+'" style="flex:1 1 auto;text-align:center;text-decoration:none;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px;font-size:13px;font-weight:700;">💬 SMS</a><a href="tel:'+phone+'" style="flex:0 0 auto;text-align:center;text-decoration:none;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 13px;font-size:13px;">📞</a>':'')
     +'<button onclick="c360Close();openEditModal(\''+id+'\')" style="flex:1 1 auto;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">✏️ Editar</button>'
+    +'<button onclick="viewAsClient(\''+id+'\')" style="flex:1 1 auto;background:#6b4ea8;color:#fff;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:800;cursor:pointer;">👁️ Ver como cliente</button>'
     +'</div>';
   // 1) Resumen de cuenta (arriba de todo, solo compradores)
   if(f.buyer){ h+=sec('💵 Resumen de cuenta', _c360FinSummary(c)); }
@@ -4089,6 +4092,7 @@ window.renderAll = function() {
         <div class="cli-balance">${formatMoney(totalClientDebt(c))}${addonsBalance(c)>0.005?`<div style="font-size:10px;color:#1f6feb;font-weight:600;">carro ${formatMoney(balance)} + cargos ${formatMoney(addonsBalance(c))}</div>`:''}</div>
         <div class="cli-actions">
           <button type="button" class="cli-btn" style="background:var(--gold3);color:var(--navy3);" onclick="event.stopPropagation();openClient360('${c.id}')" title="Ver ficha completa">👤</button>
+          <button type="button" class="cli-btn" style="background:#6b4ea8;color:#fff;" onclick="event.stopPropagation();viewAsClient('${c.id}')" title="Ver su perfil como cliente (portal)">👁️</button>
           <button type="button" class="cli-btn" style="background:var(--green);color:#000;" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">💵</button>
           <button type="button" class="cli-btn" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)">💬</button>
           <button type="button" class="cli-btn" data-action="edit" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">✏️</button>
@@ -4157,6 +4161,7 @@ window.renderAll = function() {
         <div class="cb-prog" title="${progress}% pagado"><div class="cb-progfill" style="width:${progress}%"></div></div>
         <div class="cb-actions">
           <button class="cb-btn" style="background:var(--gold3);color:var(--navy3);font-weight:700;" onclick="event.stopPropagation();openClient360('${c.id}')" title="Ficha completa">👤</button>
+          <button class="cb-btn" style="background:#6b4ea8;color:#fff;font-weight:700;" onclick="event.stopPropagation();viewAsClient('${c.id}')" title="Ver su perfil como cliente (portal)">👁️</button>
           <button class="cb-btn" style="background:var(--green);color:#000;" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)" title="Pago">💵</button>
           <button class="cb-btn" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)" title="SMS">💬</button>
           <button class="cb-btn" onclick="event.stopPropagation();openApptModal('${c.id}')" title="Cita">📅</button>
@@ -4233,6 +4238,7 @@ window.renderAll = function() {
         </div>
         <div class="card-actions">
           <button type="button" class="btn" style="flex:0;padding:9px 11px;background:var(--gold3);color:var(--navy3);font-weight:700;" onclick="event.stopPropagation();openClient360('${c.id}')" title="Ver ficha completa 360">👤</button>
+          <button type="button" class="btn" style="flex:0;padding:9px 11px;background:#6b4ea8;color:#fff;font-weight:700;" onclick="event.stopPropagation();viewAsClient('${c.id}')" title="Ver su perfil como cliente (portal)">👁️</button>
           <button type="button" class="btn btn-pay" data-action="pay" data-client-id="${c.id}" onclick="return handleClientAction(this,event)">💵 Pago</button>
           <button type="button" class="btn btn-whatsapp" style="background:#2196F3;color:#fff;" data-action="sms" data-client-id="${c.id}" data-status="${status}" onclick="return handleClientAction(this,event)">💬 SMS</button>
           <button type="button" class="btn" style="flex:0;padding:9px 10px;" onclick="event.stopPropagation();openApptModal('${c.id}')" title="Agendar cita">📅</button>
