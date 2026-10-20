@@ -2211,6 +2211,17 @@ function svcRenderModal(){
       +'<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">📤 Fecha de salida (cuándo se entregó)</label><input id="svc-delivered" type="datetime-local" value="'+_toLocal(d.deliveredAt)+'" style="'+SVC_IN+';">';
   }
   const isEdit=!!d.editId;
+  // 📁 DOCUMENTOS (al editar): estimado inicial / final / invoice — cada uno desde su snapshot inmutable.
+  let docsHtml='';
+  if(isEdit){
+    const docs=[];
+    if(_svcOrd.estInitial) docs.push(['initial','🧾 Estimado inicial',_svcOrd.estInitial.at]);
+    if(_svcOrd.estFinal) docs.push(['final','🧾 Estimado final',_svcOrd.estFinal.at]);
+    if(_svcOrd.invoice) docs.push(['invoice','✅ Invoice · pagado',_svcOrd.invoice.at]);
+    if(docs.length){
+      docsHtml=docs.map(x=>{ const dt=x[2]?new Date(x[2]).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; return '<div onclick="svcViewDoc(\''+d.editId+'\',\''+x[0]+'\')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;cursor:pointer;background:var(--surface3);"><span style="font-weight:700;font-size:13px;">'+x[0+1]+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+dt+' ›</span></div>'; }).join('');
+    }
+  }
   // 🏷️ BANNER DE ESTADO (al editar): etapa actual + "cuánto pagó" + ver recibo. Reusa svcStatusLabel.
   let bannerHtml='';
   if(isEdit){
@@ -2228,6 +2239,7 @@ function svcRenderModal(){
     +bannerHtml
     +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',svcHtml)
     +(isEdit?SVC_SEC('4 · Estatus y fechas',datesHtml):'')
+    +(docsHtml?SVC_SEC('📁 Documentos',docsHtml):'')
     +(_svcAccepted
       ? ('<button id="svc-save-btn" onclick="svcSaveQuick(event)" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">💾 Guardar cambios</button>'
         +'<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 Ver estimado autorizado</button>')
@@ -2394,6 +2406,26 @@ window.svcGenEstimate=async function(btn){
     +'<button onclick="var o=document.getElementById(\'svc-est-overlay\');if(o)o.remove();" style="background:#eee;border:none;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;">Cerrar</button>'
     +'<button onclick="svcEstPrint()" style="background:#0b0e14;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;">🖨 Imprimir</button>'
     +'<button onclick="svcEstSend()" style="background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;">💬 Enviar</button>'
+    +'</div><div>'+window._svcEstHtml+'</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+};
+// 📁 Ver un DOCUMENTO guardado (estimado inicial / final / invoice) desde su snapshot inmutable.
+window.svcViewDoc=function(orderId, kind){
+  const o=svcOrders.find(x=>x.id===orderId); if(!o){ alert('Orden no encontrada.'); return; }
+  const snap = kind==='initial'?o.estInitial : kind==='final'?o.estFinal : o.invoice;
+  if(!snap){ alert('Ese documento aún no existe.'); return; }
+  const snapServices=(snap.services||[]).map(s=>({ desc:s.desc||'', descEn:s.descEn||'', price:(s.price!=null?Number(s.price):((Number(s.laborCents!=null?s.laborCents:s.priceCents)||0)/100)), parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[]) }));
+  const d={ lang:o.lang||'es', clientName:o.clientName||'', clientPhone:o.clientPhone||'', vehicleLabel:o.vehicleLabel||'', vin:o.vin||'', plate:o.plate||'', deposit:(Number(snap.depositCents)||0)/100 };
+  const opts = (kind==='invoice') ? {receipt:true, order:o} : {};
+  window._svcEstHtml=svcEstimateSheetHTML(d, snapServices, opts);
+  const title = kind==='initial'?'Estimado inicial':kind==='final'?'Estimado final':'Invoice';
+  const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2147483100;display:flex;align-items:center;justify-content:center;padding:14px;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const box=document.createElement('div'); box.style.cssText='background:#fff;color:#111;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow:auto;';
+  box.innerHTML='<div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;padding:10px 14px;display:flex;gap:8px;align-items:center;justify-content:space-between;z-index:2;">'
+    +'<span style="font-weight:800;color:#0b0e14;font-size:13px;">📁 '+title+'</span>'
+    +'<span style="display:flex;gap:8px;"><button onclick="var o=document.getElementById(\'svc-est-overlay\');if(o)o.remove();" style="background:#eee;border:none;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;">Cerrar</button>'
+    +'<button onclick="svcEstPrint()" style="background:#0b0e14;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;">🖨 Imprimir</button></span>'
     +'</div><div>'+window._svcEstHtml+'</div>';
   ov.appendChild(box); document.body.appendChild(ov);
 };
