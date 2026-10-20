@@ -2377,6 +2377,8 @@ window.svcSaveOrder=async function(opts){
       if(v){ vin=v.vin||vin; plate=v.plate||plate; vehicleLabel=v.label||vehicleLabel; }
     }
   }
+  // 🔁 Deja los datos RESUELTOS en el borrador para que "Enviar"/"Generar estimado" tengan nombre/teléfono/auto correctos.
+  d.clientId=clientId; d.clientName=clientName; d.clientPhone=clientPhone; d.vehicleLabel=vehicleLabel; d.plate=plate; d.vin=vin;
   // 3 · servicios (cada uno con su labor = tiempo × tarifa) + partes — feed del invoice
   const rate=Number(d.laborRate)||0;
   const capF=s=>{ s=(s||'').trim(); return s?s.charAt(0).toUpperCase()+s.slice(1):s; };
