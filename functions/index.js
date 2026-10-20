@@ -1,7 +1,7 @@
 // Legacy DMS — backend (Cloud Functions v2)
 // redeploy marker: push onMoneyIn trigger (IAM + eventarc service agent concedidos)
 const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
@@ -1071,6 +1071,50 @@ exports.onMoneyIn = onDocumentCreated("transactions/{id}", async (event) => {
       url,
     });
   } catch (e) { console.log("onMoneyIn", e); }
+});
+
+// 🔔 Push a UN CLIENTE (por sus tokens: clientId o teléfono), EN SU IDIOMA (agrupa por lang del token).
+async function _pushToClient(clientId, phone, payload) {
+  try {
+    const db = admin.firestore();
+    const seen = {}; const docs = [];
+    if (clientId) { const s = await db.collection("push_tokens").where("clientId", "==", clientId).get(); s.forEach((d) => { if (!seen[d.id]) { seen[d.id] = 1; docs.push(d); } }); }
+    if (phone) { const s2 = await db.collection("push_tokens").where("phone", "==", phone).get(); s2.forEach((d) => { if (!seen[d.id]) { seen[d.id] = 1; docs.push(d); } }); }
+    if (!docs.length) return;
+    const grp = { es: { t: [], r: [] }, en: { t: [], r: [] } };
+    docs.forEach((d) => { const dd = d.data() || {}; if (dd.token) { const lg = (dd.lang === "en") ? "en" : "es"; grp[lg].t.push(dd.token); grp[lg].r.push(d.ref); } });
+    const dead = [];
+    for (const lg of ["es", "en"]) {
+      if (!grp[lg].t.length) continue;
+      const title = ((lg === "en" ? payload.titleEn : payload.title) || payload.title || "Legacy").slice(0, 80);
+      const body = ((lg === "en" ? payload.bodyEn : payload.body) || payload.body || "").slice(0, 180);
+      const res = await admin.messaging().sendEachForMulticast({
+        tokens: grp[lg].t, data: { title, body, url: payload.url || "/portal.html" },
+        webpush: { headers: { Urgency: "high", TTL: "86400" } },
+      });
+      res.responses.forEach((r, i) => { if (!r.success) { const c = r.error && r.error.code; if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token") dead.push(grp[lg].r[i]); } });
+    }
+    await Promise.all(dead.map((ref) => ref.delete().catch(() => {})));
+  } catch (e) { console.log("_pushToClient", e); }
+}
+
+// 🚗 Avisa al CLIENTE cuando su orden de servicio cambia de estatus (en su idioma). Hoy: auto LISTO para recoger.
+exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) => {
+  try {
+    const before = (event.data && event.data.before && event.data.before.data()) || {};
+    const after = (event.data && event.data.after && event.data.after.data()) || {};
+    if (before.status === after.status) return;   // solo cambios de estatus
+    const veh = after.vehicleLabel || (after.plate ? after.plate : "tu auto");
+    const vehEn = after.vehicleLabel || (after.plate ? after.plate : "your car");
+    const fol = after.orderNum ? (" #" + after.orderNum) : "";
+    let p = null;
+    if (after.status === "listo") {
+      p = { title: "🚗 Tu auto está listo", body: "Ya puedes pasar por " + veh + fol + ".", titleEn: "🚗 Your car is ready", bodyEn: vehEn + fol + " is ready for pickup." };
+    }
+    if (!p) return;
+    p.url = "/portal.html?order=" + event.params.id;
+    await _pushToClient(after.clientId || "", after.clientPhone || "", p);
+  } catch (e) { console.log("onServiceStatus", e); }
 });
 
 // 🌐 BOT DE VENTAS de la página web (Claude). Contesta a visitantes y los empuja a venir en persona.
