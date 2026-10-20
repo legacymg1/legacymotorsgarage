@@ -1555,6 +1555,8 @@ function svcRenderTabs(){
   const box=document.getElementById('svc-tabs'); if(!box) return;
   const cnt={activas:0,estimados:0,completadas:0}; const cli=new Set();
   svcOrders.forEach(o=>{ cnt[svcBucket(o)]++; if(o.clientId) cli.add(o.clientId); });
+  // La vista de Clientes también incluye los clientes marcados kind:'service' sin orden → cuéntalos igual.
+  try{ (clients||[]).forEach(c=>{ if(c && c.id && c.kind==='service') cli.add(c.id); }); }catch(e){}
   const cur=window._svcTab||'activas';
   const tabs=[['activas','🔧 Activas',cnt.activas],['estimados','🧾 Estimados',cnt.estimados],['completadas','✅ Completadas',cnt.completadas],['clientes','👥 Clientes',cli.size]];
   box.innerHTML=tabs.map(t=>'<button onclick="svcSetTab(\''+t[0]+'\')" style="padding:9px 14px;border-radius:999px;border:1px solid '+(cur===t[0]?'var(--gold)':'var(--border)')+';background:'+(cur===t[0]?'var(--gold)':'transparent')+';color:'+(cur===t[0]?'var(--navy3)':'var(--text)')+';font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;">'+t[1]+' <span style="opacity:.7;">'+t[2]+'</span></button>').join('');
