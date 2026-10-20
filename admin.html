@@ -2040,6 +2040,7 @@ window.svcSaveClient=async function(btn){
   svcCapture(); const d=window._svcDraft;
   const nm=titleCase((d.clientName||'').trim()), ph=(d.clientPhone||'').trim();
   if(!nm){ alert('Escribe el nombre del cliente.'); return; }
+  if(!ph){ if(!confirm('⚠️ Este cliente no tiene teléfono.\nSin número no le podrás mandar el estimado ni el recibo por SMS.\n¿Guardar de todos modos?')) return; }   // evita clientes sin número por error
   if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
   try{
     const e164=(typeof toE164==='function'?toE164(ph):'')||'';
@@ -2054,6 +2055,14 @@ window.svcSaveClient=async function(btn){
     svcRenderModal();   // re-pinta → muestra el cliente guardado + el picker de autos
   }catch(e){ alert('No se pudo guardar el cliente: '+(e.message||e)); if(btn){ btn.disabled=false; btn.textContent='💾 Guardar cliente y continuar'; } }
 };
+// 🚗 Elegir un auto del cliente (radio) → resuelve sus datos y colapsa a un renglón; "Otro auto" abre el formulario.
+window.svcPickVeh=function(i){
+  svcCapture(); const d=window._svcDraft;
+  const c=d.clientId?clients.find(x=>x.id===d.clientId):null; const vs=c?clientVehicles(c):[];
+  if(i==='__new__'){ d.vehPick='__new__'; d.vin=''; d.plate=''; d.vehicleLabel=''; d._vehEdit=true; }
+  else { const v=vs[+i]; if(v){ d.vin=v.vin||''; d.plate=v.plate||''; d.vehicleLabel=v.label||''; d.vehPick=String(i); d._vehEdit=false; } }
+  svcRenderModal();
+};
 // 💾 Guardar AUTO y continuar (lo agrega al cliente ya guardado).
 window.svcSaveVehicle=async function(btn){
   svcCapture(); const d=window._svcDraft;
@@ -2064,6 +2073,7 @@ window.svcSaveVehicle=async function(btn){
   try{
     const v=await addVehicleToClient(d.clientId,{vin,plate,label});
     if(v){ d.vin=v.vin||vin; d.plate=v.plate||plate; d.vehicleLabel=v.label||label; }
+    d._vehEdit=false;   // colapsa a un renglón → se ve que YA quedó guardado
     try{ const c=clients.find(x=>x.id===d.clientId); const vs=c?clientVehicles(c):[]; const idx=vs.findIndex(x=>((x.label||'')===(d.vehicleLabel||'') || (x.vin&&x.vin===d.vin))); if(idx>=0) d.vehPick=String(idx); }catch(e){}
     svcToast&&svcToast('💾 Auto guardado'); svcRenderModal();
   }catch(e){ alert('No se pudo guardar el auto: '+(e.message||e)); if(btn){ btn.disabled=false; btn.textContent='💾 Guardar auto y continuar'; } }
@@ -2104,14 +2114,23 @@ function svcRenderModal(){
   const c=d.clientId?clients.find(x=>x.id===d.clientId):null;
   const vs=c?clientVehicles(c):[];
   let vehHtml='';
-  if(vs.length && !d.editId){
+  const vehSet=((d.vin||'').trim()||(d.plate||'').trim()||(d.vehicleLabel||'').trim());
+  const vehCompact=(vehSet && !d._vehEdit);
+  // 🚗 COMPACTO: una vez que hay un auto elegido/guardado → un renglón fijo + "Cambiar" (igual que el cliente). Así se ve que YA quedó.
+  if(vehCompact){
+    const bits=[ d.vehicleLabel?svcEsc(d.vehicleLabel):'', d.plate?('🪪 '+svcEsc(d.plate)):'', d.vin?('VIN …'+svcEsc((d.vin||'').slice(-6))):'' ].filter(Boolean).join(' · ');
+    vehHtml='<div style="background:var(--surface3);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+      +'<div style="min-width:0;"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🚗 '+(bits||'Auto')+'</div></div>'
+      +'<button onclick="svcCapture();window._svcDraft._vehEdit=true;svcRenderModal()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;">Cambiar</button></div>';
+  }
+  if(!vehCompact && vs.length){
     vehHtml=vs.map((v,i)=>'<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;">'
-      +'<input type="radio" name="svc-veh" value="'+i+'" '+((d.vehPick===String(i)||(!d.vehPick&&i===0))?'checked':'')+' onchange="svcCapture();svcRenderModal()">'
+      +'<input type="radio" name="svc-veh" value="'+i+'" '+((d.vehPick===String(i))?'checked':'')+' onchange="svcPickVeh(\''+i+'\')">'
       +'<span><b>'+svcEsc(v.label||'')+'</b>'+(v.plate?(' · 🪪 '+svcEsc(v.plate)):'')+(v.vin?(' · VIN …'+svcEsc((v.vin||'').slice(-6))):'')+'</span></label>').join('');
     vehHtml+='<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px dashed var(--border);border-radius:10px;cursor:pointer;">'
-      +'<input type="radio" name="svc-veh" value="__new__" '+(d.vehPick==='__new__'?'checked':'')+' onchange="svcCapture();svcRenderModal()"><span>➕ Otro auto</span></label>';
+      +'<input type="radio" name="svc-veh" value="__new__" '+(d.vehPick==='__new__'?'checked':'')+' onchange="svcPickVeh(\'__new__\')"><span>➕ Otro auto</span></label>';
   }
-  const showNewVeh = !vs.length || d.vehPick==='__new__' || !!d.editId;
+  const showNewVeh = !vehCompact && (!vs.length || d.vehPick==='__new__' || !!d._vehEdit || (!!d.editId && !vehSet));
   if(showNewVeh){
     vehHtml+='<div style="margin-top:'+(vs.length?'8px':'0')+';display:flex;flex-direction:column;gap:8px;">'
       +'<div style="display:flex;gap:8px;"><input id="svc-veh-vin" value="'+svcEsc(d.vin||'')+'" placeholder="VIN (opcional)" style="'+SVC_IN+';flex:1;text-transform:uppercase;">'
@@ -2200,12 +2219,22 @@ function svcRenderModal(){
     +(_svcAccepted
       ? ('<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">💾 Guardar cambios</button>'
         +'<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 Ver estimado autorizado</button>')
-      : ('<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">📄 Generar / enviar estimado</button>'
-        +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:11px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">✅ Crear orden directa (sin estimado)</button>'))
+      : (isEdit
+        ? ('<button onclick="svcSaveQuick()" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">💾 Guardar cambios</button>'
+          +'<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 '+(_svcOrd && _svcOrd.estimateStatus==='sent'?'Ver / reenviar estimado':'Generar y enviar estimado')+'</button>')
+        : ('<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">📄 Generar / enviar estimado</button>'
+          +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:11px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">✅ Crear orden directa (sin estimado)</button>')))
     +((d.editId && _svcOrd && _svcOrd.estimateStatus==='sent' && !_svcOrd.paid)?'<button onclick="svcResend(\''+d.editId+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:rgba(232,182,74,.08);color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📤 Reenviar estimado al cliente</button>':'')
     +(isEdit?'<button onclick="svcDeleteOrder()" style="width:100%;margin-top:10px;padding:11px;border-radius:12px;border:1px solid #c0392b;background:transparent;color:#e0683a;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">🗑️ Eliminar orden</button>':'');
 }
 window.svcRenderModal=svcRenderModal;
+// 💾 Guardar cambios SIN exigir función (guarda en silencio, avisa y re-pinta). Para editar datos/cliente/auto sin convertir en orden.
+window.svcSaveQuick=async function(){
+  try{
+    const id=await window.svcSaveOrder({silent:true});
+    if(id){ try{ svcToast('💾 Cambios guardados'); }catch(e){} svcRenderModal(); }
+  }catch(e){ alert('No se pudo guardar: '+((e&&e.message)||e)); }
+};
 // Servicios individuales + labor
 function svcFmtMin(m){ m=Number(m)||0; if(m<60) return m+' min'; const h=m/60; return (Number.isInteger(h)?h:h.toFixed(1))+(h===1?' hora':' horas'); }
 // 🧾 Resumen de la cuenta (solo Labor / Partes / Total / Saldo). El desglose completo va en el estimado bonito.
