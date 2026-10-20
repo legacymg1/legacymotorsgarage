@@ -2099,7 +2099,7 @@ function svcRenderModal(){
   if(d.clientId){
     const c=clients.find(x=>x.id===d.clientId);
     cliHtml='<div style="background:var(--surface3);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
-      +'<div><div style="font-weight:800;">'+svcEsc(c?c.name:'')+'</div><div style="font-size:12px;color:var(--muted);">'+svcEsc(c?(c.phone||''):'')+'</div></div>'
+      +'<div><div style="font-weight:800;">'+svcEsc(titleCase(c?c.name:''))+'</div><div style="font-size:12px;color:var(--muted);">'+svcEsc(c?_fmtPhone(c.phone||c.phoneE164||''):'')+'</div></div>'
       +'<button onclick="svcClearClient()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;">Cambiar</button></div>';
   } else {
     cliHtml='<input id="svc-cli-search" oninput="svcCliSearch()" placeholder="🔍 Buscar cliente existente…" style="'+SVC_IN+'">'
@@ -2449,8 +2449,9 @@ window.svcResend=async function(id){
     if(entered && entered.trim()){
       num=_toNum(entered);
       if(num){
-        try{ await updateDoc(doc(db,'serviceOrders',id), { clientPhone:entered.trim() }); }catch(e){}
-        try{ if(o.clientId){ const cp={ phone:entered.trim() }; const e164=(typeof toE164==='function'?toE164(entered.trim()):'')||''; if(e164) cp.phoneE164=e164; await updateDoc(doc(db,'clients',o.clientId), cp); } }catch(e){}
+        const pretty=(typeof _fmtPhone==='function'?_fmtPhone(entered.trim()):entered.trim());
+        try{ await updateDoc(doc(db,'serviceOrders',id), { clientPhone:pretty }); }catch(e){}
+        try{ if(o.clientId){ const cp={ phone:pretty }; const e164=(typeof toE164==='function'?toE164(entered.trim()):'')||''; if(e164) cp.phoneE164=e164; await updateDoc(doc(db,'clients',o.clientId), cp); } }catch(e){}
       } else { alert('No reconocí ese número. Revisa que tenga 10 dígitos.'); return; }
     }
   }
