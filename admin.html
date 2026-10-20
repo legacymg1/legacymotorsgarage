@@ -5669,7 +5669,7 @@ function renderTodayBox() {
     todayClients.forEach(c => {
       const _last = dueNow(c)<(Number(c.weekly)||0);
       html += `<div style="background:var(--navy2);border-radius:9px;padding:8px 12px;display:flex;align-items:center;gap:10px;">
-        <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="font-weight:600;font-size:14px;">${c.name}</span> <span style="font-size:12px;color:var(--muted);">· ${c.year} ${c.make} ${c.model}</span></div>
+        <div onclick="openClient360('${c.id}')" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;"><span style="font-weight:600;font-size:14px;">${c.name}</span> <span style="font-size:12px;color:var(--muted);">· ${c.year} ${c.make} ${c.model}</span></div>
         ${_last?'<span style="font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">Último</span>':''}
         <div style="font-family:var(--font-display);font-size:16px;color:var(--green);white-space:nowrap;">${formatMoney(dueNow(c))}</div>
         <button onclick="sendFriendlyTodayMsg('${c.id}')" title="SMS" style="background:var(--green);color:#000;border:none;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">💬</button>
@@ -5687,7 +5687,7 @@ function renderTodayBox() {
     overdueClients.forEach(c => {
       const days = Math.abs(daysUntil(getNextPayDate(c)));
       html += `<div style="background:rgba(255,59,59,0.08);border:1px solid rgba(255,59,59,0.2);border-radius:9px;padding:8px 12px;display:flex;align-items:center;gap:10px;">
-        <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="font-weight:600;font-size:14px;">${c.name}</span> <span style="font-size:12px;color:#ff8080;">· ${c.year} ${c.make} ${c.model} · ${days}d</span></div>
+        <div onclick="openClient360('${c.id}')" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;"><span style="font-weight:600;font-size:14px;">${c.name}</span> <span style="font-size:12px;color:#ff8080;">· ${c.year} ${c.make} ${c.model} · ${days}d</span></div>
         <div style="font-size:9px;color:#ff8080;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">debe ${formatMoney(calcBalance(c))}</div>
         <div style="font-family:var(--font-display);font-size:16px;color:var(--red);white-space:nowrap;">${formatMoney(c.weekly)}</div>
         <button onclick="openWhatsApp('${c.id}','overdue')" title="SMS" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">💬</button>
