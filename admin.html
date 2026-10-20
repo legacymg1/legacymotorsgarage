@@ -1153,6 +1153,7 @@ function addDays(dateStr, n) { const d = new Date(dateStr+'T12:00:00'); d.setDat
 function formatDate(d) { if(!d) return '—'; const [y,m,day]=d.split('-'); return `${m}/${day}/${y}`; }
 function formatMoney(n) { return '$'+Number(n).toLocaleString('en-US'); }
 function titleCase(s){ return String(s||'').replace(/\b\w/g, c=>c.toUpperCase()); }
+function _fmtPhone(p){ const d=String(p||'').replace(/\D/g,''); if(d.length===10) return '('+d.slice(0,3)+') '+d.slice(3,6)+'-'+d.slice(6); if(d.length===11&&d[0]==='1') return '('+d.slice(1,4)+') '+d.slice(4,7)+'-'+d.slice(7); return String(p||''); }
 window.formatPhone=function(el){
   let d=(el.value||'').replace(/[^0-9]/g,'');
   if(d.length===11 && d[0]==='1') d=d.slice(1);   // quita el 1 de país si lo pegaron
@@ -2255,7 +2256,7 @@ function svcEstimateSheetHTML(d, services, opts){
   const stamp=(receipt && o.paid)?('<div style="text-align:center;margin:10px 0 2px;"><span style="display:inline-block;border:2.5px solid #0a7a35;color:#0a7a35;font-weight:900;letter-spacing:2px;font-size:15px;padding:5px 16px;border-radius:8px;transform:rotate(-4deg);">✓ '+(en?'PAID':'PAGADO')+(payMethodTxt?(' · '+payMethodTxt):'')+'</span></div>'):'';
   const body='<div class="estsheet"><div class="h"><h1>LEGACY MOTORS GARAGE</h1><div class="s">'+L.sub+(folio?(' · '+folio):'')+'</div></div>'
     +stamp
-    +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(d.clientName||'—')+(d.clientPhone?(' · '+svcEsc(d.clientPhone)):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+(receipt&&paidDate?paidDate:dstr)+(folio?('<br><b>'+L.ord+':</b> '+folio):'')+'</div>'
+    +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(titleCase(d.clientName)||'—')+(d.clientPhone?(' · '+svcEsc(_fmtPhone(d.clientPhone))):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+(receipt&&paidDate?paidDate:dstr)+(folio?('<br><b>'+L.ord+':</b> '+folio):'')+'</div>'
     +'<table>'+rows+'</table>'
     +'<div class="tot"><div class="line"><span style="color:#777;">'+L.labor+'</span><b>'+money(laborSub)+'</b></div><div class="line"><span style="color:#777;">'+L.parts+'</span><b>'+money(partsSub)+'</b></div><div class="line grand"><span>'+L.total+'</span><span>'+money(grand)+'</span></div>'
     +(receipt
@@ -2275,7 +2276,7 @@ window.svcGenEstimate=async function(btn){
   if(btn){ try{ btn.disabled=false; if(btn.dataset._t) btn.textContent=btn.dataset._t; }catch(e){} }
   const d2=window._svcDraft; const services2=(d2.services||[]).filter(s=>(s.desc||'').trim()||(s.parts||[]).length);
   window._svcEstHtml=svcEstimateSheetHTML(d2, services2);
-  const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100001;display:flex;align-items:center;justify-content:center;padding:14px;';
+  const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2147483100;display:flex;align-items:center;justify-content:center;padding:14px;';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
   const box=document.createElement('div'); box.style.cssText='background:#fff;color:#111;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow:auto;';
   box.innerHTML='<div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;z-index:2;">'
@@ -2292,7 +2293,7 @@ window.svcOpenReceipt=function(orderId){
   const d={ lang:o.lang||'es', clientName:o.clientName||'', clientPhone:o.clientPhone||'', vehicleLabel:o.vehicleLabel||'', vin:o.vin||'', plate:o.plate||'', deposit:(Number(o.depositCents)||0)/100 };
   const services=(Array.isArray(o.services)&&o.services.length)?o.services.map(s=>({desc:s.desc||'',price:(s.price!=null?Number(s.price):((Number(s.laborCents!=null?s.laborCents:s.priceCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[])})):[{desc:o.reason||'Servicio',price:(Number(o.grandTotalCents)||0)/100,parts:[]}];
   window._svcEstHtml=svcEstimateSheetHTML(d, services, {receipt:true, order:o}); window._svcRcptOrder=o.id;
-  const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100001;display:flex;align-items:center;justify-content:center;padding:14px;';
+  const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2147483100;display:flex;align-items:center;justify-content:center;padding:14px;';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
   const box=document.createElement('div'); box.style.cssText='background:#fff;color:#111;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow:auto;';
   box.innerHTML='<div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;z-index:2;">'
