@@ -1845,6 +1845,24 @@ exports.svcBackfillNums = onRequest(async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
 });
 
+// 🔎 DIAG TEMPORAL — teléfonos de las últimas órdenes y sus clientes. ?key=lmgfin2026
+exports.svcDiagPhones = onRequest(async (req, res) => {
+  if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
+  try {
+    const db = admin.firestore();
+    const snap = await db.collection("serviceOrders").get();
+    const docs = []; snap.forEach((d) => docs.push({ id: d.id, ...(d.data() || {}) }));
+    docs.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    const out = [];
+    for (const o of docs.slice(0, 10)) {
+      let cliPhone = null, cliE164 = null, cliFound = false;
+      if (o.clientId) { try { const cs = await db.collection("clients").doc(o.clientId).get(); if (cs.exists) { cliFound = true; const c = cs.data() || {}; cliPhone = c.phone || null; cliE164 = c.phoneE164 || null; } } catch (e) {} }
+      out.push({ orderNum: o.orderNum || null, clientName: o.clientName || "", clientId: o.clientId || "(none)", orderClientPhone: o.clientPhone || "(none)", clientDocFound: cliFound, clientDocPhone: cliPhone, clientDocE164: cliE164 });
+    }
+    res.json({ ok: true, orders: out });
+  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
+});
+
 // 📋 F3 — HOJA DE RECEPCIÓN del carro de servicio (checklist corto al recibir). Guarda el estado AL RECIBIRLO (protege de daños pre-existentes) y avanza a 'recibido'.
 exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
