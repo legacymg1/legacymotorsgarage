@@ -920,7 +920,8 @@ function estimateCardHTML(o){
       : `<div style="margin-top:12px;">
           <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
           <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.'}</div>
-        </div>`}`;
+        </div>`}
+    ${(!o.paid && Number(o.total)>0)?`<button onclick="portalPayService('${o.id}')" style="width:100%;margin-top:10px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">💳 ${es?'Pagar con tarjeta':'Pay with card'}</button><div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">${es?'Pago seguro por Square · puedes pagar todo o una parte':'Secure payment by Square · pay full or partial'}</div>`:''}`;
   return `
   <div class="info-card" id="est-${o.id}" style="margin-top:16px;${focus?'border:1px solid var(--gold);box-shadow:0 0 0 2px rgba(200,162,74,.25);':''}">
     <div ${o.paid?`onclick="portalToggleRcpt('${o.id}')" style="cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;"`:`style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"`}>
@@ -1082,6 +1083,26 @@ window.payNow = async function(){
     window.location.href = j.url;   // redirige a la página SEGURA de Square
   }catch(e){ alert((L==='en'?'Could not start payment: ':'No se pudo iniciar el pago: ')+((e&&e.message)||e)); }
 };
+// 💳 El cliente paga una ORDEN DE SERVICIO con tarjeta (total o una parte).
+window.portalPayService = async function(orderId){
+  const o = (portalEstimates||[]).find(x=>x.id===orderId); if(!o) return;
+  const es = L!=='en';
+  const total = Number(o.total)||0; const paid = (Number(o.paidCents)||0)/100; const due = Math.max(0, total-paid);
+  if(!(due>0)){ alert(es?'Ya está pagado.':'Already paid.'); return; }
+  const v = prompt(es?('¿Cuánto quieres pagar con tarjeta? (puedes pagar todo o una parte)\nSaldo: '+formatMoney(due)):('How much to pay by card? (full or partial)\nBalance: '+formatMoney(due)), due.toFixed(2));
+  if(v===null) return;
+  let amt = Math.round(parseFloat(String(v).replace(/[^0-9.]/g,''))*100);
+  if(!(amt>=100)){ alert(es?'Mínimo $1.00':'Minimum $1.00'); return; }
+  if(amt>Math.round(due*100)) amt=Math.round(due*100);
+  try{
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(SQ_FN+'/createServiceCheckout',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ idToken, orderId, amountCents:amt }) });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || !j.url){ throw new Error(j.error||('HTTP '+r.status)); }
+    try{ localStorage.setItem('sqPendingOrder', j.orderId||''); }catch(e){}
+    window.location.href = j.url;   // página segura de Square
+  }catch(e){ alert((es?'No se pudo iniciar el pago: ':'Could not start payment: ')+((e&&e.message)||e)); }
+};
 // Al regresar de Square, re-verifica el pago y refresca el saldo.
 async function checkSquareReturn(){
   try{
@@ -1097,6 +1118,7 @@ async function checkSquareReturn(){
     const j = await r.json().catch(()=>({}));
     if(j && j.ok){
       try{ const snap = await getDoc(doc(db,'clients',currentClient.id)); if(snap.exists()){ currentClient = { id:snap.id, ...snap.data() }; renderPortal(); } }catch(e){}
+      try{ await loadPortalEstimates(); }catch(e){}   // 🔧 refresca órdenes de servicio (por si fue un pago de servicio)
       alert(L==='en' ? ('✅ Payment received: '+formatMoney(j.amount)+'. Thank you!') : ('✅ Pago recibido: '+formatMoney(j.amount)+'. ¡Gracias!'));
     }
   }catch(e){}

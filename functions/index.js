@@ -835,6 +835,54 @@ exports.confirmSquarePayment = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors:
   } catch (e) { console.error("confirmSquarePayment", e); res.status(500).json({ error: String((e && e.message) || e) }); }
 });
 
+// 💳 El CLIENTE paga una ORDEN DE SERVICIO con tarjeta desde su portal (total o una parte). Verifica que la orden sea suya (por teléfono).
+exports.createServiceCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors: true, timeoutSeconds: 30 }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
+  try {
+    const body = req.body || {};
+    const idToken = String(body.idToken || "");
+    if (!idToken) { res.status(401).json({ error: "auth" }); return; }
+    let decoded; try { decoded = await admin.auth().verifyIdToken(idToken); } catch (e) { res.status(401).json({ error: "auth" }); return; }
+    const phone = String(decoded.phone_number || "");
+    const orderId = String(body.orderId || "").slice(0, 80);
+    if (!orderId) { res.status(400).json({ error: "orderId" }); return; }
+    const db = admin.firestore();
+    const snap = await db.collection("serviceOrders").doc(orderId).get();
+    if (!snap.exists) { res.status(404).json({ error: "order" }); return; }
+    const o = snap.data() || {};
+    // La orden debe ser del cliente (por su teléfono, directo o vía el doc del cliente).
+    let mineOk = (o.clientPhone && phone && o.clientPhone === phone);
+    if (!mineOk && o.clientId && phone) { try { const cs = await db.collection("clients").doc(o.clientId).get(); if (cs.exists && (cs.data().phoneE164 || "") === phone) mineOk = true; } catch (e) {} }
+    if (!mineOk) { res.status(403).json({ error: "not_yours" }); return; }
+    const total = Number(o.grandTotalCents) || 0;
+    const due = Math.max(0, total - (Number(o.paidCents) || 0));
+    let amountCents = body.amountCents != null ? Math.round(Number(body.amountCents)) : due;
+    if (amountCents > due) amountCents = due;
+    if (!(amountCents >= 100)) { res.status(400).json({ error: "amount_min" }); return; }
+    const carLabel = o.vehicleLabel || "Servicio";
+    const payload = {
+      idempotency_key: (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)),
+      order: {
+        location_id: SQUARE_LOCATION_ID, reference_id: o.clientId || orderId,
+        line_items: [{ name: "Orden de servicio #" + (o.orderNum || "") + " — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
+        service_charges: [{ name: "Cargo por servicio / Service fee (2.9%)", percentage: "2.9", calculation_phase: "SUBTOTAL_PHASE" }],
+        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents), priv: "" },
+      },
+      checkout_options: {
+        redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1",
+        ask_for_shipping_address: false,
+        accepted_payment_methods: { apple_pay: true, google_pay: true, cash_app_pay: true, afterpay_clearpay: false },
+      },
+    };
+    const r = await fetch(SQUARE_API + "/v2/online-checkout/payment-links", { method: "POST", headers: _sqHeaders(), body: JSON.stringify(payload) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { console.error("createServiceCheckout", JSON.stringify(j)); res.status(502).json({ error: (j.errors && j.errors[0] && j.errors[0].detail) || "square_error" }); return; }
+    const link = j.payment_link || {};
+    res.status(200).json({ url: link.url || link.long_url || "", orderId: link.order_id || "" });
+  } catch (e) { console.error("createServiceCheckout", e); res.status(500).json({ error: String((e && e.message) || e) }); }
+});
+
 // 🔔 Webhook de Square: cuando un pago se completa, Square pega aquí y registramos el abono SOLO,
 // aunque el cliente haya pagado desde el link por SMS sin abrir el portal. Re-verificamos con Square
 // (así una llamada falsa no puede inventar un pago). Idempotente por el id del pago.
