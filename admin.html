@@ -1460,7 +1460,7 @@ function svcActiveRole(services){
   for(const r of roles){ if(byRole[r].some(s=>(s.status||'pendiente')!=='listo')) return r; }
   return null; // todo listo
 }
-function svcRoleOptions(sel){ return SVC_ROLES.map(r=>'<option value="'+r+'"'+((sel||'Mecánico')===r?' selected':'')+'>'+r+'</option>').join(''); }
+function svcRoleOptions(sel){ return '<option value=""'+(!sel?' selected':'')+'>— Elegir función —</option>'+SVC_ROLES.map(r=>'<option value="'+r+'"'+((sel||'')===r?' selected':'')+'>'+r+'</option>').join(''); }
 function svcEmpOptions(role, selEmp){
   const emps=svcRoster.filter(e=>!role||(Array.isArray(e.roles)&&e.roles.includes(role)));
   const busy=svcBusyByEmp();
@@ -1959,12 +1959,12 @@ function svcCapServices(){
     const minutes=Number((document.getElementById('svc-svc-time-'+i)||{}).value)||0;
     const price=Number((document.getElementById('svc-svc-price-'+i)||{}).value)||0;
     const parts=(partsBySvc[i]||[]).filter(p=>p.desc||p.price);
-    const role=(document.getElementById('svc-svc-role-'+i)||{}).value||'Mecánico';
+    const role=(document.getElementById('svc-svc-role-'+i)||{}).value||'';
     const assignEmpId=(document.getElementById('svc-svc-emp-'+i)||{}).value||'';
     const e=assignEmpId?svcRoster.find(x=>String(x.id)===String(assignEmpId)):null;
     arr.push({desc:desc, minutes:minutes, price:price, parts:parts, role:role, assignEmpId:assignEmpId, assignName:(e?e.name:''), status:(pv.status||'pendiente'), estNote:(pv.estNote||''), _collapsed:false});
   });
-  d.services=arr.length?arr:[{desc:'',minutes:60,price:0,parts:[],role:'Mecánico',assignEmpId:'',assignName:'',status:'pendiente'}];
+  d.services=arr.length?arr:[{desc:'',minutes:60,price:0,parts:[],role:'',assignEmpId:'',assignName:'',status:'pendiente'}];
 }
 window.svcCapture=svcCapture;
 // Al cambiar el ROL de un servicio, se limpia la persona (cambia la lista) y se re-dibuja ese selector.
@@ -2179,7 +2179,7 @@ window.svcEstimateOne=async function(si){
     svcRenderModal(); try{ svcRecalc(); }catch(e){}
   }catch(e){ if(btn){ btn.disabled=false; btn.innerHTML='✨ Estimar tiempo y labor (IA)'; } alert('No se pudo estimar: '+((e&&e.message)||e)); }
 };
-window.svcAddService=function(){ svcCapture(); const arr=(window._svcDraft.services=window._svcDraft.services||[]); arr.forEach(s=>{ s._collapsed=true; }); arr.push({desc:'',minutes:60,price:0,parts:[],role:'Mecánico',assignEmpId:'',assignName:'',status:'pendiente',_collapsed:false}); svcRenderModal(); };
+window.svcAddService=function(){ svcCapture(); const arr=(window._svcDraft.services=window._svcDraft.services||[]); arr.forEach(s=>{ s._collapsed=true; }); arr.push({desc:'',minutes:60,price:0,parts:[],role:'',assignEmpId:'',assignName:'',status:'pendiente',_collapsed:false}); svcRenderModal(); };
 window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.services||[]; a.splice(i,1); if(!a.length) a.push({desc:'',minutes:60,price:0,parts:[]}); svcRenderModal(); };
 window.svcAddPart=function(si){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s){ (s.parts=s.parts||[]).push({desc:'',price:0}); } svcRenderModal(); };
 window.svcRemovePart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s&&Array.isArray(s.parts)){ s.parts.splice(pi,1); } svcRenderModal(); };
@@ -2342,8 +2342,11 @@ window.svcSaveOrder=async function(opts){
   // 3 · servicios (cada uno con su labor = tiempo × tarifa) + partes — feed del invoice
   const rate=Number(d.laborRate)||0;
   const capF=s=>{ s=(s||'').trim(); return s?s.charAt(0).toUpperCase()+s.slice(1):s; };
-  const services=(d.services||[]).map(s=>{ const e=s.assignEmpId?svcRoster.find(x=>String(x.id)===String(s.assignEmpId)):null; return { desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, parts:(Array.isArray(s.parts)?s.parts:[]), role:s.role||'Mecánico', assignEmpId:s.assignEmpId||'', assignName:(e?e.name:(s.assignName||'')), status:(s.status||'pendiente') }; }).filter(s=>s.desc);
+  const services=(d.services||[]).map(s=>{ const e=s.assignEmpId?svcRoster.find(x=>String(x.id)===String(s.assignEmpId)):null; return { desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, parts:(Array.isArray(s.parts)?s.parts:[]), role:(s.role||''), assignEmpId:s.assignEmpId||'', assignName:(e?e.name:(s.assignName||'')), status:(s.status||'pendiente') }; }).filter(s=>s.desc);
   if(!services.length){ alert('Agrega al menos un trabajo.'); return; }
+  // 🔧 OBLIGATORIO: cada servicio debe tener FUNCIÓN asignada (ya no se pone Mecánico por default).
+  const _sinFn=services.filter(s=>!s.role);
+  if(_sinFn.length){ alert('Falta elegir la FUNCIÓN de: '+_sinFn.map(s=>'• '+s.desc).join('\n')+'\n\nAsígnale una función a cada servicio antes de continuar.'); return; }
   services.forEach(s=>{ s.priceCents=Math.round((Number(s.price)||0)*100); s.laborCents=s.priceCents; });   // el cobro es el PRECIO PLANO del trabajo (no tiempo × tarifa)
   // ✨ Corrector + bilingüe (IA): corrige ortografía ES/EN/mixto. OPCIONAL — con TIMEOUT de 3.5s para NO atorar el guardado si la IA está lenta/fría.
   let reasonEn='';
