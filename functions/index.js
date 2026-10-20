@@ -766,6 +766,17 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
     if (priv) patch.private = true;
     if (cur.estimateStatus !== "accepted") { patch.estimateStatus = "accepted"; if (!cur.estimateAcceptedAt) patch.estimateAcceptedAt = nowISO; }   // 💡 pagar = aceptar
     if (fullyPaid) { patch.status = "entregado"; if (!cur.deliveredAt) patch.deliveredAt = nowISO; }
+    // 🧾 INVOICE inmutable: foto final de lo cobrado (una sola vez, al quedar pagada). Cubre efectivo, tarjeta y link de Square.
+    if (fullyPaid && !cur.invoice) {
+      patch.invoice = {
+        num: cur.orderNum || null, at: nowISO, by: who || method || "service-caja",
+        services: Array.isArray(cur.services) ? cur.services : [],
+        parts: Array.isArray(cur.parts) ? cur.parts : [],
+        laborTotalCents: Number(cur.laborTotalCents) || 0, partsTotalCents: Number(cur.partsTotalCents) || 0,
+        grandTotalCents: total, depositCents: Number(cur.depositCents) || 0, balanceCents: 0,
+        paidCents: newPaid, payMethod: method || "cash", private: !!priv,
+      };
+    }
     tx.set(oref, patch, { merge: true });
   });
 }
