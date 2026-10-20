@@ -1898,6 +1898,15 @@ window.svcOpenOrder=function(id){
   svcLoadRoster().then(()=>svcRenderModal());
 };
 window.svcClose=function(){ const m=document.getElementById('svc-modal'); if(m) m.style.display='none'; };
+// 🗑️ Eliminar una orden de servicio (solo al editar una existente). Confirma; avisa si ya estaba pagada.
+window.svcDeleteOrder=async function(){
+  const d=window._svcDraft; const id=d&&d.editId; if(!id) return;
+  const o=svcOrders.find(x=>x.id===id)||{};
+  if(o.paid){ if(!confirm('⚠️ Esta orden'+(o.orderNum?(' #'+o.orderNum):'')+' ya está PAGADA. Eliminarla NO borra el ingreso que ya entró a Finanzas. ¿Eliminar de todos modos?')) return; }
+  else if(!confirm('¿Eliminar la orden de servicio'+(o.orderNum?(' #'+o.orderNum):'')+(o.clientName?(' de '+o.clientName):'')+'?\nEsto no se puede deshacer.')) return;
+  try{ await deleteDoc(doc(db,'serviceOrders',id)); svcClose(); alert('🗑️ Orden eliminada.'); }
+  catch(e){ alert('No se pudo eliminar: '+((e&&e.message)||e)); }
+};
 function svcCapture(){
   const d=window._svcDraft; if(!d) return; const g=id=>document.getElementById(id);
   if(g('svc-new-name')) d.clientName=g('svc-new-name').value;
@@ -2095,7 +2104,8 @@ function svcRenderModal(){
     +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',svcHtml)
     +(isEdit?SVC_SEC('4 · Estatus y fechas',datesHtml):'')
     +'<button onclick="svcGenEstimate()" style="width:100%;margin-top:6px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 Generar estimado</button>'
-    +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">'+(isEdit?'💾 Guardar cambios':'✅ Crear orden')+'</button>';
+    +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">'+(isEdit?'💾 Guardar cambios':'✅ Crear orden')+'</button>'
+    +(isEdit?'<button onclick="svcDeleteOrder()" style="width:100%;margin-top:10px;padding:11px;border-radius:12px;border:1px solid #c0392b;background:transparent;color:#e0683a;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">🗑️ Eliminar orden</button>':'');
 }
 window.svcRenderModal=svcRenderModal;
 // Servicios individuales + labor
