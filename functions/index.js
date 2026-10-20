@@ -764,6 +764,7 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
     const fullyPaid = (newPaid >= total && total > 0);
     const patch = { paidCents: newPaid, paid: fullyPaid, paidAt: nowISO, payMethod: method || "cash", updatedAt: nowISO };
     if (priv) patch.private = true;
+    if (cur.estimateStatus !== "accepted") { patch.estimateStatus = "accepted"; if (!cur.estimateAcceptedAt) patch.estimateAcceptedAt = nowISO; }   // 💡 pagar = aceptar
     if (fullyPaid) { patch.status = "entregado"; if (!cur.deliveredAt) patch.deliveredAt = nowISO; }
     tx.set(oref, patch, { merge: true });
   });
