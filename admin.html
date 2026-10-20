@@ -2217,10 +2217,10 @@ function svcRenderModal(){
     +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',svcHtml)
     +(isEdit?SVC_SEC('4 · Estatus y fechas',datesHtml):'')
     +(_svcAccepted
-      ? ('<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">💾 Guardar cambios</button>'
+      ? ('<button id="svc-save-btn" onclick="svcSaveQuick(event)" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">💾 Guardar cambios</button>'
         +'<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 Ver estimado autorizado</button>')
       : (isEdit
-        ? ('<button onclick="svcSaveQuick()" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">💾 Guardar cambios</button>'
+        ? ('<button id="svc-save-btn" onclick="svcSaveQuick(event)" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">💾 Guardar cambios</button>'
           +'<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📄 '+(_svcOrd && _svcOrd.estimateStatus==='sent'?'Ver / reenviar estimado':'Generar y enviar estimado')+'</button>')
         : ('<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">📄 Generar / enviar estimado</button>'
           +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:11px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">✅ Crear orden directa (sin estimado)</button>')))
@@ -2229,11 +2229,21 @@ function svcRenderModal(){
 }
 window.svcRenderModal=svcRenderModal;
 // 💾 Guardar cambios SIN exigir función (guarda en silencio, avisa y re-pinta). Para editar datos/cliente/auto sin convertir en orden.
-window.svcSaveQuick=async function(){
+window.svcSaveQuick=async function(ev){
+  const b=document.getElementById('svc-save-btn')||(ev&&ev.target)||null;
+  const GOLD='linear-gradient(135deg,var(--gold3),var(--gold))', GREEN='linear-gradient(135deg,#1f8f4e,#28b463)';
+  const _restore=()=>{ if(!b) return; b.disabled=false; b.textContent='💾 Guardar cambios'; b.style.background=GOLD; b.style.color='var(--navy3)'; };
+  if(b){ b.disabled=true; b.textContent='⏳ Guardando…'; }
   try{
-    const id=await window.svcSaveOrder({silent:true});
-    if(id){ try{ svcToast('💾 Cambios guardados'); }catch(e){} svcRenderModal(); }
-  }catch(e){ alert('No se pudo guardar: '+((e&&e.message)||e)); }
+    const id=await window.svcSaveOrder({silent:true, noAI:true});   // ⚡ sin IA → instantáneo
+    if(id){
+      if(b){ b.disabled=true; b.textContent='✅ Cambios guardados'; b.style.background=GREEN; b.style.color='#eafff1';
+        // vuelve a "Guardar cambios" si el usuario edita algo más
+        const body=document.getElementById('svc-modal-body');
+        if(body && !body._svcSaveWired){ body._svcSaveWired=true; const reset=()=>{ _restore(); body.removeEventListener('input',reset); body.removeEventListener('change',reset); body._svcSaveWired=false; }; body.addEventListener('input',reset); body.addEventListener('change',reset); }
+      }
+    } else { _restore(); }   // validación falló (ya avisó)
+  }catch(e){ alert('No se pudo guardar: '+((e&&e.message)||e)); _restore(); }
 };
 // Servicios individuales + labor
 function svcFmtMin(m){ m=Number(m)||0; if(m<60) return m+' min'; const h=m/60; return (Number.isInteger(h)?h:h.toFixed(1))+(h===1?' hora':' horas'); }
@@ -2538,13 +2548,15 @@ window.svcSaveOrder=async function(opts){
   services.forEach(s=>{ s.priceCents=Math.round((Number(s.price)||0)*100); s.laborCents=s.priceCents; });   // el cobro es el PRECIO PLANO del trabajo (no tiempo × tarifa)
   // ✨ Corrector + bilingüe (IA): corrige ortografía ES/EN/mixto. OPCIONAL — con TIMEOUT de 3.5s para NO atorar el guardado si la IA está lenta/fría.
   let reasonEn='';
-  try{
-    const _p=httpsCallable(functions,'svcFixText')({ items: services.map(s=>s.desc) });
-    const _r=await Promise.race([_p, new Promise(res=>setTimeout(()=>res(null),3500))]);
-    if(_r){ const _dd=(_r&&_r.data)||{}; const _es=_dd.es||[], _en=_dd.en||[];
-      services.forEach((s,i)=>{ if(_es[i]) s.desc=_es[i]; s.descEn=_en[i]||_es[i]||s.desc; });
-      reasonEn=services.map(s=>s.descEn||s.desc).join(' · '); }
-  }catch(e){ console.warn('svcFixText', e); }
+  if(!opts.noAI){   // ⚡ "Guardar cambios" rápido salta la IA (no la necesita) → guardado instantáneo
+    try{
+      const _p=httpsCallable(functions,'svcFixText')({ items: services.map(s=>s.desc) });
+      const _r=await Promise.race([_p, new Promise(res=>setTimeout(()=>res(null),3500))]);
+      if(_r){ const _dd=(_r&&_r.data)||{}; const _es=_dd.es||[], _en=_dd.en||[];
+        services.forEach((s,i)=>{ if(_es[i]) s.desc=_es[i]; s.descEn=_en[i]||_es[i]||s.desc; });
+        reasonEn=services.map(s=>s.descEn||s.desc).join(' · '); }
+    }catch(e){ console.warn('svcFixText', e); }
+  } else { services.forEach(s=>{ if(!s.descEn) s.descEn=s.desc; }); }
   const reason=services.map(s=>s.desc).join(' · ');   // ya corregido (ES) si la IA respondió
   const reasonEs=reason; if(!reasonEn) reasonEn=reason;
   const estMinutes=services.reduce((a,s)=>a+s.minutes,0);
