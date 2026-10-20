@@ -2344,9 +2344,11 @@ window.svcSaveOrder=async function(opts){
   const capF=s=>{ s=(s||'').trim(); return s?s.charAt(0).toUpperCase()+s.slice(1):s; };
   const services=(d.services||[]).map(s=>{ const e=s.assignEmpId?svcRoster.find(x=>String(x.id)===String(s.assignEmpId)):null; return { desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, parts:(Array.isArray(s.parts)?s.parts:[]), role:(s.role||''), assignEmpId:s.assignEmpId||'', assignName:(e?e.name:(s.assignName||'')), status:(s.status||'pendiente') }; }).filter(s=>s.desc);
   if(!services.length){ alert('Agrega al menos un trabajo.'); return; }
-  // 🔧 OBLIGATORIO: cada servicio debe tener FUNCIÓN asignada (ya no se pone Mecánico por default).
-  const _sinFn=services.filter(s=>!s.role);
-  if(_sinFn.length){ alert('Falta elegir la FUNCIÓN de: '+_sinFn.map(s=>'• '+s.desc).join('\n')+'\n\nAsígnale una función a cada servicio antes de continuar.'); return; }
+  // 🔧 FUNCIÓN obligatoria SOLO al crear/guardar la ORDEN real (no en estimado: el estimado es cotización, aún no necesita función ni fecha ni mecánico).
+  if(!opts.silent){
+    const _sinFn=services.filter(s=>!s.role);
+    if(_sinFn.length){ alert('Falta elegir la FUNCIÓN de:\n'+_sinFn.map(s=>'• '+s.desc).join('\n')+'\n\nAsígnale una función a cada servicio antes de crear la orden.\n(Si solo quieres mandar el estimado, usa "📄 Generar estimado".)'); return; }
+  }
   services.forEach(s=>{ s.priceCents=Math.round((Number(s.price)||0)*100); s.laborCents=s.priceCents; });   // el cobro es el PRECIO PLANO del trabajo (no tiempo × tarifa)
   // ✨ Corrector + bilingüe (IA): corrige ortografía ES/EN/mixto. OPCIONAL — con TIMEOUT de 3.5s para NO atorar el guardado si la IA está lenta/fría.
   let reasonEn='';
