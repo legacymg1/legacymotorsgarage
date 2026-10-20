@@ -193,6 +193,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, collection, getDocs, query, where, doc, getDoc, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getMessaging, getToken, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
 // Convert any picked image (including iPhone HEIC) to a web-friendly JPEG via canvas.
@@ -269,6 +270,10 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app);
+// 🔔 Push del portal (FCM): VAPID pública + service worker compartido.
+const VAPID_KEY="BDUfgtFZl2cfkkTcFSdGmXScxn0_Y-hthANv1DTW6S8EQJk_Abh6Zx6MCg8xdltHn-WEiwBjRjoV_OtClRhmOmU";
+let _portalMsg=null;
+try{ if('serviceWorker' in navigator){ navigator.serviceWorker.register('firebase-messaging-sw.js').catch(()=>{}); } }catch(e){}
 
 let currentClient = null;
 let serviceAppointments = [];
@@ -565,6 +570,7 @@ onAuthStateChanged(auth, async (user)=>{
     document.getElementById('app').style.display='block';
     { const _hf=document.getElementById('help-fab'); if(_hf) _hf.style.display='flex'; }
     renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); maybeAskConsent();
+    if(currentClient && currentClient.smsConsent && currentClient.smsConsent.date){ setTimeout(function(){ try{ portalMaybeNotif(); }catch(e){} }, 500); }   // 🔔 SMS ya resuelto → ofrece notificaciones
     loadPortalEstimates();   // 🧾 trae los estimados de servicio (se pintan al llegar)
     checkSquareReturn();   // 💳 si viene de pagar con Square, registra y refresca
     try{ await updateDoc(doc(db,'clients',currentClient.id), { lastLogin: new Date().toISOString() }); }catch(e){}
@@ -1453,12 +1459,55 @@ window.answerConsent = async function(accept) {
     await writeConsent(!!accept, 'portal_first_login');
     document.getElementById('consent-modal').style.display = 'none';
     document.body.style.overflow = '';
+    setTimeout(function(){ try{ portalMaybeNotif(); }catch(e){} }, 300);   // 🔔 después del SMS, ofrece notificaciones
   } catch(e) {
     const err = document.getElementById('consent-modal-err');
     err.textContent = t('errSave') + e.message;
     err.style.display = 'block';
   }
 };
+
+// 🔔 NOTIFICACIONES del cliente (insistente pero CON salida — no traba a los de Safari que no pueden).
+async function portalEnsurePushToken(){
+  try{
+    if(!('Notification' in window) || Notification.permission!=='granted') return;
+    if(!(await isSupported())) return;
+    if(!_portalMsg) _portalMsg=getMessaging(app);
+    const reg=await navigator.serviceWorker.ready;
+    const tok=await getToken(_portalMsg, { vapidKey:VAPID_KEY, serviceWorkerRegistration:reg });
+    if(tok){ const ph=(auth.currentUser&&auth.currentUser.phoneNumber)||(currentClient&&currentClient.phoneE164)||''; await setDoc(doc(db,'push_tokens',tok),{ token:tok, phone:ph, clientId:(currentClient&&currentClient.id)||'', role:'client', lang:L, ts:new Date().toISOString() }); }
+  }catch(e){ console.warn('portal push', e); }
+}
+async function portalMaybeNotif(){
+  try{
+    if(!currentClient || !('Notification' in window)) return;
+    if(Notification.permission==='granted'){ portalEnsurePushToken(); return; }
+    if(Notification.permission==='denied') return;   // bloqueadas: no insistir (lo activan en ajustes del iPhone)
+    try{ if(sessionStorage.getItem('lmg_notif_skip')==='1') return; }catch(e){}
+    let ok=false; try{ ok=await isSupported(); }catch(e){ ok=false; }
+    const es=(L!=='en'); const box=document.getElementById('consent-modal-box'); if(!box) return;
+    if(ok){
+      box.innerHTML='<div style="font-size:38px;text-align:center;margin-bottom:8px;">🔔</div>'
+        +'<div style="font-family:var(--font-display);font-size:23px;color:var(--white);text-align:center;font-weight:300;">'+(es?'Activa tus notificaciones':'Turn on notifications')+'</div>'
+        +'<div style="font-size:15px;color:var(--muted);line-height:1.55;margin-top:18px;text-align:center;">'+(es?'Te avisamos cuando tu auto esté listo, cuando haya una actualización de tu servicio y tu recibo.':'We will alert you when your car is ready, on service updates, and your receipt.')+'</div>'
+        +'<button onclick="portalNotifYes()" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:15px;font-family:var(--font-display);font-size:18px;cursor:pointer;margin-top:20px;">'+(es?'Activar':'Turn on')+'</button>'
+        +'<button onclick="portalNotifSkip()" style="width:100%;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:12px;padding:13px;font-size:14px;cursor:pointer;margin-top:10px;">'+(es?'Ahora no':'Not now')+'</button>';
+    } else {
+      box.innerHTML='<div style="font-size:38px;text-align:center;margin-bottom:8px;">📲</div>'
+        +'<div style="font-family:var(--font-display);font-size:22px;color:var(--white);text-align:center;font-weight:300;">'+(es?'Recibe avisos en tu teléfono':'Get alerts on your phone')+'</div>'
+        +'<div style="font-size:14px;color:var(--muted);line-height:1.6;margin-top:16px;text-align:center;">'+(es?'Para notificaciones, instala la app: toca <b>Compartir</b> ⬆️ y <b>Agregar a inicio</b>. Mientras, te avisamos por <b>SMS</b>.':'For notifications, install the app: tap <b>Share</b> ⬆️ then <b>Add to Home Screen</b>. Meanwhile we text you by <b>SMS</b>.')+'</div>'
+        +'<button onclick="portalNotifSkip()" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-size:16px;cursor:pointer;margin-top:20px;">'+(es?'Entendido':'Got it')+'</button>';
+    }
+    document.getElementById('consent-modal').style.display='flex';
+  }catch(e){}
+}
+window.portalNotifYes=async function(){
+  try{ await Notification.requestPermission(); }catch(e){}
+  if(Notification.permission==='granted'){ try{ await portalEnsurePushToken(); }catch(e){} }
+  else { try{ sessionStorage.setItem('lmg_notif_skip','1'); }catch(e){} }
+  try{ document.getElementById('consent-modal').style.display='none'; document.body.style.overflow=''; }catch(e){}
+};
+window.portalNotifSkip=function(){ try{ sessionStorage.setItem('lmg_notif_skip','1'); }catch(e){} try{ document.getElementById('consent-modal').style.display='none'; document.body.style.overflow=''; }catch(e){} };
 
 window.saveSmsConsent = async function() {
   const on = !!document.getElementById('sms-opt').checked;
