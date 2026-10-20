@@ -1559,8 +1559,9 @@ function svcRenderTabs(){
   svcOrders.forEach(o=>{ cnt[svcBucket(o)]++; if(o.clientId) cli.add(o.clientId); });
   // La vista de Clientes también incluye los clientes marcados kind:'service' sin orden → cuéntalos igual.
   try{ (clients||[]).forEach(c=>{ if(c && c.id && c.kind==='service') cli.add(c.id); }); }catch(e){}
+  let citasN=0; try{ citasN=(appointments||[]).filter(a=>a.status==='scheduled').length; }catch(e){}
   const cur=window._svcTab||'activas';
-  const tabs=[['activas','🔧 Activas',cnt.activas],['estimados','🧾 Estimados',cnt.estimados],['completadas','✅ Completadas',cnt.completadas],['clientes','👥 Clientes',cli.size]];
+  const tabs=[['activas','🔧 Activas',cnt.activas],['citas','📅 Citas',citasN],['estimados','🧾 Estimados',cnt.estimados],['completadas','✅ Completadas',cnt.completadas],['clientes','👥 Clientes',cli.size]];
   box.innerHTML=tabs.map(t=>'<button onclick="svcSetTab(\''+t[0]+'\')" style="padding:9px 14px;border-radius:999px;border:1px solid '+(cur===t[0]?'var(--gold)':'var(--border)')+';background:'+(cur===t[0]?'var(--gold)':'transparent')+';color:'+(cur===t[0]?'var(--navy3)':'var(--text)')+';font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;">'+t[1]+' <span style="opacity:.7;">'+t[2]+'</span></button>').join('');
 }
 // Lista tipo TABLA (folio · cliente/carro · estado · total). Toca una fila → abre la orden (o el recibo si está pagada).
@@ -1599,6 +1600,44 @@ function svcRenderClientsTab(box,q){
       +'<span style="color:var(--gold);font-size:18px;flex:none;">›</span></div>';
   }).join('')+'</div>';
 }
+// 📅 Pestaña CITAS dentro de Servicio: las citas que agenda el cliente (o tú), con "Recibir / Crear orden".
+function svcRenderCitasTab(box,q){
+  let up=(appointments||[]).filter(a=>a.status==='scheduled');
+  if(q) up=up.filter(a=>((a.clientName||'')+' '+(a.phone||'')+' '+(a.carLabel||'')+' '+(a.type||'')+' '+(a.note||'')).toLowerCase().includes(q));
+  up.sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  if(!up.length){ box.innerHTML='<div class="faint" style="padding:36px 20px;text-align:center;line-height:1.6;">Sin citas agendadas. 📅<br>Los clientes pueden agendar desde su portal, o usa <b>＋ Nueva cita</b>.</div>'; return; }
+  const todayISO=apptTodayISO(), tomoISO=apptAddDays(todayISO,1);
+  const groups=[
+    {label:'⚠️ Atrasadas', color:'var(--red)', items:up.filter(a=>a.date<todayISO)},
+    {label:'Hoy', color:'#28b463', items:up.filter(a=>a.date===todayISO)},
+    {label:'Mañana', color:'var(--gold)', items:up.filter(a=>a.date===tomoISO)},
+    {label:'Próximas', color:'var(--muted)', items:up.filter(a=>a.date>tomoISO)},
+  ];
+  let html='';
+  for(const g of groups){
+    if(!g.items.length) continue;
+    html+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:'+g.color+';font-weight:800;margin:12px 0 6px;">'+g.label+'</div>';
+    for(const a of g.items){
+      const hora=a.time?(' · '+appt12h(a.time)):'';
+      const car=a.carLabel?(' · 🚗 '+svcEsc(a.carLabel)):'';
+      const flag=(a.lang==='en')?'🇺🇸':'🇲🇽';
+      const svc=Array.isArray(a.services)?a.services.map(s=>(typeof s==='string'?s:(s.es||s.en||''))).filter(Boolean).join(', '):(a.type||a.note||'Cita');
+      html+='<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:9px;background:var(--surface2);">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">'
+        +'<div style="min-width:160px;flex:1;"><div style="font-weight:800;font-size:14px;">'+svcEsc(a.clientName||'Cliente')+' '+flag+(a.source==='web-bot'?' <span style="font-size:10px;background:rgba(240,192,64,.14);color:var(--gold);border:1px solid var(--gold);border-radius:5px;padding:1px 6px;">🤖 Lead web</span>':'')+'</div>'
+        +'<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+svcEsc(svc)+car+(a.phone?(' · '+svcEsc(a.phone)):'')+'</div>'
+        +'<div style="font-size:14px;font-weight:700;color:var(--gold);margin-top:3px;">📅 '+apptFmtLong(a.date,'es')+hora+'</div></div></div>'
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;">'
+        +'<button onclick="svcOrderFromAppt(\''+a.id+'\')" style="flex:1 1 auto;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:8px;padding:9px 11px;font-size:12px;font-weight:800;cursor:pointer;">🚗 Recibir / Crear orden</button>'
+        +'<button onclick="sendApptConfirm(\''+a.id+'\')" style="background:'+(a.confirmSent?'transparent':'#2196F3')+';color:'+(a.confirmSent?'var(--muted)':'#fff')+';border:1px solid '+(a.confirmSent?'var(--border)':'#2196F3')+';border-radius:8px;padding:9px 10px;font-size:12px;font-weight:700;cursor:pointer;">'+(a.confirmSent?'✓':'📩')+'</button>'
+        +'<button onclick="sendApptReminder(\''+a.id+'\')" style="background:'+(a.reminderSent?'transparent':'var(--gold3)')+';color:'+(a.reminderSent?'var(--muted)':'var(--navy3)')+';border:1px solid '+(a.reminderSent?'var(--border)':'var(--gold)')+';border-radius:8px;padding:9px 10px;font-size:12px;font-weight:700;cursor:pointer;">'+(a.reminderSent?'✓':'🔔')+'</button>'
+        +'<button onclick="editAppt(\''+a.id+'\')" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:12px;cursor:pointer;">✏️</button>'
+        +'<button onclick="cancelAppt(\''+a.id+'\')" style="background:transparent;color:var(--red);border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-size:12px;cursor:pointer;">✖</button>'
+        +'</div></div>';
+    }
+  }
+  box.innerHTML=html;
+}
 window.svcRenderOrders = function(){
   const box=document.getElementById('svc-orders'); if(!box) return;
   const tab=window._svcTab||'activas';
@@ -1607,6 +1646,7 @@ window.svcRenderOrders = function(){
   if(!svcRosterLoaded){ svcLoadRoster().then(()=>{ const sv=document.getElementById('service-view'); if(sv && sv.style.display!=='none') svcRenderOrders(); }); }
   const q=(document.getElementById('svc-search')?.value||'').toLowerCase().trim();
   if(tab==='clientes'){ svcRenderClientsTab(box,q); return; }
+  if(tab==='citas'){ svcRenderCitasTab(box,q); return; }
   let list=svcOrders.filter(o=>svcBucket(o)===tab);
   if(q){ list=list.filter(o=>((o.orderNum?('#'+o.orderNum+' '):'')+(o.clientName||'')+' '+(o.clientPhone||'')+' '+(o.vehicleLabel||'')+' '+(o.vin||'')+' '+(o.plate||'')+' '+(o.reason||'')+' '+(o.assignName||'')).toLowerCase().includes(q)); }
   list.sort((a,b)=> String(b.scheduledAt||b.createdAt||'').localeCompare(String(a.scheduledAt||a.createdAt||'')));
@@ -2963,6 +3003,7 @@ function startApptListening(){
       appointments = snap.docs.map(d=>({id:d.id, ...d.data()}));
       if(window.renderAppointments) renderAppointments();
       try{ renderTodayBox(); }catch(e){}
+      try{ const sv=document.getElementById('service-view'); if(sv && sv.style.display!=='none' && window.svcRenderOrders) svcRenderOrders(); }catch(e){}   // refresca pestaña 📅 Citas de Servicio
     }, (err)=>{ console.warn('citas offline', err); });
   }catch(e){ console.warn('appt listener', e); }
 }
