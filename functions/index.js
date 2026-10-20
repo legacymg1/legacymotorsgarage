@@ -1098,17 +1098,20 @@ async function _pushToClient(clientId, phone, payload) {
   } catch (e) { console.log("_pushToClient", e); }
 }
 
-// 🚗 Avisa al CLIENTE cuando su orden de servicio cambia de estatus (en su idioma). Hoy: auto LISTO para recoger.
+// 🚗 Avisa al CLIENTE (en su idioma) cuando: le mandan un NUEVO ESTIMADO, o su auto queda LISTO para recoger.
 exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) => {
   try {
     const before = (event.data && event.data.before && event.data.before.data()) || {};
     const after = (event.data && event.data.after && event.data.after.data()) || {};
-    if (before.status === after.status) return;   // solo cambios de estatus
     const veh = after.vehicleLabel || (after.plate ? after.plate : "tu auto");
     const vehEn = after.vehicleLabel || (after.plate ? after.plate : "your car");
     const fol = after.orderNum ? (" #" + after.orderNum) : "";
     let p = null;
-    if (after.status === "listo") {
+    if (before.estimateStatus !== "sent" && after.estimateStatus === "sent") {
+      // 🧾 nuevo estimado enviado al cliente
+      p = { title: "🧾 Tienes un nuevo estimado", body: "Revisa y acepta el estimado de " + veh + fol + ".", titleEn: "🧾 You have a new estimate", bodyEn: "Review and approve the estimate for " + vehEn + fol + "." };
+    } else if (before.status !== after.status && after.status === "listo") {
+      // 🚗 auto listo para recoger
       p = { title: "🚗 Tu auto está listo", body: "Ya puedes pasar por " + veh + fol + ".", titleEn: "🚗 Your car is ready", bodyEn: vehEn + fol + " is ready for pickup." };
     }
     if (!p) return;

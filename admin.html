@@ -1564,18 +1564,21 @@ function svcTableHtml(list){
   return '<div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">'+head+rows+'</div>';
 }
 function svcRenderClientsTab(box,q){
+  // 🗂️ BASE DEL CRM: TODOS los clientes de servicio — con estimado, activos, completados, o marcados kind:'service' aunque aún no tengan orden.
   const byId={};
   svcOrders.forEach(o=>{ if(!o.clientId) return; const b=byId[o.clientId]||(byId[o.clientId]={id:o.clientId,name:o.clientName||'Cliente',phone:o.clientPhone||'',n:0,last:''}); b.n++; const dt=o.scheduledAt||o.createdAt||''; if(dt>b.last)b.last=dt; });
+  try{ (clients||[]).forEach(c=>{ if(!c||!c.id) return; if(c.kind==='service' && !byId[c.id]){ byId[c.id]={id:c.id,name:c.name||'Cliente',phone:c.phone||c.phoneE164||'',n:0,last:c.createdAt||''}; } }); }catch(e){}
   let arr=Object.values(byId);
   if(q) arr=arr.filter(c=>((c.name||'')+' '+(c.phone||'')).toLowerCase().includes(q));
   arr.sort((a,b)=>String(b.last).localeCompare(String(a.last)));
-  if(!arr.length){ box.innerHTML='<div class="faint" style="padding:36px;text-align:center;">Sin clientes de servicio.</div>'; return; }
+  if(!arr.length){ box.innerHTML='<div class="faint" style="padding:36px;text-align:center;">Sin clientes de servicio todavía.</div>'; return; }
   const ini=n=>{ const p=String(n||'').trim().split(/\s+/).filter(Boolean); return (((p[0]||'')[0]||'?')+((p[1]||'')[0]||'')).toUpperCase(); };
-  box.innerHTML='<div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">'+arr.map(c=>{
+  box.innerHTML='<div class="faint" style="font-size:12px;margin-bottom:8px;">'+arr.length+' cliente(s) de servicio</div><div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">'+arr.map(c=>{
     const last=c.last?new Date(c.last).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'';
+    const sub=(c.n>0?(c.n+' orden(es)'+(last?(' · últ. '+last):'')):'Sin órdenes aún');
     return '<div onclick="openClient360(\''+c.id+'\')" style="display:flex;gap:11px;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
       +'<span style="width:38px;height:38px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;">'+ini(c.name)+'</span>'
-      +'<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+svcEsc(c.name)+'</div><div style="font-size:12px;color:var(--muted);">'+svcEsc(c.phone||'')+' · '+c.n+' orden(es)'+(last?(' · últ. '+last):'')+'</div></div>'
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+svcEsc(c.name)+'</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+svcEsc(c.phone||'')+' · '+sub+'</div></div>'
       +'<span style="color:var(--gold);font-size:18px;flex:none;">›</span></div>';
   }).join('')+'</div>';
 }
