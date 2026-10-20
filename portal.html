@@ -900,12 +900,11 @@ function estimateCardHTML(o){
     (s.parts||[]).forEach(p=>{ rows+=`<div class="info-row" style="border:none;padding:1px 0 1px 12px;"><span class="ir-label" style="font-size:12px;">• ${escPortal(p.desc||'')}</span><span class="ir-value" style="font-size:12px;color:var(--muted);">${formatMoney(p.price)}</span></div>`; });
   });
   const focus = focusOrderId && o.id===focusOrderId;
-  return `
-  <div class="info-card" id="est-${o.id}" style="margin-top:16px;${focus?'border:1px solid var(--gold);box-shadow:0 0 0 2px rgba(200,162,74,.25);':''}">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-      <div class="section-title" style="margin:0;">${o.paid?(es?'Recibo de servicio':'Service receipt'):(es?'Estimado de servicio':'Service estimate')}${o.orderNum?` <span style="color:var(--gold);font-weight:800;">#${o.orderNum}</span>`:''}</div><span style="font-size:20px;">${o.paid?'✅':'🧾'}</span>
-    </div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">🚗 ${escPortal(o.vehicleLabel||o.vin||'')}${o.plate?(' · '+escPortal(o.plate)):''}</div>
+  const collapsed = o.paid && !focus;   // 💤 pagado → minimizado; se expande al tocar
+  const title = `${o.paid?(es?'Recibo de servicio':'Service receipt'):(es?'Estimado de servicio':'Service estimate')}${o.orderNum?` <span style="color:var(--gold);font-weight:800;">#${o.orderNum}</span>`:''}`;
+  const paidLine = o.paid ? `<div style="font-size:12.5px;color:#49d17f;font-weight:800;margin-top:3px;">✅ ${es?'PAGADO':'PAID'} · ${formatMoney((o.paidCents||0)/100||o.total)}${o.paidAt?(' · '+formatDate((o.paidAt||'').slice(0,10))):''}</div>` : '';
+  const detail = `
+    <div style="font-size:13px;color:var(--muted);margin:8px 0;">🚗 ${escPortal(o.vehicleLabel||o.vin||'')}${o.plate?(' · '+escPortal(o.plate)):''}</div>
     ${showTrack?svcTrackerHTML(o):''}
     ${rows}
     <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
@@ -921,9 +920,17 @@ function estimateCardHTML(o){
       : `<div style="margin-top:12px;">
           <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
           <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.'}</div>
-        </div>`}
+        </div>`}`;
+  return `
+  <div class="info-card" id="est-${o.id}" style="margin-top:16px;${focus?'border:1px solid var(--gold);box-shadow:0 0 0 2px rgba(200,162,74,.25);':''}">
+    <div ${o.paid?`onclick="portalToggleRcpt('${o.id}')" style="cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;"`:`style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"`}>
+      <div style="min-width:0;"><div class="section-title" style="margin:0;">${title}</div>${paidLine}</div>
+      <span style="flex:none;font-size:20px;white-space:nowrap;">${o.paid?`<span id="est-chev-${o.id}" style="color:var(--muted);font-size:15px;">${collapsed?'▸':'▾'}</span> ✅`:'🧾'}</span>
+    </div>
+    <div id="est-detail-${o.id}" style="${collapsed?'display:none;':''}">${detail}</div>
   </div>`;
 }
+window.portalToggleRcpt=function(id){ var d=document.getElementById('est-detail-'+id); var ch=document.getElementById('est-chev-'+id); if(!d) return; var open=(d.style.display!=='none'); d.style.display=open?'none':''; if(ch) ch.textContent=open?'▸':'▾'; };
 function estimatesHTML(){
   if(!portalEstimates.length) return '';
   const list = portalEstimates.slice().sort((a,b)=> (a.id===focusOrderId?-1:(b.id===focusOrderId?1:0)) );
