@@ -1481,6 +1481,7 @@ function svcBusyByEmp(){
 }
 function svcHHMM(ms){ try{ return new Date(ms).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
 const SVC_STATUS = {
+  arrancado:     {lbl:'🚀 Servicio arrancó (refacciones)', c:'#7c5cff'},
   agendado:      {lbl:'📅 Agendado',         c:'#0a84ff'},
   por_recibir:   {lbl:'🕐 Por recibir',      c:'#c9a84c'},
   recibido:      {lbl:'📋 Recibido',         c:'#c9a84c'},
@@ -1534,6 +1535,7 @@ async function svcLoadRoster(){
 function svcStatusLabel(o){
   if(o.paid) return {txt:'✅ Pagado', col:'#28b463'};
   const s=o.status;
+  if(s==='arrancado') return {txt:'🚀 ¡Servicio arrancó!', col:'#7c5cff'};
   if(s==='entregado') return {txt:'🏁 Entregado', col:'#28b463'};
   if(s==='listo') return {txt:'✅ Listo p/ entrega', col:'#28b463'};
   if(s==='en_proceso') return {txt:'🔧 En proceso', col:'#e8b64a'};
@@ -1546,7 +1548,7 @@ function svcStatusLabel(o){
 }
 function svcBucket(o){
   if(o.paid===true || o.status==='entregado') return 'completadas';
-  if(o.estimateStatus==='accepted' || ['recibido','en_proceso','pausado_partes','listo'].indexOf(o.status)>=0) return 'activas';
+  if(o.estimateStatus==='accepted' || ['arrancado','recibido','en_proceso','pausado_partes','listo'].indexOf(o.status)>=0) return 'activas';
   return 'estimados';
 }
 window._svcTab=window._svcTab||'activas';

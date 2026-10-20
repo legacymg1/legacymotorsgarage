@@ -747,6 +747,7 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
   const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const txRef = db.doc("transactions/" + entryId);
   const oref = db.collection("serviceOrders").doc(orderId);
+  let startedParts = null;   // {name, folio, veh} si este pago ARRANCÓ el servicio (pago temprano de refacciones)
   await db.runTransaction(async (tx) => {
     const ts = await tx.get(txRef);
     if (ts.exists) return;   // ya registrado (idempotente)
@@ -766,6 +767,11 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
     if (priv) patch.private = true;
     if (cur.estimateStatus !== "accepted") { patch.estimateStatus = "accepted"; if (!cur.estimateAcceptedAt) patch.estimateAcceptedAt = nowISO; }   // 💡 pagar = aceptar
     if (fullyPaid) { patch.status = "entregado"; if (!cur.deliveredAt) patch.deliveredAt = nowISO; }
+    // 🚀 PAGO TEMPRANO DE REFACCIONES (antes de recibir el carro): arranca el servicio → estado 'arrancado'.
+    else if (["agendado", "por_recibir", ""].indexOf(cur.status || "") >= 0) {
+      patch.status = "arrancado"; if (!cur.partsPaidAt) patch.partsPaidAt = nowISO;
+      startedParts = { name: cur.clientName || "Cliente", folio: cur.orderNum ? ("#" + cur.orderNum) : "", veh: cur.vehicleLabel || cur.plate || "" };
+    }
     // 🧾 INVOICE inmutable: foto final de lo cobrado (una sola vez, al quedar pagada). Cubre efectivo, tarjeta y link de Square.
     if (fullyPaid && !cur.invoice) {
       patch.invoice = {
@@ -779,6 +785,18 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
     }
     tx.set(oref, patch, { merge: true });
   });
+  // 🚀 Avisa a los dueños que el cliente pagó las refacciones → hay que ORDENARLAS.
+  if (startedParts) {
+    try {
+      const fol = startedParts.folio ? (" " + startedParts.folio) : "";
+      const veh = startedParts.veh ? (" · " + startedParts.veh) : "";
+      await _pushToOwners({
+        title: "🚀 Pagó las refacciones" + fol, body: startedParts.name + " pagó — ordena sus piezas 📦" + veh,
+        titleEn: "🚀 Parts paid" + fol, bodyEn: startedParts.name + " paid — order the parts 📦" + veh,
+        url: "/admin.html",
+      });
+    } catch (e) { console.log("startedParts push", e); }
+  }
 }
 
 // 💵 CAJA DE SERVICIO: cobra una orden. method 'cash' = registra YA (ingreso + marca pagada); 'square' = crea link de pago y lo regresa.

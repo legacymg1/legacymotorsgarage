@@ -919,6 +919,22 @@ window.portalFocusVehicle=function(vin,label){
   const el=document.getElementById('book-toggle') || document.getElementById('booking-widget');
   if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
 };
+// 🎯 Mensaje EMOCIONANTE por etapa (tipo Tesla) — hace sentir al cliente acompañado en todo el viaje.
+function svcStageHero(o){
+  const es=L!=='en';
+  const veh=escPortal(o.vehicleLabel||o.plate||(es?'tu auto':'your car'));
+  let ic,ti,su,c1,c2;
+  if(o.paid){ ic='🏁'; ti=es?'¡Gracias por confiar en nosotros!':'Thank you for trusting us!'; su=es?('Fue un placer atender tu '+veh+'.'):('It was a pleasure servicing your '+veh+'.'); c1='#1f8f4e'; c2='#28b463'; }
+  else if(o.status==='listo'){ ic='🎉'; ti=es?'¡Tu auto está listo!':'Your car is ready!'; su=es?('Pásale por tu '+veh+' cuando gustes.'):('Come pick up your '+veh+' anytime.'); c1='#1f8f4e'; c2='#28b463'; }
+  else if(['en_proceso','recibido','pausado_partes'].indexOf(o.status)>=0){ ic='🔧'; ti=es?'¡Manos a la obra!':'Work in progress!'; su=es?('Nuestro equipo está trabajando en tu '+veh+'.'):('Our team is working on your '+veh+'.'); c1='#b8860b'; c2='#e8b64a'; }
+  else if(o.status==='arrancado'){ ic='🚀'; ti=es?'¡Tu servicio ya arrancó!':'Your service is underway!'; su=es?('Estamos reuniendo las piezas de tu '+veh+'.'):('We are gathering the parts for your '+veh+'.'); c1='#5b3fb0'; c2='#8a63c9'; }
+  else if(o.estimateStatus==='accepted'){ ic='🤝'; ti=es?'¡Tu auto está en buenas manos!':'Your car is in good hands!'; su=es?'Paga tus refacciones y arrancamos de inmediato.':'Pay for your parts and we get started right away.'; c1='#5b3fb0'; c2='#8a63c9'; }
+  else if(o.estimateStatus==='sent'){ ic='🧾'; ti=es?'Tu estimado está listo':'Your estimate is ready'; su=es?'Revísalo y apruébalo para arrancar.':'Review and approve to get started.'; c1='#b8860b'; c2='#e8b64a'; }
+  else return '';
+  return '<div style="background:linear-gradient(135deg,'+c1+','+c2+');border-radius:14px;padding:14px 16px;margin:4px 0 12px;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.18);">'
+    +'<div style="font-size:16px;font-weight:800;line-height:1.25;">'+ic+' '+ti+'</div>'
+    +'<div style="font-size:13px;opacity:.95;margin-top:3px;line-height:1.4;">'+su+'</div></div>';
+}
 // 🟢 Rastreador de estatus tipo Tesla: línea de tiempo con palomita en lo hecho y la etapa actual resaltada.
 function svcTrackerHTML(o){
   const es=L!=='en';
@@ -962,6 +978,7 @@ function estimateCardHTML(o){
   const paidLine = o.paid ? `<div style="font-size:12.5px;color:#49d17f;font-weight:800;margin-top:3px;">✅ ${es?'PAGADO':'PAID'} · ${formatMoney((o.paidCents||0)/100||o.total)}${o.paidAt?(' · '+formatDate((o.paidAt||'').slice(0,10))):''}</div>` : '';
   const detail = `
     <div style="font-size:13px;color:var(--muted);margin:8px 0;">🚗 ${escPortal(o.vehicleLabel||o.vin||'')}${o.plate?(' · '+escPortal(o.plate)):''}</div>
+    ${svcStageHero(o)}
     ${showTrack?svcTrackerHTML(o):''}
     ${rows}
     <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
@@ -978,7 +995,11 @@ function estimateCardHTML(o){
           <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
           <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.'}</div>
         </div>`}
-    ${(!o.paid && Number(o.total)>0)?`<button onclick="portalPayService('${o.id}')" style="width:100%;margin-top:10px;${accepted?'background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;':'background:transparent;border:1.5px solid var(--gold);color:var(--gold);'}border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">💳 ${es?'Pagar con tarjeta':'Pay with card'}</button><div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">${es?'Pago seguro por Square · todo o una parte · pagar también aprueba':'Secure payment by Square · full or partial · paying also approves'}</div>`:''}`;
+    ${(!o.paid && Number(o.total)>0)?(
+      (accepted && Number(o.partsTotal)>0)
+      ? `<button onclick="portalPayService('${o.id}','parts')" style="width:100%;margin-top:10px;background:linear-gradient(135deg,#6b4ea8,#8a63c9);color:#fff;border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">🔩 ${es?'Pagar mis refacciones':'Pay for my parts'} · ${formatMoney(o.partsTotal)}</button><div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">${es?'Las ordenamos apenas pagues · 🚀 arrancamos tu servicio · pago seguro Square':'We order them as soon as you pay · 🚀 your service begins · secure Square payment'}</div><button onclick="portalPayService('${o.id}')" style="width:100%;margin-top:8px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:12px;padding:10px;font-size:13px;cursor:pointer;font-family:inherit;">${es?'Pagar otra cantidad':'Pay a different amount'}</button>`
+      : `<button onclick="portalPayService('${o.id}')" style="width:100%;margin-top:10px;${accepted?'background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;':'background:transparent;border:1.5px solid var(--gold);color:var(--gold);'}border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">💳 ${es?'Pagar con tarjeta':'Pay with card'}</button><div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">${es?'Pago seguro por Square · todo o una parte · pagar también aprueba':'Secure payment by Square · full or partial · paying also approves'}</div>`
+    ):''}`;
   return `
   <div class="info-card" id="est-${o.id}" style="margin-top:16px;${focus?'border:1px solid var(--gold);box-shadow:0 0 0 2px rgba(200,162,74,.25);':''}">
     <div ${o.paid?`onclick="portalToggleRcpt('${o.id}')" style="cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;"`:`style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"`}>
@@ -1141,12 +1162,18 @@ window.payNow = async function(){
   }catch(e){ alert((L==='en'?'Could not start payment: ':'No se pudo iniciar el pago: ')+((e&&e.message)||e)); }
 };
 // 💳 El cliente paga una ORDEN DE SERVICIO con tarjeta (total o una parte).
-window.portalPayService = async function(orderId){
+window.portalPayService = async function(orderId, mode){
   const o = (portalEstimates||[]).find(x=>x.id===orderId); if(!o) return;
   const es = L!=='en';
   const total = Number(o.total)||0; const paid = (Number(o.paidCents)||0)/100; const due = Math.max(0, total-paid);
   if(!(due>0)){ alert(es?'Ya está pagado.':'Already paid.'); return; }
-  const v = prompt(es?('¿Cuánto quieres pagar con tarjeta? (puedes pagar todo o una parte)\nSaldo: '+formatMoney(due)):('How much to pay by card? (full or partial)\nBalance: '+formatMoney(due)), due.toFixed(2));
+  // 🔩 Modo refacciones: sugiere el total de partes (o el saldo si es menor).
+  const partsTot = Number(o.partsTotal)||0;
+  const suggest = (mode==='parts' && partsTot>0) ? Math.min(partsTot, due) : due;
+  const promptMsg = (mode==='parts')
+    ? (es?('💳 Paga tus refacciones para que las ordenemos y arranquemos.\nRefacciones: '+formatMoney(partsTot)+(due<partsTot?('\nSaldo: '+formatMoney(due)):'')):('💳 Pay for your parts so we can order them and get started.\nParts: '+formatMoney(partsTot)))
+    : (es?('¿Cuánto quieres pagar con tarjeta? (puedes pagar todo o una parte)\nSaldo: '+formatMoney(due)):('How much to pay by card? (full or partial)\nBalance: '+formatMoney(due)));
+  const v = prompt(promptMsg, suggest.toFixed(2));
   if(v===null) return;
   let amt = Math.round(parseFloat(String(v).replace(/[^0-9.]/g,''))*100);
   if(!(amt>=100)){ alert(es?'Mínimo $1.00':'Minimum $1.00'); return; }
