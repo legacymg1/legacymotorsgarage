@@ -2135,8 +2135,9 @@ window.svcRecalc=function(){
 // ⚙️ Tarifa de mano de obra del taller (para el estimado IA). Se recuerda en el navegador. Default Central Valley ~$130/hr.
 function _svcDefaultRate(){ try{ const v=parseFloat(localStorage.getItem('svcLaborRate')); if(!isNaN(v)&&v>0) return v; }catch(e){} return 130; }
 // 📅 Agendado: valor por defecto (mañana 9:00) para el picker + vista bonita de la fecha elegida.
-function _svcDefaultWhen(){ const d=new Date(); d.setDate(d.getDate()+1); const p=function(n){return String(n).padStart(2,'0');}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T09:00'; }
-function _svcPrettyWhen(v){ if(!v) return ''; try{ const s=new Date(v).toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}); return '🗓️ '+s.charAt(0).toUpperCase()+s.slice(1); }catch(e){ return ''; } }
+// (en window: el onclick/onchange inline corre en scope global y debe poder llamarlas)
+window._svcDefaultWhen=function(){ const d=new Date(); d.setDate(d.getDate()+1); const p=function(n){return String(n).padStart(2,'0');}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T09:00'; };
+window._svcPrettyWhen=function(v){ if(!v) return ''; try{ const s=new Date(v).toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}); return '🗓️ '+s.charAt(0).toUpperCase()+s.slice(1); }catch(e){ return ''; } };
 window.svcSetRate=function(v){ const n=parseFloat(v)||0; if(window._svcDraft) window._svcDraft.laborRate=n; try{ if(n>0) localStorage.setItem('svcLaborRate', String(n)); }catch(e){} };
 // ✍️ Auto-corrige la ortografía del servicio AL TERMINAR de escribir (on blur), en su mismo idioma. Sin botón.
 let _svcFixing={};
