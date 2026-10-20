@@ -2393,13 +2393,19 @@ function svcEstSMS(o, link){
 // 📤 REENVIAR el estimado a un cliente (si el SMS anterior se cortó / nunca llegó). Vuelve a abrir el SMS con el link.
 window.svcResend=async function(id){
   const o=svcOrders.find(x=>x.id===id); if(!o){ alert('No encontré la orden.'); return; }
+  // 📞 Resuelve el teléfono: de la orden, o buscándolo por el cliente (clientId) — E.164 si existe.
+  const cli=o.clientId?clients.find(x=>x.id===o.clientId):null;
+  let rawPhone=o.clientPhone||(cli?(cli.phoneE164||cli.phone||''):'');
   const link=PORTAL_URL+'?order='+id;
   const text=svcEstSMS(o, link);
-  try{ const patch={ estimateSentAt:new Date().toISOString(), estimateSentBy:(auth.currentUser&&auth.currentUser.email)||'' }; if(!o.estimateStatus) patch.estimateStatus='sent'; if(!o.estInitial) patch.estInitial=svcSnap(o); await updateDoc(doc(db,'serviceOrders',id), patch); }catch(e){ console.warn('svcResend', e); }
-  const digits=(o.clientPhone||'').replace(/\D/g,'');
-  if(digits.length>=10){ const num=digits.length===10?('+1'+digits):('+'+digits); const a=document.createElement('a'); a.href='sms:'+num+'?&body='+encodeURIComponent(text); a.click(); return; }
-  try{ if(navigator.share){ await navigator.share({text}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
-  try{ await navigator.clipboard.writeText(text); alert('Estimado copiado 📋 (esta orden no tiene teléfono del cliente).'); }catch(e){}
+  try{ const patch={ estimateSentAt:new Date().toISOString(), estimateSentBy:(auth.currentUser&&auth.currentUser.email)||'' }; if(!o.estimateStatus) patch.estimateStatus='sent'; if(!o.estInitial) patch.estInitial=svcSnap(o); if(!o.clientPhone && rawPhone) patch.clientPhone=rawPhone; await updateDoc(doc(db,'serviceOrders',id), patch); }catch(e){ console.warn('svcResend', e); }
+  let num='';
+  if(/^\+/.test(String(rawPhone))) num=String(rawPhone).replace(/[^\d+]/g,'');
+  else { const digits=String(rawPhone).replace(/\D/g,''); if(digits.length===10) num='+1'+digits; else if(digits.length>=11) num='+'+digits; }
+  if(num){ const a=document.createElement('a'); a.href='sms:'+num+'?&body='+encodeURIComponent(text); a.click(); return; }
+  // Sin teléfono: avisa claro y copia (no abrir el menú de compartir que confunde).
+  try{ await navigator.clipboard.writeText(text); }catch(e){}
+  alert('⚠️ Esta orden no tiene teléfono del cliente.\nEl estimado se copió al portapapeles 📋 — pégalo donde quieras, o edita el cliente para agregarle el número.');
 };
 window.svcEstSend=async function(){
   const d=window._svcDraft; const en=(d.lang==='en');
