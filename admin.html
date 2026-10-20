@@ -2069,8 +2069,13 @@ function svcRenderModal(){
     +'<div id="svc-bill">'+svcBillHtml(svcList, Number(d.deposit)||0)+'</div>'
     +'<div style="display:flex;gap:8px;margin-top:8px;">'
     +'<button onclick="svcCapture();window._svcDraft.when=\'now\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when!=='later'?'var(--gold)':'var(--border)')+';background:'+(d.when!=='later'?'var(--gold)':'transparent')+';color:'+(d.when!=='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">🕐 Ahora</button>'
-    +'<button onclick="svcCapture();window._svcDraft.when=\'later\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">📅 Agendar</button></div>'
-    +(d.when==='later'?'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" style="'+SVC_IN+';margin-top:8px;">':'');
+    +'<button onclick="svcCapture();window._svcDraft.when=\'later\';if(!window._svcDraft.scheduledAt)window._svcDraft.scheduledAt=_svcDefaultWhen();svcRenderModal();setTimeout(function(){var s=document.getElementById(\'svc-sched\');if(s&&s.focus)s.focus();},60)" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">📅 Agendar</button></div>'
+    +(d.when==='later'
+      ? '<label style="display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;">📅 Elige el día y la hora de la cita</label>'
+        +'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" onchange="window._svcDraft.scheduledAt=this.value;var p=document.getElementById(\'svc-sched-pretty\');if(p)p.textContent=_svcPrettyWhen(this.value);" style="'+SVC_IN+';font-size:16px;padding:14px;cursor:pointer;">'
+        +'<div id="svc-sched-pretty" style="font-size:13.5px;color:var(--gold);font-weight:800;margin-top:7px;">'+_svcPrettyWhen(d.scheduledAt)+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Toca el campo para abrir el calendario del teléfono.</div>'
+      : '');
   // (La asignación ahora es POR SERVICIO, dentro de cada tarjeta de servicio arriba.)
   // 5 · ESTATUS + FECHAS (solo al editar una orden existente)
   const _toLocal=iso=>{ if(!iso) return ''; try{ const dt=new Date(iso); if(isNaN(dt)) return ''; return new Date(dt.getTime()-dt.getTimezoneOffset()*60000).toISOString().slice(0,16); }catch(e){ return ''; } };
@@ -2119,6 +2124,9 @@ window.svcRecalc=function(){
 };
 // ⚙️ Tarifa de mano de obra del taller (para el estimado IA). Se recuerda en el navegador. Default Central Valley ~$130/hr.
 function _svcDefaultRate(){ try{ const v=parseFloat(localStorage.getItem('svcLaborRate')); if(!isNaN(v)&&v>0) return v; }catch(e){} return 130; }
+// 📅 Agendado: valor por defecto (mañana 9:00) para el picker + vista bonita de la fecha elegida.
+function _svcDefaultWhen(){ const d=new Date(); d.setDate(d.getDate()+1); const p=function(n){return String(n).padStart(2,'0');}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T09:00'; }
+function _svcPrettyWhen(v){ if(!v) return ''; try{ const s=new Date(v).toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}); return '🗓️ '+s.charAt(0).toUpperCase()+s.slice(1); }catch(e){ return ''; } }
 window.svcSetRate=function(v){ const n=parseFloat(v)||0; if(window._svcDraft) window._svcDraft.laborRate=n; try{ if(n>0) localStorage.setItem('svcLaborRate', String(n)); }catch(e){} };
 // ✍️ Auto-corrige la ortografía del servicio AL TERMINAR de escribir (on blur), en su mismo idioma. Sin botón.
 let _svcFixing={};
