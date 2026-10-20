@@ -1120,6 +1120,70 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
   } catch (e) { console.log("onServiceStatus", e); }
 });
 
+// 🔧 Push a UN EMPLEADO (por sus tokens: empId), EN SU IDIOMA (agrupa por lang del token).
+async function _pushToEmp(empId, payload) {
+  try {
+    if (!empId) return;
+    const db = admin.firestore();
+    const snap = await db.collection("push_tokens").where("empId", "==", empId).get();
+    if (snap.empty) return;
+    const grp = { es: { t: [], r: [] }, en: { t: [], r: [] } };
+    snap.forEach((d) => { const dd = d.data() || {}; if (dd.token) { const lg = (dd.lang === "en") ? "en" : "es"; grp[lg].t.push(dd.token); grp[lg].r.push(d.ref); } });
+    const dead = [];
+    for (const lg of ["es", "en"]) {
+      if (!grp[lg].t.length) continue;
+      const title = ((lg === "en" ? payload.titleEn : payload.title) || payload.title || "Legacy").slice(0, 80);
+      const body = ((lg === "en" ? payload.bodyEn : payload.body) || payload.body || "").slice(0, 180);
+      const res = await admin.messaging().sendEachForMulticast({
+        tokens: grp[lg].t, data: { title, body, url: payload.url || "/warehouse.html" },
+        webpush: { headers: { Urgency: "high", TTL: "86400" } },
+      });
+      res.responses.forEach((r, i) => { if (!r.success) { const c = r.error && r.error.code; if (c === "messaging/registration-token-not-registered" || c === "messaging/invalid-registration-token") dead.push(grp[lg].r[i]); } });
+    }
+    await Promise.all(dead.map((ref) => ref.delete().catch(() => {})));
+  } catch (e) { console.log("_pushToEmp", e); }
+}
+
+// 🔧 "Atiende esto" — texto del aviso según prioridad (🔴 Ahora / 🟡 Siguiente), en el idioma del empleado.
+function _taskPushPayload(t) {
+  const prio = String(t.priority || "cola");
+  const title = t.title || "Tarea";
+  const car = t.carLabel ? (" · " + t.carLabel) : "";
+  if (prio === "now") {
+    return { title: "🔴 Atiende esto ahora", body: title + car, titleEn: "🔴 Attend this now", bodyEn: title + car, url: "/warehouse.html" };
+  }
+  if (prio === "next") {
+    return { title: "🟡 Sigues con esto", body: title + car, titleEn: "🟡 You're up next", bodyEn: title + car, url: "/warehouse.html" };
+  }
+  return null; // 🟢 En cola no manda push
+}
+
+// 🔧 Avisa al EMPLEADO cuando le ASIGNAN una tarea 🔴 Ahora / 🟡 Siguiente (nueva).
+exports.onTaskAssign = onDocumentCreated("tasks/{id}", async (event) => {
+  try {
+    const t = (event.data && event.data.data()) || null; if (!t) return;
+    if (t.isTemplate || t.status === "hecho") return;
+    if (!t.assignEmpId) return;
+    const p = _taskPushPayload(t); if (!p) return;
+    await _pushToEmp(t.assignEmpId, p);
+  } catch (e) { console.log("onTaskAssign", e); }
+});
+
+// 🔧 Avisa al EMPLEADO cuando una tarea EXISTENTE se sube a 🔴/🟡 o se le reasigna (el "deja eso y atiende este").
+exports.onTaskBump = onDocumentUpdated("tasks/{id}", async (event) => {
+  try {
+    const before = (event.data && event.data.before && event.data.before.data()) || {};
+    const after = (event.data && event.data.after && event.data.after.data()) || {};
+    if (after.isTemplate || after.status === "hecho") return;
+    if (!after.assignEmpId) return;
+    const p = _taskPushPayload(after); if (!p) return;        // solo 🔴/🟡 mandan
+    const reassigned = before.assignEmpId !== after.assignEmpId;      // le tocó a otra persona
+    const bumped = String(before.priority || "cola") !== String(after.priority || "cola"); // cambió la prioridad
+    if (!reassigned && !bumped) return;                        // sin cambio relevante, no spamear
+    await _pushToEmp(after.assignEmpId, p);
+  } catch (e) { console.log("onTaskBump", e); }
+});
+
 // 🌐 BOT DE VENTAS de la página web (Claude). Contesta a visitantes y los empuja a venir en persona.
 const SITE_BOT_MODEL = "claude-sonnet-5";   // buen balance calidad/costo (mismo que el bot de eBay). Se puede subir a opus.
 function buildSitePrompt(inv, todayStr) {

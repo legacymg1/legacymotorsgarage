@@ -1673,12 +1673,16 @@ function renderJourney(){
     return;
   }
   if(emptyEl) emptyEl.style.display='none';
-  box.innerHTML=JOURNEY.map((o,i)=>{
+  // 🟢🟡🔴 Orden por PRIORIDAD: Ahora → Siguiente → En cola (y dentro, por orden de creación).
+  const _pr={now:0,next:1,cola:2};
+  const list=JOURNEY.slice().sort((a,b)=>((_pr[a.priority||'cola']!=null?_pr[a.priority||'cola']:2)-(_pr[b.priority||'cola']!=null?_pr[b.priority||'cola']:2))||((a.order||0)-(b.order||0)));
+  box.innerHTML=list.map((o,i)=>{
     const total=(o.checklist||[]).length, done=(o.checklist||[]).filter(c=>c.done).length;
     const prog=total?(' · '+done+'/'+total):'';
     const next=(i===0)?'<div style="font-size:11px;color:var(--gold);font-weight:800;letter-spacing:.04em;margin-bottom:6px;">'+t('jNext')+'</div>':'';
+    const prioB = o.priority==='now' ? '<span style="background:rgba(224,104,58,.14);color:#e0683a;border:1px solid #e0683a;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:800;white-space:nowrap;flex:none;">🔴 '+L2('Ahora','Now')+'</span>' : o.priority==='next' ? '<span style="background:rgba(232,182,74,.14);color:#e8b64a;border:1px solid #e8b64a;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:800;white-space:nowrap;flex:none;">🟡 '+L2('Siguiente','Next')+'</span>' : '';
     return '<div class="jcard" onclick="openTaskDetail(\''+o.id+'\')">'+next
-      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:800;font-size:16px;min-width:0;">'+esc(o.title)+'</span>'+taskChip(o)+'</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-weight:800;font-size:16px;min-width:0;">'+esc(o.title)+'</span><span style="display:flex;gap:5px;align-items:center;flex:none;">'+prioB+taskChip(o)+'</span></div>'
       +(o.carLabel?'<div style="font-size:12.5px;font-weight:600;margin-bottom:3px;">🚗 '+esc(o.carLabel)+'</div>':'')
       +'<div class="faint" style="font-size:12.5px;">'+(o.status==='pausada'?t('jPaused'):(o.status==='en_proceso'?t('jInProc'):t('jToStart')))+prog+(o.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
@@ -1958,11 +1962,14 @@ function renderOwnerPanel(){
   // Tareas
   const box=document.getElementById('op-tasks'); if(!box) return;
   if(!OP_TASKS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:14px;line-height:1.5;">'+t('opEmpty')+'</div>'; return; }
-  box.innerHTML=OP_TASKS.map(x=>{
+  const _prO={now:0,next:1,cola:2};
+  const _opList=OP_TASKS.slice().sort((a,b)=>((_prO[a.priority||'cola']!=null?_prO[a.priority||'cola']:2)-(_prO[b.priority||'cola']!=null?_prO[b.priority||'cola']:2))||((a.order||0)-(b.order||0)));
+  box.innerHTML=_opList.map(x=>{
     const total=x.steps||0, done=x.done||0, pr=total?(' · '+done+'/'+total):'';
     const who=x.assignName?('👤 '+esc(x.assignName)):t('unassigned');
     const car=x.carLabel?(' · 🚗 '+esc(x.carLabel)):'';
-    return '<div onclick="opWorkTask(\''+x.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(x.title)+' '+lineBadge(x.line)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+taskChip(x)+'<span onclick="event.stopPropagation();jobEditOpen(\''+x.id+'\')" title="Editar" style="cursor:pointer;font-size:14px;padding:3px 5px;border-radius:7px;background:var(--surface2);">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+_opStatusLabel(x.status)+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
+    const prioB = x.priority==='now' ? '<span style="color:#e0683a;font-weight:800;font-size:10px;border:1px solid #e0683a;border-radius:999px;padding:1px 6px;white-space:nowrap;">🔴</span> ' : x.priority==='next' ? '<span style="color:#e8b64a;font-weight:800;font-size:10px;border:1px solid #e8b64a;border-radius:999px;padding:1px 6px;white-space:nowrap;">🟡</span> ' : '';
+    return '<div onclick="opWorkTask(\''+x.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+prioB+esc(x.title)+' '+lineBadge(x.line)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+taskChip(x)+'<span onclick="event.stopPropagation();jobEditOpen(\''+x.id+'\')" title="Editar" style="cursor:pointer;font-size:14px;padding:3px 5px;border-radius:7px;background:var(--surface2);">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+_opStatusLabel(x.status)+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
 
@@ -1992,6 +1999,7 @@ window.jobAddOpen=async function(editId){
     +'<label style="'+LBL+'">'+t('jWhatLbl')+'</label><input id="job-title" autocapitalize="sentences" placeholder="'+t('jTitle')+'" style="'+IN+'">'
     +'<label style="'+LBL+'">'+t('jFuncLbl')+'</label><select id="job-role" style="'+IN+'">'+roleOpts+'</select>'
     +'<label style="'+LBL+'">'+t('jExecLbl')+'</label><select id="job-emp" style="'+IN+'">'+empOpts+'</select>'
+    +'<label style="'+LBL+'">'+L2('Prioridad','Priority')+'</label><select id="job-prio" style="'+IN+'"><option value="cola">🟢 '+L2('En cola — cuando le toque','Queued — when it comes up')+'</option><option value="next">🟡 '+L2('Siguiente — al terminar lo de ahora','Next up — after current')+'</option><option value="now">🔴 '+L2('Ahora — deja todo y hazlo ya','Now — drop everything')+'</option></select>'
     +'<label style="'+LBL+'">'+t('jCarLbl')+'</label><div id="job-car-wrap"></div>'
     +'<label style="'+LBL+'">'+t('jStepsOpt')+'</label><textarea id="job-steps" placeholder="'+t('jStepsPh')+'" style="'+IN+';min-height:100px;resize:vertical;"></textarea>'
     +(ed?'':'<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;margin-bottom:16px;"><input type="checkbox" id="job-daily" style="width:19px;height:19px;"> '+t('jDaily')+'</label>')
@@ -2001,6 +2009,7 @@ window.jobAddOpen=async function(editId){
     const gt=document.getElementById('job-title'); if(gt) gt.value=ed.title||'';
     const gr=document.getElementById('job-role'); if(gr) gr.value=ed.assignRole||'';
     const ge=document.getElementById('job-emp'); if(ge) ge.value=ed.assignEmpId||'';
+    const gp=document.getElementById('job-prio'); if(gp) gp.value=ed.priority||'cola';
     const gs=document.getElementById('job-steps'); if(gs) gs.value=((ed.checklist||[]).map(c=>c.text)).join('\n');
   }
   renderCarPicker();
@@ -2054,16 +2063,17 @@ window.jobAddSave=async function(){
   const role2=document.getElementById('job-role').value;
   const emp=document.getElementById('job-emp').value;
   const carId=JOB_CAR_ID||''; const carLabel=JOB_CAR_ID?(JOB_CAR_LABEL||''):'';
+  const prio=(document.getElementById('job-prio')||{}).value||'cola';
   const dailyEl=document.getElementById('job-daily'); const daily=!!(dailyEl&&dailyEl.checked);
   const steps=(document.getElementById('job-steps').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
   if(!title){ whToast(L==='en'?'Say what needs to be done.':'Di qué se le va a hacer.',true); return; }
   if(daily && !emp){ whToast(t('jDailyHint'),true); return; }
   try{
     if(JOB_EDIT_ID){
-      await httpsCallable(functions,'taskEdit')({ taskId:JOB_EDIT_ID, title:title, checklist:steps, assignEmpId:emp, assignRole:role2, carId:carId, carLabel:carLabel });
+      await httpsCallable(functions,'taskEdit')({ taskId:JOB_EDIT_ID, title:title, checklist:steps, assignEmpId:emp, assignRole:role2, carId:carId, carLabel:carLabel, priority:prio });
       whToast(t('jSaved'));
     } else {
-      await httpsCallable(functions,'taskAdd')({ title:title, line:'general', checklist:steps, assignEmpId:emp, assignRole:role2, carId:carId, carLabel:carLabel, recurring:daily?'daily':'none' });
+      await httpsCallable(functions,'taskAdd')({ title:title, line:'general', checklist:steps, assignEmpId:emp, assignRole:role2, carId:carId, carLabel:carLabel, recurring:daily?'daily':'none', priority:prio });
       whToast(L==='en'?'✅ Task created':'✅ Tarea creada');
     }
     jobAddClose();
