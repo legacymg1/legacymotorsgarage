@@ -1932,6 +1932,20 @@ window.openLead360=async function(qid){
   document.getElementById('c360-modal').style.display='flex'; body.innerHTML=h;
 };
 
+// 🚗 Recibir un carro que vino por CITA → abre una orden NUEVA prellenada (cliente, auto, motivo). Sin estimado todavía: aquí se revisa y se cotiza.
+window.svcOrderFromAppt=function(apptId){
+  const a=appointments.find(x=>x.id===apptId); if(!a){ alert('Cita no encontrada.'); return; }
+  let clientId=a.clientId||'';
+  if(!clientId && a.phoneE164){ const m=clients.find(c=>c.phoneE164===a.phoneE164); if(m) clientId=m.id; }
+  if(!clientId && a.phone){ const e164=(typeof toE164==='function'?toE164(a.phone):''); if(e164){ const m=clients.find(c=>c.phoneE164===e164); if(m) clientId=m.id; } }
+  const reason=(Array.isArray(a.services)&&a.services.length)
+    ? a.services.map(s=>(typeof s==='string'?s:(s.es||s.en||''))).filter(Boolean).join(', ')
+    : (a.type||a.note||a.reason||'Revisión / diagnóstico');
+  window._svcDraft={ clientId, clientName:a.clientName||'', clientPhone:a.phone||'', lang:(a.lang||'es'), vin:a.vin||'', plate:a.plate||'', vehicleLabel:a.carLabel||'', vehPick:'', reason:'', when:'now', scheduledAt:'', estMin:60, assignRole:'Mecánico', assignEmpId:'', assignName:'', services:[{desc:reason,minutes:60,price:0,parts:[]}], laborRate:_svcDefaultRate(), deposit:0, editId:'', status:'', _fromAppt:apptId };
+  svcRenderModal();
+  document.getElementById('svc-modal').style.display='flex';
+  try{ svcLoadRoster().then(()=>svcRenderModal()); }catch(e){}
+};
 window.svcNewOrder=function(){
   window._svcDraft={ clientId:'', clientName:'', clientPhone:'', lang:'es', vin:'', plate:'', vehicleLabel:'', vehPick:'', reason:'', when:'now', scheduledAt:'', estMin:60, assignRole:'Mecánico', assignEmpId:'', assignName:'', services:[{desc:'',minutes:60,price:0,parts:[]}], laborRate:_svcDefaultRate(), deposit:0, editId:'', status:'' };
   svcRenderModal();
@@ -2681,6 +2695,8 @@ window.svcSaveOrder=async function(opts){
     else { const oref=doc(collection(db,'serviceOrders')); orderId=oref.id; await setDoc(oref, Object.assign(payload,{ createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' })); }
   }catch(e){ alert('No se pudo guardar la orden: '+(e.message||e)); return; }
   d.editId=orderId;   // ya quedó guardada: futuras acciones (p.ej. Enviar estimado) apuntan al mismo doc
+  // 🔗 Si la orden vino de una CITA agendada → marca la cita como atendida y la liga (sale de "Citas").
+  if(d._fromAppt){ try{ await updateDoc(doc(db,'appointments',d._fromAppt),{ status:'done', came:true, serviceOrderId:orderId, closedAt:new Date().toISOString() }); }catch(e){} d._fromAppt=''; }
   if(opts.silent) return orderId;
   try{ svcToast(wasEdit?('💾 Orden'+(orderNum?(' #'+orderNum):'')+' actualizada'):('✅ Orden'+(orderNum?(' #'+orderNum):'')+' creada'+(status==='agendado'?' · agendada':''))); }catch(e){}
   return orderId;
@@ -3253,6 +3269,7 @@ window.renderAppointments=function(){
             ${a.source==='web-bot' ? apptIntel(a) : (a.note?'<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px;">'+a.note+'</div>':'')}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button onclick="svcOrderFromAppt('${a.id}')" title="Recibir el carro y crear la orden de servicio" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;">🚗 Recibir / Crear orden</button>
             <button onclick="sendApptConfirm('${a.id}')" title="Confirmar por SMS" style="background:${a.confirmSent?'transparent':'#2196F3'};color:${a.confirmSent?'var(--muted)':'#fff'};border:1px solid ${a.confirmSent?'var(--border)':'#2196F3'};border-radius:7px;padding:6px 9px;font-size:11px;font-weight:700;cursor:pointer;">${a.confirmSent?'✓ Confirmó':'📩 Confirmar'}</button>
             <button onclick="sendApptReminder('${a.id}')" title="Recordatorio por SMS" style="background:${a.reminderSent?'transparent':'var(--gold3)'};color:${a.reminderSent?'var(--muted)':'var(--navy3)'};border:1px solid ${a.reminderSent?'var(--border)':'var(--gold)'};border-radius:7px;padding:6px 9px;font-size:11px;font-weight:700;cursor:pointer;">${a.reminderSent?'✓ Recordó':'🔔 Recordar'}</button>
             <button onclick="editAppt('${a.id}')" title="Editar" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer;">✏️</button>
