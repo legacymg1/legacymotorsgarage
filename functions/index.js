@@ -2162,11 +2162,12 @@ exports.taskAdd = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (recurring === "daily" && !assignEmpId) throw new HttpsError("invalid-argument", "Una tarea diaria debe asignarse a un empleado.");
   const carId = String(d.carId || "");
   const carLabel = String(d.carLabel || "").slice(0, 80);
+  const priority = ["cola", "next", "now"].indexOf(String(d.priority || "cola")) >= 0 ? String(d.priority) : "cola";
   const db = admin.firestore();
   let assignName = "";
   if (assignEmpId) { try { const es = await db.collection("employees").doc(assignEmpId).get(); if (es.exists) assignName = (es.data() || {}).name || ""; } catch (e) {} }
   const ref = db.collection("tasks").doc();
-  const base = { title, line, checklist, assignEmpId, assignRole, assignName, carId, carLabel, createdBy: id.name || id.email || "", createdAt: new Date().toISOString(), order: Date.now() };
+  const base = { title, line, checklist, assignEmpId, assignRole, assignName, carId, carLabel, priority, createdBy: id.name || id.email || "", createdAt: new Date().toISOString(), order: Date.now() };
   if (recurring === "daily") await ref.set(Object.assign(base, { isTemplate: true, recurring: "daily", status: "template" }));
   else await ref.set(Object.assign(base, { isTemplate: false, recurring: "none", status: "cola" }));
   return { ok: true, id: ref.id };
@@ -2193,6 +2194,7 @@ exports.taskEdit = onCall({ timeoutSeconds: 20 }, async (request) => {
   }
   if (d.carId != null) upd.carId = String(d.carId || "");
   if (d.carLabel != null) upd.carLabel = String(d.carLabel || "").slice(0, 80);
+  if (d.priority != null) upd.priority = ["cola", "next", "now"].indexOf(String(d.priority)) >= 0 ? String(d.priority) : "cola";
   if (Array.isArray(d.checklist)) {
     const oldDone = {}; (Array.isArray(cur.checklist) ? cur.checklist : []).forEach((c) => { if (c && c.text) oldDone[c.text] = !!c.done; });
     upd.checklist = d.checklist.map((s) => String(s || "").trim()).filter(Boolean).slice(0, 40).map((text) => ({ text, done: !!oldDone[text] }));
@@ -2229,7 +2231,7 @@ exports.myTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   }
   const list = all.filter((t) => !t.isTemplate && t.status !== "hecho" && _taskMine(t, id));
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], materials: Array.isArray(t.materials) ? t.materials : [], status: t.status || "cola", assignName: t.assignName || "", assignRole: t.assignRole || "", carId: t.carId || "", carLabel: t.carLabel || "", pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }));
+  const out = list.map((t) => ({ id: t.id, title: t.title, line: t.line || "general", checklist: t.checklist || [], materials: Array.isArray(t.materials) ? t.materials : [], status: t.status || "cola", priority: t.priority || "cola", order: t.order || 0, assignName: t.assignName || "", assignRole: t.assignRole || "", carId: t.carId || "", carLabel: t.carLabel || "", pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }));
   return { ok: true, tasks: out, today };
 });
 exports.taskStep = onCall({ timeoutSeconds: 20 }, async (request) => {
@@ -2341,7 +2343,7 @@ exports.allTasks = onCall({ timeoutSeconds: 30 }, async (request) => {
   let snap; try { snap = await db.collection("tasks").get(); } catch (e) { return { ok: true, tasks: [] }; }
   const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.isTemplate && t.status !== "hecho");
   list.sort((a, b) => (a.order || 0) - (b.order || 0));
-  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", assignEmpId: t.assignEmpId || "", carId: t.carId || "", carLabel: t.carLabel || "", checklist: cl.map((c) => ({ text: c.text, done: !!c.done })), materials: Array.isArray(t.materials) ? t.materials : [], status: t.status || "cola", steps: cl.length, done: cl.filter((c) => c.done).length, pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }; });
+  const out = list.map((t) => { const cl = t.checklist || []; return { id: t.id, title: t.title, line: t.line || "general", assignName: t.assignName || "", assignRole: t.assignRole || "", assignEmpId: t.assignEmpId || "", carId: t.carId || "", carLabel: t.carLabel || "", checklist: cl.map((c) => ({ text: c.text, done: !!c.done })), materials: Array.isArray(t.materials) ? t.materials : [], status: t.status || "cola", priority: t.priority || "cola", order: t.order || 0, steps: cl.length, done: cl.filter((c) => c.done).length, pausedReason: t.pausedReason || "", needsHelp: !!t.needsHelp }; });
   return { ok: true, tasks: out };
 });
 
