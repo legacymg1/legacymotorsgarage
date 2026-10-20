@@ -2348,6 +2348,8 @@ window.svcSaveOrder=async function(opts){
   if(!opts.silent){
     const _sinFn=services.filter(s=>!s.role);
     if(_sinFn.length){ alert('Falta elegir la FUNCIÓN de:\n'+_sinFn.map(s=>'• '+s.desc).join('\n')+'\n\nAsígnale una función a cada servicio antes de crear la orden.\n(Si solo quieres mandar el estimado, usa "📄 Generar estimado".)'); return; }
+    // ✅ Todo validado → cierra YA (silencioso) y guarda por detrás; el toast confirma. No más popup ni esperar viéndola.
+    svcClose(); try{ svcToast('⏳ Guardando…'); }catch(e){}
   }
   services.forEach(s=>{ s.priceCents=Math.round((Number(s.price)||0)*100); s.laborCents=s.priceCents; });   // el cobro es el PRECIO PLANO del trabajo (no tiempo × tarifa)
   // ✨ Corrector + bilingüe (IA): corrige ortografía ES/EN/mixto. OPCIONAL — con TIMEOUT de 3.5s para NO atorar el guardado si la IA está lenta/fría.
@@ -2404,8 +2406,8 @@ window.svcSaveOrder=async function(opts){
   }catch(e){ alert('No se pudo guardar la orden: '+(e.message||e)); return; }
   d.editId=orderId;   // ya quedó guardada: futuras acciones (p.ej. Enviar estimado) apuntan al mismo doc
   if(opts.silent) return orderId;
-  svcClose();
-  alert(wasEdit?'💾 Orden actualizada.':('✅ Orden de servicio creada'+(status==='agendado'?' (agendada)':'')+'.'));
+  try{ svcToast(wasEdit?('💾 Orden'+(orderNum?(' #'+orderNum):'')+' actualizada'):('✅ Orden'+(orderNum?(' #'+orderNum):'')+' creada'+(status==='agendado'?' · agendada':''))); }catch(e){}
+  return orderId;
   return orderId;
 };
 
