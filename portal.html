@@ -848,25 +848,47 @@ function vehListCardHTML(c){
   if(!vehicles.length) return '';
   const rows=vehicles.map(v=>{
     const vin=(v.vin||'').toUpperCase();
-    const hasEst=portalEstimates.some(o=>(o.vin||'').toUpperCase()===vin && vin);
-    const tag=hasEst?`<span style="font-size:11px;font-weight:800;color:var(--gold);background:rgba(232,182,74,.12);padding:2px 8px;border-radius:999px;margin-right:8px;">🧾 ${es?'estimado':'estimate'}</span>`:'';
-    return `<div onclick="portalFocusVehicle('${vin}')" class="info-row" style="cursor:pointer;">
+    // 🧾 Etiqueta inteligente: refleja el ESTADO real de las órdenes del vehículo, no "estimado" para todo.
+    const mine=vin?portalEstimates.filter(o=>(o.vin||'').toUpperCase()===vin):[];
+    const ACTIVE=['recibido','en_proceso','pausado_partes','listo','entregado'];
+    const pending=mine.some(o=>!o.paid && o.estimateStatus!=='accepted' && ACTIVE.indexOf(o.status)<0); // estimado sin aceptar ni pagar
+    const active =mine.some(o=>!o.paid && (o.estimateStatus==='accepted' || ACTIVE.indexOf(o.status)>=0)); // aceptado / en taller, aún sin pagar
+    const paid   =mine.some(o=>o.paid);
+    let tag='';
+    const chip=(col,bg,txt)=>`<span style="font-size:11px;font-weight:800;color:${col};background:${bg};padding:2px 8px;border-radius:999px;margin-right:8px;">${txt}</span>`;
+    if(pending)      tag=chip('var(--gold)','rgba(232,182,74,.12)','🧾 '+(es?'estimado':'estimate'));
+    else if(active)  tag=chip('#49d17f','rgba(40,180,99,.12)','🔧 '+(es?'en servicio':'in service'));
+    else if(paid)    tag=chip('#49d17f','rgba(40,180,99,.12)','✅ '+(es?'pagado':'paid'));
+    const lblArg=String(v.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div onclick="portalFocusVehicle('${vin}','${lblArg}')" class="info-row" style="cursor:pointer;">
       <span class="ir-label">🚗 ${escPortal(v.label)}${v.vin?' · …'+escPortal(v.vin.slice(-6)):''}</span>
       <span class="ir-value" style="display:flex;align-items:center;">${tag}<span style="color:var(--gold);font-size:18px;line-height:1;">›</span></span>
     </div>`;
   }).join('');
   return `<div class="info-card" style="margin-top:16px;"><div class="section-title" style="margin:0 0 14px;">${es?'Mis vehículos':'My vehicles'}</div>${rows}</div>`;
 }
-window.portalFocusVehicle=function(vin){
-  vin=(vin||'').toUpperCase();
-  const est=portalEstimates.find(o=>(o.vin||'').toUpperCase()===vin && vin);
-  let el = est ? document.getElementById('est-'+est.id) : null;
-  if(!el){ el=document.getElementById('book-toggle') || document.getElementById('booking-widget'); }
-  if(el){
-    el.scrollIntoView({behavior:'smooth',block:'center'});
-    const card = est ? document.getElementById('est-'+est.id) : null;
-    if(card){ const prev=card.style.boxShadow; card.style.boxShadow='0 0 0 2px var(--gold)'; setTimeout(()=>{ card.style.boxShadow=prev; },1600); }
+window.portalFocusVehicle=function(vin,label){
+  vin=(vin||'').toUpperCase(); label=(label||'').toLowerCase();
+  const ACTIVE=['recibido','en_proceso','pausado_partes','listo','entregado'];
+  // empata por VIN; si no, por nombre del vehículo/placa
+  let mine=portalEstimates.filter(o=>vin && (o.vin||'').toUpperCase()===vin);
+  if(!mine.length && label) mine=portalEstimates.filter(o=>((o.vehicleLabel||'').toLowerCase()===label)||((o.plate||'').toLowerCase()===label));
+  // rango: estimado pendiente (0) → aceptado/en taller sin pagar (1) → pagado/otros (2); dentro, el más reciente
+  const rank=o=>{ if(!o.paid && o.estimateStatus!=='accepted' && ACTIVE.indexOf(o.status)<0) return 0; if(!o.paid) return 1; return 2; };
+  const when=o=>String(o.scheduledAt||o.createdAt||o.paidAt||'');
+  mine.sort((a,b)=> rank(a)-rank(b) || when(b).localeCompare(when(a)));
+  const est=mine[0];
+  const card = est ? document.getElementById('est-'+est.id) : null;
+  if(card){
+    // si es recibo minimizado, expándelo para que vea el detalle/estatus
+    const det=document.getElementById('est-detail-'+est.id); const ch=document.getElementById('est-chev-'+est.id);
+    if(det && det.style.display==='none'){ det.style.display=''; if(ch) ch.textContent='▾'; }
+    card.scrollIntoView({behavior:'smooth',block:'center'});
+    const prev=card.style.boxShadow; card.style.boxShadow='0 0 0 2px var(--gold)'; setTimeout(()=>{ card.style.boxShadow=prev; },1600);
+    return;
   }
+  const el=document.getElementById('book-toggle') || document.getElementById('booking-widget');
+  if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
 };
 // 🟢 Rastreador de estatus tipo Tesla: línea de tiempo con palomita en lo hecho y la etapa actual resaltada.
 function svcTrackerHTML(o){
