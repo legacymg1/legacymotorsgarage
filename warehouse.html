@@ -1819,6 +1819,14 @@ function _opStatusLabel(s){
   if(s==='listo'||s==='hecho'||s==='terminado'||s==='entregado') return L==='en'?'Done':'Terminado';
   return L==='en'?'Queued':'En cola';
 }
+// 🎨 Color único de estatus en TODO el sistema (congruente con Servicio/Clientes): En cola gris · En proceso dorado · En pausa naranja · Terminado verde.
+function _opStatusColor(s){
+  if(s==='en_proceso') return '#e8b64a';
+  if(s==='pausada'||s==='pausado'||s==='pausado_partes') return '#ff9800';
+  if(s==='listo'||s==='hecho'||s==='terminado'||s==='entregado') return '#35c46a';
+  return '#8a8fa8';
+}
+function _opBadge(s){ const c=_opStatusColor(s); return '<span style="font-size:10px;font-weight:800;color:'+c+';background:'+c+'1f;border:1px solid '+c+';padding:2px 7px;border-radius:999px;white-space:nowrap;">'+_opStatusLabel(s)+'</span>'; }
 // Secciones minimizables del Centro (Dealer/Dismantling colapsadas por default porque suelen ser MUCHOS).
 let _opCollapse={ dealer:true, service:false, dis:true };
 window.opToggle=function(key){ _opCollapse[key]=!_opCollapse[key]; renderOwnerPanel(); };
@@ -1843,7 +1851,7 @@ window.opSearch=function(q){
   const dl=(OP_DEALER||[]).filter(c=>hit(c.label)||hit(c.inventoryNum)||hit(c.vin));
   if(dl.length) groups.push(['🚗 Dealer', dl.map(c=>row('opWorkDealer(\''+c.id+'\')',(c.inventoryNum?('#'+E(c.inventoryNum)+' '):'')+E(c.label), t(STAGE_KEY[c.reconStage]||'stMecanico'))).join('')]);
   const sv=(OP_SVC||[]).filter(o=>hit(o.clientName)||hit(o.vehicleLabel)||hit(o.plate)||hit(o.vin)||hit(o.reason)||hit(o.orderNum)||hit((o.services||[]).map(s=>s.assignName).join(' ')));
-  if(sv.length) groups.push(['🔧 Servicio', sv.map(o=>row('opWorkService()',(o.orderNum?('#'+E(o.orderNum)+' '):'')+E(o.clientName||'Cliente'), E(o.vehicleLabel||''))).join('')]);
+  if(sv.length) groups.push(['🔧 Servicio', sv.map(o=>row('svcEmpOpen(\''+o.id+'\')',(o.orderNum?('#'+E(o.orderNum)+' '):'')+E(o.clientName||'Cliente'), E(o.vehicleLabel||''))).join('')]);
   const ds=(OP_DIS||[]).filter(c=>hit(c.label)||hit(c.inventoryNum)||hit(c.vin));
   if(ds.length) groups.push(['🧩 Dismantling', ds.map(c=>row('openCarAccounts(\''+c.id+'\')',(c.inventoryNum?('#'+E(c.inventoryNum)+' '):'')+E(c.label), '💰 '+L2('cuentas','accounts'))).join('')]);
   const tk=(OP_TASKS||[]).filter(x=>hit(x.title)||hit(x.assignName)||hit(x.carLabel));
@@ -1914,7 +1922,7 @@ function _opSvcHtml(){
     const doneSt=(o.status==='listo'||o.status==='entregado'||o.status==='hecho');
     const stage = o.activeRole ? ('🚩 '+svcRoleLabel(o.activeRole)) : (doneSt ? ('🏁 '+L2('Terminado','Done')) : ('🚩 '+_opStatusLabel(o.status)));
     const s=(o.services||[]).find(x=>x.role===o.activeRole && x.assignName); const who=s?(' · 👤 '+esc(s.assignName)):'';
-    return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+' <span style="color:var(--muted);">›</span></span></div><div class="faint" style="font-size:12px;margin-top:2px;">🚗 '+car+who+' · '+_opStatusLabel(o.status)+'</div></div>';
+    return '<div onclick="svcEmpOpen(\''+o.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+' <span style="color:var(--muted);">›</span></span></div><div style="font-size:12px;margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span class="faint">🚗 '+car+who+'</span>'+_opBadge(o.status)+'</div></div>';
   }).join('');
 }
 function _opDisHtml(){
@@ -2280,7 +2288,7 @@ function renderMyService(boxId){
 }
 // 📋 Abrir la orden (empleado): detalle + acciones. Tocar la tarjeta SIEMPRE abre esto (antes no hacía nada si no había botón).
 window.svcEmpOpen=function(orderId){
-  const o=(SVC_MY||[]).find(x=>x.id===orderId); if(!o) return;
+  const o=(SVC_MY||[]).find(x=>x.id===orderId) || (typeof OP_SVC!=='undefined' && (OP_SVC||[]).find(x=>x.id===orderId)); if(!o) return;
   let ov=document.getElementById('svc-emp-sheet');
   if(!ov){ ov=document.createElement('div'); ov.id='svc-emp-sheet'; ov.style.cssText='position:fixed;inset:0;z-index:2147482996;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) ov.remove(); }; document.body.appendChild(ov); }
   const s=SVC_ST[o.status]||{c:'#8a8fa8'};
