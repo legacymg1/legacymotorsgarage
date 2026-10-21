@@ -1779,6 +1779,7 @@ window.taskDoComplete=async function(){
 
 // 👑 Panel de operación del dueño — todas las tareas abiertas (allTasks) con resumen + scroll.
 let OP_TASKS=[], OP_TEAM=[], OP_DEALER=[], OP_SVC=[], OP_DONE=[], OP_CLOCK=null, OP_DIS=[];
+let _opErr={};   // marca por sección si su carga FALLÓ (para distinguir "vacío" de "no se pudo cargar" — nada de ceros falsos)
 // 👥 Equipo en vivo = quién está TRABAJANDO ahora (reloj = empleados; tarea/servicio activo = todos, incl. dueños).
 function _opRebuildTeam(){
   const live={}; const keyN=n=>(String(n||'').trim().toLowerCase());
@@ -1795,16 +1796,16 @@ window.loadOwnerPanel=async function(){
   let hadCache=false;
   try{ const cx=JSON.parse(sessionStorage.getItem('lmg_op_cache')||'null'); if(cx){ OP_TASKS=cx.OP_TASKS||[]; OP_CLOCK=cx.OP_CLOCK||null; OP_DEALER=cx.OP_DEALER||[]; OP_SVC=cx.OP_SVC||[]; OP_DONE=cx.OP_DONE||[]; OP_DIS=cx.OP_DIS||[]; OP_TEAM=cx.OP_TEAM||[]; renderOwnerPanel(); hadCache=true; } }catch(e){}
   if(!hadCache){ const tb=document.getElementById('op-tab-body'); if(tb) tb.innerHTML='<div class="faint" style="text-align:center;padding:12px;">'+t('jLoadingTxt')+'</div>'; }
-  const call=(n)=>httpsCallable(functions,n)({}).then(r=>(r&&r.data)||{}).catch(()=>({}));
+  const callE=(n)=>httpsCallable(functions,n)({}).then(r=>(r&&r.data)||{});
   const paint=()=>{ if(seq!==_opLoadSeq) return; _opRebuildTeam(); renderOwnerPanel(); };
-  // 2) Las 6 en paralelo; cada una repinta SU parte al resolver.
+  // 2) Las 6 en paralelo; cada una repinta SU parte al resolver. Si FALLA, marca _opErr (no deja ceros falsos).
   const jobs=[
-    call('allTasks').then(a=>{ OP_TASKS=a.tasks||[]; paint(); }),
-    call('clockWeek').then(c=>{ OP_CLOCK=c; paint(); }),
-    call('carsInProcess').then(x=>{ OP_DEALER=x.cars||[]; paint(); }),
-    call('svcMyOrders').then(x=>{ OP_SVC=(x.orders||[]).filter(o=>o.status!=='entregado'); paint(); }),
-    call('opsDoneToday').then(x=>{ OP_DONE=x.people||[]; paint(); }),
-    call('disInProcess').then(x=>{ OP_DIS=x.cars||[]; paint(); }),
+    callE('allTasks').then(a=>{ OP_TASKS=a.tasks||[]; _opErr.tasks=false; paint(); }).catch(()=>{ _opErr.tasks=true; paint(); }),
+    callE('clockWeek').then(c=>{ OP_CLOCK=c; _opErr.clock=false; paint(); }).catch(()=>{ _opErr.clock=true; paint(); }),
+    callE('carsInProcess').then(x=>{ OP_DEALER=x.cars||[]; _opErr.dealer=false; paint(); }).catch(()=>{ _opErr.dealer=true; paint(); }),
+    callE('svcMyOrders').then(x=>{ OP_SVC=(x.orders||[]).filter(o=>o.status!=='entregado'); _opErr.svc=false; paint(); }).catch(()=>{ _opErr.svc=true; paint(); }),
+    callE('opsDoneToday').then(x=>{ OP_DONE=x.people||[]; _opErr.done=false; paint(); }).catch(()=>{ _opErr.done=true; paint(); }),
+    callE('disInProcess').then(x=>{ OP_DIS=x.cars||[]; _opErr.dis=false; paint(); }).catch(()=>{ _opErr.dis=true; paint(); }),
   ];
   await Promise.allSettled(jobs);
   if(seq!==_opLoadSeq) return;   // se disparó otra carga más nueva
@@ -1827,6 +1828,8 @@ function _opStatusColor(s){
   return '#8a8fa8';
 }
 function _opBadge(s){ const c=_opStatusColor(s); return '<span style="font-size:10px;font-weight:800;color:'+c+';background:'+c+'1f;border:1px solid '+c+';padding:2px 7px;border-radius:999px;white-space:nowrap;">'+_opStatusLabel(s)+'</span>'; }
+// ⚠️ Mensaje de "no se pudo cargar" (distinto de "vacío"). Toca ↻ para reintentar.
+function _opErrMsg(){ return '<div style="font-size:13px;padding:10px 2px;color:#ff8a4c;font-weight:700;">⚠️ '+L2('No se pudo cargar — toca ↻ arriba para reintentar','Could not load — tap ↻ above to retry')+'</div>'; }
 // Secciones minimizables del Centro (Dealer/Dismantling colapsadas por default porque suelen ser MUCHOS).
 let _opCollapse={ dealer:true, service:false, dis:true };
 window.opToggle=function(key){ _opCollapse[key]=!_opCollapse[key]; renderOwnerPanel(); };
@@ -1882,7 +1885,7 @@ function _opDiv(label,count){ return '<div style="display:flex;align-items:cente
 function _opTeamHtml(){
   const doneCount={}; (OP_DONE||[]).forEach(p=>{ doneCount[(p.name||'').trim().toLowerCase()]=p.count; });
   const team=OP_TEAM.slice().sort((a,b)=>Number(!!b.open)-Number(!!a.open)||Number(!!b.task)-Number(!!a.task)||(b.hours||0)-(a.hours||0));
-  if(!team.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nobody working right now.':'Nadie trabajando ahora.')+'</div>';
+  if(!team.length) return _opErr.clock?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nobody working right now.':'Nadie trabajando ahora.')+'</div>';
   return team.map(e=>{
     const dot=e.open?'🟢':(e.task?'🔧':'⚪');
     const hrs=(e.open||e.hours)?(' <span class="faint" style="font-weight:400;font-size:12px;">· '+Number(e.hours||0).toFixed(1)+' h</span>'):'';
@@ -1894,14 +1897,14 @@ function _opTeamHtml(){
   }).join('');
 }
 function _opDoneHtml(){
-  if(!OP_DONE.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nothing completed yet today.':'Aún nada terminado hoy.')+'</div>';
+  if(!OP_DONE.length) return _opErr.done?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nothing completed yet today.':'Aún nada terminado hoy.')+'</div>';
   return OP_DONE.map(p=>{
     const items=(p.items||[]).map(it=>'<div style="font-size:12px;color:var(--text);padding:2px 0 2px 38px;">• '+esc(it.title||'')+' '+lineBadge(it.line)+(it.car?(' <span class="faint">· 🚗 '+esc(it.car)+'</span>'):'')+'</div>').join('');
     return '<div style="padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex:none;">'+whInitials(p.name)+'</span><div style="font-weight:700;font-size:14px;">'+esc(p.name||'—')+' <span style="color:#35c46a;font-size:12px;">· ✅ '+p.count+'</span></div></div>'+items+'</div>';
   }).join('');
 }
 function _opDealerHtml(){
-  if(!OP_DEALER.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No cars in prep.':'Sin carros en preparación.')+'</div>';
+  if(!OP_DEALER.length) return _opErr.dealer?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No cars in prep.':'Sin carros en preparación.')+'</div>';
   return OP_DEALER.map(c=>{
     const stage=t(STAGE_KEY[c.reconStage]||'stMecanico');
     let dvi='';
@@ -1916,7 +1919,7 @@ function _opDealerHtml(){
   }).join('');
 }
 function _opSvcHtml(){
-  if(!OP_SVC.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No open service orders.':'Sin órdenes de servicio abiertas.')+'</div>';
+  if(!OP_SVC.length) return _opErr.svc?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No open service orders.':'Sin órdenes de servicio abiertas.')+'</div>';
   return OP_SVC.map(o=>{
     const car=esc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
     const doneSt=(o.status==='listo'||o.status==='entregado'||o.status==='hecho');
@@ -1929,7 +1932,7 @@ function _opSvcHtml(){
   }).join('');
 }
 function _opDisHtml(){
-  if(!OP_DIS.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No cars in dismantling.':'Sin carros en dismantling.')+'</div>';
+  if(!OP_DIS.length) return _opErr.dis?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No cars in dismantling.':'Sin carros en dismantling.')+'</div>';
   return OP_DIS.map(c=>{
     const parts = c.partsTotal
       ? ('🧩 '+c.partsLeft+'/'+c.partsTotal+' '+L2('partes','parts')+' · '+L2('vendidas','sold')+' '+c.partsSold)
@@ -1941,7 +1944,7 @@ function _opDisHtml(){
   }).join('');
 }
 function _opTasksHtml(){
-  if(!OP_TASKS.length) return '<div class="faint" style="text-align:center;padding:14px;line-height:1.5;">'+t('opEmpty')+'</div>';
+  if(!OP_TASKS.length) return _opErr.tasks?('<div style="text-align:center;padding:14px;">'+_opErrMsg()+'</div>'):'<div class="faint" style="text-align:center;padding:14px;line-height:1.5;">'+t('opEmpty')+'</div>';
   const _prO={now:0,next:1,cola:2};
   const _opList=OP_TASKS.slice().sort((a,b)=>((_prO[a.priority||'cola']!=null?_prO[a.priority||'cola']:2)-(_prO[b.priority||'cola']!=null?_prO[b.priority||'cola']:2))||((a.order||0)-(b.order||0)));
   return _opList.map(x=>{
