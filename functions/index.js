@@ -1871,6 +1871,31 @@ exports.svcBackfillNums = onRequest(async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
 });
 
+// 🔎 DIAG TEMPORAL — orden por folio + sus transacciones. ?key=lmgfin2026&num=1001
+exports.svcDiagOrder = onRequest(async (req, res) => {
+  if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
+  try {
+    const db = admin.firestore();
+    const num = Number(req.query.num || 0);
+    let ord = null;
+    const os = await db.collection("serviceOrders").where("orderNum", "==", num).limit(1).get();
+    os.forEach((d) => { ord = { id: d.id, ...(d.data() || {}) }; });
+    if (!ord) { res.json({ ok: true, found: false }); return; }
+    const o = {
+      id: ord.id, orderNum: ord.orderNum, clientId: ord.clientId || "", clientName: ord.clientName || "",
+      grandTotalCents: ord.grandTotalCents || 0, paidCents: ord.paidCents || 0, paid: !!ord.paid,
+      balanceCents: ord.balanceCents != null ? ord.balanceCents : null, depositCents: ord.depositCents || 0,
+      status: ord.status || "", estimateStatus: ord.estimateStatus || "", payMethod: ord.payMethod || "", paidAt: ord.paidAt || "",
+    };
+    // transacciones ligadas por serviceOrderId o por cliente
+    const tx = [];
+    try { const s = await db.collection("transactions").where("serviceOrderId", "==", ord.id).get(); s.forEach((d) => tx.push({ id: d.id, ...(d.data() || {}) })); } catch (e) {}
+    try { if (ord.clientId) { const s2 = await db.collection("transactions").where("clientId", "==", ord.clientId).get(); s2.forEach((d) => { if (!tx.find((t) => t.id === d.id)) tx.push({ id: d.id, ...(d.data() || {}) }); }); } } catch (e) {}
+    const txOut = tx.map((t) => ({ id: t.id, type: t.type, amountCents: t.amountCents, category: t.category, saleType: t.saleType, serviceOrderId: t.serviceOrderId || "", orderNum: t.orderNum || null, method: t.method, date: t.date, note: t.note || "", source: t.source || "" }));
+    res.json({ ok: true, found: true, order: o, transactions: txOut });
+  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
+});
+
 // 📋 F3 — HOJA DE RECEPCIÓN del carro de servicio (checklist corto al recibir). Guarda el estado AL RECIBIRLO (protege de daños pre-existentes) y avanza a 'recibido'.
 exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
