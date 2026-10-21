@@ -329,22 +329,10 @@
     <div style="position:relative;margin-bottom:12px;"><input id="op-search" type="search" oninput="opSearch(this.value)" placeholder="🔎 Buscar carro, orden, tarea o empleado…" autocomplete="off" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 12px;color:var(--text);font-size:15px;"></div>
     <div id="op-results" style="display:none;margin-bottom:14px;"></div>
     <div id="op-normal">
-    <button onclick="whOwnerJornada()" class="btn ghost" style="width:100%;margin-bottom:14px;">👷 <span data-i18n="ownerMyDay">Mi jornada — trabajar algo de la lista</span></button>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-team-h" style="font-weight:800;font-size:14px;">👥 Equipo en vivo</span></div>
-    <div id="op-team" style="margin-bottom:14px;"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-done-h" style="font-weight:800;font-size:14px;">✅ Hoy se hizo</span></div>
-    <div id="op-done" style="margin-bottom:14px;"></div>
-    <!-- 🏁 LAS 3 LÍNEAS con su etapa -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-dealer-h" style="font-weight:800;font-size:14px;">🚗 Dealer — preparación</span></div>
-    <div id="op-dealer" style="margin-bottom:14px;"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-svc-h" style="font-weight:800;font-size:14px;">🔧 Órdenes de servicio</span></div>
-    <div id="op-svc" style="margin-bottom:14px;"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-dis-h" style="font-weight:800;font-size:14px;">🧩 Dismantling</span></div>
-    <div id="op-dis" style="margin-bottom:14px;"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span id="op-tasks-h" style="font-weight:800;font-size:14px;">📋 Tareas</span>
-      <div style="display:flex;gap:8px;"><button class="btn sm" onclick="jobAddOpen()" data-i18n="opAddTask" style="padding:6px 11px;font-size:12px;">➕ Tarea</button><button class="btn ghost sm" onclick="openCarsProc()" data-i18n="opCarsProc" style="padding:6px 11px;font-size:12px;">🚗 Carros</button></div>
-    </div>
-    <div id="op-tasks" style="max-height:40vh;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
+    <button onclick="whOwnerJornada()" class="btn ghost" style="width:100%;margin-bottom:12px;">👷 <span data-i18n="ownerMyDay">Mi jornada — trabajar algo de la lista</span></button>
+    <!-- Pestañas (como Servicio/Clientes): 🗂️ Todo · 👥 Equipo · 🚗 Dealer · 🔧 Service · 🧩 Dismantling · 📋 Pit -->
+    <div id="op-tabs" style="display:flex;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:14px;padding-bottom:2px;"></div>
+    <div id="op-tab-body"></div>
     </div><!-- /op-normal -->
   </div>
 
@@ -1806,7 +1794,7 @@ window.loadOwnerPanel=async function(){
   // 1) PINTAR AL INSTANTE desde la última foto (sessionStorage) → cero espera al refrescar.
   let hadCache=false;
   try{ const cx=JSON.parse(sessionStorage.getItem('lmg_op_cache')||'null'); if(cx){ OP_TASKS=cx.OP_TASKS||[]; OP_CLOCK=cx.OP_CLOCK||null; OP_DEALER=cx.OP_DEALER||[]; OP_SVC=cx.OP_SVC||[]; OP_DONE=cx.OP_DONE||[]; OP_DIS=cx.OP_DIS||[]; OP_TEAM=cx.OP_TEAM||[]; renderOwnerPanel(); hadCache=true; } }catch(e){}
-  if(!hadCache){ const tb=document.getElementById('op-team'); if(tb) tb.innerHTML='<div class="faint" style="text-align:center;padding:12px;">'+t('jLoadingTxt')+'</div>'; }
+  if(!hadCache){ const tb=document.getElementById('op-tab-body'); if(tb) tb.innerHTML='<div class="faint" style="text-align:center;padding:12px;">'+t('jLoadingTxt')+'</div>'; }
   const call=(n)=>httpsCallable(functions,n)({}).then(r=>(r&&r.data)||{}).catch(()=>({}));
   const paint=()=>{ if(seq!==_opLoadSeq) return; _opRebuildTeam(); renderOwnerPanel(); };
   // 2) Las 6 en paralelo; cada una repinta SU parte al resolver.
@@ -1877,100 +1865,109 @@ function opHeader(key, headerId, listId, label, count){
   }
   const list=document.getElementById(listId); if(list) list.style.display=collapsed?'none':'';
 }
-function renderOwnerPanel(){
-  const tt=document.getElementById('op-title'); if(tt) tt.textContent=L==='en'?'📊 Operations Center':'📊 Centro de Operaciones';
-  const th=document.getElementById('op-team-h'); if(th) th.textContent=L==='en'?'👥 Team live':'👥 Equipo en vivo';
-  const kh=document.getElementById('op-tasks-h'); if(kh) kh.textContent=L==='en'?'📋 Tasks':'📋 Tareas';
-  // Resumen de hoy (4 contadores: Dealer · Service · Tareas · En turno)
-  const sum=document.getElementById('op-summary');
-  const onShift=OP_TEAM.filter(x=>x.open).length;
-  const cells=[['🚗',OP_DEALER.length,'Dealer','dealer'],['🔧',OP_SVC.length,'Service','service'],['🧩',OP_DIS.length,'Dismantling','dis'],['📋',OP_TASKS.length,(L==='en'?'Tasks':'Tareas'),''],['🟢',onShift,(L==='en'?'On shift':'En turno'),'']];
-  if(sum) sum.innerHTML=cells.map(x=>{ const clickable=!!x[3]; const tap=clickable?(' onclick="opJump(\''+x[3]+'\')"'):''; const cur=clickable?'cursor:pointer;':'';
-    return '<div'+tap+' style="flex:1;min-width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 6px;text-align:center;'+cur+'"><div style="font-size:22px;font-weight:800;">'+x[1]+'</div><div class="faint" style="font-size:10.5px;">'+x[0]+' '+x[2]+'</div></div>'; }).join('');
-  // 👥 Equipo en vivo: quién trabaja ahora (🟢 fichado · 🔧 con tarea activa) + horas de la semana + ✅ terminadas hoy.
+// === Centro de Operaciones por PESTAÑAS (congruente con Servicio/Clientes) ===
+let _opTab='todo';
+window.opSetTab=function(tk){ _opTab=tk; renderOwnerPanel(); };
+// Divisor suave (igual que el panorama "Todas" de Servicio).
+function _opDiv(label,count){ return '<div style="display:flex;align-items:center;gap:10px;margin:16px 2px 8px;"><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">'+label+'</span><span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);"></span>'+(count==null?'':'<span style="font-size:11px;color:var(--faint);">'+count+'</span>')+'</div>'; }
+// --- Builders de cada parte (regresan HTML string) ---
+function _opTeamHtml(){
   const doneCount={}; (OP_DONE||[]).forEach(p=>{ doneCount[(p.name||'').trim().toLowerCase()]=p.count; });
-  const tb=document.getElementById('op-team');
-  if(tb){
-    const team=OP_TEAM.slice().sort((a,b)=>Number(!!b.open)-Number(!!a.open)||Number(!!b.task)-Number(!!a.task)||(b.hours||0)-(a.hours||0));
-    if(!team.length){ tb.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nobody working right now.':'Nadie trabajando ahora.')+'</div>'; }
-    else tb.innerHTML=team.map(e=>{
-      const dot=e.open?'🟢':(e.task?'🔧':'⚪');
-      const hrs=(e.open||e.hours)?(' <span class="faint" style="font-weight:400;font-size:12px;">· '+Number(e.hours||0).toFixed(1)+' h</span>'):'';
-      const dc=doneCount[(e.name||'').trim().toLowerCase()]||0;
-      const doneBadge=dc?(' <span style="font-size:11px;color:#35c46a;font-weight:700;">· ✅ '+dc+'</span>'):'';
-      const sub=e.task?('<span style="color:var(--text);">'+esc(e.task.title)+'</span> '+lineBadge(e.task.line)+' · '+_opStatusLabel('en_proceso')):(e.open?(L==='en'?'Clocked in · no active task':'Fichado · sin tarea activa'):'');
-      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><span style="width:30px;height:30px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none;">'+whInitials(e.name)+'</span><div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:14px;">'+dot+' '+esc(e.name||'—')+hrs+doneBadge+'</div><div class="faint" style="font-size:12px;">'+sub+'</div></div></div>';
-    }).join('');
-  }
-  // ✅ Hoy se hizo (terminado hoy por persona)
-  const dh=document.getElementById('op-done-h'); if(dh) dh.textContent=L==='en'?'✅ Done today':'✅ Hoy se hizo';
-  const donebox=document.getElementById('op-done');
-  if(donebox){
-    if(!OP_DONE.length){ donebox.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nothing completed yet today.':'Aún nada terminado hoy.')+'</div>'; }
-    else donebox.innerHTML=OP_DONE.map(p=>{
-      const items=(p.items||[]).map(it=>'<div style="font-size:12px;color:var(--text);padding:2px 0 2px 38px;">• '+esc(it.title||'')+' '+lineBadge(it.line)+(it.car?(' <span class="faint">· 🚗 '+esc(it.car)+'</span>'):'')+'</div>').join('');
-      return '<div style="padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex:none;">'+whInitials(p.name)+'</span><div style="font-weight:700;font-size:14px;">'+esc(p.name||'—')+' <span style="color:#35c46a;font-size:12px;">· ✅ '+p.count+'</span></div></div>'+items+'</div>';
-    }).join('');
-  }
-  // 🚗 LÍNEA DEALER (preparación) — carros con su etapa + estado del DVI.
-  opHeader('dealer','op-dealer-h','op-dealer',(L==='en'?'🚗 Dealer — prep':'🚗 Dealer — preparación'),OP_DEALER.length);
-  const dlbox=document.getElementById('op-dealer');
-  if(dlbox){
-    if(!OP_DEALER.length){ dlbox.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No cars in prep.':'Sin carros en preparación.')+'</div>'; }
-    else dlbox.innerHTML=OP_DEALER.map(c=>{
-      const stage=t(STAGE_KEY[c.reconStage]||'stMecanico');
-      let dvi='';
-      if(c.waitingParts) dvi='<span style="color:#ff8a4c;">⏸️ '+L2('Esperando partes','Waiting on parts')+(c.partsNeeded?(' ('+c.partsNeeded+')'):'')+'</span>';
-      else if(c.reconStage==='mecanico' && !c.inspStarted) dvi='<span style="color:var(--muted);">'+L2('Inspección pendiente','Inspection pending')+'</span>';
-      else if(c.reconStage==='mecanico' && c.inspStarted && !c.inspDone) dvi='<span style="color:var(--gold);">'+L2('En inspección','Inspecting')+'</span>';
-      else if(c.inspDone) dvi='<span style="color:#35c46a;">✓ '+L2('Inspección lista','Inspection done')+'</span>';
-      const tsk=c.tasks?(' · 🔧 '+c.tasks+' '+t('jobsN')):'';
-      const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' '+L2('labor','labor')+'</span>'):'';
-      return '<div onclick="opWorkDealer(\''+c.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+esc(stage)+' <span style="color:var(--muted);">›</span></span></div>'
-        +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(dvi||'&nbsp;')+tsk+lab+'</div>'+dealPipelineHtml(c.reconStage)+'</div>';
-    }).join('');
-  }
-  // 🔧 Órdenes de servicio abiertas (línea Service) — para que dueños las vean sin entrar como trabajador.
-  opHeader('service','op-svc-h','op-svc',(L==='en'?'🔧 Service orders':'🔧 Órdenes de servicio'),OP_SVC.length);
-  const svcbox=document.getElementById('op-svc');
-  if(svcbox){
-    if(!OP_SVC.length){ svcbox.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No open service orders.':'Sin órdenes de servicio abiertas.')+'</div>'; }
-    else svcbox.innerHTML=OP_SVC.map(o=>{
-      const car=esc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
-      // "Terminado" SOLO si la orden está realmente lista/entregada; si la revirtieron (por recibir/recibido) manda el status de la orden.
-      const doneSt=(o.status==='listo'||o.status==='entregado'||o.status==='hecho');
-      const stage = o.activeRole ? ('🚩 '+svcRoleLabel(o.activeRole)) : (doneSt ? ('🏁 '+L2('Terminado','Done')) : ('🚩 '+_opStatusLabel(o.status)));
-      const s=(o.services||[]).find(x=>x.role===o.activeRole && x.assignName); const who=s?(' · 👤 '+esc(s.assignName)):'';
-      return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+' <span style="color:var(--muted);">›</span></span></div><div class="faint" style="font-size:12px;margin-top:2px;">🚗 '+car+who+' · '+_opStatusLabel(o.status)+'</div></div>';
-    }).join('');
-  }
-  // 🧩 LÍNEA DISMANTLING — carros en desmantelado + contador de partes (quedan / vendidas).
-  opHeader('dis','op-dis-h','op-dis','🧩 Dismantling',OP_DIS.length);
-  const disbox=document.getElementById('op-dis');
-  if(disbox){
-    if(!OP_DIS.length){ disbox.innerHTML='<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No cars in dismantling.':'Sin carros en dismantling.')+'</div>'; }
-    else disbox.innerHTML=OP_DIS.map(c=>{
-      const parts = c.partsTotal
-        ? ('🧩 '+c.partsLeft+'/'+c.partsTotal+' '+L2('partes','parts')+' · '+L2('vendidas','sold')+' '+c.partsSold)
-        : ('<span style="color:var(--muted);">'+L2('Aún sin partes capturadas','No parts captured yet')+'</span>');
-      const allSold = c.partsTotal>0 && c.partsLeft===0;
-      const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' labor</span>'):'';
-      return '<div onclick="openCarAccounts(\''+c.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="white-space:nowrap;">'+(allSold?'<span style="font-size:11px;color:#35c46a;font-weight:700;">✓ </span>':'')+'<span style="font-size:11px;font-weight:700;color:var(--gold);">💰 '+L2('cuentas','accounts')+' <span style="color:var(--muted);">›</span></span></span></div>'
-        +'<div class="faint" style="font-size:12px;margin-top:2px;">'+parts+lab+'</div></div>';
-    }).join('');
-  }
-  // Tareas
-  const box=document.getElementById('op-tasks'); if(!box) return;
-  if(!OP_TASKS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:14px;line-height:1.5;">'+t('opEmpty')+'</div>'; return; }
+  const team=OP_TEAM.slice().sort((a,b)=>Number(!!b.open)-Number(!!a.open)||Number(!!b.task)-Number(!!a.task)||(b.hours||0)-(a.hours||0));
+  if(!team.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nobody working right now.':'Nadie trabajando ahora.')+'</div>';
+  return team.map(e=>{
+    const dot=e.open?'🟢':(e.task?'🔧':'⚪');
+    const hrs=(e.open||e.hours)?(' <span class="faint" style="font-weight:400;font-size:12px;">· '+Number(e.hours||0).toFixed(1)+' h</span>'):'';
+    const dc=doneCount[(e.name||'').trim().toLowerCase()]||0;
+    const doneBadge=dc?(' <span style="font-size:11px;color:#35c46a;font-weight:700;">· ✅ '+dc+'</span>'):'';
+    const nm=(typeof whEscA==='function'?whEscA(e.name||''):String(e.name||'')).replace(/\x27/g,'');
+    const sub=e.task?('<span style="color:var(--text);">'+esc(e.task.title)+'</span> '+lineBadge(e.task.line)+' · '+_opStatusLabel('en_proceso')):(e.open?(L==='en'?'Clocked in · no active task':'Fichado · sin tarea activa'):'');
+    return '<div onclick="whEmpReport(\'\',\''+nm+'\',\'\')" style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><span style="width:30px;height:30px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none;">'+whInitials(e.name)+'</span><div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:14px;">'+dot+' '+esc(e.name||'—')+hrs+doneBadge+'</div><div class="faint" style="font-size:12px;">'+sub+'</div></div><span style="color:var(--muted);">›</span></div>';
+  }).join('');
+}
+function _opDoneHtml(){
+  if(!OP_DONE.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nothing completed yet today.':'Aún nada terminado hoy.')+'</div>';
+  return OP_DONE.map(p=>{
+    const items=(p.items||[]).map(it=>'<div style="font-size:12px;color:var(--text);padding:2px 0 2px 38px;">• '+esc(it.title||'')+' '+lineBadge(it.line)+(it.car?(' <span class="faint">· 🚗 '+esc(it.car)+'</span>'):'')+'</div>').join('');
+    return '<div style="padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.06);"><div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex:none;">'+whInitials(p.name)+'</span><div style="font-weight:700;font-size:14px;">'+esc(p.name||'—')+' <span style="color:#35c46a;font-size:12px;">· ✅ '+p.count+'</span></div></div>'+items+'</div>';
+  }).join('');
+}
+function _opDealerHtml(){
+  if(!OP_DEALER.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No cars in prep.':'Sin carros en preparación.')+'</div>';
+  return OP_DEALER.map(c=>{
+    const stage=t(STAGE_KEY[c.reconStage]||'stMecanico');
+    let dvi='';
+    if(c.waitingParts) dvi='<span style="color:#ff8a4c;">⏸️ '+L2('Esperando partes','Waiting on parts')+(c.partsNeeded?(' ('+c.partsNeeded+')'):'')+'</span>';
+    else if(c.reconStage==='mecanico' && !c.inspStarted) dvi='<span style="color:var(--muted);">'+L2('Inspección pendiente','Inspection pending')+'</span>';
+    else if(c.reconStage==='mecanico' && c.inspStarted && !c.inspDone) dvi='<span style="color:var(--gold);">'+L2('En inspección','Inspecting')+'</span>';
+    else if(c.inspDone) dvi='<span style="color:#35c46a;">✓ '+L2('Inspección lista','Inspection done')+'</span>';
+    const tsk=c.tasks?(' · 🔧 '+c.tasks+' '+t('jobsN')):'';
+    const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' '+L2('labor','labor')+'</span>'):'';
+    return '<div onclick="opWorkDealer(\''+c.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+esc(stage)+' <span style="color:var(--muted);">›</span></span></div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(dvi||'&nbsp;')+tsk+lab+'</div>'+dealPipelineHtml(c.reconStage)+'</div>';
+  }).join('');
+}
+function _opSvcHtml(){
+  if(!OP_SVC.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No open service orders.':'Sin órdenes de servicio abiertas.')+'</div>';
+  return OP_SVC.map(o=>{
+    const car=esc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
+    const doneSt=(o.status==='listo'||o.status==='entregado'||o.status==='hecho');
+    const stage = o.activeRole ? ('🚩 '+svcRoleLabel(o.activeRole)) : (doneSt ? ('🏁 '+L2('Terminado','Done')) : ('🚩 '+_opStatusLabel(o.status)));
+    const s=(o.services||[]).find(x=>x.role===o.activeRole && x.assignName); const who=s?(' · 👤 '+esc(s.assignName)):'';
+    return '<div onclick="opWorkService()" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+' <span style="color:var(--muted);">›</span></span></div><div class="faint" style="font-size:12px;margin-top:2px;">🚗 '+car+who+' · '+_opStatusLabel(o.status)+'</div></div>';
+  }).join('');
+}
+function _opDisHtml(){
+  if(!OP_DIS.length) return '<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No cars in dismantling.':'Sin carros en dismantling.')+'</div>';
+  return OP_DIS.map(c=>{
+    const parts = c.partsTotal
+      ? ('🧩 '+c.partsLeft+'/'+c.partsTotal+' '+L2('partes','parts')+' · '+L2('vendidas','sold')+' '+c.partsSold)
+      : ('<span style="color:var(--muted);">'+L2('Aún sin partes capturadas','No parts captured yet')+'</span>');
+    const allSold = c.partsTotal>0 && c.partsLeft===0;
+    const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' labor</span>'):'';
+    return '<div onclick="openCarAccounts(\''+c.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="white-space:nowrap;">'+(allSold?'<span style="font-size:11px;color:#35c46a;font-weight:700;">✓ </span>':'')+'<span style="font-size:11px;font-weight:700;color:var(--gold);">💰 '+L2('cuentas','accounts')+' <span style="color:var(--muted);">›</span></span></span></div>'
+      +'<div class="faint" style="font-size:12px;margin-top:2px;">'+parts+lab+'</div></div>';
+  }).join('');
+}
+function _opTasksHtml(){
+  if(!OP_TASKS.length) return '<div class="faint" style="text-align:center;padding:14px;line-height:1.5;">'+t('opEmpty')+'</div>';
   const _prO={now:0,next:1,cola:2};
   const _opList=OP_TASKS.slice().sort((a,b)=>((_prO[a.priority||'cola']!=null?_prO[a.priority||'cola']:2)-(_prO[b.priority||'cola']!=null?_prO[b.priority||'cola']:2))||((a.order||0)-(b.order||0)));
-  box.innerHTML=_opList.map(x=>{
+  return _opList.map(x=>{
     const total=x.steps||0, done=x.done||0, pr=total?(' · '+done+'/'+total):'';
     const who=x.assignName?('👤 '+esc(x.assignName)):t('unassigned');
     const car=x.carLabel?(' · 🚗 '+esc(x.carLabel)):'';
     const prioB = x.priority==='now' ? '<span style="color:#e0683a;font-weight:800;font-size:10px;border:1px solid #e0683a;border-radius:999px;padding:1px 6px;white-space:nowrap;">🔴</span> ' : x.priority==='next' ? '<span style="color:#e8b64a;font-weight:800;font-size:10px;border:1px solid #e8b64a;border-radius:999px;padding:1px 6px;white-space:nowrap;">🟡</span> ' : '';
     return '<div onclick="opWorkTask(\''+x.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+prioB+esc(x.title)+' '+lineBadge(x.line)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+taskChip(x)+'<span onclick="event.stopPropagation();jobEditOpen(\''+x.id+'\')" title="Editar" style="cursor:pointer;font-size:14px;padding:3px 5px;border-radius:7px;background:var(--surface2);">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+_opStatusLabel(x.status)+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
+}
+function renderOwnerPanel(){
+  const tt=document.getElementById('op-title'); if(tt) tt.textContent=L==='en'?'📊 Operations Center':'📊 Centro de Operaciones';
+  const onShift=OP_TEAM.filter(x=>x.open).length;
+  // Resumen de hoy (contadores) → cada uno CAMBIA de pestaña.
+  const sum=document.getElementById('op-summary');
+  const cells=[['🚗',OP_DEALER.length,'Dealer','dealer'],['🔧',OP_SVC.length,'Service','service'],['🧩',OP_DIS.length,'Dismantling','dis'],['📋',OP_TASKS.length,(L==='en'?'Tasks':'Tareas'),'pit'],['🟢',onShift,(L==='en'?'On shift':'En turno'),'equipo']];
+  if(sum) sum.innerHTML=cells.map(x=>'<div onclick="opSetTab(\''+x[3]+'\')" style="flex:1;min-width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer;"><div style="font-size:22px;font-weight:800;">'+x[1]+'</div><div class="faint" style="font-size:10.5px;">'+x[0]+' '+x[2]+'</div></div>').join('');
+  // Pestañas
+  const tabsArr=[['todo','🗂️ '+L2('Todo','All'),OP_DEALER.length+OP_SVC.length+OP_DIS.length+OP_TASKS.length],['equipo','👥 '+L2('Equipo','Team'),OP_TEAM.length],['dealer','🚗 Dealer',OP_DEALER.length],['service','🔧 Service',OP_SVC.length],['dis','🧩 Dismantling',OP_DIS.length],['pit','📋 Pit',OP_TASKS.length]];
+  const tabsBox=document.getElementById('op-tabs'); const cur=_opTab;
+  if(tabsBox) tabsBox.innerHTML=tabsArr.map(a=>'<button onclick="opSetTab(\''+a[0]+'\')" style="padding:8px 13px;border-radius:999px;border:1px solid '+(cur===a[0]?'var(--gold)':'var(--border)')+';background:'+(cur===a[0]?'var(--gold)':'transparent')+';color:'+(cur===a[0]?'var(--navy3,#0b0e14)':'var(--text)')+';font-weight:800;font-size:12.5px;cursor:pointer;white-space:nowrap;flex:none;">'+a[1]+' <span style="opacity:.7;">'+a[2]+'</span></button>').join('');
+  // Cuerpo de la pestaña activa
+  const body=document.getElementById('op-tab-body'); if(!body) return;
+  let html='';
+  if(cur==='equipo'){ html=_opDiv('👥 '+L2('Equipo en vivo','Team live'),null)+_opTeamHtml()+_opDiv('✅ '+L2('Hoy se hizo','Done today'),null)+_opDoneHtml(); }
+  else if(cur==='dealer'){ html=_opDealerHtml(); }
+  else if(cur==='service'){ html=_opSvcHtml(); }
+  else if(cur==='dis'){ html=_opDisHtml(); }
+  else if(cur==='pit'){ html='<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn sm" onclick="jobAddOpen()" style="padding:7px 12px;font-size:12px;">➕ '+L2('Tarea','Task')+'</button><button class="btn ghost sm" onclick="openCarsProc()" style="padding:7px 12px;font-size:12px;">🚗 '+L2('Carros','Cars')+'</button></div>'+_opTasksHtml(); }
+  else { // 🗂️ Todo = panorama con divisores suaves
+    html=_opDiv('👥 '+L2('Equipo','Team'),OP_TEAM.filter(x=>x.open||x.task).length)+_opTeamHtml()
+      +_opDiv('🚗 Dealer',OP_DEALER.length)+_opDealerHtml()
+      +_opDiv('🔧 Service',OP_SVC.length)+_opSvcHtml()
+      +_opDiv('🧩 Dismantling',OP_DIS.length)+_opDisHtml()
+      +_opDiv('📋 Pit',OP_TASKS.length)+_opTasksHtml();
+  }
+  body.innerHTML=html;
 }
 
 // ➕ Dueño crea / ✏️ edita una TAREA SUELTA (Pit): qué → función → ejecutor → carro (inventario/desmantelar) → pasos.
