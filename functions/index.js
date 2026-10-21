@@ -1905,7 +1905,7 @@ exports.sqDiag = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 
         location_id: SQUARE_LOCATION_ID, reference_id: o.clientId || orderId,
         line_items: [{ name: "Orden de servicio #" + (o.orderNum || "") + " — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
         service_charges: [{ name: "Cargo por servicio / Service fee (2.9%)", percentage: "2.9", calculation_phase: "SUBTOTAL_PHASE" }],
-        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents), priv: "" },
+        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents) },
       },
       checkout_options: { redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1", ask_for_shipping_address: false, accepted_payment_methods: { apple_pay: true, google_pay: true, cash_app_pay: true, afterpay_clearpay: false } },
     };
