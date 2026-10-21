@@ -979,6 +979,7 @@
   ];
 </script>
 
+<script src="legacy-svc.js"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1593,11 +1594,8 @@ function svcRenderAllTab(box,q){
   const label=k=>{ if(k==='—') return 'Sin fecha'; if(k===todayK) return 'Hoy'; if(k===yK) return 'Ayer'; try{ return new Date(k+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}); }catch(e){ return k; } };
   const groups=[]; const seen={};
   list.forEach(o=>{ const k=dayKey(o); if(!seen[k]){ seen[k]={k,items:[]}; groups.push(seen[k]); } seen[k].items.push(o); });
-  box.innerHTML=groups.map(g=>'<div style="display:flex;align-items:center;gap:10px;margin:16px 2px 8px;">'
-    +'<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">'+label(g.k)+'</span>'
-    +'<span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);"></span>'
-    +'<span style="font-size:11px;color:var(--faint);">'+g.items.length+'</span></div>'
-    +svcTableHtml(g.items, true)).join('');
+  const _div=(lbl,n)=>(window.LMG&&LMG.softDivider)?LMG.softDivider(lbl,n):('<div style="display:flex;align-items:center;gap:10px;margin:16px 2px 8px;"><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">'+lbl+'</span><span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);"></span><span style="font-size:11px;color:var(--faint);">'+n+'</span></div>');
+  box.innerHTML=groups.map(g=>_div(label(g.k),g.items.length)+svcTableHtml(g.items, true)).join('');
 }
 function svcRenderClientsTab(box,q){
   // 🗂️ BASE DEL CRM: TODOS los clientes de servicio — con estimado, activos, completados, o marcados kind:'service' aunque aún no tengan orden.
