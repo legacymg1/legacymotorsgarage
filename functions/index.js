@@ -847,7 +847,7 @@ exports.svcCharge = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 
         location_id: SQUARE_LOCATION_ID, reference_id: o.clientId || orderId,
         line_items: [{ name: "Orden de servicio #" + (o.orderNum || "") + " — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
         service_charges: [{ name: "Cargo por servicio / Service fee (2.9%)", percentage: "2.9", calculation_phase: "SUBTOTAL_PHASE" }],
-        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents), priv: priv ? "1" : "" },
+        metadata: Object.assign({ kind: "service", serviceOrderId: orderId, baseCents: String(amountCents) }, priv ? { priv: "1" } : {}),   // ⚠️ Square rechaza metadata con valor "" → solo mandar priv si es privado.
       },
       checkout_options: {
         redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1",
@@ -911,7 +911,7 @@ exports.createServiceCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors
         location_id: SQUARE_LOCATION_ID, reference_id: o.clientId || orderId,
         line_items: [{ name: "Orden de servicio #" + (o.orderNum || "") + " — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
         service_charges: [{ name: "Cargo por servicio / Service fee (2.9%)", percentage: "2.9", calculation_phase: "SUBTOTAL_PHASE" }],
-        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents), priv: "" },
+        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents) },   // ⚠️ NO mandar claves vacías: Square rechaza metadata con valor "".
       },
       checkout_options: {
         redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1",
