@@ -1886,24 +1886,57 @@ exports.svcBackfillNums = onRequest(async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
 });
 
-// 🔎 DIAG TEMPORAL — últimos pagos de Square con total/comisión/neto. ?key=lmgfin2026&days=10
-exports.sqRecent = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (req, res) => {
+// 💳🔗 LIGA un pago REAL de Square a una orden de servicio (reutilizable: fix manual, Terminal API, webhook).
+//   - Finanzas: registra el NETO real (total − comisión de Square). Idempotente por sq_<paymentId>.
+//   - Orden: queda PAGADA por el TOTAL DEL SERVICIO (el cliente pagó el servicio; el 2% y la comisión son cargo de tarjeta).
+//   - Guarda en la orden total/comisión/neto + id del pago → feed del INVOICE (desglose).
+async function _sqLinkPaymentToOrder(db, orderId, paymentId, who) {
+  const r = await fetch(SQUARE_API + "/v2/payments/" + encodeURIComponent(paymentId), { headers: _sqHeaders() });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.payment) return { ok: false, error: (j.errors && j.errors[0] && j.errors[0].detail) || "square_error" };
+  const p = j.payment;
+  if (p.status !== "COMPLETED") return { ok: false, error: "pago no completado (" + p.status + ")" };
+  const totalCents = (p.amount_money && Number(p.amount_money.amount)) || 0;
+  const feeCents = (Array.isArray(p.processing_fee) ? p.processing_fee : []).reduce((a, f) => a + ((f.amount_money && Number(f.amount_money.amount)) || 0), 0);
+  const netCents = totalCents - feeCents;
+  const last4 = (p.card_details && p.card_details.card && p.card_details.card.last_4) || "";
+  const nowISO = new Date().toISOString();
+  const dateStr = (p.created_at || nowISO).slice(0, 10);
+  const oref = db.collection("serviceOrders").doc(orderId);
+  const os = await oref.get();
+  if (!os.exists) return { ok: false, error: "order" };
+  const o = os.data() || {};
+  const svcTotal = Number(o.grandTotalCents) || 0;
+  const entryId = "sq_" + paymentId;
+  const txref = db.doc("transactions/" + entryId);
+  const ts = await txref.get();
+  if (!ts.exists) {   // 💵 NETO real a Finanzas (idempotente)
+    await txref.set({
+      entryId, type: "income", dept: "dealer", category: "Servicio", saleType: "servicio", private: false,
+      clientId: o.clientId || "", clientName: o.clientName || "",
+      serviceOrderId: orderId, orderNum: o.orderNum || null, carLabel: o.vehicleLabel || "",
+      amountCents: netCents, method: "square", date: dateStr,
+      note: "Pago Square" + (last4 ? (" ·" + last4) : "") + " · total $" + (totalCents / 100).toFixed(2) + " · comisión $" + (feeCents / 100).toFixed(2) + " · neto $" + (netCents / 100).toFixed(2),
+      createdAt: nowISO, createdBy: who || "square", source: "square-terminal",
+      sqPaymentId: paymentId, sqTotalCents: totalCents, sqFeeCents: feeCents,
+    });
+  }
+  // Orden: pagada por el total del servicio + datos de Square para el invoice.
+  const patch = { paidCents: svcTotal, paid: true, balanceCents: 0, payMethod: "square", paidAt: p.created_at || nowISO, updatedAt: nowISO, sqPaymentId: paymentId, sqTotalCents: totalCents, sqFeeCents: feeCents, sqNetCents: netCents, sqLast4: last4 };
+  if (o.estimateStatus !== "accepted") { patch.estimateStatus = "accepted"; if (!o.estimateAcceptedAt) patch.estimateAcceptedAt = nowISO; }
+  patch.status = "entregado"; if (!o.deliveredAt) patch.deliveredAt = nowISO;
+  await oref.set(patch, { merge: true });
+  return { ok: true, totalCents, feeCents, netCents, last4, serviceTotalCents: svcTotal };
+}
+// 🛠️ TEMP — liga el pago de Square confirmado a la orden #1004. ?key=lmgfin2026
+exports.svcLink1004 = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (req, res) => {
   if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
   try {
-    const days = Math.min(60, Math.max(1, Number(req.query.days || 14)));
-    const begin = new Date(Date.now() - days * 864e5).toISOString();
-    const url = SQUARE_API + "/v2/payments?sort_order=DESC&limit=30&begin_time=" + encodeURIComponent(begin);
-    const r = await fetch(url, { method: "GET", headers: _sqHeaders() });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { res.json({ ok: false, status: r.status, err: j.errors || null }); return; }
-    const cents = (m) => (m && m.amount != null) ? Number(m.amount) : 0;
-    const out = (j.payments || []).map((p) => {
-      const total = cents(p.amount_money);
-      const fee = (Array.isArray(p.processing_fee) ? p.processing_fee : []).reduce((a, f) => a + cents(f.amount_money), 0);
-      const src = (p.source_type || "") + (p.card_details && p.card_details.entry_method ? ("/" + p.card_details.entry_method) : "");
-      return { id: p.id, status: p.status, totalUSD: (total / 100).toFixed(2), feeUSD: (fee / 100).toFixed(2), netUSD: ((total - fee) / 100).toFixed(2), feePending: fee === 0, created: p.created_at, last4: (p.card_details && p.card_details.card && p.card_details.card.last_4) || "", source: src, note: p.note || "", orderId: p.order_id || "" };
-    });
-    res.json({ ok: true, count: out.length, payments: out });
+    const db = admin.firestore();
+    let orderId = ""; const s = await db.collection("serviceOrders").where("orderNum", "==", 1004).limit(1).get(); s.forEach((d) => { orderId = d.id; });
+    if (!orderId) { res.json({ ok: false, err: "no #1004" }); return; }
+    const r = await _sqLinkPaymentToOrder(db, orderId, "Yj4CAtnFFhiOUORph9sUIUAJNVZZY", "square-terminal (fix #1004)");
+    res.json(r);
   } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
 });
 
