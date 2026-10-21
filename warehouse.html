@@ -535,6 +535,7 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
+<script src="legacy-svc.js"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1814,20 +1815,22 @@ window.loadOwnerPanel=async function(){
   try{ sessionStorage.setItem('lmg_op_cache', JSON.stringify({OP_TASKS,OP_CLOCK,OP_DEALER,OP_SVC,OP_DONE,OP_DIS,OP_TEAM})); }catch(e){}
 };
 // Normaliza cualquier estatus interno a los términos UNIFICADOS: En cola → En proceso → En pausa → Terminado.
+// 🔗 Delegan al componente compartido legacy-svc.js (LMG); con respaldo local por si el archivo no cargó.
 function _opStatusLabel(s){
+  if(window.LMG && LMG.svcStatusLabel) return LMG.svcStatusLabel(s, L==='en');
   if(s==='en_proceso') return L==='en'?'In progress':'En proceso';
   if(s==='pausada'||s==='pausado'||s==='pausado_partes') return L==='en'?'Paused':'En pausa';
   if(s==='listo'||s==='hecho'||s==='terminado'||s==='entregado') return L==='en'?'Done':'Terminado';
   return L==='en'?'Queued':'En cola';
 }
-// 🎨 Color único de estatus en TODO el sistema (congruente con Servicio/Clientes): En cola gris · En proceso dorado · En pausa naranja · Terminado verde.
 function _opStatusColor(s){
+  if(window.LMG && LMG.svcStatusColor) return LMG.svcStatusColor(s);
   if(s==='en_proceso') return '#e8b64a';
   if(s==='pausada'||s==='pausado'||s==='pausado_partes') return '#ff9800';
   if(s==='listo'||s==='hecho'||s==='terminado'||s==='entregado') return '#35c46a';
   return '#8a8fa8';
 }
-function _opBadge(s){ const c=_opStatusColor(s); return '<span style="font-size:10px;font-weight:800;color:'+c+';background:'+c+'1f;border:1px solid '+c+';padding:2px 7px;border-radius:999px;white-space:nowrap;">'+_opStatusLabel(s)+'</span>'; }
+function _opBadge(s){ if(window.LMG && LMG.svcBadge) return LMG.svcBadge(s, L==='en'); const c=_opStatusColor(s); return '<span style="font-size:10px;font-weight:800;color:'+c+';background:'+c+'1f;border:1px solid '+c+';padding:2px 7px;border-radius:999px;white-space:nowrap;">'+_opStatusLabel(s)+'</span>'; }
 // ⚠️ Mensaje de "no se pudo cargar" (distinto de "vacío"). Toca ↻ para reintentar.
 function _opErrMsg(){ return '<div style="font-size:13px;padding:10px 2px;color:#ff8a4c;font-weight:700;">⚠️ '+L2('No se pudo cargar — toca ↻ arriba para reintentar','Could not load — tap ↻ above to retry')+'</div>'; }
 // Secciones minimizables del Centro (Dealer/Dismantling colapsadas por default porque suelen ser MUCHOS).
@@ -1880,7 +1883,7 @@ function opHeader(key, headerId, listId, label, count){
 let _opTab='todo';
 window.opSetTab=function(tk){ _opTab=tk; renderOwnerPanel(); };
 // Divisor suave (igual que el panorama "Todas" de Servicio).
-function _opDiv(label,count){ return '<div style="display:flex;align-items:center;gap:10px;margin:16px 2px 8px;"><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">'+label+'</span><span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);"></span>'+(count==null?'':'<span style="font-size:11px;color:var(--faint);">'+count+'</span>')+'</div>'; }
+function _opDiv(label,count){ if(window.LMG && LMG.softDivider) return LMG.softDivider(label,count); return '<div style="display:flex;align-items:center;gap:10px;margin:16px 2px 8px;"><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">'+label+'</span><span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);"></span>'+(count==null?'':'<span style="font-size:11px;color:var(--faint);">'+count+'</span>')+'</div>'; }
 // --- Builders de cada parte (regresan HTML string) ---
 function _opTeamHtml(){
   const doneCount={}; (OP_DONE||[]).forEach(p=>{ doneCount[(p.name||'').trim().toLowerCase()]=p.count; });
