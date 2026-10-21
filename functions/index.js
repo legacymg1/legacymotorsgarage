@@ -1886,23 +1886,25 @@ exports.svcBackfillNums = onRequest(async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
 });
 
-// 🔎 DIAG TEMPORAL — verifica scopes del token de Square (leer pagos + vincular Terminal). ?key=lmgfin2026
-exports.sqScopeCheck = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (req, res) => {
+// 🔎 DIAG TEMPORAL — últimos pagos de Square con total/comisión/neto. ?key=lmgfin2026&days=10
+exports.sqRecent = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (req, res) => {
   if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
-  const out = {};
-  // 1) PAYMENTS_READ → leer el neto/comisión real
   try {
-    const r = await fetch(SQUARE_API + "/v2/payments?limit=1", { method: "GET", headers: _sqHeaders() });
+    const days = Math.min(60, Math.max(1, Number(req.query.days || 14)));
+    const begin = new Date(Date.now() - days * 864e5).toISOString();
+    const url = SQUARE_API + "/v2/payments?sort_order=DESC&limit=30&begin_time=" + encodeURIComponent(begin);
+    const r = await fetch(url, { method: "GET", headers: _sqHeaders() });
     const j = await r.json().catch(() => ({}));
-    out.payments_read = { status: r.status, ok: r.ok, err: (j.errors && j.errors[0] && (j.errors[0].code + " · " + j.errors[0].detail)) || null };
-  } catch (e) { out.payments_read = { err: String(e) }; }
-  // 2) DEVICE_CREDENTIAL_MANAGEMENT → vincular el Square Terminal (crea un código de dispositivo; expira en 5 min)
-  try {
-    const r2 = await fetch(SQUARE_API + "/v2/devices/codes", { method: "POST", headers: _sqHeaders(), body: JSON.stringify({ idempotency_key: Date.now().toString(36) + Math.random().toString(36).slice(2, 10), device_code: { name: "Legacy — prueba scope", product_type: "TERMINAL_API", location_id: SQUARE_LOCATION_ID } }) });
-    const j2 = await r2.json().catch(() => ({}));
-    out.device_mgmt = { status: r2.status, ok: r2.ok, code: (j2.device_code && j2.device_code.code) || null, err: (j2.errors && j2.errors[0] && (j2.errors[0].code + " · " + j2.errors[0].detail)) || null };
-  } catch (e) { out.device_mgmt = { err: String(e) }; }
-  res.json({ ok: true, scopes: out });
+    if (!r.ok) { res.json({ ok: false, status: r.status, err: j.errors || null }); return; }
+    const cents = (m) => (m && m.amount != null) ? Number(m.amount) : 0;
+    const out = (j.payments || []).map((p) => {
+      const total = cents(p.amount_money);
+      const fee = (Array.isArray(p.processing_fee) ? p.processing_fee : []).reduce((a, f) => a + cents(f.amount_money), 0);
+      const src = (p.source_type || "") + (p.card_details && p.card_details.entry_method ? ("/" + p.card_details.entry_method) : "");
+      return { id: p.id, status: p.status, totalUSD: (total / 100).toFixed(2), feeUSD: (fee / 100).toFixed(2), netUSD: ((total - fee) / 100).toFixed(2), feePending: fee === 0, created: p.created_at, last4: (p.card_details && p.card_details.card && p.card_details.card.last_4) || "", source: src, note: p.note || "", orderId: p.order_id || "" };
+    });
+    res.json({ ok: true, count: out.length, payments: out });
+  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
 });
 
 // 📋 F3 — HOJA DE RECEPCIÓN del carro de servicio (checklist corto al recibir). Guarda el estado AL RECIBIRLO (protege de daños pre-existentes) y avanza a 'recibido'.
