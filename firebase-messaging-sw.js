@@ -37,8 +37,17 @@ self.addEventListener('message', (event) => {
 self.addEventListener('install', (event) => { self.skipWaiting(); });
 self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()); });
 self.addEventListener('fetch', (event) => {
-  // Pass-through a la red (sin caché). Su sola presencia hace instalable la PWA.
-  return;
+  const req = event.request;
+  // 🔄 NAVEGACIONES (cargar/recargar la página) SIEMPRE frescas → ningún cliente queda pegado en una versión vieja.
+  // Revalida con el servidor (no-cache); si falla (offline), reintenta normal.
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' }))
+        .catch(() => fetch(req))
+    );
+    return;
+  }
+  // Lo demás (JS/CSS/imágenes): pass-through normal del navegador.
 });
 
 // Al tocar la notificación → abre/enfoca la app EN ESA conversación.
