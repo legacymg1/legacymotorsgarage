@@ -1922,7 +1922,10 @@ function _opSvcHtml(){
     const doneSt=(o.status==='listo'||o.status==='entregado'||o.status==='hecho');
     const stage = o.activeRole ? ('🚩 '+svcRoleLabel(o.activeRole)) : (doneSt ? ('🏁 '+L2('Terminado','Done')) : ('🚩 '+_opStatusLabel(o.status)));
     const s=(o.services||[]).find(x=>x.role===o.activeRole && x.assignName); const who=s?(' · 👤 '+esc(s.assignName)):'';
-    return '<div onclick="svcEmpOpen(\''+o.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+esc(o.clientName||'Cliente')+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+stage+' <span style="color:var(--muted);">›</span></span></div><div style="font-size:12px;margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span class="faint">🚗 '+car+who+'</span>'+_opBadge(o.status)+'</div></div>';
+    const folio=o.orderNum?('<span style="color:var(--gold);font-weight:800;font-variant-numeric:tabular-nums;">#'+o.orderNum+'</span> · '):'';
+    return '<div onclick="svcEmpOpen(\''+o.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+folio+esc(o.clientName||'Cliente')+'</span><span style="display:flex;align-items:center;gap:6px;flex:none;">'+_opBadge(o.status)+'<span style="color:var(--muted);">›</span></span></div>'
+      +'<div class="faint" style="font-size:12px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚗 '+car+(o.reason?(' · '+esc(o.reason)):'')+(stage?(' · '+stage):'')+who+'</div></div>';
   }).join('');
 }
 function _opDisHtml(){
