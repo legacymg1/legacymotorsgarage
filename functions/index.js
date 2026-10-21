@@ -834,8 +834,9 @@ exports.svcCharge = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 
     await oref.set(patch, { merge: true });
     return { ok: true, paid: fullyPaid, paidCents: newPaid, reconciled: true };
   }
-  if (method === "cash") {
-    await _postServiceIncome(db, o, orderId, amountCents, "cash", "svc_" + orderId + "_" + Date.now().toString(36), id.email || id.name || "", priv);
+  // 💵 Efectivo o 💳 TARJETA EN PERSONA (terminal): registra YA el ingreso y marca pagada (ambos entran a Finanzas).
+  if (method === "cash" || method === "terminal") {
+    await _postServiceIncome(db, o, orderId, amountCents, method, "svc_" + orderId + "_" + Date.now().toString(36), id.email || id.name || "", priv);
     const fresh = (await oref.get()).data() || {};
     return { ok: true, paid: !!fresh.paid, paidCents: Number(fresh.paidCents) || 0 };
   }

@@ -1747,7 +1747,8 @@ window.svcChargeOpen=function(id){
         +'<label style="display:flex;align-items:center;gap:9px;margin-bottom:8px;cursor:pointer;color:var(--text);font-size:13px;"><input type="checkbox" id="svc-caja-priv" style="width:18px;height:18px;"> 🔒 Fuera de Legacy (privado — entra a Finanzas, no cuenta en Legacy)</label>'
         +'<label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;cursor:pointer;color:var(--text);font-size:13px;background:rgba(40,180,99,.08);border:1px solid rgba(40,180,99,.3);border-radius:10px;padding:9px;"><input type="checkbox" id="svc-caja-recon" style="width:18px;height:18px;"> ✅ Este pago YA está en Finanzas (solo cuadra la orden, <b>no vuelve a registrar</b>)</label>'
         +'<button onclick="svcChargeDo(\''+id+'\',\'cash\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💵 Efectivo</button>'
-        +'<button onclick="svcChargeDo(\''+id+'\',\'square\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💳 Tarjeta (link de Square)</button>'
+        +'<button onclick="svcChargeDo(\''+id+'\',\'terminal\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💳 Tarjeta en persona (ya cobrada)</button>'
+        +'<button onclick="svcChargeDo(\''+id+'\',\'square\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💳 Enviar link de pago (Square)</button>'
         +'<div id="svc-caja-msg" style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;"></div>'
       : '<div style="text-align:center;color:#28b463;font-weight:800;padding:8px 0 14px;">✅ Ya está pagada.</div>'
         +'<button onclick="document.getElementById(\'svc-caja\').remove();svcOpenReceipt(\''+id+'\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;">🧾 Ver recibo</button>')
@@ -1764,18 +1765,19 @@ window.svcChargeDo=async function(id, method){
   const priv=!!(document.getElementById('svc-caja-priv') && document.getElementById('svc-caja-priv').checked);
   const recon=!!(document.getElementById('svc-caja-recon') && document.getElementById('svc-caja-recon').checked);   // ✅ ya está en Finanzas
   const partial=(amountCents < Math.round(due*100)-1);
-  if(recon && method==='square'){ alert('"Ya está en Finanzas" es para pagos YA recibidos. Usa 💵 Efectivo (no genera link de Square).'); return; }
-  if(method==='cash'){
+  if(recon && method==='square'){ alert('"Ya está en Finanzas" es para pagos YA recibidos. Usa 💵 Efectivo o 💳 Tarjeta en persona (no genera link de Square).'); return; }
+  if(method==='cash' || method==='terminal'){
+    const mLbl = method==='terminal' ? 'CON TARJETA (en persona / terminal Square)' : 'EN EFECTIVO';
     const line = recon
       ? ('¿Cuadrar '+formatMoney(amt)+' que YA está en Finanzas?\n'+(partial?'Es un ABONO; queda saldo.':'Se marca pagada y entregada.')+'\n⚠️ NO se vuelve a registrar en Finanzas (no se duplica).')
-      : ('¿Registrar '+formatMoney(amt)+' EN EFECTIVO'+(priv?' (PRIVADO, fuera de Legacy)':'')+'?\n'+(partial?'Es un ABONO; queda saldo.':'Se marca pagada y entregada.')+'\nEntra a Finanzas como ingreso de Servicio.');
+      : ('¿Registrar '+formatMoney(amt)+' '+mLbl+(priv?' (PRIVADO, fuera de Legacy)':'')+'?\n'+(partial?'Es un ABONO; queda saldo.':'Se marca pagada y entregada.')+'\nEntra a Finanzas como ingreso de Servicio.');
     if(!confirm(line)) return;
   }
   if(msg) msg.textContent='Procesando…';
   try{
     const r=await httpsCallable(functions,'svcCharge')({ orderId:id, method, amountCents, private:priv, reconcile:recon });
     const dd=(r&&r.data)||{};
-    if(method==='cash'){
+    if(method==='cash' || method==='terminal'){
       const o=svcOrders.find(x=>x.id===id)||{}; const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
       const ov=document.getElementById('svc-caja'); if(ov) ov.remove();
       const nowPaid=!!dd.paid; const en=(o.lang==='en');
@@ -2313,7 +2315,7 @@ function svcRenderModal(){
     const sl=(typeof svcStatusLabel==='function')?svcStatusLabel(_svcOrd):{txt:'',col:'var(--muted)'};
     const _pc=Number(_svcOrd.paidCents)||0, _tot=Number(_svcOrd.grandTotalCents)||0;
     const _bal=_svcOrd.balanceCents!=null?Number(_svcOrd.balanceCents):Math.max(0,_tot-_pc);
-    const _m=(_svcOrd.payMethod==='cash')?' · efectivo':(((_svcOrd.payMethod||'').indexOf('square')===0)?' · tarjeta':'');
+    const _m=(_svcOrd.payMethod==='cash')?' · efectivo':((_svcOrd.payMethod==='terminal')?' · tarjeta (en persona)':(((_svcOrd.payMethod||'').indexOf('square')===0)?' · tarjeta':''));
     const _dt=_svcOrd.paidAt?(' · '+new Date(_svcOrd.paidAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})):'';
     let paidBit='', paidCol='#28b463';
     if(_svcOrd.paid){ paidBit='✅ Pagado '+formatMoney((_pc||_tot)/100)+_m+(_svcOrd.private?' · 🔒':'')+_dt; }
