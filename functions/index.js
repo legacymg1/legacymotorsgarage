@@ -1885,36 +1885,6 @@ exports.svcBackfillNums = onRequest(async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
 });
 
-// 🔎 DIAG TEMPORAL — reproduce la llamada a Square del pago de servicio y devuelve el error COMPLETO. ?key=lmgfin2026&num=1001
-exports.sqDiag = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (req, res) => {
-  if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
-  try {
-    const db = admin.firestore();
-    const num = Number(req.query.num || 0);
-    let o = null, orderId = "";
-    const s = await db.collection("serviceOrders").where("orderNum", "==", num).limit(1).get();
-    s.forEach((d) => { o = d.data() || {}; orderId = d.id; });
-    if (!o) { res.json({ ok: false, err: "orden no encontrada" }); return; }
-    const total = Number(o.grandTotalCents) || 0;
-    let amountCents = Math.max(0, total - (Number(o.paidCents) || 0)) || total;
-    if (amountCents < 100) amountCents = 100;
-    const carLabel = o.vehicleLabel || "Servicio";
-    const payload = {
-      idempotency_key: (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)),
-      order: {
-        location_id: SQUARE_LOCATION_ID, reference_id: o.clientId || orderId,
-        line_items: [{ name: "Orden de servicio #" + (o.orderNum || "") + " — " + carLabel, quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
-        service_charges: [{ name: "Cargo por servicio / Service fee (2.9%)", percentage: "2.9", calculation_phase: "SUBTOTAL_PHASE" }],
-        metadata: { kind: "service", serviceOrderId: orderId, baseCents: String(amountCents) },
-      },
-      checkout_options: { redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1", ask_for_shipping_address: false, accepted_payment_methods: { apple_pay: true, google_pay: true, cash_app_pay: true, afterpay_clearpay: false } },
-    };
-    const r = await fetch(SQUARE_API + "/v2/online-checkout/payment-links", { method: "POST", headers: _sqHeaders(), body: JSON.stringify(payload) });
-    const j = await r.json().catch(() => ({}));
-    res.json({ ok: r.ok, httpStatus: r.status, squareErrors: j.errors || null, url: (j.payment_link && j.payment_link.url) || null, sentAmountCents: amountCents });
-  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
-});
-
 // 📋 F3 — HOJA DE RECEPCIÓN del carro de servicio (checklist corto al recibir). Guarda el estado AL RECIBIRLO (protege de daños pre-existentes) y avanza a 'recibido'.
 exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
