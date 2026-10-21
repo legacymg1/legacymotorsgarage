@@ -1928,18 +1928,6 @@ async function _sqLinkPaymentToOrder(db, orderId, paymentId, who) {
   await oref.set(patch, { merge: true });
   return { ok: true, totalCents, feeCents, netCents, last4, serviceTotalCents: svcTotal };
 }
-// 🛠️ TEMP — liga el pago de Square confirmado a la orden #1004. ?key=lmgfin2026
-exports.svcLink1004 = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (req, res) => {
-  if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
-  try {
-    const db = admin.firestore();
-    let orderId = ""; const s = await db.collection("serviceOrders").where("orderNum", "==", 1004).limit(1).get(); s.forEach((d) => { orderId = d.id; });
-    if (!orderId) { res.json({ ok: false, err: "no #1004" }); return; }
-    const r = await _sqLinkPaymentToOrder(db, orderId, "Yj4CAtnFFhiOUORph9sUIUAJNVZZY", "square-terminal (fix #1004)");
-    res.json(r);
-  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
-});
-
 // 📋 F3 — HOJA DE RECEPCIÓN del carro de servicio (checklist corto al recibir). Guarda el estado AL RECIBIRLO (protege de daños pre-existentes) y avanza a 'recibido'.
 exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
