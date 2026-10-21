@@ -2311,12 +2311,22 @@ function svcRenderModal(){
   let bannerHtml='';
   if(isEdit){
     const sl=(typeof svcStatusLabel==='function')?svcStatusLabel(_svcOrd):{txt:'',col:'var(--muted)'};
-    const paidBit=_svcOrd.paid?('✅ Pagado '+formatMoney((_svcOrd.paidCents||_svcOrd.grandTotalCents||0)/100)+(_svcOrd.payMethod==='cash'?' · efectivo':((_svcOrd.payMethod||'').indexOf('square')===0?' · tarjeta':''))+(_svcOrd.private?' · 🔒':'')+(_svcOrd.paidAt?(' · '+new Date(_svcOrd.paidAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})):'')):'';
+    const _pc=Number(_svcOrd.paidCents)||0, _tot=Number(_svcOrd.grandTotalCents)||0;
+    const _bal=_svcOrd.balanceCents!=null?Number(_svcOrd.balanceCents):Math.max(0,_tot-_pc);
+    const _m=(_svcOrd.payMethod==='cash')?' · efectivo':(((_svcOrd.payMethod||'').indexOf('square')===0)?' · tarjeta':'');
+    const _dt=_svcOrd.paidAt?(' · '+new Date(_svcOrd.paidAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})):'';
+    let paidBit='', paidCol='#28b463';
+    if(_svcOrd.paid){ paidBit='✅ Pagado '+formatMoney((_pc||_tot)/100)+_m+(_svcOrd.private?' · 🔒':'')+_dt; }
+    else if(_pc>0){ paidBit='💵 Abonado '+formatMoney(_pc/100)+' · Saldo '+formatMoney(_bal/100)+_m+(_svcOrd.reconciled?' · ✅ ya en Finanzas':'')+_dt; paidCol='var(--gold)'; }
+    const showRcpt=(_svcOrd.paid||_pc>0);
     bannerHtml='<div style="background:'+sl.col+'1f;border:1px solid '+sl.col+';border-radius:12px;padding:10px 13px;margin-bottom:'+(paidBit?'8px':'14px')+';display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">'
       +'<span style="font-weight:800;color:'+sl.col+';font-size:14px;">'+sl.txt+'</span>'
-      +(_svcOrd.paid?'<button onclick="svcOpenReceipt(\''+d.editId+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🧾 Ver recibo</button>':'')
+      +'<span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+      +((_svcAccepted && _bal>0)?'<button onclick="svcChargeOpen(\''+d.editId+'\')" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;">💵 '+(_pc>0?'Cobrar saldo ':'Cobrar ')+formatMoney(_bal/100)+'</button>':'')
+      +(showRcpt?'<button onclick="svcOpenReceipt(\''+d.editId+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">🧾 Recibo</button>':'')
+      +'</span>'
       +'</div>'
-      +(paidBit?'<div style="margin-bottom:14px;font-size:12.5px;color:#28b463;font-weight:700;">'+paidBit+'</div>':'');
+      +(paidBit?'<div style="margin-bottom:14px;font-size:12.5px;color:'+paidCol+';font-weight:700;">'+paidBit+'</div>':'');
   }
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
     +'<h2 style="font-family:var(--font-display);font-size:21px;margin:0;">'+(isEdit?('Orden de servicio'+(d.orderNum?(' <span style="color:var(--gold);">#'+d.orderNum+'</span>'):'')):'Nueva orden de servicio')+'</h2>'
