@@ -1208,7 +1208,7 @@ window.portalPayService = async function(orderId, mode){
     else if(isIOS()){ t.innerHTML=es()?'📲 Instálala: toca <b>Compartir</b> ⬆️ y luego <b>Agregar a inicio</b>':'📲 Install: tap <b>Share</b> ⬆️ then <b>Add to Home Screen</b>'; btn.style.display='none'; b.style.display='flex'; }
   }
   window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); _dp=e; show(); });
-  window.addEventListener('appinstalled', function(){ const b=document.getElementById('pwa-install-bar'); if(b) b.style.display='none'; });
+  window.addEventListener('appinstalled', function(){ const b=document.getElementById('pwa-install-bar'); if(b) b.style.display='none'; try{ alert(es()?'✅ ¡App instalada! Búscala en tu pantalla de inicio o en el cajón de aplicaciones.':'✅ App installed! Find it on your home screen or app drawer.'); }catch(e){} });
   window.portalShowInstall=show;
   try{ if(!standalone() && isIOS()) setTimeout(show, 1800); }catch(e){}
 })();

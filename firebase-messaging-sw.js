@@ -32,6 +32,15 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// 📲 PWA INSTALABLE (Android/Chrome): Chrome exige un service worker con handler 'fetch'.
+// Sin esto sale "No se pudo instalar la aplicación web". skipWaiting/claim = la versión nueva toma control pronto.
+self.addEventListener('install', (event) => { self.skipWaiting(); });
+self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()); });
+self.addEventListener('fetch', (event) => {
+  // Pass-through a la red (sin caché). Su sola presencia hace instalable la PWA.
+  return;
+});
+
 // Al tocar la notificación → abre/enfoca la app EN ESA conversación.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
