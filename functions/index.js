@@ -820,6 +820,20 @@ exports.svcCharge = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 
   const priv = !!d.private;   // 🔒 "fuera de Legacy": entra a Finanzas pero privado (no cuenta en los números de Legacy)
   if (!(amountCents > 0)) throw new HttpsError("invalid-argument", "Monto inválido.");
   if (amountCents > 2000000) throw new HttpsError("invalid-argument", "Monto demasiado alto.");
+  // ✅ "YA ESTÁ EN FINANZAS" (reconcile): cuadra la orden SIN crear transacción ni postear ingreso (el dinero ya se registró por otro lado).
+  if (d.reconcile) {
+    if (!id.isOwner) throw new HttpsError("permission-denied", "Solo dueños pueden conciliar.");
+    const newPaid = already + amountCents;
+    const fullyPaid = (newPaid >= total && total > 0);
+    const nowISO = new Date().toISOString();
+    const patch = { paidCents: newPaid, paid: fullyPaid, paidAt: nowISO, payMethod: method || "cash", reconciled: true, balanceCents: Math.max(0, total - newPaid), updatedAt: nowISO };
+    if (o.estimateStatus !== "accepted") { patch.estimateStatus = "accepted"; if (!o.estimateAcceptedAt) patch.estimateAcceptedAt = nowISO; }
+    if (fullyPaid) { patch.status = "entregado"; if (!o.deliveredAt) patch.deliveredAt = nowISO; }
+    const linkTx = String(d.linkTxId || "");   // opcional: liga la transacción ya existente a la orden
+    if (linkTx) { try { await db.collection("transactions").doc(linkTx).set({ serviceOrderId: orderId, orderNum: o.orderNum || null }, { merge: true }); } catch (e) {} }
+    await oref.set(patch, { merge: true });
+    return { ok: true, paid: fullyPaid, paidCents: newPaid, reconciled: true };
+  }
   if (method === "cash") {
     await _postServiceIncome(db, o, orderId, amountCents, "cash", "svc_" + orderId + "_" + Date.now().toString(36), id.email || id.name || "", priv);
     const fresh = (await oref.get()).data() || {};
@@ -1893,6 +1907,31 @@ exports.svcDiagOrder = onRequest(async (req, res) => {
     try { if (ord.clientId) { const s2 = await db.collection("transactions").where("clientId", "==", ord.clientId).get(); s2.forEach((d) => { if (!tx.find((t) => t.id === d.id)) tx.push({ id: d.id, ...(d.data() || {}) }); }); } } catch (e) {}
     const txOut = tx.map((t) => ({ id: t.id, type: t.type, amountCents: t.amountCents, category: t.category, saleType: t.saleType, serviceOrderId: t.serviceOrderId || "", orderNum: t.orderNum || null, method: t.method, date: t.date, note: t.note || "", source: t.source || "" }));
     res.json({ ok: true, found: true, order: o, transactions: txOut });
+  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
+});
+
+// 🛠️ FIX TEMPORAL #1001 (Misael): abono $680 ya-en-Finanzas (saldo $60) + liga y reclasifica la transacción. ?key=lmgfin2026. Idempotente.
+exports.svcFix1001 = onRequest(async (req, res) => {
+  if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
+  try {
+    const db = admin.firestore();
+    const ORDER_ID = "O4Urm92Yne9U18O7jddL", TX_ID = "inc_1792107851869_j6t4";
+    const oref = db.collection("serviceOrders").doc(ORDER_ID);
+    const os = await oref.get();
+    if (!os.exists) { res.json({ ok: false, err: "orden no existe" }); return; }
+    const o = os.data() || {};
+    const total = Number(o.grandTotalCents) || 0;       // 74000
+    const paid = 68000;                                 // $680 ya pagado
+    const nowISO = new Date().toISOString();
+    // 1) cuadra la orden: $680 pagado, saldo $60 (NO toca Finanzas)
+    await oref.set({ paidCents: paid, paid: (paid >= total), balanceCents: Math.max(0, total - paid), payMethod: "cash", paidAt: o.paidAt || "2026-10-15T18:00:00.000Z", reconciled: true, estimateStatus: "accepted", updatedAt: nowISO }, { merge: true });
+    // 2) liga + reclasifica la transacción existente a Servicio (no cambia monto/fecha/corte)
+    const txref = db.collection("transactions").doc(TX_ID);
+    const ts = await txref.get();
+    let txUpdated = false;
+    if (ts.exists) { await txref.set({ serviceOrderId: ORDER_ID, orderNum: 1001, category: "Servicio", saleType: "servicio", note: ((ts.data() || {}).note || "") + " · conciliado a orden #1001" }, { merge: true }); txUpdated = true; }
+    const fresh = (await oref.get()).data() || {};
+    res.json({ ok: true, order: { paidCents: fresh.paidCents, balanceCents: fresh.balanceCents, paid: fresh.paid }, txUpdated });
   } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
 });
 

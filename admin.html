@@ -1744,7 +1744,8 @@ window.svcChargeOpen=function(id){
     +(due>0
       ? '<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">💵 Cobrar ahora (puedes cobrar todo o un abono)</label>'
         +'<input id="svc-caja-amt" type="number" inputmode="decimal" step="0.01" value="'+due.toFixed(2)+'" style="'+IN+'margin-bottom:10px;">'
-        +'<label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;cursor:pointer;color:var(--text);font-size:13px;"><input type="checkbox" id="svc-caja-priv" style="width:18px;height:18px;"> 🔒 Fuera de Legacy (privado — entra a Finanzas, no cuenta en Legacy)</label>'
+        +'<label style="display:flex;align-items:center;gap:9px;margin-bottom:8px;cursor:pointer;color:var(--text);font-size:13px;"><input type="checkbox" id="svc-caja-priv" style="width:18px;height:18px;"> 🔒 Fuera de Legacy (privado — entra a Finanzas, no cuenta en Legacy)</label>'
+        +'<label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;cursor:pointer;color:var(--text);font-size:13px;background:rgba(40,180,99,.08);border:1px solid rgba(40,180,99,.3);border-radius:10px;padding:9px;"><input type="checkbox" id="svc-caja-recon" style="width:18px;height:18px;"> ✅ Este pago YA está en Finanzas (solo cuadra la orden, <b>no vuelve a registrar</b>)</label>'
         +'<button onclick="svcChargeDo(\''+id+'\',\'cash\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💵 Efectivo</button>'
         +'<button onclick="svcChargeDo(\''+id+'\',\'square\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💳 Tarjeta (link de Square)</button>'
         +'<div id="svc-caja-msg" style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;"></div>'
@@ -1761,11 +1762,18 @@ window.svcChargeDo=async function(id, method){
   if(amt>due+0.004){ amt=due; }   // no cobrar de más
   const amountCents=Math.round(amt*100);
   const priv=!!(document.getElementById('svc-caja-priv') && document.getElementById('svc-caja-priv').checked);
+  const recon=!!(document.getElementById('svc-caja-recon') && document.getElementById('svc-caja-recon').checked);   // ✅ ya está en Finanzas
   const partial=(amountCents < Math.round(due*100)-1);
-  if(method==='cash'){ if(!confirm('¿Registrar '+formatMoney(amt)+' EN EFECTIVO'+(priv?' (PRIVADO, fuera de Legacy)':'')+'?\n'+(partial?'Es un ABONO; queda saldo.':'Se marca pagada y entregada.')+'\nEntra a Finanzas como ingreso de Servicio.')) return; }
+  if(recon && method==='square'){ alert('"Ya está en Finanzas" es para pagos YA recibidos. Usa 💵 Efectivo (no genera link de Square).'); return; }
+  if(method==='cash'){
+    const line = recon
+      ? ('¿Cuadrar '+formatMoney(amt)+' que YA está en Finanzas?\n'+(partial?'Es un ABONO; queda saldo.':'Se marca pagada y entregada.')+'\n⚠️ NO se vuelve a registrar en Finanzas (no se duplica).')
+      : ('¿Registrar '+formatMoney(amt)+' EN EFECTIVO'+(priv?' (PRIVADO, fuera de Legacy)':'')+'?\n'+(partial?'Es un ABONO; queda saldo.':'Se marca pagada y entregada.')+'\nEntra a Finanzas como ingreso de Servicio.');
+    if(!confirm(line)) return;
+  }
   if(msg) msg.textContent='Procesando…';
   try{
-    const r=await httpsCallable(functions,'svcCharge')({ orderId:id, method, amountCents, private:priv });
+    const r=await httpsCallable(functions,'svcCharge')({ orderId:id, method, amountCents, private:priv, reconcile:recon });
     const dd=(r&&r.data)||{};
     if(method==='cash'){
       const o=svcOrders.find(x=>x.id===id)||{}; const phone=(o.clientPhone||'').replace(/[^0-9+]/g,'');
@@ -1775,18 +1783,19 @@ window.svcChargeDo=async function(id, method){
       const abonoTxt=formatMoney(amountCents/100);
       const saldoTxt=formatMoney(Math.max(0,((Number(o.grandTotalCents)||0)-(Number(dd.paidCents)||0)))/100);
       const fol=o.orderNum?(' #'+o.orderNum):'';
+      const finTxt = recon ? ' (el pago ya estaba en Finanzas; no se duplicó)' : ' y entró a Finanzas';
       if(nowPaid){
-        if(phone && confirm('✅ Cobro registrado y entró a Finanzas.\n\n¿Enviar el recibo por SMS al cliente?')){
+        if(phone && confirm('✅ Cobro registrado'+finTxt+'.\n\n¿Enviar el recibo por SMS al cliente?')){
           const body=(en?('Thank you! Your Legacy service receipt'+fol+': '):('¡Gracias! Tu recibo de servicio Legacy'+fol+': '))+link;
           location.href='sms:'+phone+'?body='+encodeURIComponent(body);
-        } else { alert('✅ Cobro registrado. La orden quedó pagada y entró a Finanzas.'); }
+        } else { alert('✅ Cobro registrado. La orden quedó pagada'+finTxt+'.'); }
       } else {
-        if(phone && confirm('✅ Abono registrado y entró a Finanzas.\n\n¿Enviar al cliente "abonaste '+abonoTxt+', saldo '+saldoTxt+'" por SMS?')){
+        if(phone && confirm('✅ Abono registrado'+finTxt+'.\n\n¿Enviar al cliente "abonaste '+abonoTxt+', saldo '+saldoTxt+'" por SMS?')){
           const body=en
             ? ('Legacy Motors Garage'+fol+': you paid '+abonoTxt+'. Remaining balance '+saldoTxt+'. '+link)
             : ('Legacy Motors Garage'+fol+': abonaste '+abonoTxt+'. Saldo pendiente '+saldoTxt+'. '+link);
           location.href='sms:'+phone+'?body='+encodeURIComponent(body);
-        } else { alert('✅ Abono registrado y entró a Finanzas. Saldo pendiente '+saldoTxt+'.'); }
+        } else { alert('✅ Abono registrado'+finTxt+'. Saldo pendiente '+saldoTxt+'.'); }
       }
     }
     else {
