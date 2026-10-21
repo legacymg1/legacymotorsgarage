@@ -1885,56 +1885,6 @@ exports.svcBackfillNums = onRequest(async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
 });
 
-// 🔎 DIAG TEMPORAL — orden por folio + sus transacciones. ?key=lmgfin2026&num=1001
-exports.svcDiagOrder = onRequest(async (req, res) => {
-  if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
-  try {
-    const db = admin.firestore();
-    const num = Number(req.query.num || 0);
-    let ord = null;
-    const os = await db.collection("serviceOrders").where("orderNum", "==", num).limit(1).get();
-    os.forEach((d) => { ord = { id: d.id, ...(d.data() || {}) }; });
-    if (!ord) { res.json({ ok: true, found: false }); return; }
-    const o = {
-      id: ord.id, orderNum: ord.orderNum, clientId: ord.clientId || "", clientName: ord.clientName || "",
-      grandTotalCents: ord.grandTotalCents || 0, paidCents: ord.paidCents || 0, paid: !!ord.paid,
-      balanceCents: ord.balanceCents != null ? ord.balanceCents : null, depositCents: ord.depositCents || 0,
-      status: ord.status || "", estimateStatus: ord.estimateStatus || "", payMethod: ord.payMethod || "", paidAt: ord.paidAt || "",
-    };
-    // transacciones ligadas por serviceOrderId o por cliente
-    const tx = [];
-    try { const s = await db.collection("transactions").where("serviceOrderId", "==", ord.id).get(); s.forEach((d) => tx.push({ id: d.id, ...(d.data() || {}) })); } catch (e) {}
-    try { if (ord.clientId) { const s2 = await db.collection("transactions").where("clientId", "==", ord.clientId).get(); s2.forEach((d) => { if (!tx.find((t) => t.id === d.id)) tx.push({ id: d.id, ...(d.data() || {}) }); }); } } catch (e) {}
-    const txOut = tx.map((t) => ({ id: t.id, type: t.type, amountCents: t.amountCents, category: t.category, saleType: t.saleType, serviceOrderId: t.serviceOrderId || "", orderNum: t.orderNum || null, method: t.method, date: t.date, note: t.note || "", source: t.source || "" }));
-    res.json({ ok: true, found: true, order: o, transactions: txOut });
-  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
-});
-
-// 🛠️ FIX TEMPORAL #1001 (Misael): abono $680 ya-en-Finanzas (saldo $60) + liga y reclasifica la transacción. ?key=lmgfin2026. Idempotente.
-exports.svcFix1001 = onRequest(async (req, res) => {
-  if ((req.query.key || "") !== "lmgfin2026") { res.status(403).json({ ok: false }); return; }
-  try {
-    const db = admin.firestore();
-    const ORDER_ID = "O4Urm92Yne9U18O7jddL", TX_ID = "inc_1792107851869_j6t4";
-    const oref = db.collection("serviceOrders").doc(ORDER_ID);
-    const os = await oref.get();
-    if (!os.exists) { res.json({ ok: false, err: "orden no existe" }); return; }
-    const o = os.data() || {};
-    const total = Number(o.grandTotalCents) || 0;       // 74000
-    const paid = 68000;                                 // $680 ya pagado
-    const nowISO = new Date().toISOString();
-    // 1) cuadra la orden: $680 pagado, saldo $60 (NO toca Finanzas)
-    await oref.set({ paidCents: paid, paid: (paid >= total), balanceCents: Math.max(0, total - paid), payMethod: "cash", paidAt: o.paidAt || "2026-10-15T18:00:00.000Z", reconciled: true, estimateStatus: "accepted", updatedAt: nowISO }, { merge: true });
-    // 2) liga + reclasifica la transacción existente a Servicio (no cambia monto/fecha/corte)
-    const txref = db.collection("transactions").doc(TX_ID);
-    const ts = await txref.get();
-    let txUpdated = false;
-    if (ts.exists) { await txref.set({ serviceOrderId: ORDER_ID, orderNum: 1001, category: "Servicio", saleType: "servicio", note: ((ts.data() || {}).note || "") + " · conciliado a orden #1001" }, { merge: true }); txUpdated = true; }
-    const fresh = (await oref.get()).data() || {};
-    res.json({ ok: true, order: { paidCents: fresh.paidCents, balanceCents: fresh.balanceCents, paid: fresh.paid }, txUpdated });
-  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
-});
-
 // 📋 F3 — HOJA DE RECEPCIÓN del carro de servicio (checklist corto al recibir). Guarda el estado AL RECIBIRLO (protege de daños pre-existentes) y avanza a 'recibido'.
 exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
