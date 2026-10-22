@@ -1925,7 +1925,7 @@ exports.svcBackfillNums = onRequest(async (req, res) => {
 //   - Finanzas: registra el NETO real (total − comisión de Square). Idempotente por sq_<paymentId>.
 //   - Orden: queda PAGADA por el TOTAL DEL SERVICIO (el cliente pagó el servicio; el 2% y la comisión son cargo de tarjeta).
 //   - Guarda en la orden total/comisión/neto + id del pago → feed del INVOICE (desglose).
-async function _sqLinkPaymentToOrder(db, orderId, paymentId, who) {
+async function _sqLinkPaymentToOrder(db, orderId, paymentId, who, baseCents) {
   const r = await fetch(SQUARE_API + "/v2/payments/" + encodeURIComponent(paymentId), { headers: _sqHeaders() });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.payment) return { ok: false, error: (j.errors && j.errors[0] && j.errors[0].detail) || "square_error" };
@@ -1963,6 +1963,18 @@ async function _sqLinkPaymentToOrder(db, orderId, paymentId, who) {
   await oref.set(patch, { merge: true });
   return { ok: true, totalCents, feeCents, netCents, last4, serviceTotalCents: svcTotal };
 }
+// 💳 Liga un pago de Square (en persona) a una orden de servicio — lo usa el botón "🔎 Ligar pago de Square".
+exports.svcLinkSquarePayment = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 }, async (request) => {
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  const paymentId = String(d.paymentId || "");
+  if (!orderId || !paymentId) throw new HttpsError("invalid-argument", "Falta orden o pago.");
+  const r = await _sqLinkPaymentToOrder(admin.firestore(), orderId, paymentId, id.email || id.name || "");
+  if (!r.ok) throw new HttpsError("internal", r.error || "no se pudo ligar");
+  return r;
+});
 // 📋 F3 — HOJA DE RECEPCIÓN del carro de servicio (checklist corto al recibir). Guarda el estado AL RECIBIRLO (protege de daños pre-existentes) y avanza a 'recibido'.
 exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");

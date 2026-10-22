@@ -1749,7 +1749,8 @@ window.svcChargeOpen=function(id){
         +'<label style="display:flex;align-items:center;gap:9px;margin-bottom:8px;cursor:pointer;color:var(--text);font-size:13px;"><input type="checkbox" id="svc-caja-priv" style="width:18px;height:18px;"> 🔒 Fuera de Legacy (privado — entra a Finanzas, no cuenta en Legacy)</label>'
         +'<label style="display:flex;align-items:center;gap:9px;margin-bottom:14px;cursor:pointer;color:var(--text);font-size:13px;background:rgba(40,180,99,.08);border:1px solid rgba(40,180,99,.3);border-radius:10px;padding:9px;"><input type="checkbox" id="svc-caja-recon" style="width:18px;height:18px;"> ✅ Este pago YA está en Finanzas (solo cuadra la orden, <b>no vuelve a registrar</b>)</label>'
         +'<button onclick="svcChargeDo(\''+id+'\',\'cash\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💵 Efectivo</button>'
-        +'<button onclick="svcChargeDo(\''+id+'\',\'terminal\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💳 Tarjeta en persona (ya cobrada)</button>'
+        +'<button onclick="svcLinkSqOpen(\''+id+'\')" style="width:100%;background:linear-gradient(135deg,#6b4ea8,#8a63c9);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">🔎 Ligar pago de Square (tarjeta en persona)</button>'
+        +'<button onclick="svcChargeDo(\''+id+'\',\'terminal\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💳 Tarjeta en persona (registrar monto a mano)</button>'
         +'<button onclick="svcChargeDo(\''+id+'\',\'square\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💳 Enviar link de pago (Square)</button>'
         +'<div id="svc-caja-msg" style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;"></div>'
       : '<div style="text-align:center;color:#28b463;font-weight:800;padding:8px 0 14px;">✅ Ya está pagada.</div>'
@@ -1845,6 +1846,35 @@ window.sqPairTerminal=async function(){
       }catch(e){}
     }, 3000);
   }catch(e){ const b=document.getElementById('sq-pair-body'); if(b) b.innerHTML='<div style="color:var(--red)">Error: '+svcEsc((e&&e.message)||String(e))+'</div>'; }
+};
+// 🔎 LIGAR PAGO DE SQUARE (en persona) a una orden: lista pagos recientes → elige → se liga (neto a Finanzas + invoice).
+window.svcLinkSqOpen=async function(orderId){
+  const o=svcOrders.find(x=>x.id===orderId)||{};
+  const due=Math.max(0,((Number(o.grandTotalCents)||0)-(Number(o.paidCents)||0)))/100;
+  let ov=document.getElementById('sq-link'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='sq-link'; ov.style.cssText='position:fixed;inset:0;z-index:2147483300;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:14px;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:470px;width:100%;max-height:88vh;overflow:auto;padding:18px;cursor:default;box-shadow:0 18px 50px rgba(0,0,0,.5);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:16px;">🔎 Ligar pago de Square</div><button onclick="document.getElementById(\'sq-link\').remove()" style="background:transparent;border:none;color:var(--muted);font-size:24px;cursor:pointer;">×</button></div><div id="sq-link-body"><div class="faint" style="text-align:center;padding:24px;">Cargando pagos de Square…</div></div></div>';
+  document.body.appendChild(ov);
+  try{
+    const r=await httpsCallable(functions,'squareRecentPayments')({days:14}); const pays=(((r&&r.data)||{}).payments||[]).filter(p=>p.status==='COMPLETED');
+    const body=document.getElementById('sq-link-body'); if(!body) return;
+    if(!pays.length){ body.innerHTML='<div class="faint" style="text-align:center;padding:24px;">No hay pagos recientes en Square.</div>'; return; }
+    const M=formatMoney;
+    body.innerHTML='<div class="faint" style="font-size:12px;margin-bottom:10px;">Saldo de la orden: <b style="color:var(--gold);">'+M(due)+'</b> · elige el pago de la terminal (✓ = coincide):</div>'+pays.slice(0,25).map(p=>{
+      const tot=(Number(p.totalCents)||0)/100, net=(Number(p.netCents)||0)/100, fee=(Number(p.feeCents)||0)/100;
+      const match=due>0 && ((Math.abs(tot-due)<0.02)||(Math.abs(tot-due*1.02)<0.03));
+      const when=p.createdAt?new Date(p.createdAt).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      return '<div onclick="svcLinkSqDo(\''+orderId+'\',\''+p.id+'\','+tot.toFixed(2)+')" style="border:1px solid '+(match?'var(--gold)':'var(--border)')+';border-radius:11px;padding:11px 12px;margin-bottom:8px;cursor:pointer;'+(match?'background:rgba(232,182,74,.08);':'')+'"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span style="font-weight:800;font-size:15px;">'+M(tot)+(match?' <span style="font-size:10px;color:var(--gold);">✓ coincide</span>':'')+'</span><span style="font-size:12px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+(p.cardBrand?esc(p.cardBrand)+' ':'💳 ')+(p.last4?'····'+esc(p.last4):'')+' · neto '+M(net)+(p.feeReady?(' · comisión '+M(fee)):' · comisión pendiente')+'</div></div>';
+    }).join('');
+  }catch(e){ const b=document.getElementById('sq-link-body'); if(b) b.innerHTML='<div style="color:var(--red);text-align:center;padding:20px;">Error: '+esc((e&&e.message)||String(e))+'</div>'; }
+};
+window.svcLinkSqDo=async function(orderId, paymentId, totalUSD){
+  if(!confirm('¿Ligar este pago de Square de $'+Number(totalUSD).toFixed(2)+' a la orden?\n\nFinanzas recibe el NETO (sin comisión), la orden queda pagada, y el invoice muestra el desglose. No se duplica.')) return;
+  try{
+    const r=await httpsCallable(functions,'svcLinkSquarePayment')({ orderId, paymentId }); const d=(r&&r.data)||{};
+    const sl=document.getElementById('sq-link'); if(sl) sl.remove(); const cj=document.getElementById('svc-caja'); if(cj) cj.remove();
+    try{ svcToast('✅ Pago de Square ligado · neto '+formatMoney((Number(d.netCents)||0)/100)+' a Finanzas'); }catch(e){}
+  }catch(e){ alert('No se pudo ligar: '+((e&&e.message)||e)); }
 };
 // ===================== 👥 CLIENTE 360 (perfil unificado) =====================
 const C360_BADGES=[['buyer','🔑','Compró'],['service','🔧','Servicio'],['quote','🧮','Cotizó'],['parts','🔩','Partes']];
