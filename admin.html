@@ -2546,7 +2546,7 @@ function svcEstimateSheetHTML(d, services, opts){
         ? ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):''))
         : (dep>0?('<div class="line"><span style="color:#777;">'+L.dep+'</span><b>−'+money(dep)+'</b></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.bal+'</span><span>'+money(bal)+'</span></div>'):''))+'</div>'
     +'<div class="disc">'+L.disc+'</div>'
-    +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California Dealer License No. 83177</div></div>';
+    +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California BAR Reg. No. ARD 317673 · Automotive Repair Dealer</div></div>';
   return '<style>'+style+'</style>'+body;
 }
 window.svcGenEstimate=async function(btn){
