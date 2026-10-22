@@ -928,6 +928,41 @@ exports.createServiceCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors
   } catch (e) { console.error("createServiceCheckout", e); res.status(500).json({ error: String((e && e.message) || e) }); }
 });
 
+// 📟 VINCULAR SQUARE TERMINAL — paso 1: genera un código para teclear en el Terminal (Terminal API).
+exports.sqPairStart = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 20 }, async (request) => {
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const r = await fetch(SQUARE_API + "/v2/devices/codes", { method: "POST", headers: _sqHeaders(), body: JSON.stringify({ idempotency_key: Date.now().toString(36) + Math.random().toString(36).slice(2, 10), device_code: { name: "Legacy — " + (id.name || "Terminal"), product_type: "TERMINAL_API", location_id: SQUARE_LOCATION_ID } }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new HttpsError("internal", (j.errors && j.errors[0] && j.errors[0].detail) || "square_error");
+  const dc = j.device_code || {};
+  return { ok: true, code: dc.code || "", codeId: dc.id || "", status: dc.status || "" };
+});
+// 📟 paso 2: revisa si ya se emparejó; si sí, GUARDA el device_id en config/square.
+exports.sqPairCheck = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 20 }, async (request) => {
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const codeId = String((request.data || {}).codeId || "");
+  if (!codeId) throw new HttpsError("invalid-argument", "Falta codeId.");
+  const r = await fetch(SQUARE_API + "/v2/devices/codes/" + encodeURIComponent(codeId), { headers: _sqHeaders() });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new HttpsError("internal", (j.errors && j.errors[0] && j.errors[0].detail) || "square_error");
+  const dc = j.device_code || {};
+  if (dc.status === "PAIRED" && dc.device_id) {
+    await admin.firestore().doc("config/square").set({ terminalDeviceId: dc.device_id, terminalName: dc.name || "", pairedAt: new Date().toISOString(), pairedBy: id.email || id.name || "" }, { merge: true });
+    return { ok: true, status: "PAIRED", deviceId: dc.device_id };
+  }
+  return { ok: true, status: dc.status || "UNKNOWN" };
+});
+// 📟 ¿hay Terminal vinculado? (para mostrar estado en admin)
+exports.sqTerminalStatus = onCall({ timeoutSeconds: 15 }, async (request) => {
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const s = await admin.firestore().doc("config/square").get();
+  const d = s.exists ? (s.data() || {}) : {};
+  return { ok: true, paired: !!d.terminalDeviceId, name: d.terminalName || "", pairedAt: d.pairedAt || "" };
+});
+
 // 🔔 Webhook de Square: cuando un pago se completa, Square pega aquí y registramos el abono SOLO,
 // aunque el cliente haya pagado desde el link por SMS sin abrir el portal. Re-verificamos con Square
 // (así una llamada falsa no puede inventar un pago). Idempotente por el id del pago.

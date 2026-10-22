@@ -318,7 +318,7 @@
     <span>🟡 <b id="stat-soon" style="color:var(--yellow);">0</b> <span style="color:var(--muted);">esta semana</span></span>
     <span>🟢 <b id="stat-ok" style="color:var(--green);">0</b> <span style="color:var(--muted);">al corriente</span></span>
   </div>
-  <div style="display:none;text-align:right;margin:4px 2px 0;"><button type="button" id="seller-sign-btn" onclick="openSellerSign()" title="Tu firma como vendedor: firmas una vez y se estampa sola en cada contrato firmado." style="display:none;background:transparent;color:var(--gold);border:1px solid rgba(240,192,64,0.5);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:8px;">✍️ Mi firma (vendedor)</button><button type="button" onclick="repairDocs()" title="Convierte a imagen los ID/seguros que sean PDF o HEIC. Hazlo en el iPad para las fotos de iPhone." style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">🛠 Reparar fotos ID/seguro (PDF→imagen)</button></div>
+  <div style="display:none;text-align:right;margin:4px 2px 0;"><button type="button" id="seller-sign-btn" onclick="openSellerSign()" title="Tu firma como vendedor: firmas una vez y se estampa sola en cada contrato firmado." style="display:none;background:transparent;color:var(--gold);border:1px solid rgba(240,192,64,0.5);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:8px;">✍️ Mi firma (vendedor)</button><button type="button" onclick="repairDocs()" title="Convierte a imagen los ID/seguros que sean PDF o HEIC. Hazlo en el iPad para las fotos de iPhone." style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">🛠 Reparar fotos ID/seguro (PDF→imagen)</button><button type="button" id="sq-terminal-btn" onclick="sqPairTerminal()" title="Vincula tu Square Terminal para cobrar desde las órdenes y que el pago se ligue solo." style="display:none;background:transparent;color:var(--gold);border:1px solid rgba(240,192,64,0.5);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-left:8px;">📟 Vincular Terminal Square</button></div>
 
   <!-- Cobranza: resumen de cobros del dealer (se abre desde el LOGO). Nombre distinto a la página Finanzas. -->
   <div class="modal-overlay" id="fin-modal">
@@ -1130,6 +1130,7 @@ onAuthStateChanged(auth, async (user) => {
   document.body.classList.toggle('role-viewer', !isOwner);   // Ivan: solo ver clientes
   try{ const _tb=document.getElementById('team-box'); if(_tb) _tb.style.display = isOwner ? '' : 'none'; }catch(e){}   // 👥 Cuentas del equipo: solo el dueño
   try{ const _ss=document.getElementById('seller-sign-btn'); if(_ss) _ss.style.display = isOwner ? '' : 'none'; }catch(e){}   // ✍️ Mi firma (vendedor): solo el dueño
+  try{ const _st=document.getElementById('sq-terminal-btn'); if(_st) _st.style.display = isOwner ? '' : 'none'; }catch(e){}   // 📟 Vincular Terminal Square: solo el dueño
   if(!_listeningStarted){ _listeningStarted = true; startListening(); }
 });
 
@@ -1814,6 +1815,36 @@ window.svcChargeDo=async function(id, method){
   }catch(e){ if(msg) msg.textContent='Error: '+((e&&e.message)||e); else alert('Error: '+((e&&e.message)||e)); }
 };
 
+// 📟 VINCULAR SQUARE TERMINAL (dueño): genera un código → lo tecleas en el Terminal → se empareja (sondeo).
+window._sqPairStop=function(){ try{ if(window._sqPairTimer){ clearInterval(window._sqPairTimer); window._sqPairTimer=null; } }catch(e){} };
+window.sqPairTerminal=async function(){
+  window._sqPairStop();
+  let ov=document.getElementById('sq-pair'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='sq-pair'; ov.style.cssText='position:fixed;inset:0;z-index:2147483300;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:16px;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov){ window._sqPairStop(); ov.remove(); } };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:420px;width:100%;padding:22px;text-align:center;cursor:default;box-shadow:0 18px 50px rgba(0,0,0,.5);"><div id="sq-pair-body">Generando código…</div></div>';
+  document.body.appendChild(ov);
+  try{
+    const r=await httpsCallable(functions,'sqPairStart')({}); const d=(r&&r.data)||{};
+    if(!d.code){ document.getElementById('sq-pair-body').innerHTML='<div style="color:var(--red)">No se pudo generar el código. Intenta de nuevo.</div>'; return; }
+    window._sqPairCodeId=d.codeId;
+    document.getElementById('sq-pair-body').innerHTML=
+      '<div style="font-weight:800;font-size:18px;margin-bottom:10px;">📟 Vincular Square Terminal</div>'
+      +'<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px;">En tu <b>Square Terminal</b> entra a <b>Ajustes → Iniciar sesión con código de dispositivo</b> y escribe:</div>'
+      +'<div style="font-family:var(--font-display);font-size:40px;letter-spacing:8px;color:var(--gold);background:var(--surface2);border:1px solid var(--gold);border-radius:12px;padding:14px;margin-bottom:14px;">'+svcEsc(d.code)+'</div>'
+      +'<div id="sq-pair-status" style="font-size:13px;color:var(--muted);">⏳ Esperando a que lo vincules…</div>'
+      +'<button onclick="window._sqPairStop();document.getElementById(\'sq-pair\').remove();" style="margin-top:14px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer;font-family:inherit;">Cerrar</button>';
+    let ticks=0;
+    window._sqPairTimer=setInterval(async function(){
+      ticks++; if(ticks>100){ window._sqPairStop(); const st=document.getElementById('sq-pair-status'); if(st) st.textContent='El código expiró. Cierra y genera uno nuevo.'; return; }
+      try{
+        const c=await httpsCallable(functions,'sqPairCheck')({ codeId: window._sqPairCodeId }); const cd=(c&&c.data)||{};
+        const st=document.getElementById('sq-pair-status'); if(!st) return;
+        if(cd.status==='PAIRED'){ window._sqPairStop(); st.innerHTML='<b style="color:#28b463;">✅ ¡Terminal vinculado!</b><br>Ya puedes cobrar desde las órdenes y el pago se liga solo.'; }
+        else { st.textContent='⏳ Esperando… ('+(cd.status||'')+')'; }
+      }catch(e){}
+    }, 3000);
+  }catch(e){ const b=document.getElementById('sq-pair-body'); if(b) b.innerHTML='<div style="color:var(--red)">Error: '+svcEsc((e&&e.message)||String(e))+'</div>'; }
+};
 // ===================== 👥 CLIENTE 360 (perfil unificado) =====================
 const C360_BADGES=[['buyer','🔑','Compró'],['service','🔧','Servicio'],['quote','🧮','Cotizó'],['parts','🔩','Partes']];
 function c360BadgeHtml(flags){ return C360_BADGES.filter(b=>flags[b[0]]).map(b=>'<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;margin:0 4px 4px 0;">'+b[1]+' '+b[2]+'</span>').join(''); }
