@@ -2516,12 +2516,21 @@ function svcEstimateSheetHTML(d, services, opts){
     (s.parts||[]).forEach(p=>{ const pp=Number(p.price)||0; partsSub+=pp; rows+='<tr class="prow"><td>• '+svcEsc((p.desc||'').trim()||(en?'Part':'Parte'))+'</td><td class="r">'+money(pp)+'</td></tr>'; });
   });
   const grand=laborSub+partsSub, dep=Number(d.deposit)||0, bal=Math.max(0,grand-dep);
-  // 💳 El invoice se adapta a CÓMO pagaron: tarjeta (link o en persona) lleva desglose del cargo por tarjeta; efectivo no.
-  const isCard=receipt && (/^square/.test(String(o.payMethod||''))||o.payMethod==='terminal'||o.payMethod==='card');
+  // 💳 El invoice se adapta a CÓMO pagaron: efectivo no lleva cargo; tarjeta en persona lleva el extra que se tecleó; el LINK siempre suma 2.9% (service_charge de Square).
+  const _pm0=String(o.payMethod||'');
+  const isCard=receipt && (/^square/.test(_pm0)||_pm0==='terminal'||_pm0==='card');
+  const isLinkPay=(_pm0==='square-link');
   const cardTotal=(Number(o.sqTotalCents)||0)/100;
-  const surcharge=(isCard && cardTotal>grand+0.004)?(cardTotal-grand):0;
+  let surcharge=0, surchPct=0;
+  if(isCard){
+    if(cardTotal>grand+0.004){ surcharge=cardTotal-grand; surchPct=grand>0?(surcharge/grand*100):0; }   // total real de Square (en persona o link con dato)
+    else if(isLinkPay){ surcharge=Math.round(grand*0.029*100)/100; surchPct=2.9; }                      // link sin dato guardado → 2.9% fijo
+  }
+  const surchLabel=isLinkPay
+      ? (en?('Service fee ('+(surchPct||2.9).toFixed(1)+'%)'):('Cargo por servicio ('+(surchPct||2.9).toFixed(1)+'%)'))
+      : (en?('Card fee ('+surchPct.toFixed(1)+'%)'):('Cargo por tarjeta ('+surchPct.toFixed(1)+'%)'));
   const finalTotal=grand+surcharge;
-  const paidAmt=surcharge>0?finalTotal:((Number(o.paidCents)||0)/100), dueAmt=Math.max(0,finalTotal-paidAmt);
+  const paidAmt=(surcharge>0 && o.paid)?finalTotal:((Number(o.paidCents)||0)/100), dueAmt=Math.max(0,finalTotal-paidAmt);
   const _pm=String(o.payMethod||'');
   const payMethodTxt=(o.payMethod==='cash')?(en?'Cash':'Efectivo')
     :((/^square/.test(_pm)||_pm==='terminal'||_pm==='card')
@@ -2555,7 +2564,7 @@ function svcEstimateSheetHTML(d, services, opts){
     +'<table>'+rows+'</table>'
     +'<div class="tot"><div class="line"><span style="color:#777;">'+L.labor+'</span><b>'+money(laborSub)+'</b></div><div class="line"><span style="color:#777;">'+L.parts+'</span><b>'+money(partsSub)+'</b></div>'
     +(surcharge>0
-        ? ('<div class="line"><span style="color:#777;">'+L.subt+'</span><b>'+money(grand)+'</b></div><div class="line"><span style="color:#777;">'+L.surch+(o.sqLast4?(' ····'+o.sqLast4):'')+'</span><b>+'+money(surcharge)+'</b></div><div class="line grand"><span>'+L.total+'</span><span>'+money(finalTotal)+'</span></div>')
+        ? ('<div class="line"><span style="color:#777;">'+L.subt+'</span><b>'+money(grand)+'</b></div><div class="line"><span style="color:#777;">'+surchLabel+(o.sqLast4?(' ····'+o.sqLast4):'')+'</span><b>+'+money(surcharge)+'</b></div><div class="line grand"><span>'+L.total+'</span><span>'+money(finalTotal)+'</span></div>')
         : ('<div class="line grand"><span>'+L.total+'</span><span>'+money(grand)+'</span></div>'))
     +(receipt
         ? ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+(payMethodTxt?(' · '+payMethodTxt):'')+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):''))
