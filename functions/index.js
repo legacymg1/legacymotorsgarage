@@ -736,7 +736,7 @@ async function _sqRecordServiceCharge(order) {
   const db = admin.firestore();
   const snap = await db.collection("serviceOrders").doc(orderId).get();
   if (!snap.exists) return { ok: false, error: "order" };
-  await _postServiceIncome(db, snap.data() || {}, orderId, amountCents, "square", "sq_" + payId, "square", order.metadata.priv === "1");
+  await _postServiceIncome(db, snap.data() || {}, orderId, amountCents, "square-link", "sq_" + payId, "square", order.metadata.priv === "1");
   return { ok: true, amount: Math.round(amountCents) / 100 };
 }
 
@@ -1957,7 +1957,9 @@ async function _sqLinkPaymentToOrder(db, orderId, paymentId, who, baseCents) {
     });
   }
   // Orden: pagada por el total del servicio + datos de Square para el invoice.
-  const patch = { paidCents: svcTotal, paid: true, balanceCents: 0, payMethod: "square", paidAt: p.created_at || nowISO, updatedAt: nowISO, sqPaymentId: paymentId, sqTotalCents: totalCents, sqFeeCents: feeCents, sqNetCents: netCents, sqLast4: last4 };
+  const _entry = (p.card_details && p.card_details.entry_method) || "";   // EMV/CONTACTLESS/SWIPED/KEYED = en persona; ON_FILE/KEYED online = link
+  const _isOnline = /ON_FILE/i.test(_entry) || (p.source_type && /WALLET|BANK|CASH_APP/i.test(p.source_type));
+  const patch = { paidCents: svcTotal, paid: true, balanceCents: 0, payMethod: _isOnline ? "square-link" : "square-terminal", sqEntry: _entry, paidAt: p.created_at || nowISO, updatedAt: nowISO, sqPaymentId: paymentId, sqTotalCents: totalCents, sqFeeCents: feeCents, sqNetCents: netCents, sqLast4: last4 };
   if (o.estimateStatus !== "accepted") { patch.estimateStatus = "accepted"; if (!o.estimateAcceptedAt) patch.estimateAcceptedAt = nowISO; }
   patch.status = "entregado"; if (!o.deliveredAt) patch.deliveredAt = nowISO;
   await oref.set(patch, { merge: true });

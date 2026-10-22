@@ -2516,11 +2516,22 @@ function svcEstimateSheetHTML(d, services, opts){
     (s.parts||[]).forEach(p=>{ const pp=Number(p.price)||0; partsSub+=pp; rows+='<tr class="prow"><td>• '+svcEsc((p.desc||'').trim()||(en?'Part':'Parte'))+'</td><td class="r">'+money(pp)+'</td></tr>'; });
   });
   const grand=laborSub+partsSub, dep=Number(d.deposit)||0, bal=Math.max(0,grand-dep);
-  const paidAmt=(Number(o.paidCents)||0)/100, dueAmt=Math.max(0,grand-paidAmt);
-  const payMethodTxt=(o.payMethod==='cash')?(en?'Cash':'Efectivo'):((o.payMethod||'').indexOf('square')===0?(en?'Card':'Tarjeta'):'');
+  // 💳 El invoice se adapta a CÓMO pagaron: tarjeta (link o en persona) lleva desglose del cargo por tarjeta; efectivo no.
+  const isCard=receipt && (/^square/.test(String(o.payMethod||''))||o.payMethod==='terminal'||o.payMethod==='card');
+  const cardTotal=(Number(o.sqTotalCents)||0)/100;
+  const surcharge=(isCard && cardTotal>grand+0.004)?(cardTotal-grand):0;
+  const finalTotal=grand+surcharge;
+  const paidAmt=surcharge>0?finalTotal:((Number(o.paidCents)||0)/100), dueAmt=Math.max(0,finalTotal-paidAmt);
+  const _pm=String(o.payMethod||'');
+  const payMethodTxt=(o.payMethod==='cash')?(en?'Cash':'Efectivo')
+    :((/^square/.test(_pm)||_pm==='terminal'||_pm==='card')
+        ?( _pm==='square-link' ? (en?'Online payment (link)':'Pago en línea (link)')
+           : (surcharge>0||_pm==='square-terminal'||_pm==='terminal') ? (en?'Card — in person':'Tarjeta — en persona')
+           : (en?'Online payment (link)':'Pago en línea (link)') )
+        :'');
   const paidDate=o.paidAt?new Date(o.paidAt).toLocaleDateString(en?'en-US':'es-MX',{year:'numeric',month:'long',day:'numeric'}):'';
   const folio=o.orderNum?('#'+o.orderNum):'';
-  const L=en?{sub:receipt?'SERVICE RECEIPT':'SERVICE ESTIMATE',cust:'Customer',date:'Date',ord:'Order',veh:'Vehicle',labor:'Labor',parts:'Parts',total:'TOTAL',dep:'Deposit',bal:'Balance',paid:'Paid',due:'Balance due',disc:receipt?'<b>Thank you for your business.</b> This is your service receipt. Keep it for your records and warranty.':'<b>Estimate only — subject to your authorization.</b> Final amounts may change after inspection; we will notify you before any additional work.'}:{sub:receipt?'RECIBO DE SERVICIO':'ESTIMADO DE SERVICIO',cust:'Cliente',date:'Fecha',ord:'Orden',veh:'Vehículo',labor:'Mano de obra',parts:'Partes',total:'TOTAL',dep:'Anticipo',bal:'Saldo',paid:'Pagado',due:'Saldo',disc:receipt?'<b>Gracias por su preferencia.</b> Este es su recibo de servicio. Consérvelo para su garantía.':'<b>Estimado informativo — sujeto a su autorización.</b> Los montos finales pueden cambiar tras la inspección; le avisamos antes de cualquier trabajo adicional.'};
+  const L=en?{sub:receipt?'SERVICE RECEIPT':'SERVICE ESTIMATE',cust:'Customer',date:'Date',ord:'Order',veh:'Vehicle',labor:'Labor',parts:'Parts',subt:'Subtotal',surch:'Card processing (2%)',total:'TOTAL',dep:'Deposit',bal:'Balance',paid:'Paid',due:'Balance due',disc:receipt?'<b>Thank you for your business.</b> This is your service receipt. Keep it for your records and warranty.':'<b>Estimate only — subject to your authorization.</b> Final amounts may change after inspection; we will notify you before any additional work.'}:{sub:receipt?'RECIBO DE SERVICIO':'ESTIMADO DE SERVICIO',cust:'Cliente',date:'Fecha',ord:'Orden',veh:'Vehículo',labor:'Mano de obra',parts:'Partes',total:'TOTAL',dep:'Anticipo',bal:'Saldo',paid:'Pagado',due:'Saldo',disc:receipt?'<b>Gracias por su preferencia.</b> Este es su recibo de servicio. Consérvelo para su garantía.':'<b>Estimado informativo — sujeto a su autorización.</b> Los montos finales pueden cambiar tras la inspección; le avisamos antes de cualquier trabajo adicional.'};
   const style='.estsheet{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1a1a1a;padding:26px;max-width:620px;margin:0 auto;background:#fff;}'
     +'.estsheet .h{text-align:center;border-bottom:3px solid #c9a24a;padding-bottom:14px;margin-bottom:10px;}'
     +'.estsheet .h h1{font-size:22px;letter-spacing:1.5px;color:#0b0e14;margin:0;}'
@@ -2542,9 +2553,12 @@ function svcEstimateSheetHTML(d, services, opts){
     +stamp
     +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(titleCase(d.clientName)||'—')+(d.clientPhone?(' · '+svcEsc(_fmtPhone(d.clientPhone))):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+(receipt&&paidDate?paidDate:dstr)+(folio?('<br><b>'+L.ord+':</b> '+folio):'')+'</div>'
     +'<table>'+rows+'</table>'
-    +'<div class="tot"><div class="line"><span style="color:#777;">'+L.labor+'</span><b>'+money(laborSub)+'</b></div><div class="line"><span style="color:#777;">'+L.parts+'</span><b>'+money(partsSub)+'</b></div><div class="line grand"><span>'+L.total+'</span><span>'+money(grand)+'</span></div>'
+    +'<div class="tot"><div class="line"><span style="color:#777;">'+L.labor+'</span><b>'+money(laborSub)+'</b></div><div class="line"><span style="color:#777;">'+L.parts+'</span><b>'+money(partsSub)+'</b></div>'
+    +(surcharge>0
+        ? ('<div class="line"><span style="color:#777;">'+L.subt+'</span><b>'+money(grand)+'</b></div><div class="line"><span style="color:#777;">'+L.surch+(o.sqLast4?(' ····'+o.sqLast4):'')+'</span><b>+'+money(surcharge)+'</b></div><div class="line grand"><span>'+L.total+'</span><span>'+money(finalTotal)+'</span></div>')
+        : ('<div class="line grand"><span>'+L.total+'</span><span>'+money(grand)+'</span></div>'))
     +(receipt
-        ? ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):''))
+        ? ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+(payMethodTxt?(' · '+payMethodTxt):'')+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):''))
         : (dep>0?('<div class="line"><span style="color:#777;">'+L.dep+'</span><b>−'+money(dep)+'</b></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.bal+'</span><span>'+money(bal)+'</span></div>'):''))+'</div>'
     +'<div class="disc">'+L.disc+'</div>'
     +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California BAR Reg. No. ARD 317673 · Automotive Repair Dealer</div></div>';
