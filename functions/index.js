@@ -629,6 +629,57 @@ const SQUARE_API = "https://connect.squareup.com"; // Production
 function _sqHeaders() {
   return { "Authorization": "Bearer " + SQUARE_ACCESS_TOKEN.value(), "Content-Type": "application/json", "Square-Version": "2024-10-17" };
 }
+function _sqDateStr() { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); }
+// 💳 Trae la comisión REAL de Square de un pago (GetPayment). OJO: la comisión a veces tarda ~1 día → ready=false hasta que aparece.
+async function _sqGetFee(payId) {
+  try {
+    const r = await fetch(SQUARE_API + "/v2/payments/" + encodeURIComponent(payId), { headers: _sqHeaders() });
+    const j = await r.json().catch(() => ({}));
+    const p = j.payment || {};
+    const grossCents = (p.total_money && Number(p.total_money.amount)) || (p.amount_money && Number(p.amount_money.amount)) || 0;
+    const feeCents = (Array.isArray(p.processing_fee) ? p.processing_fee : []).reduce((a, f) => a + ((f.amount_money && Number(f.amount_money.amount)) || 0), 0);
+    const last4 = (p.card_details && p.card_details.card && p.card_details.card.last_4) || "";
+    const ready = !!(p.processing_fee && p.processing_fee.length);
+    return { ok: !!r.ok, grossCents, feeCents, netCents: Math.max(0, grossCents - feeCents), last4, ready };
+  } catch (e) { return { ok: false, grossCents: 0, feeCents: 0, netCents: 0, last4: "", ready: false }; }
+}
+// 💸 Escribe el GASTO "Comisión Square" (idempotente por sqfee_<payId>). Solo si feeCents>0. Así cada pago con tarjeta queda desglosado: ingreso bruto + comisión aparte.
+async function _sqWriteFeeExpense(db, payId, info) {
+  if (!payId || !(info && Number(info.feeCents) > 0)) return false;
+  const ref = db.doc("transactions/sqfee_" + payId);
+  const s = await ref.get();
+  if (s.exists) return false;   // ya registrada
+  const nowISO = new Date().toISOString();
+  await ref.set({
+    entryId: "sqfee_" + payId, type: "expense", dept: info.dept || "dealer",
+    category: "Comisión Square", expenseType: "comision-square", private: !!info.private,
+    amountCents: Math.round(info.feeCents),
+    clientId: info.clientId || "", clientName: info.clientName || "",
+    serviceOrderId: info.serviceOrderId || "", orderNum: info.orderNum || null, carLabel: info.carLabel || "",
+    date: info.dateStr || _sqDateStr(),
+    note: "Comisión Square" + (info.last4 ? (" ·" + info.last4) : "") + (info.refNote ? (" · " + info.refNote) : ""),
+    createdAt: nowISO, createdBy: "square", source: "square-fee", sqPaymentId: payId,
+  });
+  return true;
+}
+// 💳 Escribe el INGRESO del cargo por tarjeta (el 2.9% que pagó el cliente por usar el link). Idempotente por sqsur_<payId>. Solo lado DEALER (en servicio el 2.9% ya va dentro del ingreso bruto).
+async function _sqWriteSurchargeIncome(db, payId, info) {
+  if (!payId || !(info && Number(info.surCents) > 0)) return false;
+  const ref = db.doc("transactions/sqsur_" + payId);
+  const s = await ref.get();
+  if (s.exists) return false;
+  const nowISO = new Date().toISOString();
+  await ref.set({
+    entryId: "sqsur_" + payId, type: "income", dept: info.dept || "dealer",
+    category: "Cargo por tarjeta", saleType: "cargo-tarjeta", private: !!info.private,
+    amountCents: Math.round(info.surCents),
+    clientId: info.clientId || "", clientName: info.clientName || "",
+    date: info.dateStr || _sqDateStr(),
+    note: "Cargo por tarjeta 2.9%" + (info.last4 ? (" ·" + info.last4) : "") + (info.refNote ? (" · " + info.refNote) : ""),
+    createdAt: nowISO, createdBy: "square", source: "square-surcharge", sqPaymentId: payId,
+  });
+  return true;
+}
 // Crea un link de pago (hosted checkout de Square) para un cliente. El cliente mete su tarjeta EN SQUARE.
 exports.createSquareCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors: true, timeoutSeconds: 30 }, async (req, res) => {
   if (req.method === "OPTIONS") { res.status(204).send(""); return; }
@@ -717,8 +768,17 @@ async function _sqRecordOrderId(orderId) {
     } catch (e) {}
     payments.push({ entryId, amount, date: dateStr, method: "square", schedDate, createdAt: nowISO, createdBy: "square", source: "square" });
     tx.update(cref, { payments });
-    tx.set(db.doc("transactions/" + entryId), { entryId, type: "payment", dept: "dealer", clientId, clientName, amountCents, method: "square", date: dateStr, schedDate: "", createdAt: nowISO, createdBy: "square", note: "Pago por Square (el cliente pagó +2.9% de cargo por servicio aparte)", source: "square" });
+    tx.set(db.doc("transactions/" + entryId), { entryId, type: "payment", dept: "dealer", clientId, clientName, amountCents, method: "square", date: dateStr, schedDate: "", createdAt: nowISO, createdBy: "square", note: "Pago por Square (abono al carro; el 2.9% y la comisión van desglosados aparte)", source: "square" });
   });
+  // 💳 Desglose fiel (idempotente por payId): el 2.9% que pagó el cliente = INGRESO "Cargo por tarjeta"; la comisión real de Square = GASTO "Comisión Square". El abono al carro sigue siendo el BASE.
+  try {
+    const gross = Math.round((order.total_money && Number(order.total_money.amount)) || amountCents);
+    const surCents = Math.max(0, gross - Math.round(amountCents));
+    const feePayId = (tenders[0] && (tenders[0].payment_id || tenders[0].id)) || order.id;
+    await _sqWriteSurchargeIncome(db, payId, { surCents, dept: "dealer", clientId, clientName, dateStr, refNote: "Semana del coche" });
+    const fee = await _sqGetFee(feePayId);
+    await _sqWriteFeeExpense(db, payId, { feeCents: fee.feeCents, dept: "dealer", clientId, clientName, dateStr, last4: fee.last4, refNote: "Semana del coche" });
+  } catch (e) { console.error("sq dealer desglose", e); }
   return { ok: true, amount, clientName };
 }
 
@@ -733,16 +793,21 @@ async function _sqRecordServiceCharge(order) {
   try { amountCents = parseInt(order.metadata.baseCents, 10) || 0; } catch (e) {}
   if (!amountCents) amountCents = Math.round((order.net_amounts && order.net_amounts.line_item_total_money && order.net_amounts.line_item_total_money.amount) || (order.total_money && order.total_money.amount) || 0);
   const payId = (tenders[0] && tenders[0].id) || order.id;
+  const feePayId = (tenders[0] && (tenders[0].payment_id || tenders[0].id)) || order.id;
   const db = admin.firestore();
   const snap = await db.collection("serviceOrders").doc(orderId).get();
   if (!snap.exists) return { ok: false, error: "order" };
-  await _postServiceIncome(db, snap.data() || {}, orderId, amountCents, "square-link", "sq_" + payId, "square", order.metadata.priv === "1");
+  // 💳 Ingreso BRUTO (servicio + 2.9%) y comisión REAL de Square, desglosada. La comisión puede tardar → se completa en el reintento del webhook (payment.updated).
+  const fee = await _sqGetFee(feePayId);
+  const gross = Math.round((order.total_money && Number(order.total_money.amount)) || (amountCents + Math.round(amountCents * 0.029)));
+  const sq = { payId: feePayId, grossCents: gross, feeCents: fee.feeCents, netCents: Math.max(0, gross - fee.feeCents), last4: fee.last4 };
+  await _postServiceIncome(db, snap.data() || {}, orderId, amountCents, "square-link", "sq_" + payId, "square", order.metadata.priv === "1", sq);
   return { ok: true, amount: Math.round(amountCents) / 100 };
 }
 
 // Postea el ingreso de SERVICIO (bolsa dealer, category Servicio) + marca la orden pagada/entregada. Idempotente por entryId.
 // priv=true → transacción PRIVADA ("fuera de Legacy"): entra a Finanzas pero NO cuenta en los números de Legacy.
-async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, who, priv) {
+async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, who, priv, sq) {
   const nowISO = new Date().toISOString();
   const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const txRef = db.doc("transactions/" + entryId);
@@ -759,8 +824,9 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
       entryId, type: "income", dept: "dealer", category: "Servicio", saleType: "servicio", private: !!priv,
       clientId: cur.clientId || "", clientName: cur.clientName || "",
       serviceOrderId: orderId, orderNum: cur.orderNum || null, carLabel: cur.vehicleLabel || "",
-      amountCents: Math.round(amountCents), method: method || "cash", date: dateStr,
-      note: "Orden de servicio #" + (cur.orderNum || orderId) + (newPaid < total ? " (abono)" : ""), createdAt: nowISO, createdBy: who || method || "service-caja", source: "service-caja",
+      amountCents: (sq && sq.grossCents) ? Math.round(sq.grossCents) : Math.round(amountCents), method: method || "cash", date: dateStr,
+      note: "Orden de servicio #" + (cur.orderNum || orderId) + (newPaid < total ? " (abono)" : "") + ((sq && Number(sq.feeCents) > 0) ? (" · bruto $" + (sq.grossCents / 100).toFixed(2) + " · comisión $" + (sq.feeCents / 100).toFixed(2) + " · neto $" + (sq.netCents / 100).toFixed(2)) : ""), createdAt: nowISO, createdBy: who || method || "service-caja", source: "service-caja",
+      ...(sq ? { sqPaymentId: sq.payId || "", sqTotalCents: Math.round(sq.grossCents || 0), sqFeeCents: Math.round(sq.feeCents || 0), sqNetCents: Math.round(sq.netCents || 0), sqLast4: sq.last4 || "" } : {}),
     });
     const fullyPaid = (newPaid >= total && total > 0);
     const patch = { paidCents: newPaid, paid: fullyPaid, paidAt: nowISO, payMethod: method || "cash", updatedAt: nowISO };
@@ -785,6 +851,14 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
     }
     tx.set(oref, patch, { merge: true });
   });
+  // 💸 Gasto "Comisión Square" (idempotente por payId) — corre aunque el ingreso ya existiera, para rellenar la comisión cuando Square la publica (payment.updated).
+  if (sq && sq.payId && Number(sq.feeCents) > 0) {
+    try { await _sqWriteFeeExpense(db, sq.payId, { feeCents: sq.feeCents, dept: "dealer", private: !!priv, clientId: o.clientId || "", clientName: o.clientName || "", serviceOrderId: orderId, orderNum: o.orderNum || null, carLabel: o.vehicleLabel || "", last4: sq.last4 || "", dateStr, refNote: "Servicio #" + (o.orderNum || orderId) }); } catch (e) { console.error("sqfee svc", e); }
+  }
+  // Guarda en la orden el total/comisión/neto REAL de Square → el invoice muestra el desglose exacto.
+  if (sq && sq.payId && Number(sq.grossCents) > 0) {
+    try { await oref.set({ sqPaymentId: sq.payId, sqTotalCents: Math.round(sq.grossCents), sqFeeCents: Math.round(sq.feeCents || 0), sqNetCents: Math.round(sq.netCents || 0), sqLast4: sq.last4 || "", updatedAt: nowISO }, { merge: true }); } catch (e) {}
+  }
   // 🚀 Avisa a los dueños que el cliente pagó las refacciones → hay que ORDENARLAS.
   if (startedParts) {
     try {
@@ -1945,16 +2019,18 @@ async function _sqLinkPaymentToOrder(db, orderId, paymentId, who, baseCents) {
   const entryId = "sq_" + paymentId;
   const txref = db.doc("transactions/" + entryId);
   const ts = await txref.get();
-  if (!ts.exists) {   // 💵 NETO real a Finanzas (idempotente)
+  if (!ts.exists) {   // 💵 INGRESO BRUTO a Finanzas (la comisión va como gasto aparte). Idempotente.
     await txref.set({
       entryId, type: "income", dept: "dealer", category: "Servicio", saleType: "servicio", private: false,
       clientId: o.clientId || "", clientName: o.clientName || "",
       serviceOrderId: orderId, orderNum: o.orderNum || null, carLabel: o.vehicleLabel || "",
-      amountCents: netCents, method: "square", date: dateStr,
-      note: "Pago Square" + (last4 ? (" ·" + last4) : "") + " · total $" + (totalCents / 100).toFixed(2) + " · comisión $" + (feeCents / 100).toFixed(2) + " · neto $" + (netCents / 100).toFixed(2),
+      amountCents: totalCents, method: "square", date: dateStr,
+      note: "Pago Square" + (last4 ? (" ·" + last4) : "") + " · bruto $" + (totalCents / 100).toFixed(2) + " · comisión $" + (feeCents / 100).toFixed(2) + " · neto $" + (netCents / 100).toFixed(2),
       createdAt: nowISO, createdBy: who || "square", source: "square-terminal",
-      sqPaymentId: paymentId, sqTotalCents: totalCents, sqFeeCents: feeCents,
+      sqPaymentId: paymentId, sqTotalCents: totalCents, sqFeeCents: feeCents, sqNetCents: netCents, sqLast4: last4,
     });
+    // 💸 Gasto "Comisión Square" (idempotente por paymentId) — junto con el ingreso recién creado.
+    await _sqWriteFeeExpense(db, paymentId, { feeCents, dept: "dealer", clientId: o.clientId || "", clientName: o.clientName || "", serviceOrderId: orderId, orderNum: o.orderNum || null, carLabel: o.vehicleLabel || "", last4, dateStr, refNote: "Servicio #" + (o.orderNum || orderId) });
   }
   // Orden: pagada por el total del servicio + datos de Square para el invoice.
   const _entry = (p.card_details && p.card_details.entry_method) || "";   // EMV/CONTACTLESS/SWIPED/KEYED = en persona; ON_FILE/KEYED online = link
