@@ -2346,6 +2346,7 @@ function svcRenderModal(){
         +'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" onchange="window._svcDraft.scheduledAt=this.value;var p=document.getElementById(\'svc-sched-pretty\');if(p)p.textContent=_svcPrettyWhen(this.value);" style="'+SVC_IN+';font-size:16px;padding:14px;cursor:pointer;">'
         +'<div id="svc-sched-pretty" style="font-size:13.5px;color:var(--gold);font-weight:800;margin-top:7px;">'+_svcPrettyWhen(d.scheduledAt)+'</div>'
         +'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Toca el campo para abrir el calendario del teléfono.</div>'
+        +(d.editId?'<button onclick="svcNotifySms(\''+d.editId+'\',\'cita\')" style="width:100%;margin-top:9px;background:var(--surface3);border:1px solid var(--gold);color:var(--gold);border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💬 Avisar la cita al cliente por SMS</button>':'')
       : '');
   // (La asignación ahora es POR SERVICIO, dentro de cada tarjeta de servicio arriba.)
   // 5 · ESTATUS + FECHAS (solo al editar una orden existente)
@@ -2590,6 +2591,31 @@ window.svcViewDoc=function(orderId, kind){
   ov.appendChild(box); document.body.appendChild(ov);
 };
 // 📦 CHECKLIST DE REFACCIONES: cada parte Pendiente/Recibida. Cuando están TODAS → invita a agendar la cita.
+// 💬 Avisar al cliente por SMS: 'parts' = llegaron las refacciones; 'cita' = su cita quedó agendada. (Confiable para quien no tiene la app.)
+window.svcNotifySms=function(orderId, kind){
+  const o=svcOrders.find(x=>x.id===orderId); if(!o){ alert('Orden no encontrada.'); return; }
+  const en=(o.lang==='en');
+  const nm=((titleCase(o.clientName||'')||'').split(' ')[0])||'';
+  const veh=o.vehicleLabel||o.plate||(en?'your vehicle':'tu vehículo');
+  const link=PORTAL_URL+'?order='+orderId; const fol=o.orderNum?(' #'+o.orderNum):'';
+  let text;
+  if(kind==='cita'){
+    let sched=o.scheduledAt;   // usa la fecha del borrador si la acabas de poner y aún no guardas
+    try{ if(window._svcDraft && window._svcDraft.editId===orderId && window._svcDraft.scheduledAt) sched=window._svcDraft.scheduledAt; }catch(e){}
+    const when=sched?new Date(sched).toLocaleString(en?'en-US':'es-MX',{weekday:'long',day:'2-digit',month:'long',hour:'2-digit',minute:'2-digit'}):'';
+    text=en?('Hi '+nm+'! 🗓️ Your Legacy service appointment'+fol+' is set'+(when?(' for '+when):'')+'. See you! '+link+'\n— Legacy Motors Garage · (559) 540-5145')
+          :('Hola '+nm+'! 🗓️ Tu cita de servicio Legacy'+fol+' quedó'+(when?(' para el '+when):'')+'. ¡Te esperamos! '+link+'\n— Legacy Motors Garage · (559) 540-5145');
+  } else {
+    text=en?('Hi '+nm+'! 🎉 The parts for your '+veh+fol+' arrived. Let\'s schedule your service. '+link+'\n— Legacy Motors Garage · (559) 540-5145')
+          :('Hola '+nm+'! 🎉 Ya llegaron las refacciones de tu '+veh+fol+'. Vamos a agendar tu cita de servicio. '+link+'\n— Legacy Motors Garage · (559) 540-5145');
+  }
+  const cli=o.clientId?clients.find(x=>x.id===o.clientId):null;
+  const raw=o.clientPhone||(cli?(cli.phoneE164||cli.phone||''):'');
+  let num=''; if(/^\+/.test(String(raw))) num=String(raw).replace(/[^\d+]/g,''); else { const dd=String(raw).replace(/\D/g,''); if(dd.length===10) num='+1'+dd; else if(dd.length>=11) num='+'+dd; }
+  if(num){ const a=document.createElement('a'); a.href='sms:'+num+'?&body='+encodeURIComponent(text); a.click(); return; }
+  try{ navigator.clipboard.writeText(text); }catch(e){}
+  alert('Esta orden no tiene teléfono del cliente. El texto se copió 📋.');
+};
 function svcPartsChecklist(o){
   const parts=[]; (Array.isArray(o.services)?o.services:[]).forEach(s=>{ (Array.isArray(s.parts)?s.parts:[]).forEach(p=>{ if((p.desc||'').trim()||p.priceCents||p.price) parts.push(p); }); });
   if(!parts.length) return '';
@@ -2603,7 +2629,8 @@ function svcPartsChecklist(o){
   }).join('');
   const all=(got===parts.length);
   const head='<div style="font-size:12px;color:'+(all?'#28b463':'var(--muted)')+';margin-bottom:8px;font-weight:700;">📦 '+got+' de '+parts.length+' refacciones recibidas'+(all?' · ✅ COMPLETAS':'')+'</div>';
-  const cta=all?'<div style="margin-top:8px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);border-radius:10px;padding:11px;font-size:12.5px;color:#49d17f;font-weight:700;text-align:center;line-height:1.5;">✅ ¡Todas las refacciones llegaron!<br>Ya puedes <b>agendar la cita</b> aquí abajo 🗓️</div>':'';
+  const cta=all?'<div style="margin-top:8px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);border-radius:10px;padding:11px;font-size:12.5px;color:#49d17f;font-weight:700;text-align:center;line-height:1.5;">✅ ¡Todas las refacciones llegaron!<br>Ya puedes <b>agendar la cita</b> aquí abajo 🗓️</div>'
+    +'<button onclick="svcNotifySms(\''+o.id+'\',\'parts\')" style="width:100%;margin-top:8px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💬 Avisar al cliente por SMS (llegaron las refacciones)</button>':'';
   return head+rows+cta;
 }
 window.svcTogglePart=async function(orderId, kEnc){
