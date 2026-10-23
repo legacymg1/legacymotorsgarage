@@ -2389,7 +2389,7 @@ function renderMyService(boxId){
       +'<div style="font-size:14px;margin-bottom:3px;">🚗 '+car+'</div>'
       +(idbits?'<div class="faint" style="font-size:12px;margin-bottom:6px;">'+idbits+'</div>':'')
       +_svcPipeHTML(o)+_svcMyListHTML(o)
-      +'<div class="faint" style="font-size:12px;margin-bottom:10px;">'+when+(phone?(' · <a href="sms:'+phone+'" onclick="event.stopPropagation();" style="color:var(--gold);text-decoration:none;">'+t('svcMsg')+'</a>'):'')+'</div>'+_svcActionsHTML(o)+'</div>';
+      +'<div class="faint" style="font-size:12px;margin-bottom:10px;">'+when+' · <a onclick="event.stopPropagation();svcMsgAdmin(\''+(o.orderNum||'')+'\')" style="color:var(--gold);text-decoration:none;cursor:pointer;">💬 '+L2('Avisar a la oficina','Message office')+'</a></div>'+_svcActionsHTML(o)+'</div>';
   }).join('');
 }
 // 📋 Abrir la orden (empleado): detalle + acciones. Tocar la tarjeta SIEMPRE abre esto (antes no hacía nada si no había botón).
@@ -2412,8 +2412,22 @@ window.svcEmpOpen=function(orderId){
     +_svcPipeHTML(o)+_svcMyListHTML(o)
     +'<div class="faint" style="font-size:12px;margin:8px 0 14px;">'+when+'</div>'
     +(acts?('<div style="margin-bottom:10px;">'+acts+'</div>'):'<div class="faint" style="text-align:center;padding:8px 0 14px;font-size:13px;line-height:1.5;">'+L2('Nada por hacer ahora en esta orden.','Nothing to do on this order right now.')+'</div>')
-    +(phone?'<a href="sms:'+phone+'" style="display:block;text-align:center;text-decoration:none;color:var(--gold);font-size:14px;padding:8px;">💬 '+t('svcMsg')+'</a>':'')
+    +'<a onclick="svcMsgAdmin(\''+(o.orderNum||'')+'\')" style="display:block;text-align:center;text-decoration:none;color:var(--gold);font-size:14px;padding:8px;cursor:pointer;">💬 '+L2('Avisar a la oficina','Message office')+'</a>'
   +'</div>';
+};
+// 💬 El empleado avisa a la OFICINA/supervisores (NUNCA al cliente). Abre el chat interno si lo tiene (cuentas por correo);
+//    si es empleado por teléfono (aún sin chat interno), manda SMS a la LÍNEA DE OFICINA, no al cliente.
+window.svcMsgAdmin=function(folio){
+  try{ const sh=document.getElementById('svc-emp-sheet'); if(sh) sh.remove(); }catch(e){}
+  const fab=document.getElementById('lcw-fab');
+  const chatOn = fab && (function(){ try{ return getComputedStyle(fab).display!=='none'; }catch(e){ return fab.style.display && fab.style.display!=='none'; } })();
+  if(chatOn && typeof window.lcwOpenTo==='function'){
+    try{ window.lcwOpenTo('mechanic-owners'); return; }catch(e){}   // el widget cae al panel si no tiene ese canal
+  }
+  // Sin chat interno (empleado por teléfono) → contacta a la OFICINA, jamás al cliente.
+  const office='+15595405145';
+  const body=encodeURIComponent((L==='es'?'Hola oficina, sobre la orden #':'Hi office, about order #')+(folio||'')+': ');
+  try{ const a=document.createElement('a'); a.href='sms:'+office+'?&body='+body; a.click(); }catch(e){ try{ whToast&&whToast(L2('Avísanos a la oficina: (559) 540-5145','Tell the office: (559) 540-5145')); }catch(e2){} }
 };
 // 🔧 RELEVO: el trabajador marca SU etapa; al terminar su rol, pasa al siguiente. (En "actuar como" escribe como el empleado.)
 window.svcStage=async function(orderId,action){
