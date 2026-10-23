@@ -1550,6 +1550,7 @@ function svcStatusLabel(o){
   return {txt:'🧾 Borrador de estimado', col:'#8a8fa8'};
 }
 function svcBucket(o){
+  if(window.LMG && LMG.svcBucketOf) return LMG.svcBucketOf(o);
   if(o.paid===true || o.status==='entregado') return 'completadas';
   if(o.estimateStatus==='accepted' || ['arrancado','recibido','en_proceso','pausado_partes','listo'].indexOf(o.status)>=0) return 'activas';
   return 'estimados';
@@ -1569,6 +1570,7 @@ function svcRenderTabs(){
 }
 // Una FILA de orden (folio · cliente/carro · estado · total). Toca → abre la orden (o el recibo si está pagada).
 function svcRowHtml(o){
+  if(window.LMG && LMG.svcOrderRow) return LMG.svcOrderRow(o,{esc:svcEsc,money:formatMoney,openFn:'svcOpenOrder',receiptFn:'svcOpenReceipt',lang:'es'});
   const sl=svcStatusLabel(o); const badge=sl.txt; const col=sl.col;
   const car=svcEsc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
   const tot=(Number(o.grandTotalCents)||0)>0?formatMoney(o.grandTotalCents/100):'—';

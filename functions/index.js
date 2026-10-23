@@ -1926,6 +1926,40 @@ exports.svcServiceDone = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true, status: newStatus, activeRole: svcActiveRoleSrv(svs) };
 });
 
+// 🗂️ SERVICE CRM completo para el CENTRO DE OPERACIONES (solo dueño): TODAS las órdenes (activas + completadas + estimados) + clientes de servicio.
+// Alimenta las pestañas Activas·Completadas·Clientes con el MISMO render compartido que Clientes/admin (un solo ecosistema).
+exports.svcOwnerAll = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  const orders = [], clients = [];
+  try {
+    const snap = await db.collection("serviceOrders").get();
+    snap.forEach((d) => {
+      const o = d.data() || {};
+      orders.push({
+        id: d.id, orderNum: o.orderNum || null,
+        clientId: o.clientId || "", clientName: o.clientName || "", clientPhone: o.clientPhone || "",
+        vehicleLabel: o.vehicleLabel || "", plate: o.plate || "", vin: o.vin || "",
+        reason: o.reason || "", assignName: o.assignName || "", assignRole: o.assignRole || "",
+        status: o.status || "", estimateStatus: o.estimateStatus || "",
+        paid: !!o.paid, paidCents: Number(o.paidCents) || 0, payMethod: o.payMethod || "",
+        grandTotalCents: Number(o.grandTotalCents) || 0, balanceCents: Number(o.balanceCents) || 0,
+        scheduledAt: o.scheduledAt || "", createdAt: o.createdAt || "", deliveredAt: o.deliveredAt || "",
+        services: Array.isArray(o.services) ? o.services : [],
+        sqTotalCents: Number(o.sqTotalCents) || 0, sqFeeCents: Number(o.sqFeeCents) || 0, sqNetCents: Number(o.sqNetCents) || 0, sqLast4: o.sqLast4 || "",
+        hasInvoice: !!o.invoice, lang: o.lang || "es",
+      });
+    });
+  } catch (e) { console.error("svcOwnerAll orders", e); }
+  try {
+    const cs = await db.collection("clients").where("kind", "==", "service").get();
+    cs.forEach((d) => { const c = d.data() || {}; clients.push({ id: d.id, name: c.name || "", phone: c.phoneE164 || c.phone || "", createdAt: c.createdAt || "" }); });
+  } catch (e) { console.error("svcOwnerAll clients", e); }
+  return { ok: true, orders, clients };
+});
+
 // 🔧 SERVICE: el empleado asignado (o el dueño) mueve el estatus de la orden.
 exports.svcOrderStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");

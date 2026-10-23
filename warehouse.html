@@ -1780,6 +1780,8 @@ window.taskDoComplete=async function(){
 
 // 👑 Panel de operación del dueño — todas las tareas abiertas (allTasks) con resumen + scroll.
 let OP_TASKS=[], OP_TEAM=[], OP_DEALER=[], OP_SVC=[], OP_DONE=[], OP_CLOCK=null, OP_DIS=[];
+let SVC_ALL={orders:[],clients:[]};   // 🗂️ CRM de servicio COMPLETO (svcOwnerAll): activas + completadas + clientes, mismo render que admin
+let _opSvcSub='activas';              // sub-pestaña del Servicio en el Centro: activas · completadas · clientes
 let _opErr={};   // marca por sección si su carga FALLÓ (para distinguir "vacío" de "no se pudo cargar" — nada de ceros falsos)
 // 👥 Equipo en vivo = quién está TRABAJANDO ahora (reloj = empleados; tarea/servicio activo = todos, incl. dueños).
 function _opRebuildTeam(){
@@ -1795,7 +1797,7 @@ window.loadOwnerPanel=async function(){
   const seq=(++_opLoadSeq);
   // 1) PINTAR AL INSTANTE desde la última foto (sessionStorage) → cero espera al refrescar.
   let hadCache=false;
-  try{ const cx=JSON.parse(sessionStorage.getItem('lmg_op_cache')||'null'); if(cx){ OP_TASKS=cx.OP_TASKS||[]; OP_CLOCK=cx.OP_CLOCK||null; OP_DEALER=cx.OP_DEALER||[]; OP_SVC=cx.OP_SVC||[]; OP_DONE=cx.OP_DONE||[]; OP_DIS=cx.OP_DIS||[]; OP_TEAM=cx.OP_TEAM||[]; renderOwnerPanel(); hadCache=true; } }catch(e){}
+  try{ const cx=JSON.parse(sessionStorage.getItem('lmg_op_cache')||'null'); if(cx){ OP_TASKS=cx.OP_TASKS||[]; OP_CLOCK=cx.OP_CLOCK||null; OP_DEALER=cx.OP_DEALER||[]; OP_SVC=cx.OP_SVC||[]; OP_DONE=cx.OP_DONE||[]; OP_DIS=cx.OP_DIS||[]; OP_TEAM=cx.OP_TEAM||[]; if(cx.SVC_ALL) SVC_ALL=cx.SVC_ALL; renderOwnerPanel(); hadCache=true; } }catch(e){}
   if(!hadCache){ const tb=document.getElementById('op-tab-body'); if(tb) tb.innerHTML='<div class="faint" style="text-align:center;padding:12px;">'+t('jLoadingTxt')+'</div>'; }
   const callE=(n)=>httpsCallable(functions,n)({}).then(r=>(r&&r.data)||{});
   const paint=()=>{ if(seq!==_opLoadSeq) return; _opRebuildTeam(); renderOwnerPanel(); };
@@ -1807,12 +1809,13 @@ window.loadOwnerPanel=async function(){
     callE('svcMyOrders').then(x=>{ OP_SVC=(x.orders||[]).filter(o=>o.status!=='entregado'); _opErr.svc=false; paint(); }).catch(()=>{ _opErr.svc=true; paint(); }),
     callE('opsDoneToday').then(x=>{ OP_DONE=x.people||[]; _opErr.done=false; paint(); }).catch(()=>{ _opErr.done=true; paint(); }),
     callE('disInProcess').then(x=>{ OP_DIS=x.cars||[]; _opErr.dis=false; paint(); }).catch(()=>{ _opErr.dis=true; paint(); }),
+    callE('svcOwnerAll').then(x=>{ SVC_ALL={orders:x.orders||[],clients:x.clients||[]}; _opErr.svcall=false; paint(); }).catch(()=>{ _opErr.svcall=true; paint(); }),
   ];
   await Promise.allSettled(jobs);
   if(seq!==_opLoadSeq) return;   // se disparó otra carga más nueva
   _opRebuildTeam(); renderOwnerPanel();
   // 3) Guardar la foto para el próximo refresco instantáneo.
-  try{ sessionStorage.setItem('lmg_op_cache', JSON.stringify({OP_TASKS,OP_CLOCK,OP_DEALER,OP_SVC,OP_DONE,OP_DIS,OP_TEAM})); }catch(e){}
+  try{ sessionStorage.setItem('lmg_op_cache', JSON.stringify({OP_TASKS,OP_CLOCK,OP_DEALER,OP_SVC,OP_DONE,OP_DIS,OP_TEAM,SVC_ALL})); }catch(e){}
 };
 // Normaliza cualquier estatus interno a los términos UNIFICADOS: En cola → En proceso → En pausa → Terminado.
 // 🔗 Delegan al componente compartido legacy-svc.js (LMG); con respaldo local por si el archivo no cargó.
@@ -1844,6 +1847,56 @@ window.opWorkService=function(){ _opFromCenter=true; try{ openService(); }catch(
 // 🚗 Click en un carro Dealer del Centro → abre la recepción/DVI de ESE carro (no la vista genérica). Se abre al cargar la lista del mecánico.
 let _pendingMechCar='';
 window.opWorkDealer=function(id){ if(!id) return; _opFromCenter=true; _pendingMechCar=id; try{ openService(); }catch(e){} };
+// 🗂️ Sub-pestaña del Servicio (Activas·Completadas·Clientes) en el Centro.
+window.opSvcSub=function(s){ _opSvcSub=s; renderOwnerPanel(); };
+// 🧾 Vista READ-ONLY de una orden de servicio desde el Centro (dueño). Editar/cobrar vive en Clientes/admin.
+window.svcOpsView=function(id){
+  const o=(SVC_ALL.orders||[]).find(x=>x.id===id)||(OP_SVC||[]).find(x=>x.id===id); if(!o){ whToast&&whToast(L2('Orden no encontrada','Order not found')); return; }
+  const en=(L==='en'); const m=n=>'$'+Number(n||0).toFixed(2);
+  const sl=(window.LMG&&LMG.svcStatusRich)?LMG.svcStatusRich(o,en):{txt:_opStatusLabel(o.status),col:_opStatusColor(o.status)};
+  const car=esc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):(en?'Vehicle':'Auto')));
+  const svs=Array.isArray(o.services)?o.services:[];
+  let rows='';
+  svs.forEach((s,i)=>{ const sp=(s.price!=null?Number(s.price):((Number(s.laborCents!=null?s.laborCents:s.priceCents)||0)/100));
+    rows+='<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-weight:700;font-size:13px;">'+esc((s.desc||'').trim()||((en?'Service ':'Servicio ')+(i+1)))+'</span><span style="font-weight:700;font-size:13px;white-space:nowrap;">'+m(sp)+'</span></div>';
+    (Array.isArray(s.parts)?s.parts:[]).forEach(p=>{ const pp=(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100)); rows+='<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0 3px 14px;"><span style="font-size:12px;color:var(--muted);">• '+esc((p.desc||'').trim()||(en?'Part':'Parte'))+'</span><span style="font-size:12px;color:var(--muted);white-space:nowrap;">'+m(pp)+'</span></div>'; });
+  });
+  const tot=(Number(o.grandTotalCents)||0)/100, paid=(Number(o.paidCents)||0)/100, bal=(Number(o.balanceCents)||0)/100;
+  const phone=String(o.clientPhone||'').replace(/[^\d+]/g,'');
+  const telRow=phone?('<div style="display:flex;gap:8px;margin:10px 0;"><a href="tel:'+phone+'" style="flex:1;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px;font-weight:800;font-size:13px;text-decoration:none;color:var(--text);">📞 '+L2('Llamar','Call')+'</a><a href="sms:'+phone+'" style="flex:1;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px;font-weight:800;font-size:13px;text-decoration:none;color:var(--text);">💬 SMS</a></div>'):'';
+  const ov=document.createElement('div'); ov.id='svcops-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2147483200;display:flex;align-items:flex-end;justify-content:center;padding:0;cursor:pointer;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const box=document.createElement('div'); box.style.cssText='background:var(--surface,#12151c);color:var(--text,#fff);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px 28px;cursor:default;';
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;">'
+    +'<div style="font-weight:800;font-size:16px;">'+(o.orderNum?('<span style="color:var(--gold);">#'+o.orderNum+'</span> '):'')+esc(o.clientName||(en?'Customer':'Cliente'))+'</div>'
+    +'<button onclick="var x=document.getElementById(\'svcops-ov\');if(x)x.remove();" style="background:var(--surface2);border:none;border-radius:9px;padding:7px 11px;font-weight:800;cursor:pointer;color:var(--text);">✕</button></div>'
+    +'<div style="margin-bottom:8px;"><span style="font-size:11px;font-weight:800;color:'+sl.col+';background:'+sl.col+'1f;border:1px solid '+sl.col+';padding:3px 9px;border-radius:999px;">'+sl.txt+'</span></div>'
+    +'<div class="faint" style="font-size:13px;line-height:1.6;">🚗 '+car+(o.reason?('<br>📝 '+esc(o.reason)):'')+(o.assignName?('<br>👤 '+esc(o.assignName)):'')+'</div>'
+    +telRow
+    +(rows?('<div style="margin-top:6px;">'+rows+'</div>'):'')
+    +'<div style="margin-top:12px;border-top:2px solid var(--border);padding-top:10px;">'
+      +'<div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;"><span>Total</span><span>'+m(tot)+'</span></div>'
+      +(paid>0?('<div style="display:flex;justify-content:space-between;color:#35c46a;font-weight:700;font-size:13px;margin-top:3px;"><span>'+L2('Pagado','Paid')+(o.payMethod?(' · '+esc(o.payMethod)):'')+'</span><span>'+m(paid)+'</span></div>'):'')
+      +(bal>0.004?('<div style="display:flex;justify-content:space-between;color:#ff6b6b;font-weight:700;font-size:13px;margin-top:3px;"><span>'+L2('Saldo','Balance')+'</span><span>'+m(bal)+'</span></div>'):'')
+    +'</div>'
+    +'<div class="faint" style="font-size:11px;margin-top:12px;text-align:center;line-height:1.5;">'+L2('Vista de solo lectura. Para editar o cobrar, usa Clientes.','Read-only. To edit or charge, use the Clients app.')+'</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+};
+// 👥 Órdenes de UN cliente de servicio (read-only) desde el Centro.
+window.svcOpsClient=function(id){
+  const list=(SVC_ALL.orders||[]).filter(o=>o.clientId===id);
+  const c=(SVC_ALL.clients||[]).find(x=>x.id===id)||{name:(list[0]&&list[0].clientName)||'Cliente',phone:(list[0]&&list[0].clientPhone)||''};
+  const en=(L==='en'); list.sort((a,b)=>String(b.scheduledAt||b.createdAt||'').localeCompare(String(a.scheduledAt||a.createdAt||'')));
+  const phone=String(c.phone||'').replace(/[^\d+]/g,'');
+  const ov=document.createElement('div'); ov.id='svcops-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2147483200;display:flex;align-items:flex-end;justify-content:center;padding:0;cursor:pointer;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const box=document.createElement('div'); box.style.cssText='background:var(--surface,#12151c);color:var(--text,#fff);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px 28px;cursor:default;';
+  const telRow=phone?('<div style="display:flex;gap:8px;margin:10px 0;"><a href="tel:'+phone+'" style="flex:1;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px;font-weight:800;font-size:13px;text-decoration:none;color:var(--text);">📞 '+L2('Llamar','Call')+'</a><a href="sms:'+phone+'" style="flex:1;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px;font-weight:800;font-size:13px;text-decoration:none;color:var(--text);">💬 SMS</a></div>'):'';
+  const tbl=list.length?((window.LMG&&LMG.svcTable)?LMG.svcTable(list,{openFn:'svcOpsView',receiptFn:'svcOpsView',lang:(en?'en':'es')}):''):('<div class="faint" style="text-align:center;padding:16px;">'+L2('Este cliente aún no tiene órdenes.','This client has no orders yet.')+'</div>');
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;"><div style="font-weight:800;font-size:16px;">'+esc(c.name||'Cliente')+'</div><button onclick="var x=document.getElementById(\'svcops-ov\');if(x)x.remove();" style="background:var(--surface2);border:none;border-radius:9px;padding:7px 11px;font-weight:800;cursor:pointer;color:var(--text);">✕</button></div>'
+    +(c.phone?('<div class="faint" style="font-size:13px;">'+esc(c.phone)+'</div>'):'')+telRow+tbl;
+  ov.appendChild(box); document.body.appendChild(ov);
+};
 // 🔎 F3 — BUSCADOR del Centro: carro / orden / tarea / empleado → toca y se abre.
 window.opSearch=function(q){
   q=(q||'').trim().toLowerCase();
@@ -1921,7 +1974,10 @@ function _opDealerHtml(){
       +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(dvi||'&nbsp;')+tsk+lab+'</div>'+dealPipelineHtml(c.reconStage)+'</div>';
   }).join('');
 }
-function _opSvcHtml(){
+// 🔧 Servicio en el Centro. full=true → CRM completo con sub-pestañas (Activas·Completadas·Clientes, mismo render que admin).
+// full=false (panorama "Todo") → lista operativa compacta de las abiertas (etapa/relevo/quién).
+function _opSvcHtml(full){
+  if(full) return _opSvcCrmHtml();
   if(!OP_SVC.length) return _opErr.svc?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No open service orders.':'Sin órdenes de servicio abiertas.')+'</div>';
   return OP_SVC.map(o=>{
     const car=esc(o.vehicleLabel||o.plate||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
@@ -1933,6 +1989,47 @@ function _opSvcHtml(){
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+folio+esc(o.clientName||'Cliente')+'</span><span style="display:flex;align-items:center;gap:6px;flex:none;">'+_opBadge(o.status)+'<span style="color:var(--muted);">›</span></span></div>'
       +'<div class="faint" style="font-size:12px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚗 '+car+(o.reason?(' · '+esc(o.reason)):'')+(stage?(' · '+stage):'')+who+'</div></div>';
   }).join('');
+}
+// 🗂️ CRM de servicio (sub-pestañas). Usa SVC_ALL (svcOwnerAll); si aún no cargó, cae en OP_SVC (abiertas, operativo).
+function _opSvcCrmHtml(){
+  const orders=SVC_ALL.orders||[];
+  const bucketOf=o=>(window.LMG&&LMG.svcBucketOf)?LMG.svcBucketOf(o):'activas';
+  if(!orders.length){
+    if(_opErr.svcall && !OP_SVC.length) return _opErrMsg();
+    if(OP_SVC.length) return '<div class="faint" style="font-size:12px;margin-bottom:6px;">'+L2('Cargando el CRM…','Loading CRM…')+'</div>'+_opSvcHtml(false);
+    return '<div class="faint" style="text-align:center;padding:18px;">'+L2('Aún no hay órdenes de servicio.','No service orders yet.')+'</div>';
+  }
+  const sub=_opSvcSub||'activas';
+  const act=[], done=[];
+  orders.forEach(o=>{ (bucketOf(o)==='completadas'?done:act).push(o); });
+  const cliN=_opSvcClients().length;
+  const tabs=[['activas','🔧 '+L2('Activas','Active'),act.length],['completadas','✅ '+L2('Completadas','Done'),done.length],['clientes','👥 '+L2('Clientes','Clients'),cliN]];
+  const bar='<div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:8px;margin-bottom:4px;">'+tabs.map(tb=>'<button onclick="opSvcSub(\''+tb[0]+'\')" style="padding:7px 12px;border-radius:999px;border:1px solid '+(sub===tb[0]?'var(--gold)':'var(--border)')+';background:'+(sub===tb[0]?'var(--gold)':'transparent')+';color:'+(sub===tb[0]?'var(--navy3,#0b0e14)':'var(--text)')+';font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;flex:none;">'+tb[1]+' <span style="opacity:.7;">'+tb[2]+'</span></button>').join('')+'</div>';
+  let body='';
+  if(sub==='clientes'){ body=_opSvcClientsHtml(); }
+  else {
+    let list=(sub==='completadas'?done:act).slice();
+    list.sort((a,b)=>String(b.scheduledAt||b.createdAt||'').localeCompare(String(a.scheduledAt||a.createdAt||'')));
+    if(!list.length) body='<div class="faint" style="text-align:center;padding:18px;">'+(sub==='completadas'?L2('Aún no hay servicios completados.','No completed services yet.'):L2('Sin órdenes activas.','No active orders.'))+'</div>';
+    else body=(window.LMG&&LMG.svcTable)?LMG.svcTable(list,{openFn:'svcOpsView',receiptFn:'svcOpsView',lang:(L==='en'?'en':'es')}):'';
+  }
+  return bar+body;
+}
+function _opSvcClients(){
+  const byId={};
+  (SVC_ALL.orders||[]).forEach(o=>{ if(!o.clientId) return; const b=byId[o.clientId]||(byId[o.clientId]={id:o.clientId,name:o.clientName||'Cliente',phone:o.clientPhone||'',n:0,last:''}); b.n++; const dt=o.scheduledAt||o.createdAt||''; if(dt>b.last)b.last=dt; });
+  (SVC_ALL.clients||[]).forEach(c=>{ if(!c||!c.id) return; if(!byId[c.id]) byId[c.id]={id:c.id,name:c.name||'Cliente',phone:c.phone||'',n:0,last:c.createdAt||''}; });
+  return Object.values(byId).sort((a,b)=>String(b.last).localeCompare(String(a.last)));
+}
+function _opSvcClientsHtml(){
+  const arr=_opSvcClients();
+  if(!arr.length) return '<div class="faint" style="text-align:center;padding:18px;">'+L2('Sin clientes de servicio todavía.','No service clients yet.')+'</div>';
+  const ini=n=>{ const p=String(n||'').trim().split(/\s+/).filter(Boolean); return (((p[0]||'')[0]||'?')+((p[1]||'')[0]||'')).toUpperCase(); };
+  return '<div class="faint" style="font-size:12px;margin-bottom:8px;">'+arr.length+' '+L2('cliente(s) de servicio','service client(s)')+'</div><div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">'+arr.map(c=>{
+    const last=c.last?new Date(c.last).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'2-digit',month:'short',year:'numeric'}):'';
+    const subl=(c.n>0?(c.n+' '+L2('orden(es)','order(s)')+(last?(' · '+last):'')):L2('Sin órdenes aún','No orders yet'));
+    return '<div onclick="svcOpsClient(\''+c.id+'\')" style="display:flex;gap:11px;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><span style="width:38px;height:38px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;">'+ini(c.name)+'</span><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.name)+'</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.phone||'')+' · '+subl+'</div></div><span style="color:var(--gold);font-size:18px;flex:none;">›</span></div>';
+  }).join('')+'</div>';
 }
 function _opDisHtml(){
   if(!OP_DIS.length) return _opErr.dis?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'No cars in dismantling.':'Sin carros en dismantling.')+'</div>';
@@ -1974,7 +2071,7 @@ function renderOwnerPanel(){
   let html='';
   if(cur==='equipo'){ html=_opDiv('👥 '+L2('Equipo en vivo','Team live'),null)+_opTeamHtml()+_opDiv('✅ '+L2('Hoy se hizo','Done today'),null)+_opDoneHtml(); }
   else if(cur==='dealer'){ html=_opDealerHtml(); }
-  else if(cur==='service'){ html=_opSvcHtml(); }
+  else if(cur==='service'){ html=_opSvcHtml(true); }
   else if(cur==='dis'){ html=_opDisHtml(); }
   else if(cur==='pit'){ html='<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn sm" onclick="jobAddOpen()" style="padding:7px 12px;font-size:12px;">➕ '+L2('Tarea','Task')+'</button><button class="btn ghost sm" onclick="openCarsProc()" style="padding:7px 12px;font-size:12px;">🚗 '+L2('Carros','Cars')+'</button></div>'+_opTasksHtml(); }
   else { // 🗂️ Todo = panorama con divisores suaves
