@@ -2229,6 +2229,44 @@ window.svcSaveVehicle=async function(btn){
     svcToast&&svcToast('💾 Auto guardado'); svcRenderModal();
   }catch(e){ alert('No se pudo guardar el auto: '+(e.message||e)); if(btn){ btn.disabled=false; btn.textContent='💾 Guardar auto y continuar'; } }
 };
+// 🚗 FICHA DEL CARRO (desde la orden): info completa + VIN + decodificar + buscar partes por VIN/vehículo.
+window.svcCarInfo=function(){
+  try{ svcCapture(); }catch(e){}
+  const d=window._svcDraft||{}; const vin=(d.vin||'').toUpperCase().trim(); const plate=(d.plate||'').toUpperCase().trim(); const label=d.vehicleLabel||'';
+  const ebayVin=vin?('https://www.ebay.com/sch/i.html?_nkw='+encodeURIComponent(vin)):'';
+  const qVeh=encodeURIComponent((label||'')+' parts');
+  const ebayVeh='https://www.ebay.com/sch/i.html?_nkw='+qVeh;
+  const carpart='https://www.google.com/search?q='+encodeURIComponent('site:car-part.com '+(label||vin));
+  const rock='https://www.rockauto.com/';
+  const goog='https://www.google.com/search?q='+encodeURIComponent((label||'')+' '+(vin||'')+' partes refacciones');
+  const btn=(href,txt,bg)=>'<a href="'+href+'" target="_blank" rel="noopener" style="display:block;text-align:center;background:'+(bg||'var(--surface3)')+';border:1px solid var(--border);color:var(--text);border-radius:11px;padding:12px;font-weight:800;font-size:13.5px;text-decoration:none;margin-bottom:8px;">'+txt+'</a>';
+  const ov=document.createElement('div'); ov.id='svcar-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2147483300;display:flex;align-items:flex-end;justify-content:center;padding:0;cursor:pointer;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const box=document.createElement('div'); box.style.cssText='background:var(--surface,#12151c);color:var(--text,#fff);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px 28px;cursor:default;';
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">'
+    +'<div style="font-weight:800;font-size:17px;min-width:0;">🚗 '+svcEsc(label||'Auto')+'</div>'
+    +'<button onclick="var x=document.getElementById(\'svcar-ov\');if(x)x.remove();" style="background:var(--surface2);border:none;border-radius:9px;padding:7px 11px;font-weight:800;cursor:pointer;color:var(--text);flex:none;">✕</button></div>'
+    +(plate?('<div style="font-size:13px;color:var(--muted);margin-bottom:6px;">🪪 Placa: <b style="color:var(--text);">'+svcEsc(plate)+'</b></div>'):'')
+    +(vin?('<div style="background:var(--surface3);border-radius:11px;padding:10px 12px;margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);margin-bottom:3px;">VIN</div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:800;font-size:14px;letter-spacing:.5px;word-break:break-all;">'+svcEsc(vin)+'</span><button onclick="(function(){try{navigator.clipboard.writeText(\''+svcEsc(vin)+'\');}catch(e){}})();this.textContent=\'✓\';" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:800;cursor:pointer;flex:none;">📋</button></div></div>'):'<div style="font-size:12px;color:#ff8a4c;margin-bottom:10px;">⚠️ Esta orden no tiene VIN. Agrégalo con «Cambiar» para buscar partes exactas.</div>')
+    +'<div id="svcar-spec" style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">'+(vin?'🔎 Decodificando VIN…':'')+'</div>'
+    +'<div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🔩 Buscar partes</div>'
+    +(vin?btn(ebayVin,'🛒 eBay — por VIN','linear-gradient(135deg,#f0c040,#c8960c)'):'')
+    +btn(ebayVeh,'🛒 eBay — por vehículo')
+    +btn(carpart,'🔧 car-part.com — yonkes usados')
+    +btn(rock,'🔩 RockAuto — partes nuevas')
+    +btn(goog,'🔍 Google — partes / refacciones')
+    +'<div class="faint" style="font-size:11px;margin-top:10px;text-align:center;line-height:1.5;">Pronto: buscar en NUESTRO inventario de partes con el VIN. 🔧</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  // Decodifica el VIN para la ficha técnica (no cambia la orden).
+  if(vin && vin.length>=11){
+    fetch('https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/'+encodeURIComponent(vin)+'?format=json')
+      .then(r=>r.json()).then(j=>{
+        const row=(j.Results||[]); const get=n=>{ const f=row.find(x=>x.Variable===n); return f?(f.Value||''):''; };
+        const fields=[['Año',get('Model Year')],['Marca',get('Make')],['Modelo',get('Model')],['Versión',get('Trim')],['Motor',[get('Engine Number of Cylinders')?(get('Engine Number of Cylinders')+' cil'):'',get('Displacement (L)')?(Number(get('Displacement (L)')).toFixed(1)+'L'):''].filter(Boolean).join(' · ')],['Combustible',get('Fuel Type - Primary')],['Carrocería',get('Body Class')],['Tracción',get('Drive Type')],['Transmisión',get('Transmission Style')],['Planta',[get('Plant City'),get('Plant Country')].filter(Boolean).join(', ')]].filter(x=>x[1]);
+        const el=document.getElementById('svcar-spec'); if(el){ el.innerHTML=fields.length?('<div style="display:grid;grid-template-columns:auto 1fr;gap:3px 12px;">'+fields.map(f=>'<span style="color:var(--muted);">'+f[0]+'</span><span style="color:var(--text);font-weight:600;">'+svcEsc(f[1])+'</span>').join('')+'</div>'):'<span style="color:#ff8a4c;">No se pudo decodificar el VIN.</span>'; }
+      }).catch(()=>{ const el=document.getElementById('svcar-spec'); if(el) el.innerHTML='<span style="color:#ff8a4c;">No se pudo decodificar el VIN (sin internet?).</span>'; });
+  }
+};
 window.svcDecodeVin=async function(){
   svcCapture(); const vin=(window._svcDraft.vin||'').toUpperCase().trim();
   if(vin.length<11){ alert('Escribe el VIN completo.'); return; }
@@ -2271,8 +2309,8 @@ function svcRenderModal(){
   if(vehCompact){
     const bits=[ d.vehicleLabel?svcEsc(d.vehicleLabel):'', d.plate?('🪪 '+svcEsc(d.plate)):'', d.vin?('VIN …'+svcEsc((d.vin||'').slice(-6))):'' ].filter(Boolean).join(' · ');
     vehHtml='<div style="background:var(--surface3);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
-      +'<div style="min-width:0;"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🚗 '+(bits||'Auto')+'</div></div>'
-      +'<button onclick="svcCapture();window._svcDraft._vehEdit=true;svcRenderModal()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;">Cambiar</button></div>';
+      +'<div onclick="svcCarInfo()" style="min-width:0;flex:1;cursor:pointer;"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🚗 '+(bits||'Auto')+'</div><div style="font-size:11px;color:var(--gold);margin-top:2px;">ℹ️ Ver info · buscar partes ›</div></div>'
+      +'<button onclick="event.stopPropagation();svcCapture();window._svcDraft._vehEdit=true;svcRenderModal()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none;">Cambiar</button></div>';
   }
   if(!vehCompact && vs.length){
     vehHtml=vs.map((v,i)=>'<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;">'
