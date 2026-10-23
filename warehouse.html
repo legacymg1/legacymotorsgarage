@@ -996,6 +996,8 @@ onAuthStateChanged(auth, async (user)=>{
     const _opc=document.getElementById('owner-op-card');
     if(_opc){ if(role==='owner'){ _opc.style.display='block'; try{ loadOwnerPanel(); }catch(e){} } else _opc.style.display='none'; }
     try{ maybePushPrompt(); }catch(e){}   // 🔔 aviso automático si no están activadas las notificaciones
+    // 📨 Deep-link del chat de oficina (al tocar el push): ?office=me (empleado) o ?office=<empId> (dueño).
+    try{ const of=new URLSearchParams(location.search).get('office'); if(of){ setTimeout(()=>{ if(role==='owner' && of!=='me'){ officeOpen({ownerMode:true,empId:of}); } else { officeOpen({}); } },700); } }catch(e){}
   } else {
     _carView=''; document.body.classList.remove('owner-nav'); const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
     const fc=document.getElementById('fab-chat'); if(fc) fc.style.display='none'; closeChat();
@@ -1052,6 +1054,7 @@ window.closeFunctions=function(){ const o=document.getElementById('fn-overlay'),
 function setWhLegacyActions(){ window.LEGACY_ACTIONS=[
   { label:(L==='en'?'Operations Center':'Centro de Operaciones'), ico:'📊', fn:'whOwnerHome' },
   { label:(L==='en'?'Functions':'Funciones'), ico:'🧰', fn:'openFunctions' },
+  { label:(L==='en'?'Team messages':'Mensajes del equipo'), ico:'📨', fn:'officeInboxOpen' },
   { label:(L==='en'?'Team':'Equipo'), ico:'👥', fn:'whOpenTeam' },
   { label:(L==='en'?'Payroll':'Nómina'), ico:'💵', fn:'whOpenPayroll' },
   { label:(L==='en'?'GPS locations':'Ubicaciones GPS'), ico:'⚙️', fn:'whOpenGps' }
@@ -2415,20 +2418,72 @@ window.svcEmpOpen=function(orderId){
     +'<a onclick="svcMsgAdmin(\''+(o.orderNum||'')+'\')" style="display:block;text-align:center;text-decoration:none;color:var(--gold);font-size:14px;padding:8px;cursor:pointer;">💬 '+L2('Avisar a la oficina','Message office')+'</a>'
   +'</div>';
 };
-// 💬 El empleado avisa a la OFICINA/supervisores (NUNCA al cliente). Abre el chat interno si lo tiene (cuentas por correo);
-//    si es empleado por teléfono (aún sin chat interno), manda SMS a la LÍNEA DE OFICINA, no al cliente.
+// 💬 El empleado avisa a la OFICINA/dueños (NUNCA al cliente) → abre el CHAT DE OFICINA (callables, funciona por teléfono).
 window.svcMsgAdmin=function(folio){
   try{ const sh=document.getElementById('svc-emp-sheet'); if(sh) sh.remove(); }catch(e){}
-  const fab=document.getElementById('lcw-fab');
-  const chatOn = fab && (function(){ try{ return getComputedStyle(fab).display!=='none'; }catch(e){ return fab.style.display && fab.style.display!=='none'; } })();
-  if(chatOn && typeof window.lcwOpenTo==='function'){
-    try{ window.lcwOpenTo('mechanic-owners'); return; }catch(e){}   // el widget cae al panel si no tiene ese canal
-  }
-  // Sin chat interno (empleado por teléfono) → contacta a la OFICINA, jamás al cliente.
-  const office='+15595405145';
-  const body=encodeURIComponent((L==='es'?'Hola oficina, sobre la orden #':'Hi office, about order #')+(folio||'')+': ');
+  if(role==='owner' && !_asEmp){ try{ officeInboxOpen(); return; }catch(e){} }   // dueño: abre la bandeja del equipo
+  try{ officeOpen({folio:folio}); return; }catch(e){}                              // empleado: su chat con la oficina
+  const office='+15595405145'; const body=encodeURIComponent((L==='es'?'Hola oficina, sobre la orden #':'Hi office, about order #')+(folio||'')+': ');
   try{ const a=document.createElement('a'); a.href='sms:'+office+'?&body='+body; a.click(); }catch(e){ try{ whToast&&whToast(L2('Avísanos a la oficina: (559) 540-5145','Tell the office: (559) 540-5145')); }catch(e2){} }
 };
+// ===== 📨 CHAT OFICINA ↔ EMPLEADO (callables; empleado por teléfono O dueño) =====
+let _officeTimer=null, _officeEmpId='', _officeOwnerMode=false, _officeFolio='';
+window.officeOpen=function(opts){
+  opts=opts||{}; _officeOwnerMode=!!opts.ownerMode; _officeEmpId=opts.empId||''; _officeFolio=opts.folio||'';
+  let ov=document.getElementById('office-ov');
+  if(!ov){ ov=document.createElement('div'); ov.id='office-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2147483310;display:flex;align-items:flex-end;justify-content:center;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) officeClose(); }; document.body.appendChild(ov); }
+  const title=_officeOwnerMode?('💬 '+(opts.empName||'Empleado')):('💬 '+L2('Oficina','Office'));
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface,#12151c);color:var(--text,#fff);width:100%;max-width:560px;height:88vh;display:flex;flex-direction:column;border-radius:18px 18px 0 0;overflow:hidden;cursor:default;">'
+    +'<div style="flex:0 0 auto;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);"><div style="font-weight:800;font-size:16px;min-width:0;">'+esc(title)+'</div><button onclick="officeClose()" style="background:var(--surface2);border:none;border-radius:9px;padding:7px 11px;font-weight:800;cursor:pointer;color:var(--text);flex:none;">✕</button></div>'
+    +'<div id="office-msgs" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;"><div class="faint" style="text-align:center;margin:auto;">'+L2('Cargando…','Loading…')+'</div></div>'
+    +'<div style="flex:0 0 auto;display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--border);">'
+      +'<input id="office-input" type="text" placeholder="'+L2('Escribe a la oficina…','Message the office…')+'" onkeydown="if(event.key===\'Enter\')officeSendMsg()" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;">'
+      +'<button onclick="officeSendMsg()" style="flex:0 0 auto;background:var(--gold);color:#0b0e14;border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;">'+L2('Enviar','Send')+'</button></div></div>';
+  officeLoad();
+  if(_officeTimer) clearInterval(_officeTimer);
+  _officeTimer=setInterval(officeLoad, 5000);
+  if(_officeFolio && !_officeOwnerMode){ const i=document.getElementById('office-input'); if(i && !i.value) i.value=(L==='es'?'Orden #':'Order #')+_officeFolio+': '; }
+};
+window.officeClose=function(){ if(_officeTimer){ clearInterval(_officeTimer); _officeTimer=null; } const ov=document.getElementById('office-ov'); if(ov) ov.remove(); };
+function officeLoad(){
+  const data=_officeOwnerMode?vaData({empId:_officeEmpId}):vaData({});
+  httpsCallable(functions,'officeThread')(data).then(r=>{ const d=(r&&r.data)||{}; officeRender(d.messages||[], d.mine||(_officeOwnerMode?'owner':'emp')); }).catch(e=>{ const box=document.getElementById('office-msgs'); if(box && box.children.length<=1) box.innerHTML='<div class="faint" style="text-align:center;margin:auto;color:#ff8a4c;">'+L2('No se pudo cargar.','Could not load.')+'</div>'; });
+}
+function officeRender(msgs, mine){
+  const box=document.getElementById('office-msgs'); if(!box) return;
+  if(!msgs.length){ box.innerHTML='<div class="faint" style="text-align:center;margin:auto;line-height:1.6;">'+L2('Aquí hablas directo con la oficina.<br>Escribe tu mensaje abajo. 👇','Talk directly with the office here.<br>Type your message below. 👇')+'</div>'; return; }
+  const atBottom=(box.scrollHeight-box.scrollTop-box.clientHeight)<80;
+  box.innerHTML=msgs.map(m=>{
+    const isMine=(m.from===mine);
+    const when=m.at?new Date(m.at).toLocaleString(L==='es'?'es-MX':'en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+    const name=isMine?'':('<div style="font-size:11px;color:var(--muted);margin:0 0 2px 4px;font-weight:700;">'+esc(m.byName||'')+'</div>');
+    const ord=m.orderNum?(' <span style="opacity:.65;">· #'+esc(String(m.orderNum))+'</span>'):'';
+    return '<div style="align-self:'+(isMine?'flex-end':'flex-start')+';max-width:82%;">'+name+'<div style="background:'+(isMine?'var(--gold)':'var(--surface2)')+';color:'+(isMine?'#0b0e14':'var(--text)')+';border:1px solid '+(isMine?'transparent':'var(--border)')+';border-radius:14px;padding:8px 12px;font-size:14px;line-height:1.4;word-break:break-word;">'+esc(m.text||'')+ord+'</div><div style="font-size:10px;color:var(--faint);margin:2px 6px 0;text-align:'+(isMine?'right':'left')+';">'+when+'</div></div>';
+  }).join('');
+  if(atBottom) box.scrollTop=box.scrollHeight;
+}
+window.officeSendMsg=function(){
+  const i=document.getElementById('office-input'); if(!i) return; const text=i.value.trim(); if(!text) return;
+  i.value=''; i.disabled=true;
+  const data=_officeOwnerMode?vaData({empId:_officeEmpId,text:text,orderNum:_officeFolio||null}):vaData({text:text,orderNum:_officeFolio||null});
+  httpsCallable(functions,'officeSend')(data).then(()=>{ i.disabled=false; i.focus(); officeLoad(); }).catch(e=>{ i.disabled=false; i.value=text; try{ whToast&&whToast(L2('No se pudo enviar','Could not send')); }catch(e2){} });
+};
+window.officeInboxOpen=function(){
+  let ov=document.getElementById('office-inbox-ov');
+  if(!ov){ ov=document.createElement('div'); ov.id='office-inbox-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2147483305;display:flex;align-items:flex-end;justify-content:center;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) ov.remove(); }; document.body.appendChild(ov); }
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface,#12151c);color:var(--text,#fff);width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px;cursor:default;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;">📨 '+L2('Mensajes del equipo','Team messages')+'</div><button onclick="var x=document.getElementById(\'office-inbox-ov\');if(x)x.remove();" style="background:var(--surface2);border:none;border-radius:9px;padding:7px 11px;font-weight:800;cursor:pointer;color:var(--text);">✕</button></div><div id="office-inbox-list"><div class="faint" style="text-align:center;padding:16px;">'+L2('Cargando…','Loading…')+'</div></div></div>';
+  httpsCallable(functions,'officeInbox')({}).then(r=>{ officeInboxRender(((r&&r.data)||{}).threads||[]); }).catch(()=>{ const el=document.getElementById('office-inbox-list'); if(el) el.innerHTML='<div class="faint" style="text-align:center;padding:16px;color:#ff8a4c;">'+L2('No se pudo cargar.','Could not load.')+'</div>'; });
+};
+function officeInboxRender(threads){
+  const el=document.getElementById('office-inbox-list'); if(!el) return;
+  if(!threads.length){ el.innerHTML='<div class="faint" style="text-align:center;padding:24px;line-height:1.6;">'+L2('Sin mensajes del equipo todavía.','No team messages yet.')+'</div>'; return; }
+  el.innerHTML='<div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">'+threads.map(t=>{
+    const last=t.lastAt?new Date(t.lastAt).toLocaleString(L==='es'?'es-MX':'en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+    const badge=t.unreadOwner>0?('<span style="background:#c0392b;color:#fff;border-radius:20px;min-width:20px;height:20px;font-size:11px;font-weight:800;line-height:20px;text-align:center;padding:0 5px;flex:none;">'+t.unreadOwner+'</span>'):'';
+    const nm=String(t.empName||'Empleado').replace(/['\\]/g,'');
+    return '<div onclick="var x=document.getElementById(\'office-inbox-ov\');if(x)x.remove();officeOpen({ownerMode:true,empId:\''+t.empId+'\',empName:\''+esc(nm)+'\'});" style="display:flex;gap:10px;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;">'+esc(t.empName||'Empleado')+'</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(t.lastFrom==='owner'?'↩︎ ':'')+esc(t.lastText||'')+'</div></div><div style="text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;"><span style="font-size:10px;color:var(--faint);">'+last+'</span>'+badge+'</div></div>';
+  }).join('')+'</div>';
+}
 // 🔧 RELEVO: el trabajador marca SU etapa; al terminar su rol, pasa al siguiente. (En "actuar como" escribe como el empleado.)
 window.svcStage=async function(orderId,action){
   if(_vaReadOnly()) return;

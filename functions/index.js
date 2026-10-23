@@ -1960,6 +1960,64 @@ exports.svcOwnerAll = onCall({ timeoutSeconds: 30 }, async (request) => {
   return { ok: true, orders, clients };
 });
 
+// ===== 📨 CHAT OFICINA ↔ EMPLEADO (por teléfono) — vía callables (admin SDK; funciona SIN tocar reglas de Firestore) =====
+// Un hilo por empleado: office_threads/<empId> + subcol messages. El empleado SOLO habla con la oficina/dueños (nunca con el cliente).
+exports.officeSend = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const text = String((request.data || {}).text || "").trim().slice(0, 1000);
+  const orderNum = (request.data || {}).orderNum || null;
+  if (!text) throw new HttpsError("invalid-argument", "Mensaje vacío.");
+  let empId, fromOwner;
+  if (id.isOwner) { empId = String((request.data || {}).empId || ""); if (!empId) throw new HttpsError("invalid-argument", "Falta empId."); fromOwner = true; }
+  else { empId = id.empId || id.key; if (!empId) throw new HttpsError("permission-denied", "Sin identidad de empleado."); fromOwner = false; }
+  const db = admin.firestore();
+  const nowISO = new Date().toISOString(); const tms = Date.now();
+  const tref = db.collection("office_threads").doc(empId);
+  await tref.collection("messages").add({ text, from: fromOwner ? "owner" : "emp", byName: id.name || (fromOwner ? "Oficina" : "Empleado"), orderNum: orderNum || null, at: nowISO, tms });
+  const ts = await tref.get(); const cur = ts.exists ? (ts.data() || {}) : {};
+  const patch = {
+    empId, lastText: text, lastAt: nowISO, lastFrom: fromOwner ? "owner" : "emp", updatedAt: nowISO,
+    unreadOwner: fromOwner ? 0 : ((Number(cur.unreadOwner) || 0) + 1),
+    unreadEmp: fromOwner ? ((Number(cur.unreadEmp) || 0) + 1) : 0,
+  };
+  if (!fromOwner) { patch.empName = id.name || cur.empName || "Empleado"; patch.empRoles = Array.isArray(id.roles) ? id.roles : (cur.empRoles || []); }
+  await tref.set(patch, { merge: true });
+  try {
+    if (fromOwner) await _pushToEmp(empId, { title: "💬 Oficina", body: text.slice(0, 120), titleEn: "💬 Office", bodyEn: text.slice(0, 120), url: "/warehouse.html?office=me" });
+    else await _pushToOwners({ title: "💬 " + (id.name || "Empleado"), body: text.slice(0, 120) + (orderNum ? (" · orden #" + orderNum) : ""), url: "/warehouse.html?office=" + encodeURIComponent(empId) });
+  } catch (e) {}
+  return { ok: true };
+});
+// Ver el hilo (empleado = el suyo; dueño = el del empId que pida) + marcar leído el lado que abre.
+exports.officeThread = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  let empId;
+  if (id.isOwner) { empId = String((request.data || {}).empId || ""); if (!empId) throw new HttpsError("invalid-argument", "Falta empId."); }
+  else { empId = id.empId || id.key; if (!empId) throw new HttpsError("permission-denied", "Sin identidad de empleado."); }
+  const db = admin.firestore();
+  const tref = db.collection("office_threads").doc(empId);
+  const snap = await tref.collection("messages").orderBy("tms").limit(300).get();
+  const messages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  try { await tref.set(id.isOwner ? { unreadOwner: 0 } : { unreadEmp: 0 }, { merge: true }); } catch (e) {}
+  const ts = await tref.get(); const th = ts.exists ? (ts.data() || {}) : {};
+  return { ok: true, empId, empName: th.empName || id.name || "", mine: id.isOwner ? "owner" : "emp", messages };
+});
+// Bandeja del dueño: lista de hilos con su no-leído.
+exports.officeInbox = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  let docs = [];
+  try { const snap = await db.collection("office_threads").orderBy("lastAt", "desc").limit(100).get(); docs = snap.docs; } catch (e) { const snap = await db.collection("office_threads").limit(100).get(); docs = snap.docs; }
+  const threads = docs.map((d) => { const t = d.data() || {}; return { empId: d.id, empName: t.empName || "", empRoles: t.empRoles || [], lastText: t.lastText || "", lastAt: t.lastAt || "", lastFrom: t.lastFrom || "", unreadOwner: Number(t.unreadOwner) || 0 }; });
+  return { ok: true, threads, unread: threads.reduce((a, t) => a + (t.unreadOwner || 0), 0) };
+});
+
 // 🔧 SERVICE: el empleado asignado (o el dueño) mueve el estatus de la orden.
 exports.svcOrderStatus = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
