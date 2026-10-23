@@ -83,13 +83,13 @@
     return '<div onclick="' + fn + '" style="display:flex;gap:10px;align-items:center;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
       + '<div style="width:48px;font-weight:800;color:var(--gold);font-size:13px;font-variant-numeric:tabular-nums;">' + (o.orderNum ? ('#' + o.orderNum) : '—') + '</div>'
       + '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(o.clientName || (en ? 'Customer' : 'Cliente')) + '</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚗 ' + car + (when ? (' · ' + when) : '') + '</div></div>'
-      + '<div style="width:94px;text-align:center;"><span style="font-size:10px;font-weight:800;color:' + col + ';background:' + col + '1f;border:1px solid ' + col + ';padding:3px 6px;border-radius:999px;white-space:nowrap;display:inline-block;">' + badge + '</span></div>'
-      + '<div style="width:72px;text-align:right;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;">' + tot + '</div></div>';
+      + '<div style="flex:0 0 auto;max-width:104px;text-align:center;"><span style="font-size:10px;font-weight:800;color:' + col + ';background:' + col + '1f;border:1px solid ' + col + ';padding:3px 7px;border-radius:12px;white-space:normal;line-height:1.2;display:inline-block;">' + badge + '</span></div>'
+      + '<div style="flex:0 0 auto;width:68px;text-align:right;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;">' + tot + '</div></div>';
   };
   // Lista tipo TABLA (encabezado opcional). opts igual que svcOrderRow.
   LMG.svcTable = function (list, opts, noHead) {
     opts = opts || {}; var en = (opts.lang === 'en');
-    var head = noHead ? '' : '<div style="display:flex;gap:10px;padding:9px 12px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border);background:var(--surface2);"><div style="width:48px;">#</div><div style="flex:1;">' + (en ? 'Customer / Car' : 'Cliente / Carro') + '</div><div style="width:94px;text-align:center;">' + (en ? 'Status' : 'Estado') + '</div><div style="width:72px;text-align:right;">Total</div></div>';
+    var head = noHead ? '' : '<div style="display:flex;gap:10px;padding:9px 12px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border);background:var(--surface2);"><div style="width:48px;flex:0 0 auto;">#</div><div style="flex:1;min-width:0;">' + (en ? 'Customer / Car' : 'Cliente / Carro') + '</div><div style="flex:0 0 auto;max-width:104px;text-align:center;">' + (en ? 'Status' : 'Estado') + '</div><div style="flex:0 0 auto;width:68px;text-align:right;">Total</div></div>';
     return '<div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">' + head + (list || []).map(function (o) { return LMG.svcOrderRow(o, opts); }).join('') + '</div>';
   };
 
