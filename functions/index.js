@@ -1259,7 +1259,7 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
     const veh = after.vehicleLabel || (after.plate ? after.plate : "tu auto");
     const vehEn = after.vehicleLabel || (after.plate ? after.plate : "your car");
     const fol = after.orderNum ? (" #" + after.orderNum) : "";
-    let p = null;
+    let p = null, ownerP = null;
     if (before.estimateStatus !== "sent" && after.estimateStatus === "sent") {
       // 🧾 nuevo estimado enviado al cliente
       p = { title: "🧾 Tienes un nuevo estimado", body: "Revisa y acepta el estimado de " + veh + fol + ".", titleEn: "🧾 You have a new estimate", bodyEn: "Review and approve the estimate for " + vehEn + fol + "." };
@@ -1267,14 +1267,16 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
       // 🚗 auto listo para recoger
       p = { title: "🚗 Tu auto está listo", body: "Ya puedes pasar por " + veh + fol + ".", titleEn: "🚗 Your car is ready", bodyEn: vehEn + fol + " is ready for pickup." };
     } else if (!before.partsReadyAt && after.partsReadyAt) {
-      // 🎉 llegaron TODAS las refacciones → a coordinar la cita
+      // 🎉 llegaron TODAS las refacciones → a coordinar la cita (avisa al cliente Y a los dueños)
       p = { title: "🎉 ¡Llegaron tus refacciones!", body: "Ya tenemos todo para " + veh + fol + ". Vamos a coordinar tu cita.", titleEn: "🎉 Your parts arrived!", bodyEn: "We have everything for " + vehEn + fol + ". Let's set your appointment." };
+      ownerP = { title: "📦 Refacciones completas" + fol, body: "Ya llegaron todas las de " + (after.clientName || "cliente") + " · " + veh + ". Agenda su cita 🗓️", url: "/admin.html" };
     } else if (!before.scheduledAt && after.scheduledAt) {
       // 🗓️ cita agendada (se puso fecha)
       const dt = (function () { try { return new Date(after.scheduledAt).toLocaleString("es-MX", { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } })();
       const dtEn = (function () { try { return new Date(after.scheduledAt).toLocaleString("en-US", { weekday: "long", month: "long", day: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } })();
       p = { title: "🗓️ Tu cita quedó agendada", body: "Te esperamos" + (dt ? (" el " + dt) : "") + " para " + veh + fol + ".", titleEn: "🗓️ Your appointment is set", bodyEn: "See you" + (dtEn ? (" on " + dtEn) : "") + " for " + vehEn + fol + "." };
     }
+    if (ownerP) { try { await _pushToOwners(ownerP); } catch (e) {} }   // 📦 avisa a los dueños (refacciones completas)
     if (!p) return;
     p.url = "/portal.html?order=" + event.params.id;
     await _pushToClient(after.clientId || "", after.clientPhone || "", p);

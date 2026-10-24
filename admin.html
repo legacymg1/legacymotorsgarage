@@ -1538,6 +1538,7 @@ async function svcLoadRoster(){
 function svcStatusLabel(o){
   if(o.paid) return {txt:'✅ Pagado', col:'#28b463'};
   const s=o.status;
+  if(o.scheduledAt && ['arrancado','agendado','por_recibir','',undefined].indexOf(s)>=0) return {txt:'🗓️ Agendado', col:'#0a84ff'};
   if(s==='arrancado') return {txt:'🚀 ¡Servicio arrancó!', col:'#7c5cff'};
   if(s==='entregado') return {txt:'🏁 Entregado', col:'#28b463'};
   if(s==='listo') return {txt:'✅ Listo p/ entrega', col:'#28b463'};
@@ -1563,7 +1564,7 @@ function svcRenderTabs(){
   svcOrders.forEach(o=>{ cnt[svcBucket(o)]++; if(o.clientId) cli.add(o.clientId); });
   // La vista de Clientes también incluye los clientes marcados kind:'service' sin orden → cuéntalos igual.
   try{ (clients||[]).forEach(c=>{ if(c && c.id && c.kind==='service') cli.add(c.id); }); }catch(e){}
-  let citasN=0; try{ citasN=(appointments||[]).filter(a=>a.status==='scheduled').length; }catch(e){}
+  let citasN=0; try{ citasN=(appointments||[]).filter(a=>a.status==='scheduled').length + svcOrders.filter(o=>o.scheduledAt && !o.paid && o.status!=='entregado').length; }catch(e){}
   const cur=window._svcTab||'activas';
   const tabs=[['todas','🗂️ Todas',svcOrders.length],['activas','🔧 Activas',cnt.activas],['citas','📅 Citas',citasN],['estimados','🧾 Estimados',cnt.estimados],['completadas','✅ Completadas',cnt.completadas],['clientes','👥 Clientes',cli.size]];
   box.innerHTML=tabs.map(t=>'<button onclick="svcSetTab(\''+t[0]+'\')" style="padding:9px 14px;border-radius:999px;border:1px solid '+(cur===t[0]?'var(--gold)':'var(--border)')+';background:'+(cur===t[0]?'var(--gold)':'transparent')+';color:'+(cur===t[0]?'var(--navy3)':'var(--text)')+';font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;">'+t[1]+' <span style="opacity:.7;">'+t[2]+'</span></button>').join('');
@@ -1622,8 +1623,11 @@ function svcRenderClientsTab(box,q){
 }
 // 📅 Pestaña CITAS dentro de Servicio: las citas que agenda el cliente (o tú), con "Recibir / Crear orden".
 function svcRenderCitasTab(box,q){
-  let up=(appointments||[]).filter(a=>a.status==='scheduled');
-  if(q) up=up.filter(a=>((a.clientName||'')+' '+(a.phone||'')+' '+(a.carLabel||'')+' '+(a.type||'')+' '+(a.note||'')).toLowerCase().includes(q));
+  const lz=n=>String(n).padStart(2,'0');
+  // 1) Citas del portal (appointments) + 2) Órdenes de servicio CON FECHA agendada (no terminadas).
+  let up=(appointments||[]).filter(a=>a.status==='scheduled').map(a=>Object.assign({kind:'appt'},a));
+  (svcOrders||[]).forEach(o=>{ if(!o.scheduledAt || o.paid || o.status==='entregado') return; try{ const dt=new Date(o.scheduledAt); if(isNaN(dt)) return; up.push({ kind:'order', id:o.id, orderNum:o.orderNum, date:dt.getFullYear()+'-'+lz(dt.getMonth()+1)+'-'+lz(dt.getDate()), time:lz(dt.getHours())+':'+lz(dt.getMinutes()), clientName:o.clientName||'Cliente', phone:o.clientPhone||'', carLabel:o.vehicleLabel||o.plate||'', lang:o.lang||'es', reason:o.reason||'', status:o.status }); }catch(e){} });
+  if(q) up=up.filter(a=>((a.clientName||'')+' '+(a.phone||'')+' '+(a.carLabel||'')+' '+(a.type||'')+' '+(a.reason||'')+' '+(a.note||'')+' '+(a.orderNum?('#'+a.orderNum):'')).toLowerCase().includes(q));
   up.sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
   if(!up.length){ box.innerHTML='<div class="faint" style="padding:36px 20px;text-align:center;line-height:1.6;">Sin citas agendadas. 📅<br>Los clientes pueden agendar desde su portal, o usa <b>＋ Nueva cita</b>.</div>'; return; }
   const todayISO=apptTodayISO(), tomoISO=apptAddDays(todayISO,1);
@@ -1639,6 +1643,18 @@ function svcRenderCitasTab(box,q){
     html+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:'+g.color+';font-weight:800;margin:12px 0 6px;">'+g.label+'</div>';
     for(const a of g.items){
       const hora=a.time?(' · '+appt12h(a.time)):'';
+      if(a.kind==='order'){   // 🔧 Orden de servicio agendada → abre la orden
+        const flagO=(a.lang==='en')?'🇺🇸':'🇲🇽';
+        html+='<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:9px;background:var(--surface2);">'
+          +'<div style="min-width:160px;"><div style="font-weight:800;font-size:14px;">'+svcEsc(a.clientName||'Cliente')+' '+flagO+' <span style="font-size:10px;background:rgba(10,132,255,.14);color:#0a84ff;border:1px solid #0a84ff;border-radius:5px;padding:1px 6px;">🔧 Orden'+(a.orderNum?(' #'+a.orderNum):'')+'</span></div>'
+          +'<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+svcEsc(a.reason||'Servicio')+(a.carLabel?(' · 🚗 '+svcEsc(a.carLabel)):'')+(a.phone?(' · '+svcEsc(a.phone)):'')+'</div>'
+          +'<div style="font-size:14px;font-weight:700;color:var(--gold);margin-top:3px;">📅 '+apptFmtLong(a.date,'es')+hora+'</div></div>'
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;">'
+          +'<button onclick="svcOpenOrder(\''+a.id+'\')" style="flex:1 1 auto;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:8px;padding:9px 11px;font-size:12px;font-weight:800;cursor:pointer;">📋 Abrir orden</button>'
+          +'<button onclick="svcNotifySms(\''+a.id+'\',\'cita\')" style="background:transparent;color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer;">💬</button>'
+          +'</div></div>';
+        continue;
+      }
       const car=a.carLabel?(' · 🚗 '+svcEsc(a.carLabel)):'';
       const flag=(a.lang==='en')?'🇺🇸':'🇲🇽';
       const svc=Array.isArray(a.services)?a.services.map(s=>(typeof s==='string'?s:(s.es||s.en||''))).filter(Boolean).join(', '):(a.type||a.note||'Cita');
@@ -2092,7 +2108,7 @@ window.svcOpenOrder=function(id){
   if(Array.isArray(o.parts)&&o.parts.length && !services.some(s=>s.parts&&s.parts.length)){ const _mig=o.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})); if(services[0]) services[0].parts=_mig; }
   window._svcDraft={ clientId:o.clientId||'', clientName:o.clientName||'', clientPhone:o.clientPhone||'', lang:o.lang||'es',
     vin:o.vin||'', plate:o.plate||'', vehicleLabel:o.vehicleLabel||'', vehPick:'__keep__',
-    when:o.scheduledAt?'later':'now', scheduledAt:o.scheduledAt?new Date(o.scheduledAt).toISOString().slice(0,16):'',
+    when:o.scheduledAt?'later':(o.scheduleAfterParts?'parts':'now'), scheduledAt:o.scheduledAt?new Date(o.scheduledAt).toISOString().slice(0,16):'',
     estMin:Number(o.estMinutes)||60, assignRole:o.assignRole||'Mecánico', assignEmpId:o.assignEmpId||'', assignName:o.assignName||'',
     services, laborRate:(Number(o.laborRateCents)||10000)/100, deposit:(Number(o.depositCents)||0)/100,
     editId:id, status:o.status||'por_recibir', orderNum:o.orderNum||null,
@@ -2378,15 +2394,16 @@ function svcRenderModal(){
     // 📅 La CITA (cuándo trae el carro) está SIEMPRE disponible — aunque el estimado aún no se apruebe.
     // (El asignar mecánico / empezar trabajo sí espera a la aprobación; eso es por servicio.)
     +(!_svcAccepted ? '<div style="margin-top:12px;background:rgba(232,182,74,0.08);border:1px solid rgba(232,182,74,0.3);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted);line-height:1.5;">🧾 Esto es un <b style="color:var(--text);">estimado</b>. Mándaselo al cliente para que lo apruebe. Puedes <b style="color:var(--text);">agendar la cita</b> de una vez aquí abajo; el mecánico se asigna cuando lo apruebe.</div>' : '')
-    +'<label style="display:block;font-size:12px;color:var(--muted);margin:14px 0 5px;">📅 '+(_svcAccepted?'¿Cuándo se trabaja?':'Cita — ¿cuándo trae el carro?')+'</label><div style="display:flex;gap:8px;">'
-    +'<button onclick="svcCapture();window._svcDraft.when=\'now\';svcRenderModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when!=='later'?'var(--gold)':'var(--border)')+';background:'+(d.when!=='later'?'var(--gold)':'transparent')+';color:'+(d.when!=='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">'+(_svcAccepted?'🕐 Ahora':'🕐 Sin cita fija')+'</button>'
-    +'<button onclick="svcCapture();window._svcDraft.when=\'later\';if(!window._svcDraft.scheduledAt)window._svcDraft.scheduledAt=_svcDefaultWhen();svcRenderModal();setTimeout(function(){var s=document.getElementById(\'svc-sched\');if(s&&s.focus)s.focus();},60)" style="flex:1;padding:10px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;">📅 Agendar día</button></div>'
+    +'<label style="display:block;font-size:12px;color:var(--muted);margin:14px 0 5px;">📅 '+(_svcAccepted?'¿Cuándo se trabaja?':'Cita — ¿cuándo trae el carro?')+'</label><div style="display:flex;gap:7px;flex-wrap:wrap;">'
+    +'<button onclick="svcCapture();window._svcDraft.when=\'now\';svcRenderModal()" style="flex:1;min-width:30%;padding:10px 4px;border-radius:10px;border:1px solid '+((d.when!=='later'&&d.when!=='parts')?'var(--gold)':'var(--border)')+';background:'+((d.when!=='later'&&d.when!=='parts')?'var(--gold)':'transparent')+';color:'+((d.when!=='later'&&d.when!=='parts')?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;font-size:12.5px;">'+(_svcAccepted?'🕐 Ahora':'🕐 Sin cita')+'</button>'
+    +'<button onclick="svcCapture();window._svcDraft.when=\'parts\';window._svcDraft.scheduledAt=\'\';svcRenderModal()" style="flex:1;min-width:30%;padding:10px 4px;border-radius:10px;border:1px solid '+(d.when==='parts'?'var(--gold)':'var(--border)')+';background:'+(d.when==='parts'?'var(--gold)':'transparent')+';color:'+(d.when==='parts'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;font-size:12.5px;">📦 Al llegar partes</button>'
+    +'<button onclick="svcCapture();window._svcDraft.when=\'later\';if(!window._svcDraft.scheduledAt)window._svcDraft.scheduledAt=_svcDefaultWhen();_svcCalMonth=null;svcRenderModal()" style="flex:1;min-width:30%;padding:10px 4px;border-radius:10px;border:1px solid '+(d.when==='later'?'var(--gold)':'var(--border)')+';background:'+(d.when==='later'?'var(--gold)':'transparent')+';color:'+(d.when==='later'?'var(--navy3)':'var(--muted)')+';font-weight:700;cursor:pointer;font-family:inherit;font-size:12.5px;">📅 Agendar día</button></div>'
     +(d.when==='later'
-      ? '<label style="display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;">📅 Elige el día y la hora</label>'
-        +'<input id="svc-sched" type="datetime-local" value="'+svcEsc(d.scheduledAt||'')+'" onchange="window._svcDraft.scheduledAt=this.value;var p=document.getElementById(\'svc-sched-pretty\');if(p)p.textContent=_svcPrettyWhen(this.value);" style="'+SVC_IN+';font-size:16px;padding:14px;cursor:pointer;">'
-        +'<div id="svc-sched-pretty" style="font-size:13.5px;color:var(--gold);font-weight:800;margin-top:7px;">'+_svcPrettyWhen(d.scheduledAt)+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Toca el campo para abrir el calendario del teléfono.</div>'
-        +(d.editId?'<button onclick="svcNotifySms(\''+d.editId+'\',\'cita\')" style="width:100%;margin-top:9px;background:var(--surface3);border:1px solid var(--gold);color:var(--gold);border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💬 Avisar la cita al cliente por SMS</button>':'')
+      ? '<div style="margin-top:12px;"><div id="svc-cal">'+svcCalInner()+'</div><input id="svc-sched" type="hidden" value="'+svcEsc(d.scheduledAt||'')+'">'
+        +(d.editId?'<button onclick="svcNotifySms(\''+d.editId+'\',\'cita\')" style="width:100%;margin-top:10px;background:var(--surface3);border:1px solid var(--gold);color:var(--gold);border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💬 Avisar la cita al cliente por SMS</button>':'')
+        +'</div>'
+      : d.when==='parts'
+      ? '<div style="margin-top:12px;background:rgba(124,92,255,0.1);border:1px solid rgba(124,92,255,0.4);border-radius:12px;padding:12px 14px;font-size:12.5px;color:var(--text);line-height:1.55;">📦 <b>Se agenda cuando lleguen TODAS las refacciones.</b><br><span style="color:var(--muted);">Al completar el checklist de refacciones (abajo), te avisamos a ti y al cliente — y ahí le pones la fecha.</span></div>'
       : '');
   // (La asignación ahora es POR SERVICIO, dentro de cada tarjeta de servicio arriba.)
   // 5 · ESTATUS + FECHAS (solo al editar una orden existente)
@@ -2500,6 +2517,40 @@ function _svcDefaultRate(){ try{ const v=parseFloat(localStorage.getItem('svcLab
 // (en window: el onclick/onchange inline corre en scope global y debe poder llamarlas)
 window._svcDefaultWhen=function(){ const d=new Date(); d.setDate(d.getDate()+1); const p=function(n){return String(n).padStart(2,'0');}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T09:00'; };
 window._svcPrettyWhen=function(v){ if(!v) return ''; try{ const s=new Date(v).toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}); return '🗓️ '+s.charAt(0).toUpperCase()+s.slice(1); }catch(e){ return ''; } };
+// 📅 CALENDARIO VISUAL (tipo banco) para agendar — reemplaza el datetime-local confuso del iPhone. Escribe a _svcDraft.scheduledAt ("YYYY-MM-DDTHH:MM").
+let _svcCalMonth=null;
+function _svcPad(n){ return (n<10?'0':'')+n; }
+function _svcTodayStr(){ const d=new Date(); return d.getFullYear()+'-'+_svcPad(d.getMonth()+1)+'-'+_svcPad(d.getDate()); }
+function _svcParseSched(v){ v=String(v||''); let m=v.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/); if(m) return {date:m[1],time:m[2]}; if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return {date:v,time:''}; return {date:'',time:''}; }
+function _svc12h(hhmm){ const m=String(hhmm).match(/^(\d{1,2}):(\d{2})/); if(!m) return hhmm; let h=+m[1]; const ap=h<12?'AM':'PM'; h=h%12; if(h===0)h=12; return h+':'+m[2]+' '+ap; }
+window.svcCalInner=function(){
+  const d=window._svcDraft||{}; const cur=_svcParseSched(d.scheduledAt); const today=_svcTodayStr();
+  let base=_svcCalMonth; if(!base){ base=cur.date?new Date(cur.date+'T12:00:00'):new Date(); base=new Date(base.getFullYear(),base.getMonth(),1); _svcCalMonth=base; }
+  const y=base.getFullYear(), mo=base.getMonth();
+  const monthName=base.toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+  const startDow=new Date(y,mo,1).getDay(); const dim=new Date(y,mo+1,0).getDate(); const selTime=cur.time||'09:00';
+  let h='<div style="background:var(--surface3);border-radius:14px;padding:12px;">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;"><button type="button" onclick="svcCalNav(-1)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:9px;width:34px;height:34px;font-size:18px;cursor:pointer;">‹</button><div style="font-weight:800;font-size:14px;text-transform:capitalize;">'+monthName+'</div><button type="button" onclick="svcCalNav(1)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:9px;width:34px;height:34px;font-size:18px;cursor:pointer;">›</button></div>';
+  const dows=['D','L','M','M','J','V','S'];
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px;">'+dows.map(x=>'<div style="text-align:center;font-size:10px;font-weight:800;color:var(--muted);padding:2px 0;">'+x+'</div>').join('')+'</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">';
+  for(let i=0;i<startDow;i++) h+='<div></div>';
+  for(let day=1;day<=dim;day++){ const ds=y+'-'+_svcPad(mo+1)+'-'+_svcPad(day); const isToday=(ds===today), isSel=(ds===cur.date), isPast=(ds<today);
+    const bg=isSel?'var(--gold)':(isToday?'rgba(232,182,74,.16)':'transparent'); const col=isSel?'var(--navy3,#0b0e14)':(isPast?'var(--faint)':'var(--text)'); const bd=(isToday&&!isSel)?'1px solid var(--gold)':'1px solid transparent';
+    h+='<button type="button" onclick="svcCalPick(\''+ds+'\')" style="aspect-ratio:1;border-radius:9px;border:'+bd+';background:'+bg+';color:'+col+';font-weight:'+((isSel||isToday)?'800':'600')+';font-size:13px;cursor:pointer;padding:0;">'+day+'</button>';
+  }
+  h+='</div>';
+  const slots=['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00'];
+  h+='<div style="font-size:11px;color:var(--muted);font-weight:700;margin:12px 0 6px;">🕐 Hora</div><div style="display:flex;flex-wrap:wrap;gap:6px;">'+slots.map(s=>{ const on=(s===selTime); return '<button type="button" onclick="svcCalTime(\''+s+'\')" style="padding:7px 10px;border-radius:999px;border:1px solid '+(on?'var(--gold)':'var(--border)')+';background:'+(on?'var(--gold)':'transparent')+';color:'+(on?'var(--navy3,#0b0e14)':'var(--text)')+';font-weight:800;font-size:12px;cursor:pointer;">'+_svc12h(s)+'</button>'; }).join('')+'<label style="display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);cursor:pointer;font-size:12px;color:var(--muted);font-weight:700;">⏰ <input type="time" value="'+selTime+'" onchange="svcCalTime(this.value)" style="background:transparent;border:none;color:var(--text);font-family:inherit;font-size:12px;"></label></div>';
+  const tmr=(function(){ const t=new Date(); t.setDate(t.getDate()+1); return t.getFullYear()+'-'+_svcPad(t.getMonth()+1)+'-'+_svcPad(t.getDate()); })();
+  h+='<div style="display:flex;gap:6px;margin-top:10px;"><button type="button" onclick="svcCalPick(\''+today+'\')" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:800;font-size:12px;cursor:pointer;">Hoy</button><button type="button" onclick="svcCalPick(\''+tmr+'\')" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:800;font-size:12px;cursor:pointer;">Mañana</button></div>';
+  h+='</div><div id="svc-sched-pretty" style="font-size:13.5px;color:var(--gold);font-weight:800;margin-top:9px;text-align:center;">'+(_svcPrettyWhen(d.scheduledAt)||'Elige el día y la hora')+'</div>';
+  return h;
+};
+window.svcCalRender=function(){ const el=document.getElementById('svc-cal'); if(el) el.innerHTML=svcCalInner(); const hd=document.getElementById('svc-sched'); if(hd) hd.value=(window._svcDraft&&window._svcDraft.scheduledAt)||''; };
+window.svcCalPick=function(ds){ const cur=_svcParseSched(window._svcDraft.scheduledAt); const t=cur.time||'09:00'; window._svcDraft.scheduledAt=ds+'T'+t; window._svcDraft.when='later'; const b=new Date(ds+'T12:00:00'); _svcCalMonth=new Date(b.getFullYear(),b.getMonth(),1); svcCalRender(); };
+window.svcCalTime=function(t){ t=String(t).slice(0,5); if(!/^\d{2}:\d{2}$/.test(t)) return; const cur=_svcParseSched(window._svcDraft.scheduledAt); const ds=cur.date||_svcTodayStr(); window._svcDraft.scheduledAt=ds+'T'+t; window._svcDraft.when='later'; svcCalRender(); };
+window.svcCalNav=function(delta){ let b=_svcCalMonth||new Date(); b=new Date(b.getFullYear(),b.getMonth()+delta,1); _svcCalMonth=b; svcCalRender(); };
 window.svcSetRate=function(v){ const n=parseFloat(v)||0; if(window._svcDraft) window._svcDraft.laborRate=n; try{ if(n>0) localStorage.setItem('svcLaborRate', String(n)); }catch(e){} };
 // ✍️ Auto-corrige la ortografía del servicio AL TERMINAR de escribir (on blur), en su mismo idioma. Sin botón.
 let _svcFixing={};
@@ -2693,7 +2744,8 @@ function svcPartsChecklist(o){
   const all=(got===parts.length);
   const head='<div style="font-size:12px;color:'+(all?'#28b463':'var(--muted)')+';margin-bottom:8px;font-weight:700;">📦 '+got+' de '+parts.length+' refacciones recibidas'+(all?' · ✅ COMPLETAS':'')+'</div>';
   const cta=all?'<div style="margin-top:8px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);border-radius:10px;padding:11px;font-size:12.5px;color:#49d17f;font-weight:700;text-align:center;line-height:1.5;">✅ ¡Todas las refacciones llegaron!<br>Ya puedes <b>agendar la cita</b> aquí abajo 🗓️</div>'
-    +'<button onclick="svcNotifySms(\''+o.id+'\',\'parts\')" style="width:100%;margin-top:8px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💬 Avisar al cliente por SMS (llegaron las refacciones)</button>':'';
+    +'<button onclick="svcNotifySms(\''+o.id+'\',\'parts\')" style="width:100%;margin-top:8px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💬 Avisar al cliente por SMS (llegaron las refacciones)</button>'
+    +'<button onclick="svcCapture();window._svcDraft.when=\'later\';if(!window._svcDraft.scheduledAt)window._svcDraft.scheduledAt=_svcDefaultWhen();_svcCalMonth=null;svcRenderModal();setTimeout(function(){var c=document.getElementById(\'svc-cal\');if(c&&c.scrollIntoView)c.scrollIntoView({behavior:\'smooth\',block:\'center\'});},80)" style="width:100%;margin-top:8px;background:var(--surface3);border:1px solid var(--gold);color:var(--gold);border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">📅 Ponerle fecha a la cita</button>':'';
   return head+rows+cta;
 }
 window.svcTogglePart=async function(orderId, kEnc){
@@ -2893,7 +2945,8 @@ window.svcSaveOrder=async function(opts){
   const balanceCents=Math.max(0,grandTotalCents-depositCents);
   // estatus + cita
   let scheduledAt=null, status;
-  if(d.editId){ status=d.status||'por_recibir'; if(d.scheduledAt){ try{ scheduledAt=new Date(d.scheduledAt).toISOString(); }catch(e){} } }
+  const scheduleAfterParts=(d.when==='parts');   // 📦 agendar cuando lleguen TODAS las refacciones
+  if(d.editId){ status=d.status||'por_recibir'; if(!scheduleAfterParts && d.scheduledAt){ try{ scheduledAt=new Date(d.scheduledAt).toISOString(); }catch(e){} } }
   else { status='por_recibir'; if(d.when==='later'){ if(!d.scheduledAt){ alert('Elige la fecha de la cita.'); return; } scheduledAt=new Date(d.scheduledAt).toISOString(); status='agendado'; } }
   // fechas de ingreso / salida (manuales + auto por estatus)
   let receivedAt=d.receivedAt||'', deliveredAt=d.deliveredAt||'';
@@ -2916,7 +2969,7 @@ window.svcSaveOrder=async function(opts){
   let orderNum = d.editId ? ((svcOrders.find(x=>x.id===d.editId)||{}).orderNum || null) : null;
   if(!d.editId){ try{ const _n=await httpsCallable(functions,'svcNextNum')({}); orderNum=(_n&&_n.data&&_n.data.num)||null; }catch(e){ console.warn('svcNextNum', e); } }
   // guardar
-  const payload={ clientId, clientName, clientPhone, lang, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, estMinutes, assignRole, assignEmpId, assignName, status };
+  const payload={ clientId, clientName, clientPhone, lang, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, scheduleAfterParts, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, estMinutes, assignRole, assignEmpId, assignName, status };
   if(orderNum) payload.orderNum=orderNum;
   window._svcLastPayload=Object.assign({}, payload);   // 📸 para los snapshots de documentos (estimado inicial/final)
   const wasEdit=!!d.editId; let orderId=d.editId||'';

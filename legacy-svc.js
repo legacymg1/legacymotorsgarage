@@ -49,6 +49,8 @@
     o = o || {};
     if (o.paid) return { txt: en ? '✅ Paid' : '✅ Pagado', col: '#28b463' };
     var s = o.status;
+    // 🗓️ Ya tiene FECHA agendada y aún no empieza el trabajo → muestra "Agendado" (gana sobre "arrancó").
+    if (o.scheduledAt && ['arrancado', 'agendado', 'por_recibir', '', undefined].indexOf(s) >= 0) return { txt: en ? '🗓️ Scheduled' : '🗓️ Agendado', col: '#0a84ff' };
     if (s === 'arrancado') return { txt: en ? '🚀 Service started!' : '🚀 ¡Servicio arrancó!', col: '#7c5cff' };
     if (s === 'entregado') return { txt: en ? '🏁 Delivered' : '🏁 Entregado', col: '#28b463' };
     if (s === 'listo') return { txt: en ? '✅ Ready for pickup' : '✅ Listo p/ entrega', col: '#28b463' };
