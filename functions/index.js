@@ -3265,6 +3265,39 @@ exports.clockAdminAdd = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!doc.exists) throw new HttpsError("not-found", "Empleado no encontrado.");
   return await _clockAddManual(db, Object.assign({ id: doc.id }, doc.data() || {}), date, hours, inHHMM, id.name || id.email || "admin");
 });
+// 🗑 El dueño borra un turno/registro de reloj (p.ej. corregir un manual mal puesto).
+exports.clockAdminDelete = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const entryId = String((request.data || {}).entryId || "");
+  if (!entryId) throw new HttpsError("invalid-argument", "Falta el registro.");
+  await admin.firestore().collection("timeclock").doc(entryId).delete();
+  return { ok: true };
+});
+// ⏱️ TEMP (key-gated): corregir un registro — borra `del` (doc id) y/o agrega manual por nombre. ?go=1 ejecuta. QUITAR después.
+exports.clockCorrectTmp = onRequest(async (req, res) => {
+  try {
+    if ((req.query.key || "") !== "lmgfin2026") { res.status(403).send("no"); return; }
+    const db = admin.firestore();
+    const del = String(req.query.del || "");
+    const name = String(req.query.name || "").toLowerCase().trim();
+    const date = String(req.query.date || ""); const hours = Number(req.query.hours || 0); const inHHMM = String(req.query.in || "08:00");
+    const go = (req.query.go || "") === "1";
+    const plan = { del: del || null, add: (name && /^\d{4}-\d{2}-\d{2}$/.test(date) && hours > 0) ? { name, date, hours, in: inHHMM } : null };
+    if (!go) { res.json({ ok: true, preview: plan, nota: "agrega &go=1 para ejecutar" }); return; }
+    const out = {};
+    if (del) { await db.collection("timeclock").doc(del).delete(); out.borrado = del; }
+    if (plan.add) {
+      const es = await db.collection("employees").get();
+      const matches = [];
+      es.forEach((e) => { const dd = e.data() || {}; if (((dd.name || "").toLowerCase()).indexOf(name) >= 0) matches.push({ id: e.id, name: dd.name, phoneE164: dd.phoneE164 || "" }); });
+      if (matches.length !== 1) { out.add_error = matches.length ? "ambiguo" : "sin empleado"; }
+      else { out.agregado = await _clockAddManual(db, matches[0], date, hours, inHHMM, "admin-fix"); }
+    }
+    res.json({ ok: true, out });
+  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
+});
 // Estado + horas de la semana de quien llama. Para su tarjeta en la app.
 exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
@@ -3342,7 +3375,7 @@ exports.clockDay = onCall({ timeoutSeconds: 30 }, async (request) => {
   snap.forEach((d) => {
     const x = d.data() || {};
     if (localDay(x.inAt) !== ds) return;
-    rows.push({ name: x.name || (x.email || "").split("@")[0] || "Empleado", empId: x.empId || "", location: x.location || "", inAt: x.inAt || "", outAt: x.outAt || "", in: hm(x.inAt), out: x.outAt ? hm(x.outAt) : "", hours: Number(x.hours) || 0, breakHours: Number(x.breakHours) || 0, breaks: (Array.isArray(x.breaks) ? x.breaks : []).map((b) => ({ s: hm(b.start), e: b.end ? hm(b.end) : "" })), manual: !!x.manual, open: false });
+    rows.push({ id: d.id, name: x.name || (x.email || "").split("@")[0] || "Empleado", empId: x.empId || "", location: x.location || "", inAt: x.inAt || "", outAt: x.outAt || "", in: hm(x.inAt), out: x.outAt ? hm(x.outAt) : "", hours: Number(x.hours) || 0, breakHours: Number(x.breakHours) || 0, breaks: (Array.isArray(x.breaks) ? x.breaks : []).map((b) => ({ s: hm(b.start), e: b.end ? hm(b.end) : "" })), manual: !!x.manual, open: false });
   });
   // turnos abiertos que empezaron ese día (aún sin salida)
   const openSnap = await db.collection("timeclock_open").get();

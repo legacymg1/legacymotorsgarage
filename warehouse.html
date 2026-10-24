@@ -1246,6 +1246,11 @@ window.whAddHours=async function(dayStr){
     +'<button onclick="whAddHoursSave(\''+dayStr+'\')" style="width:100%;background:var(--gold);color:#0b0e14;border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💾 '+L2('Guardar horas','Save hours')+'</button></div>';
   if(!emps.length){ const s=document.getElementById('ah-emp'); if(s) s.innerHTML='<option value="">'+L2('(sin empleados)','(no employees)')+'</option>'; }
 };
+window.whDelHours=function(entryId, name){
+  if(!entryId) return;
+  if(!confirm(L2('¿Borrar estas horas de '+name+'?','Delete these hours for '+name+'?'))) return;
+  httpsCallable(functions,'clockAdminDelete')({entryId:entryId}).then(()=>{ whToast('✅ '+L2('Borrado','Deleted')); try{ whPayLoad(true); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not delete: ')+((e&&e.message)||e)); });
+};
 window.whAddHoursSave=function(dayStr){
   const empId=(document.getElementById('ah-emp')||{}).value||'';
   const hours=Number((document.getElementById('ah-hours')||{}).value||0);
@@ -1308,7 +1313,8 @@ function _payDayHtml(){
           +'<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#fff;font-size:14px;">'+whEscA(r.name||'')+(r.open?' <span style="color:#35c46a;font-size:10.5px;">● '+L2('en turno','on shift')+'</span>':'')+(r.manual?' <span style="color:#8a93a6;font-size:10px;">✍️ '+L2('manual','manual')+'</span>':'')+'</div>'
             +'<div style="font-size:11.5px;color:#8a93a6;margin-top:1px;">🕐 '+whEscA(r.in||'—')+' → '+(r.out?whEscA(r.out):L2('ahora','now'))+(r.location&&r.location!=='manual'?(' · '+(r.location==='dealer'?'Dealer':(r.location==='yonke'?'Yonke':whEscA(r.location)))):'')+(Number(r.breakHours)>0?(' · ☕ '+Math.round(Number(r.breakHours)*60)+'m'):'')+'</div>'
             +(brk?'<div style="font-size:11px;color:#b58b2e;margin-top:2px;">'+brk+'</div>':'')+'</div>'
-          +'<div style="font-weight:800;color:#fff;font-size:14px;flex:none;">'+dur.toFixed(1)+'h</div></div>';
+          +'<div style="font-weight:800;color:#fff;font-size:14px;flex:none;">'+dur.toFixed(1)+'h</div>'
+          +((r.manual&&r.id)?'<button onclick="event.stopPropagation();whDelHours(\''+r.id+'\',\''+_nm+'\')" title="Borrar" style="flex:none;background:transparent;border:1px solid var(--border);color:#e05a4a;border-radius:8px;padding:5px 8px;font-size:12px;cursor:pointer;margin-left:6px;">🗑</button>':'')+'</div>';
       }).join('');
       inner+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 2px 2px;font-size:12px;color:#8a93a6;"><span>'+_payDayData.count+' '+L2('persona(s)','people')+'</span><span style="font-weight:800;color:#f0d680;">'+Number(_payDayData.totalHours||0).toFixed(1)+' h</span></div>';
     }
