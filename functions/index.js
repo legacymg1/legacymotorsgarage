@@ -3194,6 +3194,66 @@ exports.clockPunch = onCall({ timeoutSeconds: 30 }, async (request) => {
     return { ok: true, action: "out", hours: Math.round(hours * 100) / 100, breakMin: Math.round(breakMs / 60000), at: nowIso };
   }
 });
+// 🔧 Cierra un turno ABIERTO (timeclock_open) con una hora de SALIDA dada. Reusable: olvido de clock-out, correcciones.
+async function _clockCloseOpenDoc(db, snap, outIso, who) {
+  const d = snap.data() || {};
+  let breakMs = Number(d.breakMs) || 0;
+  const breaks = Array.isArray(d.breaks) ? d.breaks.slice() : [];
+  const outT = new Date(outIso).getTime();
+  if (d.onBreakSince) { breakMs += Math.max(0, outT - new Date(d.onBreakSince).getTime()); for (let i = breaks.length - 1; i >= 0; i--) { if (!breaks[i].end) { breaks[i].end = outIso; break; } } }
+  const grossMs = Math.max(0, outT - new Date(d.inAt).getTime());
+  const workedMs = Math.max(0, grossMs - breakMs);
+  const hours = workedMs / 3600000;
+  await db.collection("timeclock").add({
+    actorKey: d.actorKey || "", email: d.email || "", phone: d.phone || "", empId: d.empId || "", name: d.name || "",
+    location: d.location || "", outLocation: d.location || "",
+    inAt: d.inAt, outAt: outIso, inLat: d.inLat || null, inLng: d.inLng || null, outLat: null, outLng: null,
+    hours: Math.round(hours * 100) / 100, grossHours: Math.round((grossMs / 3600000) * 100) / 100,
+    breakHours: Math.round((breakMs / 3600000) * 100) / 100, breaks: breaks,
+    weekKey: d.weekKey || _laMondayKey(new Date(d.inAt)), createdAt: new Date().toISOString(),
+    closedByAdmin: true, closedBy: who || "admin",
+  });
+  await snap.ref.delete();
+  return { ok: true, name: d.name || "", inAt: d.inAt, outAt: outIso, hours: Math.round(hours * 100) / 100, breakHours: Math.round((breakMs / 3600000) * 100) / 100 };
+}
+// 👑 El dueño cierra/corrige un turno abierto de un empleado (olvidó hacer clock out). outAt = ISO o con offset.
+exports.clockAdminClose = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  const empId = String((request.data || {}).empId || "");
+  const key = String((request.data || {}).key || "");
+  const outAt = String((request.data || {}).outAt || "");
+  if (!outAt) throw new HttpsError("invalid-argument", "Falta la hora de salida.");
+  let snap = null;
+  if (key) { const s = await db.collection("timeclock_open").doc(key).get(); if (s.exists) snap = s; }
+  if (!snap && empId) { const q = await db.collection("timeclock_open").where("empId", "==", empId).limit(1).get(); if (!q.empty) snap = q.docs[0]; }
+  if (!snap) throw new HttpsError("not-found", "No hay un turno abierto de ese empleado.");
+  const outIso = new Date(outAt).toISOString();
+  if (new Date(outIso).getTime() <= new Date(snap.data().inAt).getTime()) throw new HttpsError("invalid-argument", "La salida debe ser DESPUÉS de la entrada.");
+  return await _clockCloseOpenDoc(db, snap, outIso, id.name || id.email || "admin");
+});
+// ⏱️ TEMP (key-gated): cerrar un turno abierto por NOMBRE a una hora LA. preview por default; ?go=1 ejecuta. QUITAR después.
+exports.clockCloseTmp = onRequest(async (req, res) => {
+  try {
+    if ((req.query.key || "") !== "lmgfin2026") { res.status(403).send("no"); return; }
+    const db = admin.firestore();
+    const nameq = String(req.query.name || "victor").toLowerCase();
+    const hhmm = String(req.query.t || "18:30");
+    const all = await db.collection("timeclock_open").get();
+    let snap = null;
+    all.forEach((s) => { const n = ((s.data() || {}).name || "").toLowerCase(); if (!snap && n.indexOf(nameq) >= 0) snap = s; });
+    if (!snap) { res.json({ ok: false, error: "sin turno abierto que empate '" + nameq + "'", abiertos: all.docs.map((s) => ({ name: (s.data() || {}).name, inAt: (s.data() || {}).inAt, empId: (s.data() || {}).empId })) }); return; }
+    const d = snap.data() || {};
+    const laDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d.inAt));
+    const outIso = new Date(laDate + "T" + hhmm + ":00-07:00").toISOString();
+    const preview = { target: d.name, empId: d.empId, inAt: d.inAt, outAt: outIso, location: d.location };
+    if ((req.query.go || "") !== "1") { res.json({ ok: true, preview, nota: "preview — agrega &go=1 para cerrarlo" }); return; }
+    const r = await _clockCloseOpenDoc(db, snap, outIso, "admin-fix");
+    res.json({ ok: true, cerrado: r });
+  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
+});
 // Estado + horas de la semana de quien llama. Para su tarjeta en la app.
 exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
