@@ -1261,14 +1261,14 @@ window.whAddHours=async function(dayStr){
 window.whDelHours=function(entryId, name){
   if(!entryId) return;
   if(!confirm(L2('¿Borrar estas horas de '+name+'?','Delete these hours for '+name+'?'))) return;
-  httpsCallable(functions,'clockAdminDelete')({entryId:entryId}).then(()=>{ whToast('✅ '+L2('Borrado','Deleted')); try{ whPayLoad(true); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not delete: ')+((e&&e.message)||e)); });
+  httpsCallable(functions,'clockAdminDelete')({entryId:entryId}).then(()=>{ whToast('✅ '+L2('Borrado','Deleted')); try{ whPayLoad(false); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not delete: ')+((e&&e.message)||e)); });
 };
 window.whEditHours=function(entryId, name, curHours){
   if(!entryId) return;
   const t=prompt(L2('Horas de '+name+' ese día (ej. 8):','Hours for '+name+' that day (e.g. 8):'), (curHours||'').toString());
   if(t===null) return;
   const hours=Number(t); if(!(hours>0)||hours>24){ alert(L2('Horas inválidas (0–24).','Invalid hours (0–24).')); return; }
-  httpsCallable(functions,'clockAdminEdit')({entryId:entryId, hours:hours}).then(r=>{ const dd=(r&&r.data)||{}; whToast('✅ '+L2('Horas actualizadas','Hours updated')+' · '+(dd.hours||hours)+'h'); try{ whPayLoad(true); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not edit: ')+((e&&e.message)||e)); });
+  httpsCallable(functions,'clockAdminEdit')({entryId:entryId, hours:hours}).then(r=>{ const dd=(r&&r.data)||{}; whToast('✅ '+L2('Horas actualizadas','Hours updated')+' · '+(dd.hours||hours)+'h'); try{ whPayLoad(false); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not edit: ')+((e&&e.message)||e)); });
 };
 window.whAddHoursSave=function(dayStr){
   const empId=(document.getElementById('ah-emp')||{}).value||'';
@@ -1276,7 +1276,7 @@ window.whAddHoursSave=function(dayStr){
   const inHHMM=(document.getElementById('ah-in')||{}).value||'08:00';
   if(!empId){ alert(L2('Elige un empleado.','Pick an employee.')); return; }
   if(!(hours>0)||hours>24){ alert(L2('Pon las horas (ej. 8).','Enter hours (e.g. 8).')); return; }
-  httpsCallable(functions,'clockAdminAdd')({empId:empId, date:dayStr, hours:hours, inHHMM:inHHMM}).then(r=>{ const dd=(r&&r.data)||{}; whToast('✅ '+L2('Horas agregadas','Hours added')+' · '+(dd.hours||hours)+'h'); const o=document.getElementById('wh-addhrs'); if(o)o.remove(); try{ whPayLoad(true); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not add: ')+((e&&e.message)||e)); });
+  httpsCallable(functions,'clockAdminAdd')({empId:empId, date:dayStr, hours:hours, inHHMM:inHHMM}).then(r=>{ const dd=(r&&r.data)||{}; whToast('✅ '+L2('Horas agregadas','Hours added')+' · '+(dd.hours||hours)+'h'); const o=document.getElementById('wh-addhrs'); if(o)o.remove(); try{ whPayLoad(false); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not add: ')+((e&&e.message)||e)); });
 };
 // 🔴 Cerrar/corregir un turno abierto (el empleado olvidó hacer clock out). Dueño elige la hora de salida.
 window.whCloseShift=function(empId, name){
@@ -1287,7 +1287,7 @@ window.whCloseShift=function(empId, name){
   const d=new Date(); d.setHours(+m[1], +m[2], 0, 0);
   const pretty=d.toLocaleTimeString(L==='en'?'en-US':'es-MX',{hour:'2-digit',minute:'2-digit'});
   if(!confirm(L2('¿Cerrar el turno de '+name+' a las '+pretty+'?','Close '+name+"'s shift at "+pretty+'?'))) return;
-  httpsCallable(functions,'clockAdminClose')({empId:empId, outAt:d.toISOString()}).then(r=>{ const dd=(r&&r.data)||{}; whToast('✅ '+L2('Turno cerrado','Shift closed')+(dd.hours!=null?(' · '+dd.hours+' h'):'')); try{ whPayLoad(true); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo cerrar: ','Could not close: ')+((e&&e.message)||e)); });
+  httpsCallable(functions,'clockAdminClose')({empId:empId, outAt:d.toISOString()}).then(r=>{ const dd=(r&&r.data)||{}; whToast('✅ '+L2('Turno cerrado','Shift closed')+(dd.hours!=null?(' · '+dd.hours+' h'):'')); try{ whPayLoad(false); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo cerrar: ','Could not close: ')+((e&&e.message)||e)); });
 };
 function _dayLong(ds){ try{ return new Date(ds+'T12:00:00').toLocaleDateString(L==='en'?'en-US':'es-MX',{weekday:'long',day:'numeric',month:'long'}); }catch(e){ return ds; } }
 function _payCalHtml(){
