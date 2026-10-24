@@ -1226,6 +1226,34 @@ async function whPayLoad(dayOnly){
 window.whPayCalPrev=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()-1, 1); whPayRender(); };
 window.whPayCalNext=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()+1, 1); whPayRender(); };
 window.whPayPickDay=function(ds){ _payDay=ds; const nw=_weekKeyOf(new Date(ds+'T12:00:00')); if(nw!==_payWeek){ _payWeek=nw; whPayLoad(false); } else { whPayLoad(true); } };
+// ➕ Agregar horas manuales de un DÍA que no se fichó (olvido / trabajó sin reloj).
+window.whAddHours=async function(dayStr){
+  let ov=document.getElementById('wh-addhrs');
+  if(!ov){ ov=document.createElement('div'); ov.id='wh-addhrs'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.74);z-index:2147483320;display:flex;align-items:flex-end;justify-content:center;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) ov.remove(); }; document.body.appendChild(ov); }
+  const box='<div onclick="event.stopPropagation()" style="background:var(--surface,#12151c);color:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:18px 16px 26px;cursor:default;">';
+  ov.innerHTML=box+'<div class="faint" style="text-align:center;padding:16px;">'+L2('Cargando…','Loading…')+'</div></div>';
+  let emps=[]; try{ const r=await httpsCallable(functions,'empAdmin')({op:'list'}); emps=(((r&&r.data)||{}).emps||[]).filter(e=>e.active!==false); }catch(e){}
+  const opts=emps.map(e=>'<option value="'+e.id+'">'+whEscA(e.name||'')+'</option>').join('');
+  ov.innerHTML=box
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;">➕ '+L2('Agregar horas','Add hours')+'</div><button onclick="var o=document.getElementById(\'wh-addhrs\');if(o)o.remove();" style="background:var(--surface2);border:none;border-radius:9px;padding:7px 11px;font-weight:800;cursor:pointer;color:#fff;">✕</button></div>'
+    +'<div class="faint" style="font-size:12.5px;margin-bottom:12px;">📅 '+_dayLong(dayStr)+'</div>'
+    +'<label style="font-size:12px;color:#8a93a6;font-weight:700;display:block;margin-bottom:4px;">'+L2('Empleado','Employee')+'</label>'
+    +'<select id="ah-emp" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:#fff;border-radius:10px;padding:11px;font-size:15px;font-family:inherit;margin-bottom:12px;">'+opts+'</select>'
+    +'<div style="display:flex;gap:10px;margin-bottom:16px;">'
+      +'<div style="flex:1;"><label style="font-size:12px;color:#8a93a6;font-weight:700;display:block;margin-bottom:4px;">'+L2('Horas','Hours')+'</label><input id="ah-hours" type="number" inputmode="decimal" step="0.25" min="0" max="24" placeholder="8" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:#fff;border-radius:10px;padding:11px;font-size:15px;font-family:inherit;"></div>'
+      +'<div style="flex:1;"><label style="font-size:12px;color:#8a93a6;font-weight:700;display:block;margin-bottom:4px;">'+L2('Entró (opc.)','In (opt.)')+'</label><input id="ah-in" type="time" value="08:00" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:#fff;border-radius:10px;padding:11px;font-size:15px;font-family:inherit;"></div>'
+    +'</div>'
+    +'<button onclick="whAddHoursSave(\''+dayStr+'\')" style="width:100%;background:var(--gold);color:#0b0e14;border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💾 '+L2('Guardar horas','Save hours')+'</button></div>';
+  if(!emps.length){ const s=document.getElementById('ah-emp'); if(s) s.innerHTML='<option value="">'+L2('(sin empleados)','(no employees)')+'</option>'; }
+};
+window.whAddHoursSave=function(dayStr){
+  const empId=(document.getElementById('ah-emp')||{}).value||'';
+  const hours=Number((document.getElementById('ah-hours')||{}).value||0);
+  const inHHMM=(document.getElementById('ah-in')||{}).value||'08:00';
+  if(!empId){ alert(L2('Elige un empleado.','Pick an employee.')); return; }
+  if(!(hours>0)||hours>24){ alert(L2('Pon las horas (ej. 8).','Enter hours (e.g. 8).')); return; }
+  httpsCallable(functions,'clockAdminAdd')({empId:empId, date:dayStr, hours:hours, inHHMM:inHHMM}).then(r=>{ const dd=(r&&r.data)||{}; whToast('✅ '+L2('Horas agregadas','Hours added')+' · '+(dd.hours||hours)+'h'); const o=document.getElementById('wh-addhrs'); if(o)o.remove(); try{ whPayLoad(true); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not add: ')+((e&&e.message)||e)); });
+};
 // 🔴 Cerrar/corregir un turno abierto (el empleado olvidó hacer clock out). Dueño elige la hora de salida.
 window.whCloseShift=function(empId, name){
   if(!empId){ alert(L2('Este empleado no tiene ID — ciérralo desde su perfil.','No employee id.')); return; }
@@ -1265,7 +1293,7 @@ function _payCalHtml(){
 }
 function _payDayHtml(){
   const isToday=(_payDay===_dayStr(new Date()));
-  const title='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><div style="font-weight:800;font-size:14px;color:#fff;text-transform:capitalize;">📅 '+(isToday?L2('Hoy · ','Today · '):'')+_dayLong(_payDay)+'</div></div>';
+  const title='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;"><div style="font-weight:800;font-size:14px;color:#fff;text-transform:capitalize;min-width:0;">📅 '+(isToday?L2('Hoy · ','Today · '):'')+_dayLong(_payDay)+'</div><button onclick="whAddHours(\''+_payDay+'\')" style="flex:none;background:var(--gold);color:#0b0e14;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;">➕ '+L2('Horas','Hours')+'</button></div>';
   let inner;
   if(_payDayData===null){ inner='<div style="color:#8a93a6;text-align:center;padding:14px;font-size:13px;">'+L2('Cargando el día…','Loading day…')+'</div>'; }
   else if(_payDayData.__err){ inner='<div style="color:#8a93a6;text-align:center;padding:14px;font-size:13px;">'+L2('No se pudo cargar el día.','Could not load the day.')+'</div>'; }
@@ -1274,10 +1302,12 @@ function _payDayHtml(){
     if(!rws.length){ inner='<div style="color:#8a93a6;text-align:center;padding:16px 10px;font-size:13px;">'+L2('Nadie fichó este día.','Nobody clocked in this day.')+'</div>'; }
     else {
       inner=rws.map(r=>{ const _nm=whEscA(r.name||'').replace(/\x27/g,""); const dur=Number(r.hours||0);
+        const brk=(Array.isArray(r.breaks)?r.breaks:[]).filter(b=>b&&b.s).map(b=>'☕ '+whEscA(b.s)+' → '+(b.e?whEscA(b.e):('🟡 '+L2('sin regreso','no return')))).join('  ·  ');
         return '<div onclick="whEmpReport(\''+(r.empId||'')+'\',\''+_nm+'\',\''+_payWeek+'\')" style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;">'
           +'<span style="width:32px;height:32px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:11px;flex:none;">'+whInitials(r.name)+'</span>'
-          +'<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#fff;font-size:14px;">'+whEscA(r.name||'')+(r.open?' <span style="color:#35c46a;font-size:10.5px;">● '+L2('en turno','on shift')+'</span>':'')+'</div>'
-            +'<div style="font-size:11.5px;color:#8a93a6;margin-top:1px;">🕐 '+whEscA(r.in||'—')+' → '+(r.out?whEscA(r.out):L2('ahora','now'))+(r.location?(' · '+(r.location==='dealer'?'Dealer':(r.location==='yonke'?'Yonke':whEscA(r.location)))):'')+(Number(r.breakHours)>0?(' · ☕ '+Math.round(Number(r.breakHours)*60)+'m'):'')+'</div></div>'
+          +'<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#fff;font-size:14px;">'+whEscA(r.name||'')+(r.open?' <span style="color:#35c46a;font-size:10.5px;">● '+L2('en turno','on shift')+'</span>':'')+(r.manual?' <span style="color:#8a93a6;font-size:10px;">✍️ '+L2('manual','manual')+'</span>':'')+'</div>'
+            +'<div style="font-size:11.5px;color:#8a93a6;margin-top:1px;">🕐 '+whEscA(r.in||'—')+' → '+(r.out?whEscA(r.out):L2('ahora','now'))+(r.location&&r.location!=='manual'?(' · '+(r.location==='dealer'?'Dealer':(r.location==='yonke'?'Yonke':whEscA(r.location)))):'')+(Number(r.breakHours)>0?(' · ☕ '+Math.round(Number(r.breakHours)*60)+'m'):'')+'</div>'
+            +(brk?'<div style="font-size:11px;color:#b58b2e;margin-top:2px;">'+brk+'</div>':'')+'</div>'
           +'<div style="font-weight:800;color:#fff;font-size:14px;flex:none;">'+dur.toFixed(1)+'h</div></div>';
       }).join('');
       inner+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 2px 2px;font-size:12px;color:#8a93a6;"><span>'+_payDayData.count+' '+L2('persona(s)','people')+'</span><span style="font-weight:800;color:#f0d680;">'+Number(_payDayData.totalHours||0).toFixed(1)+' h</span></div>';

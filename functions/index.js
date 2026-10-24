@@ -3265,26 +3265,6 @@ exports.clockAdminAdd = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!doc.exists) throw new HttpsError("not-found", "Empleado no encontrado.");
   return await _clockAddManual(db, Object.assign({ id: doc.id }, doc.data() || {}), date, hours, inHHMM, id.name || id.email || "admin");
 });
-// ⏱️ TEMP (key-gated): agregar horas manuales por NOMBRE. preview por default; ?go=1 ejecuta. QUITAR después.
-exports.clockAddTmp = onRequest(async (req, res) => {
-  try {
-    if ((req.query.key || "") !== "lmgfin2026") { res.status(403).send("no"); return; }
-    const db = admin.firestore();
-    const nameq = String(req.query.name || "").toLowerCase().trim();
-    if (!nameq) { res.json({ ok: false, error: "falta name" }); return; }
-    const es = await db.collection("employees").get();
-    const matches = [];
-    es.forEach((e) => { const d = e.data() || {}; if (((d.name || "").toLowerCase()).indexOf(nameq) >= 0) matches.push({ id: e.id, name: d.name, phoneE164: d.phoneE164 || "", rate: d.rate || 0 }); });
-    if (!matches.length) { res.json({ ok: false, error: "sin empleado '" + nameq + "'", todos: es.docs.map((e) => ({ id: e.id, name: (e.data() || {}).name })) }); return; }
-    if (matches.length > 1) { res.json({ ok: false, error: "ambiguo — usa nombre más específico", matches }); return; }
-    const emp = matches[0];
-    const date = String(req.query.date || ""); const hours = Number(req.query.hours || 0); const inHHMM = String(req.query.in || "08:00");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !(hours > 0)) { res.json({ ok: true, matched: emp, nota: "agrega &date=YYYY-MM-DD&hours=8&go=1" }); return; }
-    if ((req.query.go || "") !== "1") { res.json({ ok: true, preview: { emp: emp.name, empId: emp.id, date, hours, in: inHHMM } }); return; }
-    const r = await _clockAddManual(db, emp, date, hours, inHHMM, "admin-backfill");
-    res.json({ ok: true, agregado: r });
-  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
-});
 // Estado + horas de la semana de quien llama. Para su tarjeta en la app.
 exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
