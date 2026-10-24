@@ -1163,7 +1163,7 @@ function renderEmpReport(d, name, weekKey){
   _repWeek = d.weekKey || weekKey || _weekKeyOf(new Date());
   const isCurWk = (_repWeek===_weekKeyOf(new Date()));
   // 🗓️ Barra de semana con ‹ › (consistente con la Nómina)
-  const weekBar='<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:8px 6px;margin-bottom:12px;"><button onclick="whEmpWeek(-1)" style="background:transparent;border:none;color:#c9a84c;font-size:20px;cursor:pointer;line-height:1;padding:2px 10px;">‹</button><span onclick="whCalOpen(\'week\',\''+_repWeek+'\',\'whEmpPickWeek\')" style="font-weight:800;color:#fff;font-size:13.5px;cursor:pointer;text-align:center;flex:1;min-width:0;">📅 '+(isCurWk?L2('Esta semana · ','This week · '):'')+_weekRange(_repWeek)+' <span style="color:#c9a84c;font-size:11px;">▾</span></span><button onclick="whEmpWeek(1)" style="background:transparent;border:none;color:#c9a84c;font-size:20px;cursor:pointer;line-height:1;padding:2px 10px;">›</button></div>';
+  const weekBar='<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:8px 6px;margin-bottom:12px;"><button onclick="whEmpWeek(-1)" style="background:transparent;border:none;color:#c9a84c;font-size:20px;cursor:pointer;line-height:1;padding:2px 10px;">‹</button><span onclick="whCalOpen(\'week\',\''+_repWeek+'\',\'whEmpCalPick\')" style="font-weight:800;color:#fff;font-size:13.5px;cursor:pointer;text-align:center;flex:1;min-width:0;">📅 '+(isCurWk?L2('Esta semana · ','This week · '):'')+_weekRange(_repWeek)+' <span style="color:#c9a84c;font-size:11px;">▾</span></span><button onclick="whEmpWeek(1)" style="background:transparent;border:none;color:#c9a84c;font-size:20px;cursor:pointer;line-height:1;padding:2px 10px;">›</button></div>';
   const weekTitle = L2('Resumen de la semana','Week summary');
   const row=(lbl,val,col)=>'<div style="display:flex;justify-content:space-between;align-items:center;font-size:13.5px;padding:4px 0;"><span style="color:var(--muted);">'+lbl+'</span><span style="font-weight:700;'+(col?('color:'+col+';'):'')+'">'+val+'</span></div>';
   const card=(inner)=>'<div class="card" style="padding:12px 14px;margin-bottom:10px;">'+inner+'</div>';
@@ -1234,7 +1234,7 @@ function _whNavSave(o){ try{ sessionStorage.setItem('lmg_wh_nav', JSON.stringify
 function _whNavClear(){ try{ sessionStorage.removeItem('lmg_wh_nav'); }catch(e){} }
 function _whNavGet(){ try{ return JSON.parse(sessionStorage.getItem('lmg_wh_nav')||'null'); }catch(e){ return null; } }
 window.whPayClose=function(){ const o=document.getElementById('wh-pay'); if(o)o.remove(); _whNavClear(); };
-window.whPayToggleCal=function(){ whCalOpen('day', _payDay||_dayStr(new Date()), 'whPayPickDay'); };   // abre el popup para elegir DÍA
+window.whPayToggleCal=function(){ whCalOpen('day', _payDay||_dayStr(new Date()), 'whPayCalPick'); };   // abre el popup (Día/Semana)
 // 📆 POPUP de calendario REUSABLE — elige día (Nómina) o semana (Reporte) y se cierra solo.
 let _calCfg=null, _calMonth=null;
 window.whCalOpen=function(mode, curVal, onPickFnName){
@@ -1246,16 +1246,20 @@ window.whCalOpen=function(mode, curVal, onPickFnName){
 };
 window.whCalClose=function(){ const o=document.getElementById('wh-cal-pop'); if(o)o.remove(); _calCfg=null; };
 window.whCalNav=function(delta){ if(!_calMonth) _calMonth=new Date(); _calMonth=new Date(_calMonth.getFullYear(), _calMonth.getMonth()+delta, 1); whCalRender(); };
+window.whCalMode=function(m){ if(_calCfg){ _calCfg.mode=(m==='week'?'week':'day'); whCalRender(); } };
 window.whCalPick=function(ds){
   const cfg=_calCfg; whCalClose();
   if(!cfg) return;
-  const val = cfg.mode==='week' ? _weekKeyOf(new Date(ds+'T12:00:00')) : ds;
-  try{ if(typeof window[cfg.onPick]==='function') window[cfg.onPick](val); }catch(e){}
+  const type=cfg.mode;
+  const val = type==='week' ? _weekKeyOf(new Date(ds+'T12:00:00')) : ds;
+  try{ if(typeof window[cfg.onPick]==='function') window[cfg.onPick](val, type); }catch(e){}
 };
 function whCalRender(){
   const o=document.getElementById('wh-cal-pop'); if(!o||!_calCfg) return;
+  const seg=(m,lbl)=>{ const on=_calCfg.mode===m; return '<button onclick="whCalMode(\''+m+'\')" style="flex:1;padding:9px 6px;border:none;border-radius:9px;font-weight:800;font-size:13.5px;cursor:pointer;background:'+(on?'var(--gold)':'transparent')+';color:'+(on?'#0b0e14':'#fff')+';">'+lbl+'</button>'; };
   o.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:360px;width:100%;padding:16px;cursor:default;box-shadow:0 18px 50px rgba(0,0,0,.6);">'
-    +'<div style="font-weight:800;color:#fff;font-size:15px;margin-bottom:10px;text-align:center;">'+(_calCfg.mode==='week'?L2('Elige la semana','Pick the week'):L2('Elige el día','Pick the day'))+'</div>'
+    +'<div style="display:flex;gap:4px;background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:4px;margin-bottom:12px;">'+seg('day',L2('📅 Un día','📅 Day'))+seg('week',L2('🗓️ Semana','🗓️ Week'))+'</div>'
+    +'<div style="font-size:11.5px;color:#8a93a6;text-align:center;margin-bottom:8px;">'+(_calCfg.mode==='week'?L2('Toca un día para ver TODA esa semana','Tap a day to see that whole week'):L2('Toca el día que quieres ver','Tap the day you want to see'))+'</div>'
     +_calGridHtml()
     +'<button onclick="whCalClose()" style="width:100%;margin-top:12px;background:var(--surface2);border:1px solid var(--border);color:#fff;border-radius:10px;padding:11px;font-weight:800;cursor:pointer;">'+L2('Cancelar','Cancel')+'</button></div>';
 }
@@ -1284,7 +1288,15 @@ function _calGridHtml(){
     +'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">'+head+cells+'</div>'
     +(_calCfg.mode==='week'?('<div style="font-size:11px;color:#8a93a6;text-align:center;margin-top:9px;">'+L2('Toca cualquier día para elegir esa semana','Tap any day to pick that week')+'</div>'):'');
 }
-window.whEmpPickWeek=function(wk){ whEmpReport(_repEmpId, _repName, wk); };
+// Nómina: Día → ese día; Semana → esa semana (el día queda en hoy si cae en ella, si no, el lunes).
+window.whPayCalPick=function(val, type){
+  if(type==='week'){ _payWeek=val; const t=_dayStr(new Date()); _payDay=(_weekKeyOf(new Date(t+'T12:00:00'))===val)?t:val; }
+  else { _payDay=val; _payWeek=_weekKeyOf(new Date(val+'T12:00:00')); }
+  whPayLoad(false);
+};
+// Reporte del empleado: Día o Semana → muestra el reporte de ESA semana (el desglose por día ya trae cada día).
+window.whEmpCalPick=function(val, type){ const wk=(type==='week')?val:_weekKeyOf(new Date(val+'T12:00:00')); whEmpReport(_repEmpId, _repName, wk); };
+window.whEmpPickWeek=function(wk){ whEmpReport(_repEmpId, _repName, wk); };   // compat
 window.whOpenPayroll=async function(){
   if(role!=='owner') return; try{ closeAcct(); whTeamClose(); }catch(e){}
   _payWeek=_weekKeyOf(new Date()); _payCalMonth=new Date(); _payData=null; _payDay=_dayStr(new Date()); _payDayData=null;
