@@ -3016,8 +3016,11 @@ exports.empReport = onCall({ timeoutSeconds: 40 }, async (request) => {
       });
     });
   } catch (e) {}
-  // 3) ASISTENCIA (timeclock) — horas de la semana + histórico + desde cuándo ingresó
+  // 3) ASISTENCIA (timeclock) — horas de la semana + histórico + desde cuándo ingresó + DÍA POR DÍA de la semana
+  const _hm = (iso) => { try { return new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } };
+  const _localDay = (iso) => { try { return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }); } catch (e) { return ""; } };
   let wkHours = 0, atHours = 0, atShifts = 0, firstClockIn = "", lastClockIn = "";
+  const dmap = {};   // 'YYYY-MM-DD' -> { hours, entries:[{in,out,hours,manual,breaks}] }
   try {
     const tc = await db.collection("timeclock").get();
     tc.forEach((doc) => {
@@ -3025,11 +3028,41 @@ exports.empReport = onCall({ timeoutSeconds: 40 }, async (request) => {
       const mine = (empId && x.empId === empId) || (nameLc && String(x.name || "").toLowerCase() === nameLc);
       if (!mine) return;
       const h = Number(x.hours) || 0; atHours += h; atShifts++;
-      if ((x.weekKey || "") === weekKey) wkHours += h;
       const ia = x.inAt || x.createdAt || "";
       if (ia) { if (!firstClockIn || ia < firstClockIn) firstClockIn = ia; if (!lastClockIn || ia > lastClockIn) lastClockIn = ia; }
+      if ((x.weekKey || "") === weekKey) {
+        wkHours += h;
+        const dd = _localDay(x.inAt); if (!dd) return;
+        if (!dmap[dd]) dmap[dd] = { hours: 0, entries: [] };
+        dmap[dd].hours += h;
+        dmap[dd].entries.push({ in: _hm(x.inAt), out: x.outAt ? _hm(x.outAt) : "", hours: Math.round(h * 100) / 100, manual: !!x.manual, open: false, breaks: (Array.isArray(x.breaks) ? x.breaks : []).map((b) => ({ s: _hm(b.start), e: b.end ? _hm(b.end) : "" })) });
+      }
     });
   } catch (e) {}
+  // turno ABIERTO (si está fichado ahorita) → va al día de hoy
+  try {
+    const openSnap = await db.collection("timeclock_open").get();
+    openSnap.forEach((doc) => {
+      const x = doc.data() || {};
+      const mine = (empId && x.empId === empId) || (nameLc && String(x.name || "").toLowerCase() === nameLc);
+      if (!mine || (x.weekKey || "") !== weekKey) return;
+      let el = Date.now() - new Date(x.inAt).getTime(); el -= (Number(x.breakMs) || 0);
+      if (x.onBreakSince) el -= Math.max(0, Date.now() - new Date(x.onBreakSince).getTime());
+      const h = Math.max(0, el / 3600000); wkHours += h;
+      const dd = _localDay(x.inAt); if (!dd) return;
+      if (!dmap[dd]) dmap[dd] = { hours: 0, entries: [] };
+      dmap[dd].hours += h;
+      dmap[dd].entries.push({ in: _hm(x.inAt), out: "", hours: Math.round(h * 100) / 100, manual: false, open: true, breaks: (Array.isArray(x.breaks) ? x.breaks : []).map((b) => ({ s: _hm(b.start), e: b.end ? _hm(b.end) : "" })) });
+    });
+  } catch (e) {}
+  // 7 días de la semana (lunes→domingo) con sus horas y entradas
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(new Date(weekKey + "T12:00:00-07:00").getTime() + i * 86400000);
+    const ds = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(dt);
+    const dd = dmap[ds] || { hours: 0, entries: [] };
+    weekDays.push({ date: ds, hours: Math.round(dd.hours * 100) / 100, entries: dd.entries });
+  }
   // 4) MIEMBRO DESDE — alta del empleado (o su primera entrada si no hay alta)
   let memberSince = "", empPhone = "", empRoles = [], empRate = 0, empActive = true;
   try {
@@ -3049,6 +3082,7 @@ exports.empReport = onCall({ timeoutSeconds: 40 }, async (request) => {
     allTime: { minutes: atMin, costCents: atCost, tasks: atTasks, cars: atCars.size, byLineCost, hours: Math.round(atHours * 100) / 100, shifts: atShifts },
     service: { revenueCents: svcRev, count: svcCount },
     tenure: { memberSince, firstClockIn, lastClockIn, phone: empPhone, roles: empRoles, rate: empRate, active: empActive },
+    weekDays,
   };
 });
 
