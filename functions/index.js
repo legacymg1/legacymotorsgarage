@@ -3234,6 +3234,57 @@ exports.clockAdminClose = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (new Date(outIso).getTime() <= new Date(snap.data().inAt).getTime()) throw new HttpsError("invalid-argument", "La salida debe ser DESPUÉS de la entrada.");
   return await _clockCloseOpenDoc(db, snap, outIso, id.name || id.email || "admin");
 });
+// ➕ Agrega un turno MANUAL (horas de un día que no se ficharon). Reusable (callable + temp).
+async function _clockAddManual(db, emp, dateStr, hours, inHHMM, who) {
+  const phoneDigits = String(emp.phoneE164 || emp.phone || "").replace(/\D/g, "");
+  const actorKey = phoneDigits ? ("ph_" + phoneDigits) : "";   // misma llave que usa al fichar → agrupa igual en nómina
+  const inAt = new Date(dateStr + "T" + (inHHMM || "08:00") + ":00-07:00");   // PDT
+  const outAt = new Date(inAt.getTime() + hours * 3600000);
+  const rec = {
+    actorKey, email: "", phone: emp.phoneE164 || emp.phone || "", empId: emp.id, name: emp.name || "",
+    location: "manual", outLocation: "manual",
+    inAt: inAt.toISOString(), outAt: outAt.toISOString(), inLat: null, inLng: null, outLat: null, outLng: null,
+    hours: Math.round(hours * 100) / 100, grossHours: Math.round(hours * 100) / 100, breakHours: 0, breaks: [],
+    weekKey: _laMondayKey(inAt), createdAt: new Date().toISOString(), manual: true, addedBy: who || "admin",
+  };
+  const ref = await db.collection("timeclock").add(rec);
+  return { ok: true, id: ref.id, name: emp.name || "", empId: emp.id, date: dateStr, hours: rec.hours, weekKey: rec.weekKey };
+}
+// 👑 El dueño agrega horas manuales a un empleado (un día que no se fichó).
+exports.clockAdminAdd = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  const empId = String((request.data || {}).empId || "");
+  const date = String((request.data || {}).date || "");
+  const hours = Number((request.data || {}).hours || 0);
+  const inHHMM = String((request.data || {}).inHHMM || "08:00");
+  if (!empId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !(hours > 0) || hours > 24) throw new HttpsError("invalid-argument", "Datos inválidos (empleado, fecha, horas).");
+  const doc = await db.collection("employees").doc(empId).get();
+  if (!doc.exists) throw new HttpsError("not-found", "Empleado no encontrado.");
+  return await _clockAddManual(db, Object.assign({ id: doc.id }, doc.data() || {}), date, hours, inHHMM, id.name || id.email || "admin");
+});
+// ⏱️ TEMP (key-gated): agregar horas manuales por NOMBRE. preview por default; ?go=1 ejecuta. QUITAR después.
+exports.clockAddTmp = onRequest(async (req, res) => {
+  try {
+    if ((req.query.key || "") !== "lmgfin2026") { res.status(403).send("no"); return; }
+    const db = admin.firestore();
+    const nameq = String(req.query.name || "").toLowerCase().trim();
+    if (!nameq) { res.json({ ok: false, error: "falta name" }); return; }
+    const es = await db.collection("employees").get();
+    const matches = [];
+    es.forEach((e) => { const d = e.data() || {}; if (((d.name || "").toLowerCase()).indexOf(nameq) >= 0) matches.push({ id: e.id, name: d.name, phoneE164: d.phoneE164 || "", rate: d.rate || 0 }); });
+    if (!matches.length) { res.json({ ok: false, error: "sin empleado '" + nameq + "'", todos: es.docs.map((e) => ({ id: e.id, name: (e.data() || {}).name })) }); return; }
+    if (matches.length > 1) { res.json({ ok: false, error: "ambiguo — usa nombre más específico", matches }); return; }
+    const emp = matches[0];
+    const date = String(req.query.date || ""); const hours = Number(req.query.hours || 0); const inHHMM = String(req.query.in || "08:00");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !(hours > 0)) { res.json({ ok: true, matched: emp, nota: "agrega &date=YYYY-MM-DD&hours=8&go=1" }); return; }
+    if ((req.query.go || "") !== "1") { res.json({ ok: true, preview: { emp: emp.name, empId: emp.id, date, hours, in: inHHMM } }); return; }
+    const r = await _clockAddManual(db, emp, date, hours, inHHMM, "admin-backfill");
+    res.json({ ok: true, agregado: r });
+  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
+});
 // Estado + horas de la semana de quien llama. Para su tarjeta en la app.
 exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
@@ -3311,7 +3362,7 @@ exports.clockDay = onCall({ timeoutSeconds: 30 }, async (request) => {
   snap.forEach((d) => {
     const x = d.data() || {};
     if (localDay(x.inAt) !== ds) return;
-    rows.push({ name: x.name || (x.email || "").split("@")[0] || "Empleado", empId: x.empId || "", location: x.location || "", inAt: x.inAt || "", outAt: x.outAt || "", in: hm(x.inAt), out: x.outAt ? hm(x.outAt) : "", hours: Number(x.hours) || 0, breakHours: Number(x.breakHours) || 0, open: false });
+    rows.push({ name: x.name || (x.email || "").split("@")[0] || "Empleado", empId: x.empId || "", location: x.location || "", inAt: x.inAt || "", outAt: x.outAt || "", in: hm(x.inAt), out: x.outAt ? hm(x.outAt) : "", hours: Number(x.hours) || 0, breakHours: Number(x.breakHours) || 0, breaks: (Array.isArray(x.breaks) ? x.breaks : []).map((b) => ({ s: hm(b.start), e: b.end ? hm(b.end) : "" })), manual: !!x.manual, open: false });
   });
   // turnos abiertos que empezaron ese día (aún sin salida)
   const openSnap = await db.collection("timeclock_open").get();
@@ -3320,7 +3371,7 @@ exports.clockDay = onCall({ timeoutSeconds: 30 }, async (request) => {
     if (localDay(x.inAt) !== ds) return;
     let el = Date.now() - new Date(x.inAt).getTime(); el -= (Number(x.breakMs) || 0);
     if (x.onBreakSince) el -= Math.max(0, Date.now() - new Date(x.onBreakSince).getTime());
-    rows.push({ name: x.name || "Empleado", empId: x.empId || "", location: x.location || "", inAt: x.inAt || "", outAt: "", in: hm(x.inAt), out: "", hours: Math.max(0, el / 3600000), breakHours: (Number(x.breakMs) || 0) / 3600000, open: true });
+    rows.push({ name: x.name || "Empleado", empId: x.empId || "", location: x.location || "", inAt: x.inAt || "", outAt: "", in: hm(x.inAt), out: "", hours: Math.max(0, el / 3600000), breakHours: (Number(x.breakMs) || 0) / 3600000, breaks: (Array.isArray(x.breaks) ? x.breaks : []).map((b) => ({ s: hm(b.start), e: b.end ? hm(b.end) : "" })), onBreak: !!x.onBreakSince, open: true });
   });
   rows.sort((a, b) => String(a.inAt || "").localeCompare(String(b.inAt || "")));
   const totalHours = rows.reduce((s, r) => s + r.hours, 0);
