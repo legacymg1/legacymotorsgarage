@@ -1268,7 +1268,7 @@ function _calGridHtml(){
   const monthName=base.toLocaleDateString(L==='en'?'en-US':'es-MX',{month:'long',year:'numeric'});
   const first=new Date(y,mo,1); const startDow=(first.getDay()+6)%7; const start=new Date(y,mo,1-startDow);
   const todayS=_dayStr(new Date());
-  const curWeek = _calCfg.mode==='week' ? _calCfg.cur : (_calCfg.cur?_weekKeyOf(new Date(_calCfg.cur+'T12:00:00')):'');
+  let curWeek=''; try{ if(_calCfg.cur) curWeek=_weekKeyOf(new Date(_calCfg.cur+'T12:00:00')); }catch(e){}
   const curDay = _calCfg.mode==='day' ? _calCfg.cur : '';
   const wd=(L==='en'?['M','T','W','T','F','S','S']:['L','M','M','J','V','S','D']);
   const head=wd.map(x=>'<div style="text-align:center;font-size:10px;color:#6b7280;font-weight:800;padding:3px 0;">'+x+'</div>').join('');
