@@ -998,6 +998,8 @@ onAuthStateChanged(auth, async (user)=>{
     try{ maybePushPrompt(); }catch(e){}   // 🔔 aviso automático si no están activadas las notificaciones
     // 📨 Deep-link del chat de oficina (al tocar el push): ?office=me (empleado) o ?office=<empId> (dueño).
     try{ const of=new URLSearchParams(location.search).get('office'); if(of){ setTimeout(()=>{ if(role==='owner' && of!=='me'){ officeOpen({ownerMode:true,empId:of}); } else { officeOpen({}); } },700); } }catch(e){}
+    // 🧭 Al refrescar, regresa al dueño donde estaba (ej. Nómina en el día/semana que veía).
+    try{ if(role==='owner'){ const nv=_whNavGet(); if(nv && nv.panel==='payroll'){ setTimeout(()=>{ try{ whOpenPayroll(); if(nv.week) _payWeek=nv.week; if(nv.day) _payDay=nv.day; try{ _payCalMonth=new Date((nv.day||nv.week||_dayStr(new Date()))+'T12:00:00'); }catch(e){} _payCalOpen=!!nv.calOpen; whPayLoad(false); }catch(e){} }, 500); } } }catch(e){}
   } else {
     _carView=''; document.body.classList.remove('owner-nav'); const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
     const fc=document.getElementById('fab-chat'); if(fc) fc.style.display='none'; closeChat();
@@ -1214,13 +1216,19 @@ function renderEmpReport(d, name, weekKey){
 function _weekKeyOf(dt){ const x=new Date(dt); const day=(x.getDay()+6)%7; x.setHours(0,0,0,0); x.setDate(x.getDate()-day); const y=x.getFullYear(), m=String(x.getMonth()+1).padStart(2,'0'), d=String(x.getDate()).padStart(2,'0'); return y+'-'+m+'-'+d; }
 function _weekRange(weekKey){ const s=new Date(weekKey+'T12:00:00'); const e=new Date(s.getTime()+6*86400000); const mo=L==='en'?'en-US':'es-MX'; const f=(dt)=>dt.toLocaleDateString(mo,{day:'numeric',month:'short'}); return f(s)+' – '+f(e); }
 function _dayStr(dt){ const x=new Date(dt); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
-let _payWeek='', _payCalMonth=null, _payData=null, _payDay='', _payDayData=null;
+let _payWeek='', _payCalMonth=null, _payData=null, _payDay='', _payDayData=null, _payCalOpen=false;
+// 🧭 Recordar dónde estaba el dueño (sobrevive al refresco, se limpia al cerrar la pestaña).
+function _whNavSave(o){ try{ sessionStorage.setItem('lmg_wh_nav', JSON.stringify(o)); }catch(e){} }
+function _whNavClear(){ try{ sessionStorage.removeItem('lmg_wh_nav'); }catch(e){} }
+function _whNavGet(){ try{ return JSON.parse(sessionStorage.getItem('lmg_wh_nav')||'null'); }catch(e){ return null; } }
+window.whPayClose=function(){ const o=document.getElementById('wh-pay'); if(o)o.remove(); _whNavClear(); };
+window.whPayToggleCal=function(){ _payCalOpen=!_payCalOpen; whPayRender(); };
 window.whOpenPayroll=async function(){
   if(role!=='owner') return; try{ closeAcct(); whTeamClose(); }catch(e){}
   _payWeek=_weekKeyOf(new Date()); _payCalMonth=new Date(); _payData=null; _payDay=_dayStr(new Date()); _payDayData=null;
   let ov=document.getElementById('wh-pay');
   if(!ov){ ov=document.createElement('div'); ov.id='wh-pay'; ov.style.cssText='position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
-    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    ov.onclick=function(e){ if(e.target===ov) whPayClose(); };
     const box=document.createElement('div'); box.id='wh-pay-box'; box.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:460px;width:100%;padding:18px;box-sizing:border-box;cursor:default;margin:auto;';
     ov.appendChild(box); document.body.appendChild(ov);
   } else ov.style.display='flex';
@@ -1237,7 +1245,7 @@ async function whPayLoad(dayOnly){
 }
 window.whPayCalPrev=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()-1, 1); whPayRender(); };
 window.whPayCalNext=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()+1, 1); whPayRender(); };
-window.whPayPickDay=function(ds){ _payDay=ds; const nw=_weekKeyOf(new Date(ds+'T12:00:00')); if(nw!==_payWeek){ _payWeek=nw; whPayLoad(false); } else { whPayLoad(true); } };
+window.whPayPickDay=function(ds){ _payDay=ds; _payCalOpen=false; const nw=_weekKeyOf(new Date(ds+'T12:00:00')); if(nw!==_payWeek){ _payWeek=nw; whPayLoad(false); } else { whPayLoad(true); } };
 // ➕ Agregar horas manuales de un DÍA que no se fichó (olvido / trabajó sin reloj).
 window.whAddHours=async function(dayStr){
   let ov=document.getElementById('wh-addhrs');
@@ -1317,7 +1325,7 @@ function _payCalHtml(){
 }
 function _payDayHtml(){
   const isToday=(_payDay===_dayStr(new Date()));
-  const title='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;"><div style="font-weight:800;font-size:14px;color:#fff;text-transform:capitalize;min-width:0;">📅 '+(isToday?L2('Hoy · ','Today · '):'')+_dayLong(_payDay)+'</div><button onclick="whAddHours(\''+_payDay+'\')" style="flex:none;background:var(--gold);color:#0b0e14;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;">➕ '+L2('Horas','Hours')+'</button></div>';
+  const title='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;"><div onclick="whPayToggleCal()" style="font-weight:800;font-size:14px;color:#fff;text-transform:capitalize;min-width:0;cursor:pointer;">📅 '+(isToday?L2('Hoy · ','Today · '):'')+_dayLong(_payDay)+' <span style="color:#c9a84c;font-size:11px;">▾</span></div><button onclick="whAddHours(\''+_payDay+'\')" style="flex:none;background:var(--gold);color:#0b0e14;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;">➕ '+L2('Horas','Hours')+'</button></div>';
   let inner;
   if(_payDayData===null){ inner='<div style="color:#8a93a6;text-align:center;padding:14px;font-size:13px;">'+L2('Cargando el día…','Loading day…')+'</div>'; }
   else if(_payDayData.__err){ inner='<div style="color:#8a93a6;text-align:center;padding:14px;font-size:13px;">'+L2('No se pudo cargar el día.','Could not load the day.')+'</div>'; }
@@ -1342,18 +1350,25 @@ function _payDayHtml(){
 }
 function whPayRender(){
   const box=document.getElementById('wh-pay-box'); if(!box) return;
-  const header='<div style="display:flex;justify-content:space-between;align-items:center;"><div style="font-weight:800;font-size:21px;color:#fff;">💵 '+L2('Nómina','Payroll')+'</div><button onclick="var o=document.getElementById(\'wh-pay\');if(o)o.remove();" style="background:transparent;border:none;color:#8a93a6;font-size:26px;cursor:pointer;line-height:1;padding:0;">×</button></div>';
-  const cal=_payCalHtml();
-  const dayCard=_payDayHtml();
+  _whNavSave({panel:'payroll', week:_payWeek, day:_payDay, calOpen:_payCalOpen});
   const isCurrent=(_payWeek===_weekKeyOf(new Date()));
-  const weekLbl='<div style="text-align:center;font-weight:800;color:#fff;font-size:15px;margin:2px 0 12px;">'+(isCurrent?L2('Esta semana · ','This week · '):'')+_weekRange(_payWeek)+'</div>';
-  let bodyHtml;
-  if(_payData===null){ bodyHtml='<div style="color:#8a93a6;text-align:center;padding:26px;">'+L2('Cargando…','Loading…')+'</div>'; }
-  else if(_payData.__err){ bodyHtml='<div style="color:#8a93a6;text-align:center;padding:26px;">'+L2('No se pudo cargar.','Could not load.')+'</div>'; }
+  const header='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><div style="font-weight:800;font-size:21px;color:#fff;">💵 '+L2('Nómina','Payroll')+'</div><button onclick="whPayClose()" style="background:transparent;border:none;color:#8a93a6;font-size:26px;cursor:pointer;line-height:1;padding:0;">×</button></div>';
+  const cnt=(lbl,val,col)=>'<div style="flex:1;min-width:66px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 6px;text-align:center;"><div style="font-size:21px;font-weight:900;'+(col?('color:'+col+';'):'color:#fff;')+'">'+val+'</div><div style="font-size:10px;color:#8a93a6;margin-top:1px;">'+lbl+'</div></div>';
+  // 1) TOTALES DE LA SEMANA (arriba) + 2) resumen de miembros (abajo)
+  let totalsHtml, weekRowsHtml='';
+  if(_payData===null){ totalsHtml='<div style="color:#8a93a6;text-align:center;padding:20px;">'+L2('Cargando…','Loading…')+'</div>'; }
+  else if(_payData.__err){ totalsHtml='<div style="color:#8a93a6;text-align:center;padding:20px;">'+L2('No se pudo cargar.','Could not load.')+'</div>'; }
   else {
     const list=(_payData.list||[]).filter(e=>!e.owner).sort((a,b)=>(Number(b.pay)||0)-(Number(a.pay)||0));
     const totalHrs=list.reduce((s,e)=>s+(Number(e.hours)||0),0);
     const onShift=list.filter(e=>e.open).length;
+    totalsHtml='<div style="font-weight:800;font-size:13px;color:#fff;margin-bottom:8px;">'+L2('Totales de la semana','Week totals')+' · <span style="color:#f0d680;">'+(isCurrent?L2('Esta semana','This week'):_weekRange(_payWeek))+'</span></div>'
+      +'<div style="display:flex;gap:7px;flex-wrap:wrap;">'
+      +cnt(L2('A pagar','To pay'), '$'+(Number(_payData.totalPay)||0).toFixed(0), 'var(--gold)')
+      +cnt(L2('Horas','Hours'), totalHrs.toFixed(1))
+      +cnt(L2('Miembros','Members'), list.length)
+      +cnt(L2('En turno','On shift'), onShift, '#35c46a')
+      +'</div>';
     const rows = list.length ? list.map(e=>{ const pay=Number(e.pay)||0, hrs=Number(e.hours)||0; const _nm=whEscA(e.name||'').replace(/\x27/g,"");
       return '<div onclick="whEmpReport(\''+(e.empId||'')+'\',\''+_nm+'\',\''+_payWeek+'\')" style="display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
         +'<span style="width:38px;height:38px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:13px;flex:none;">'+whInitials(e.name)+'</span>'
@@ -1361,16 +1376,13 @@ function whPayRender(){
         +'<div style="text-align:right;flex:none;"><div style="font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;">$'+pay.toFixed(2)+'</div><div style="color:#4b5563;font-size:11px;">'+L2('ver ›','view ›')+'</div></div>'
         +(e.open?'<button onclick="event.stopPropagation();whCloseShift(\''+(e.empId||'')+'\',\''+_nm+'\')" style="flex:none;background:#c0392b;color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer;margin-left:8px;white-space:nowrap;">🔴 '+L2('Cerrar turno','Close shift')+'</button>':'')+'</div>';
     }).join('') : '<div style="color:#8a93a6;text-align:center;padding:26px 10px;line-height:1.6;">'+L2('Nadie fichó esta semana.','Nobody clocked in this week.')+'</div>';
-    const cnt=(lbl,val,col)=>'<div style="flex:1;min-width:66px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 6px;text-align:center;"><div style="font-size:21px;font-weight:900;'+(col?('color:'+col+';'):'color:#fff;')+'">'+val+'</div><div style="font-size:10px;color:#8a93a6;margin-top:1px;">'+lbl+'</div></div>';
-    const totals='<div style="margin-top:16px;"><div style="font-weight:800;font-size:13px;color:#fff;margin-bottom:8px;">'+L2('Totales de la semana','Week totals')+'</div><div style="display:flex;gap:7px;flex-wrap:wrap;">'
-      +cnt(L2('A pagar','To pay'), '$'+(Number(_payData.totalPay)||0).toFixed(0), 'var(--gold)')
-      +cnt(L2('Horas','Hours'), totalHrs.toFixed(1))
-      +cnt(L2('Miembros','Members'), list.length)
-      +cnt(L2('En turno','On shift'), onShift, '#35c46a')
-    +'</div></div>';
-    bodyHtml='<div style="font-weight:800;font-size:13px;color:#fff;margin-bottom:4px;">'+L2('Resumen de la semana','Week summary')+'</div><div>'+rows+'</div>'+totals+'<div style="font-size:11px;color:#6b7280;margin-top:12px;line-height:1.5;">'+L2('Toca un día del calendario para ver quién trabajó ese día · toca un miembro para su ficha completa. Nómina = horas × tarifa (estimado, no es pago).','Tap a calendar day to see who worked that day · tap a member for their full profile. Payroll = hours × rate (estimate).')+'</div>';
+    weekRowsHtml='<div style="font-weight:800;font-size:13px;color:#fff;margin:4px 0 2px;">'+L2('Resumen de la semana','Week summary')+'</div><div>'+rows+'</div><div style="font-size:11px;color:#6b7280;margin-top:12px;line-height:1.5;">'+L2('Toca la barra del calendario para ver otro día · toca un miembro para su ficha. Nómina = horas × tarifa (estimado).','Tap the calendar bar to see another day · tap a member for their profile. Payroll = hours × rate (estimate).')+'</div>';
   }
-  box.innerHTML=header+cal+dayCard+weekLbl+bodyHtml;
+  const dayCard=_payDayHtml();
+  // 3) CALENDARIO colapsable: la barra lo abre/cierra; al elegir día/semana se cierra solo.
+  const calBar='<div onclick="whPayToggleCal()" style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface2);border:1px solid '+(_payCalOpen?'var(--gold)':'var(--border)')+';border-radius:12px;padding:12px 14px;margin:4px 0 12px;cursor:pointer;"><span style="font-weight:800;color:#fff;font-size:14px;">📅 '+(isCurrent?L2('Esta semana · ','This week · '):'')+_weekRange(_payWeek)+'</span><span style="color:#c9a84c;font-size:12.5px;font-weight:800;white-space:nowrap;">'+(_payCalOpen?('▴ '+L2('cerrar','close')):('▾ '+L2('cambiar','change')))+'</span></div>';
+  const cal=_payCalOpen?_payCalHtml():'';
+  box.innerHTML=header+'<div style="margin-bottom:16px;">'+totalsHtml+'</div>'+dayCard+calBar+cal+weekRowsHtml;
 }
 window.whTeamNew=function(){ _teamEditId=null; _teamSel=[]; whTeamForm({name:'',phone:'',rate:'',active:true,owner:false,roles:[]}); };
 window.whTeamEdit=function(id){ const e=_teamEmps.find(x=>x.id===id); if(!e) return; _teamEditId=id; _teamSel=(e.roles||[]).slice(); whTeamForm(e); };
@@ -2003,8 +2015,8 @@ function opHeader(key, headerId, listId, label, count){
   const list=document.getElementById(listId); if(list) list.style.display=collapsed?'none':'';
 }
 // === Centro de Operaciones por PESTAÑAS (congruente con Servicio/Clientes) ===
-let _opTab='todo';
-window.opSetTab=function(tk){ _opTab=tk; renderOwnerPanel(); };
+let _opTab=(function(){ try{ return sessionStorage.getItem('lmg_op_tab')||'todo'; }catch(e){ return 'todo'; } })();
+window.opSetTab=function(tk){ _opTab=tk; try{ sessionStorage.setItem('lmg_op_tab',tk); }catch(e){} renderOwnerPanel(); };
 // Divisor suave (igual que el panorama "Todas" de Servicio).
 function _opDiv(label,count){ if(window.LMG && LMG.softDivider) return LMG.softDivider(label,count); return '<div style="display:flex;align-items:center;gap:10px;margin:16px 2px 8px;"><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">'+label+'</span><span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);"></span>'+(count==null?'':'<span style="font-size:11px;color:var(--faint);">'+count+'</span>')+'</div>'; }
 // --- Builders de cada parte (regresan HTML string) ---
