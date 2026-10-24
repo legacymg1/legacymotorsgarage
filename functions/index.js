@@ -3234,26 +3234,6 @@ exports.clockAdminClose = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (new Date(outIso).getTime() <= new Date(snap.data().inAt).getTime()) throw new HttpsError("invalid-argument", "La salida debe ser DESPUÉS de la entrada.");
   return await _clockCloseOpenDoc(db, snap, outIso, id.name || id.email || "admin");
 });
-// ⏱️ TEMP (key-gated): cerrar un turno abierto por NOMBRE a una hora LA. preview por default; ?go=1 ejecuta. QUITAR después.
-exports.clockCloseTmp = onRequest(async (req, res) => {
-  try {
-    if ((req.query.key || "") !== "lmgfin2026") { res.status(403).send("no"); return; }
-    const db = admin.firestore();
-    const nameq = String(req.query.name || "victor").toLowerCase();
-    const hhmm = String(req.query.t || "18:30");
-    const all = await db.collection("timeclock_open").get();
-    let snap = null;
-    all.forEach((s) => { const n = ((s.data() || {}).name || "").toLowerCase(); if (!snap && n.indexOf(nameq) >= 0) snap = s; });
-    if (!snap) { res.json({ ok: false, error: "sin turno abierto que empate '" + nameq + "'", abiertos: all.docs.map((s) => ({ name: (s.data() || {}).name, inAt: (s.data() || {}).inAt, empId: (s.data() || {}).empId })) }); return; }
-    const d = snap.data() || {};
-    const laDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d.inAt));
-    const outIso = new Date(laDate + "T" + hhmm + ":00-07:00").toISOString();
-    const preview = { target: d.name, empId: d.empId, inAt: d.inAt, outAt: outIso, location: d.location };
-    if ((req.query.go || "") !== "1") { res.json({ ok: true, preview, nota: "preview — agrega &go=1 para cerrarlo" }); return; }
-    const r = await _clockCloseOpenDoc(db, snap, outIso, "admin-fix");
-    res.json({ ok: true, cerrado: r });
-  } catch (e) { res.status(500).json({ ok: false, err: String((e && e.message) || e) }); }
-});
 // Estado + horas de la semana de quien llama. Para su tarjeta en la app.
 exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");

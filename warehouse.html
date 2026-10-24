@@ -1226,6 +1226,17 @@ async function whPayLoad(dayOnly){
 window.whPayCalPrev=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()-1, 1); whPayRender(); };
 window.whPayCalNext=function(){ _payCalMonth=new Date(_payCalMonth.getFullYear(), _payCalMonth.getMonth()+1, 1); whPayRender(); };
 window.whPayPickDay=function(ds){ _payDay=ds; const nw=_weekKeyOf(new Date(ds+'T12:00:00')); if(nw!==_payWeek){ _payWeek=nw; whPayLoad(false); } else { whPayLoad(true); } };
+// 🔴 Cerrar/corregir un turno abierto (el empleado olvidó hacer clock out). Dueño elige la hora de salida.
+window.whCloseShift=function(empId, name){
+  if(!empId){ alert(L2('Este empleado no tiene ID — ciérralo desde su perfil.','No employee id.')); return; }
+  const t=prompt(L2('¿A qué hora SALIÓ '+name+'? (24h, ej. 18:30)','What time did '+name+' clock OUT? (24h, e.g. 18:30)'),'18:30');
+  if(!t) return;
+  const m=String(t).match(/(\d{1,2}):(\d{2})/); if(!m){ alert(L2('Hora inválida. Usa 18:30','Invalid time. Use 18:30')); return; }
+  const d=new Date(); d.setHours(+m[1], +m[2], 0, 0);
+  const pretty=d.toLocaleTimeString(L==='en'?'en-US':'es-MX',{hour:'2-digit',minute:'2-digit'});
+  if(!confirm(L2('¿Cerrar el turno de '+name+' a las '+pretty+'?','Close '+name+"'s shift at "+pretty+'?'))) return;
+  httpsCallable(functions,'clockAdminClose')({empId:empId, outAt:d.toISOString()}).then(r=>{ const dd=(r&&r.data)||{}; whToast('✅ '+L2('Turno cerrado','Shift closed')+(dd.hours!=null?(' · '+dd.hours+' h'):'')); try{ whPayLoad(true); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo cerrar: ','Could not close: ')+((e&&e.message)||e)); });
+};
 function _dayLong(ds){ try{ return new Date(ds+'T12:00:00').toLocaleDateString(L==='en'?'en-US':'es-MX',{weekday:'long',day:'numeric',month:'long'}); }catch(e){ return ds; } }
 function _payCalHtml(){
   const m=_payCalMonth||new Date(); const y=m.getFullYear(), mo=m.getMonth();
@@ -1292,7 +1303,8 @@ function whPayRender(){
       return '<div onclick="whEmpReport(\''+(e.empId||'')+'\',\''+_nm+'\',\''+_payWeek+'\')" style="display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
         +'<span style="width:38px;height:38px;border-radius:50%;background:#1d2636;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:13px;flex:none;">'+whInitials(e.name)+'</span>'
         +'<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#fff;font-size:15px;">'+whEscA(e.name||'')+(e.open?' <span style="color:#35c46a;font-size:11px;">● '+L2('en turno','on shift')+'</span>':'')+'</div><div style="font-size:12px;color:#8a93a6;margin-top:1px;">'+hrs.toFixed(2)+' h'+(e.rate?(' · $'+Number(e.rate).toFixed(2)+'/h'):'')+'</div></div>'
-        +'<div style="text-align:right;flex:none;"><div style="font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;">$'+pay.toFixed(2)+'</div><div style="color:#4b5563;font-size:11px;">'+L2('ver ›','view ›')+'</div></div></div>';
+        +'<div style="text-align:right;flex:none;"><div style="font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;">$'+pay.toFixed(2)+'</div><div style="color:#4b5563;font-size:11px;">'+L2('ver ›','view ›')+'</div></div>'
+        +(e.open?'<button onclick="event.stopPropagation();whCloseShift(\''+(e.empId||'')+'\',\''+_nm+'\')" style="flex:none;background:#c0392b;color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer;margin-left:8px;white-space:nowrap;">🔴 '+L2('Cerrar turno','Close shift')+'</button>':'')+'</div>';
     }).join('') : '<div style="color:#8a93a6;text-align:center;padding:26px 10px;line-height:1.6;">'+L2('Nadie fichó esta semana.','Nobody clocked in this week.')+'</div>';
     const cnt=(lbl,val,col)=>'<div style="flex:1;min-width:66px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 6px;text-align:center;"><div style="font-size:21px;font-weight:900;'+(col?('color:'+col+';'):'color:#fff;')+'">'+val+'</div><div style="font-size:10px;color:#8a93a6;margin-top:1px;">'+lbl+'</div></div>';
     const totals='<div style="margin-top:16px;"><div style="font-weight:800;font-size:13px;color:#fff;margin-bottom:8px;">'+L2('Totales de la semana','Week totals')+'</div><div style="display:flex;gap:7px;flex-wrap:wrap;">'
