@@ -346,9 +346,9 @@
 <!-- CITAS BOX -->
 <div id="citas-box" style="margin:0 24px 16px;background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;" onclick="toggleSection('citas-list','citas-arrow')">
-    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">📅 CITAS <span id="citas-count" style="font-size:12px;color:var(--muted);font-family:var(--font-body);letter-spacing:0;"></span></div>
+    <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--gold);">📅 CITAS DEALER <span id="citas-count" style="font-size:12px;color:var(--muted);font-family:var(--font-body);letter-spacing:0;"></span></div>
     <div style="display:flex;gap:12px;align-items:center;">
-      <button onclick="event.stopPropagation();openApptModal()" style="background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">＋ Nueva cita</button>
+      <button onclick="event.stopPropagation();openApptModal(undefined,'dealer')" style="background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">＋ Nueva cita</button>
       <span id="citas-arrow" class="sec-arrow">▾</span>
     </div>
   </div>
@@ -853,6 +853,10 @@
 <div class="modal-overlay" id="appt-modal">
   <div class="modal">
     <div class="modal-title">📅 AGENDAR CITA</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button type="button" id="appt-line-service" onclick="setApptLine('service')" style="flex:1;padding:11px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;background:var(--gold);color:var(--navy3);border:1px solid var(--gold);">🔧 Servicio</button>
+      <button type="button" id="appt-line-dealer" onclick="setApptLine('dealer')" style="flex:1;padding:11px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;background:transparent;color:var(--muted);border:1px solid var(--border);">🚗 Dealer</button>
+    </div>
     <div class="form-group"><label class="form-label">Cliente</label>
       <div style="position:relative;">
         <input class="form-input" id="appt-client-search" placeholder="🔍 Busca por nombre, carro o VIN..." autocomplete="off" oninput="filterApptClients()" onfocus="filterApptClients()" onblur="setTimeout(()=>{const b=document.getElementById('appt-client-results');if(b)b.style.display='none';},200)">
@@ -868,6 +872,7 @@
       <select class="form-input" id="appt-lang"><option value="es">🇲🇽 Español</option><option value="en">🇺🇸 English</option></select>
       <div style="font-size:11px;color:var(--muted);margin-top:3px;">Se prellena con el idioma del cliente. Cámbialo a inglés/español según cómo deba ir el mensaje (el servicio se traduce solo).</div>
     </div>
+    <div id="appt-service-block">
     <div class="form-group"><label class="form-label">Carro(s) que trae</label><input class="form-input" id="appt-car" list="appt-car-list" placeholder="2019 Kia Forte" style="text-transform:capitalize;"><datalist id="appt-car-list"></datalist><div style="font-size:11px;color:var(--muted);margin-top:3px;">Si trae más de un carro, sepáralos con coma. (Se prellena con su carro si es cliente registrado.)</div></div>
     <div class="form-group"><label class="form-label">VIN (opcional)</label><input class="form-input" id="appt-vin" placeholder="Últimos dígitos o completo" oninput="this.value=this.value.toUpperCase()"></div>
     <div class="form-group"><label class="form-label">Servicios (puedes agregar varios)</label>
@@ -879,6 +884,19 @@
       <div id="appt-service-selected" style="margin-top:8px;"></div>
       <input type="hidden" id="appt-type">
       <div style="font-size:11px;color:var(--muted);margin-top:6px;">✨ Cada cita incluye una <b>inspección de cortesía sin costo</b> (se agrega sola al mensaje).</div>
+    </div>
+    </div>
+    <div id="appt-dealer-block" style="display:none;">
+      <div class="form-group"><label class="form-label">Motivo de la visita</label>
+        <select class="form-input" id="appt-dealer-reason">
+          <option value="Prueba de manejo">🚗 Prueba de manejo</option>
+          <option value="Ver un carro">👀 Ver un carro</option>
+          <option value="Interesado en comprar">💵 Interesado en comprar</option>
+          <option value="Entrega de papeles / trámite">📄 Entrega de papeles / trámite</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Carro de interés (opcional)</label><input class="form-input" id="appt-dealer-car" placeholder="2019 Kia Forte, VIN, o lo que le interesa" style="text-transform:capitalize;"><div style="font-size:11px;color:var(--muted);margin-top:3px;">¿Qué carro vino a ver / probar / comprar?</div></div>
     </div>
     <div style="display:flex;gap:12px;">
       <div class="form-group" style="flex:1;"><label class="form-label">Fecha</label><input class="form-input" id="appt-date" type="date"></div>
@@ -1564,7 +1582,7 @@ function svcRenderTabs(){
   svcOrders.forEach(o=>{ cnt[svcBucket(o)]++; if(o.clientId) cli.add(o.clientId); });
   // La vista de Clientes también incluye los clientes marcados kind:'service' sin orden → cuéntalos igual.
   try{ (clients||[]).forEach(c=>{ if(c && c.id && c.kind==='service') cli.add(c.id); }); }catch(e){}
-  let citasN=0; try{ citasN=(appointments||[]).filter(a=>a.status==='scheduled').length + svcOrders.filter(o=>o.scheduledAt && !o.paid && o.status!=='entregado').length; }catch(e){}
+  let citasN=0; try{ citasN=(appointments||[]).filter(a=>a.status==='scheduled' && a.line!=='dealer').length + svcOrders.filter(o=>o.scheduledAt && !o.paid && o.status!=='entregado').length; }catch(e){}
   const cur=window._svcTab||'activas';
   const tabs=[['todas','🗂️ Todas',svcOrders.length],['activas','🔧 Activas',cnt.activas],['citas','📅 Citas',citasN],['estimados','🧾 Estimados',cnt.estimados],['completadas','✅ Completadas',cnt.completadas],['clientes','👥 Clientes',cli.size]];
   box.innerHTML=tabs.map(t=>'<button onclick="svcSetTab(\''+t[0]+'\')" style="padding:9px 14px;border-radius:999px;border:1px solid '+(cur===t[0]?'var(--gold)':'var(--border)')+';background:'+(cur===t[0]?'var(--gold)':'transparent')+';color:'+(cur===t[0]?'var(--navy3)':'var(--text)')+';font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;">'+t[1]+' <span style="opacity:.7;">'+t[2]+'</span></button>').join('');
@@ -1625,7 +1643,7 @@ function svcRenderClientsTab(box,q){
 function svcRenderCitasTab(box,q){
   const lz=n=>String(n).padStart(2,'0');
   // 1) Citas del portal (appointments) + 2) Órdenes de servicio CON FECHA agendada (no terminadas).
-  let up=(appointments||[]).filter(a=>a.status==='scheduled').map(a=>Object.assign({kind:'appt'},a));
+  let up=(appointments||[]).filter(a=>a.status==='scheduled' && a.line!=='dealer').map(a=>Object.assign({kind:'appt'},a));
   (svcOrders||[]).forEach(o=>{ if(!o.scheduledAt || o.paid || o.status==='entregado') return; try{ const dt=new Date(o.scheduledAt); if(isNaN(dt)) return; up.push({ kind:'order', id:o.id, orderNum:o.orderNum, date:dt.getFullYear()+'-'+lz(dt.getMonth()+1)+'-'+lz(dt.getDate()), time:lz(dt.getHours())+':'+lz(dt.getMinutes()), clientName:o.clientName||'Cliente', phone:o.clientPhone||'', carLabel:o.vehicleLabel||o.plate||'', lang:o.lang||'es', reason:o.reason||'', status:o.status }); }catch(e){} });
   if(q) up=up.filter(a=>((a.clientName||'')+' '+(a.phone||'')+' '+(a.carLabel||'')+' '+(a.type||'')+' '+(a.reason||'')+' '+(a.note||'')+' '+(a.orderNum?('#'+a.orderNum):'')).toLowerCase().includes(q));
   up.sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
@@ -3293,7 +3311,7 @@ window.pickApptClient = function(id){
   else { const c=clients.find(x=>x.id===id); inp.value = c ? (c.name + (c.make?' · '+[c.year,c.make,c.model].filter(Boolean).join(' '):'')) : ''; }
   onApptClientChange();
 };
-window.openApptModal = function(clientId){
+window.openApptModal = function(clientId, line){
   document.getElementById('appt-id').value='';
   apptServices=[{es:'Cambio de aceite',en:'Oil change'}]; renderApptServices();
   document.getElementById('appt-date').value=apptNextFriday();
@@ -3304,11 +3322,28 @@ window.openApptModal = function(clientId){
   document.getElementById('appt-lang').value='es';
   document.getElementById('appt-car').value='';
   document.getElementById('appt-vin').value='';
+  const dr=document.getElementById('appt-dealer-reason'); if(dr) dr.value='Prueba de manejo';
+  const dc=document.getElementById('appt-dealer-car'); if(dc) dc.value='';
   document.getElementById('appt-client').value='';
   document.getElementById('appt-client-search').value='';
   document.getElementById('appt-client-results').style.display='none';
+  setApptLine(line||'service');
   if(clientId){ pickApptClient(clientId); } else { onApptClientChange(); }
   document.getElementById('appt-modal').classList.add('active');
+};
+// 🔀 Switch de la cita: 🔧 Servicio vs 🚗 Dealer. Muestra/esconde los campos correctos.
+window._apptLine='service';
+window.setApptLine = function(line){
+  window._apptLine = (line==='dealer') ? 'dealer' : 'service';
+  const isDealer = (window._apptLine==='dealer');
+  const sb=document.getElementById('appt-service-block'); if(sb) sb.style.display=isDealer?'none':'';
+  const db=document.getElementById('appt-dealer-block'); if(db) db.style.display=isDealer?'':'none';
+  const base='flex:1;padding:11px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;';
+  const on='background:var(--gold);color:var(--navy3);border:1px solid var(--gold);', off='background:transparent;color:var(--muted);border:1px solid var(--border);';
+  const sbtn=document.getElementById('appt-line-service'), dbtn=document.getElementById('appt-line-dealer');
+  if(sbtn) sbtn.style.cssText=base+(isDealer?off:on);
+  if(dbtn) dbtn.style.cssText=base+(isDealer?on:off);
+  const tt=document.querySelector('#appt-modal .modal-title'); if(tt) tt.textContent=isDealer?'📅 AGENDAR CITA · 🚗 Dealer':'📅 AGENDAR CITA · 🔧 Servicio';
 };
 window.onApptClientChange = function(){
   const v=document.getElementById('appt-client').value;
@@ -3327,15 +3362,22 @@ window.onApptClientChange = function(){
 };
 window.saveAppt = async function(){
   const v=document.getElementById('appt-client').value;
-  const services = apptServices.slice();
-  const type = services.map(s=>s.es).join(', ');
+  const line=window._apptLine||'service';
+  let services, type, carLabel;
+  if(line==='dealer'){
+    const reason=(document.getElementById('appt-dealer-reason')||{}).value||'Visita';
+    type=reason; services=[{es:reason,en:reason}];
+    carLabel=titleCase((document.getElementById('appt-dealer-car')||{}).value||'');
+  } else {
+    services = apptServices.slice(); type = services.map(s=>s.es).join(', ');
+    if(!services.length){ alert('Agrega al menos un servicio.'); return; }
+    carLabel=titleCase((document.getElementById('appt-car').value||'').trim());
+  }
   const date=document.getElementById('appt-date').value;
   const time=document.getElementById('appt-time').value;
   const note=document.getElementById('appt-note').value.trim();
-  if(!services.length){ alert('Agrega al menos un servicio.'); return; }
   if(!date){ alert('Elige la fecha.'); return; }
-  const carLabel=titleCase((document.getElementById('appt-car').value||'').trim());
-  const vin=(document.getElementById('appt-vin').value||'').trim().toUpperCase();
+  const vin=(line==='dealer')?'':((document.getElementById('appt-vin').value||'').trim().toUpperCase());
   const who=(auth.currentUser&&auth.currentUser.email)||'';
   let clientId='', clientName='', phone='', lang='es';
   if(v==='__walkin__'){
@@ -3369,7 +3411,7 @@ window.saveAppt = async function(){
   const existing=document.getElementById('appt-id').value;
   const id=existing || ('appt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7));
   const prior=appointments.find(x=>x.id===id)||{};
-  const data={ clientId, clientName, phone, phoneE164: toE164(phone), lang, carLabel, vin, type, services, date, time, note, status:'scheduled',
+  const data={ clientId, clientName, phone, phoneE164: toE164(phone), lang, line, carLabel, vin, type, services, date, time, note, status:'scheduled',
     confirmSent: existing?(prior.confirmSent||false):false, reminderSent: existing?(prior.reminderSent||false):false,
     createdBy: prior.createdBy||who, createdAt: prior.createdAt||new Date().toISOString(), updatedBy:who, updatedAt:new Date().toISOString() };
   try{
@@ -3489,13 +3531,18 @@ window.markApptDone=async function(id){
 window.cancelAppt=async function(id){ const a=appointments.find(x=>x.id===id); if(!confirm('¿Cancelar / eliminar esta cita?')) return; try{ await deleteDoc(doc(db,'appointments',id)); if(a&&a.date&&a.time){ try{ await updateDoc(doc(db,'availability',a.date), {taken: arrayRemove(a.time)}); }catch(e){} } }catch(e){ alert(e.message);} };
 window.editAppt=function(id){
   const a=appointments.find(x=>x.id===id); if(!a) return;
-  openApptModal(a.clientId||'');
+  openApptModal(a.clientId||'', a.line||'service');
   if(!a.clientId){ pickApptClient('__walkin__'); document.getElementById('appt-name').value=a.clientName||''; document.getElementById('appt-phone').value=a.phone||''; }
   document.getElementById('appt-lang').value=a.lang||'es';
-  document.getElementById('appt-car').value=a.carLabel||'';
-  document.getElementById('appt-vin').value=a.vin||'';
   document.getElementById('appt-id').value=a.id;
-  apptServices = apptServiceList(a).map(s=>({es:s.es,en:s.en,custom:s.custom})); renderApptServices();
+  if((a.line||'service')==='dealer'){
+    const dr=document.getElementById('appt-dealer-reason'); if(dr) dr.value=a.type||(Array.isArray(a.services)&&a.services[0]&&(a.services[0].es||a.services[0]))||'Ver un carro';
+    const dc=document.getElementById('appt-dealer-car'); if(dc) dc.value=a.carLabel||'';
+  } else {
+    document.getElementById('appt-car').value=a.carLabel||'';
+    document.getElementById('appt-vin').value=a.vin||'';
+    apptServices = apptServiceList(a).map(s=>({es:s.es,en:s.en,custom:s.custom})); renderApptServices();
+  }
   document.getElementById('appt-date').value=a.date||'';
   document.getElementById('appt-time').value=a.time||'';
   document.getElementById('appt-note').value=a.note||'';
@@ -3527,7 +3574,8 @@ function apptIntel(a){
 window.renderAppointments=function(){
   const box=document.getElementById('citas-list'); if(!box) return;
   const todayISO=apptTodayISO(), tomoISO=apptAddDays(todayISO,1);
-  const up=appointments.filter(a=>a.status==='scheduled').sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
+  // 🚗 Esta sección vive en la vista DEALER → solo citas de dealer (las de servicio caen en la pestaña Citas de Servicio).
+  const up=appointments.filter(a=>a.status==='scheduled' && a.line==='dealer').sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
   const _cc=document.getElementById('citas-count'); if(_cc) _cc.textContent = up.length ? ('('+up.length+')') : '';
   if(!up.length){ box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:6px 0;">No hay citas agendadas. Toca <strong style="color:var(--gold);">＋ Nueva cita</strong> para agendar.</div>'; return; }
   const groups=[
