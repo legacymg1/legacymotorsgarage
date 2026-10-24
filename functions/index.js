@@ -3309,6 +3309,30 @@ exports.clockAdminDelete = onCall({ timeoutSeconds: 30 }, async (request) => {
   await admin.firestore().collection("timeclock").doc(entryId).delete();
   return { ok: true };
 });
+// ✏️ El dueño EDITA las horas de un registro (recalcula salida = entrada + horas; opcional nueva hora de entrada).
+exports.clockAdminEdit = onCall({ timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const entryId = String((request.data || {}).entryId || "");
+  const hours = Number((request.data || {}).hours || 0);
+  const inHHMM = String((request.data || {}).inHHMM || "");
+  if (!entryId || !(hours > 0) || hours > 24) throw new HttpsError("invalid-argument", "Datos inválidos.");
+  const db = admin.firestore();
+  const ref = db.collection("timeclock").doc(entryId);
+  const s = await ref.get();
+  if (!s.exists) throw new HttpsError("not-found", "Registro no encontrado.");
+  const x = s.data() || {};
+  let inAt = new Date(x.inAt || Date.now());
+  if (/^\d{1,2}:\d{2}$/.test(inHHMM)) {
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(inAt);
+    const hhmm = inHHMM.length === 4 ? ("0" + inHHMM) : inHHMM;
+    inAt = new Date(day + "T" + hhmm + ":00-07:00");
+  }
+  const outAt = new Date(inAt.getTime() + hours * 3600000);
+  await ref.set({ inAt: inAt.toISOString(), outAt: outAt.toISOString(), hours: Math.round(hours * 100) / 100, grossHours: Math.round(hours * 100) / 100, breakHours: 0, breaks: [], weekKey: _laMondayKey(inAt), manual: true, editedBy: id.name || id.email || "admin", editedAt: new Date().toISOString() }, { merge: true });
+  return { ok: true, hours: Math.round(hours * 100) / 100 };
+});
 // Estado + horas de la semana de quien llama. Para su tarjeta en la app.
 exports.clockMine = onCall({ timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");

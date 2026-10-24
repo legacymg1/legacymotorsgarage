@@ -1263,6 +1263,13 @@ window.whDelHours=function(entryId, name){
   if(!confirm(L2('¿Borrar estas horas de '+name+'?','Delete these hours for '+name+'?'))) return;
   httpsCallable(functions,'clockAdminDelete')({entryId:entryId}).then(()=>{ whToast('✅ '+L2('Borrado','Deleted')); try{ whPayLoad(true); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not delete: ')+((e&&e.message)||e)); });
 };
+window.whEditHours=function(entryId, name, curHours){
+  if(!entryId) return;
+  const t=prompt(L2('Horas de '+name+' ese día (ej. 8):','Hours for '+name+' that day (e.g. 8):'), (curHours||'').toString());
+  if(t===null) return;
+  const hours=Number(t); if(!(hours>0)||hours>24){ alert(L2('Horas inválidas (0–24).','Invalid hours (0–24).')); return; }
+  httpsCallable(functions,'clockAdminEdit')({entryId:entryId, hours:hours}).then(r=>{ const dd=(r&&r.data)||{}; whToast('✅ '+L2('Horas actualizadas','Hours updated')+' · '+(dd.hours||hours)+'h'); try{ whPayLoad(true); }catch(e){} try{ loadOwnerPanel(); }catch(e){} }).catch(e=>{ alert(L2('No se pudo: ','Could not edit: ')+((e&&e.message)||e)); });
+};
 window.whAddHoursSave=function(dayStr){
   const empId=(document.getElementById('ah-emp')||{}).value||'';
   const hours=Number((document.getElementById('ah-hours')||{}).value||0);
@@ -1326,7 +1333,7 @@ function _payDayHtml(){
             +'<div style="font-size:11.5px;color:#8a93a6;margin-top:1px;">🕐 '+whEscA(r.in||'—')+' → '+(r.out?whEscA(r.out):L2('ahora','now'))+(r.location&&r.location!=='manual'?(' · '+(r.location==='dealer'?'Dealer':(r.location==='yonke'?'Yonke':whEscA(r.location)))):'')+(Number(r.breakHours)>0?(' · ☕ '+Math.round(Number(r.breakHours)*60)+'m'):'')+'</div>'
             +(brk?'<div style="font-size:11px;color:#b58b2e;margin-top:2px;">'+brk+'</div>':'')+'</div>'
           +'<div style="font-weight:800;color:#fff;font-size:14px;flex:none;">'+dur.toFixed(1)+'h</div>'
-          +((r.manual&&r.id)?'<button onclick="event.stopPropagation();whDelHours(\''+r.id+'\',\''+_nm+'\')" title="Borrar" style="flex:none;background:transparent;border:1px solid var(--border);color:#e05a4a;border-radius:8px;padding:5px 8px;font-size:12px;cursor:pointer;margin-left:6px;">🗑</button>':'')+'</div>';
+          +((r.id&&!r.open)?('<button onclick="event.stopPropagation();whEditHours(\''+r.id+'\',\''+_nm+'\','+dur.toFixed(2)+')" title="Editar horas" style="flex:none;background:transparent;border:1px solid var(--border);color:#8ab4ff;border-radius:8px;padding:5px 7px;font-size:12px;cursor:pointer;margin-left:6px;">✏️</button><button onclick="event.stopPropagation();whDelHours(\''+r.id+'\',\''+_nm+'\')" title="Borrar" style="flex:none;background:transparent;border:1px solid var(--border);color:#e05a4a;border-radius:8px;padding:5px 7px;font-size:12px;cursor:pointer;margin-left:4px;">🗑</button>'):'')+'</div>';
       }).join('');
       inner+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 2px 2px;font-size:12px;color:#8a93a6;"><span>'+_payDayData.count+' '+L2('persona(s)','people')+'</span><span style="font-weight:800;color:#f0d680;">'+Number(_payDayData.totalHours||0).toFixed(1)+' h</span></div>';
     }
