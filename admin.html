@@ -1456,17 +1456,44 @@ function clientVehicles(c){
   });
   return list;
 }
+// Agrega o ACTUALIZA un auto del cliente. Si pasas origLabel/origVin, actualiza ESE mismo auto
+// (ej. agregarle el VIN a un carro que se creó sin VIN) en vez de crear un duplicado.
 async function addVehicleToClient(clientId, veh){
   const c=clients.find(x=>x.id===clientId); if(!c) return null;
   const vin=(veh.vin||'').toUpperCase().trim();
   const plate=(veh.plate||'').toUpperCase().trim();
   const label=(veh.label||'').trim();
+  const origVin=(veh.origVin||'').toUpperCase().trim();
+  const origLabel=(veh.origLabel||'').trim().toLowerCase();
   if(!vin && !plate && !label) return null;
-  const existing = clientVehicles(c).find(x=> (vin && (x.vin||'').toUpperCase()===vin) || (!vin && label && (x.label||'').toLowerCase()===label.toLowerCase()) );
-  if(existing) return existing;
+  const vs=clientVehicles(c);
+  const _vl=v=>(v.label||[v.year,v.make,v.model].filter(Boolean).join(' ')||'');
+  // 1) el VIN nuevo YA existe en otro auto → úsalo (no dupliques)
+  if(vin){ const byVin=vs.find(x=>(x.vin||'').toUpperCase()===vin); if(byVin) return byVin; }
+  // 2) ¿hay un auto que ACTUALIZAR? (el original que editamos, o un carro con el mismo label sin VIN)
+  let target=null;
+  if(origVin) target=vs.find(x=>(x.vin||'').toUpperCase()===origVin);
+  if(!target && origLabel) target=vs.find(x=>(x.label||'').toLowerCase()===origLabel);
+  if(!target && vin && label) target=vs.find(x=> !(x.vin) && (x.label||'').toLowerCase()===label.toLowerCase());
+  if(target){
+    try{
+      if(target.primary){   // el auto es el principal del cliente (year/make/model directos)
+        const patch={}; if(vin) patch.vin=vin; if(plate) patch.plate=plate;
+        if(Object.keys(patch).length){ await updateDoc(doc(db,'clients',clientId), patch); if(vin)c.vin=vin; if(plate)c.plate=plate; }
+      } else {
+        const arr=(c.vehicles||[]).map(v=>{ const vl=_vl(v).toLowerCase();
+          const match = (origVin && (v.vin||'').toUpperCase()===origVin) || (origLabel && vl===origLabel) || (!(v.vin) && label && vl===label.toLowerCase());
+          return match ? Object.assign({}, v, { vin:(vin||v.vin||''), plate:(plate||v.plate||''), label:(label||v.label||'') }) : v;
+        });
+        await updateDoc(doc(db,'clients',clientId), {vehicles:arr}); c.vehicles=arr;
+      }
+    }catch(e){ console.warn('updVehicle', e); }
+    return { vin:(vin||target.vin||''), plate:(plate||target.plate||''), label:(label||target.label||'') };
+  }
+  // 3) nuevo auto
   const v={ vin, plate, label:(label || (vin?('VIN …'+vin.slice(-6)):('Placa '+plate))), lastServiceDate: today(), addedAt: new Date().toISOString() };
   const arr=(c.vehicles||[]).concat([v]);
-  try{ await updateDoc(doc(db,'clients',clientId), {vehicles:arr}); }catch(e){ console.warn('addVehicle', e); }
+  try{ await updateDoc(doc(db,'clients',clientId), {vehicles:arr}); c.vehicles=arr; }catch(e){ console.warn('addVehicle', e); }
   return v;
 }
 
@@ -2256,8 +2283,9 @@ window.svcSaveVehicle=async function(btn){
   if(!vin && !plate && !label){ alert('Agrega el auto (VIN, placas o descripción).'); return; }
   if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
   try{
-    const v=await addVehicleToClient(d.clientId,{vin,plate,label});
+    const v=await addVehicleToClient(d.clientId,{vin,plate,label,origLabel:(d._vehOrigLabel||''),origVin:(d._vehOrigVin||'')});
     if(v){ d.vin=v.vin||vin; d.plate=v.plate||plate; d.vehicleLabel=v.label||label; }
+    d._vehOrigLabel=''; d._vehOrigVin='';
     d._vehEdit=false;   // colapsa a un renglón → se ve que YA quedó guardado
     try{ const c=clients.find(x=>x.id===d.clientId); const vs=c?clientVehicles(c):[]; const idx=vs.findIndex(x=>((x.label||'')===(d.vehicleLabel||'') || (x.vin&&x.vin===d.vin))); if(idx>=0) d.vehPick=String(idx); }catch(e){}
     svcToast&&svcToast('💾 Auto guardado'); svcRenderModal();
@@ -2344,7 +2372,7 @@ function svcRenderModal(){
     const bits=[ d.vehicleLabel?svcEsc(d.vehicleLabel):'', d.plate?('🪪 '+svcEsc(d.plate)):'', d.vin?('VIN …'+svcEsc((d.vin||'').slice(-6))):'' ].filter(Boolean).join(' · ');
     vehHtml='<div style="background:var(--surface3);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
       +'<div onclick="svcCarInfo()" style="min-width:0;flex:1;cursor:pointer;"><div style="font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">🚗 '+(bits||'Auto')+'</div><div style="font-size:11px;color:var(--gold);margin-top:2px;">ℹ️ Ver info · buscar partes ›</div></div>'
-      +'<button onclick="event.stopPropagation();svcCapture();window._svcDraft._vehEdit=true;svcRenderModal()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none;">Cambiar</button></div>';
+      +'<button onclick="event.stopPropagation();svcCapture();window._svcDraft._vehOrigLabel=window._svcDraft.vehicleLabel||\'\';window._svcDraft._vehOrigVin=window._svcDraft.vin||\'\';window._svcDraft._vehEdit=true;svcRenderModal()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none;">Cambiar</button></div>';
   }
   if(!vehCompact && vs.length){
     vehHtml=vs.map((v,i)=>'<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;">'
