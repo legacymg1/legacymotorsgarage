@@ -859,7 +859,7 @@
     </div>
     <div class="form-group"><label class="form-label">Cliente</label>
       <div style="position:relative;">
-        <input class="form-input" id="appt-client-search" placeholder="🔍 Busca por nombre, carro o VIN..." autocomplete="off" oninput="filterApptClients()" onfocus="filterApptClients()" onblur="setTimeout(()=>{const b=document.getElementById('appt-client-results');if(b)b.style.display='none';},200)">
+        <input class="form-input" id="appt-client-search" placeholder="🔍 Busca por nombre, teléfono, carro o VIN..." autocomplete="off" oninput="filterApptClients()" onfocus="filterApptClients()" onblur="setTimeout(()=>{const b=document.getElementById('appt-client-results');if(b)b.style.display='none';},200)">
         <input type="hidden" id="appt-client">
         <div id="appt-client-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--navy2);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:240px;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,0.5);"></div>
       </div>
@@ -1653,7 +1653,7 @@ function svcRenderClientsTab(box,q){
   svcOrders.forEach(o=>{ if(!o.clientId) return; const b=byId[o.clientId]||(byId[o.clientId]={id:o.clientId,name:o.clientName||'Cliente',phone:o.clientPhone||'',n:0,last:''}); b.n++; const dt=o.scheduledAt||o.createdAt||''; if(dt>b.last)b.last=dt; });
   try{ (clients||[]).forEach(c=>{ if(!c||!c.id) return; if(c.kind==='service' && !byId[c.id]){ byId[c.id]={id:c.id,name:c.name||'Cliente',phone:c.phone||c.phoneE164||'',n:0,last:c.createdAt||''}; } }); }catch(e){}
   let arr=Object.values(byId);
-  if(q) arr=arr.filter(c=>((c.name||'')+' '+(c.phone||'')).toLowerCase().includes(q));
+  if(q){ const qd=q.replace(/\D/g,''); arr=arr.filter(c=>((c.name||'')+' '+(c.phone||'')).toLowerCase().includes(q) || (qd.length>=3 && ((c.phone||'')+(c.phoneE164||'')).replace(/\D/g,'').indexOf(qd)>=0)); }
   arr.sort((a,b)=>String(b.last).localeCompare(String(a.last)));
   if(!arr.length){ box.innerHTML='<div class="faint" style="padding:36px;text-align:center;">Sin clientes de servicio todavía.</div>'; return; }
   const ini=n=>{ const p=String(n||'').trim().split(/\s+/).filter(Boolean); return (((p[0]||'')[0]||'?')+((p[1]||'')[0]||'')).toUpperCase(); };
@@ -1964,7 +1964,7 @@ window.c360Search=async function(){
   if(!q){ box.style.display='none'; box.innerHTML=''; return; }
   await c360LoadQuotes();
   const terms=q.split(/\s+/).filter(Boolean);
-  const hitC=clients.filter(c=>{ const hay=((c.name||'')+' '+(c.phone||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.year||'')+' '+(c.vin||'')+' '+(c.plate||'')).toLowerCase(); return terms.every(t=>hay.indexOf(t)>=0); }).slice(0,50);
+  const hitC=clients.filter(c=>{ const hay=((c.name||'')+' '+(c.phone||'')+' '+((c.phone||'')+(c.phoneE164||'')).replace(/\D/g,'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.year||'')+' '+(c.vin||'')+' '+(c.plate||'')).toLowerCase(); return terms.every(t=>hay.indexOf(t)>=0); }).slice(0,50);
   const cliPhones=new Set(clients.map(c=>c.phoneE164).filter(Boolean));
   const seen=new Set(), leads=[];
   (_c360Quotes||[]).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).forEach(qz=>{ const ph=qz.phoneE164||''; if(ph&&cliPhones.has(ph))return; const hay=((qz.customer||'')+' '+(qz.phone||'')+' '+((qz.options&&qz.options[0]&&qz.options[0].car)||'')).toLowerCase(); if(!terms.every(t=>hay.indexOf(t)>=0))return; const k=ph||qz.phone||qz.id; if(seen.has(k))return; seen.add(k); leads.push(qz); });
@@ -2240,7 +2240,8 @@ window.svcCliSearch=function(){
   const q=(document.getElementById('svc-cli-search')?.value||'').toLowerCase().trim();
   const box=document.getElementById('svc-cli-results'); if(!box) return;
   if(!q){ box.style.display='none'; box.innerHTML=''; return; }
-  const hits=clients.filter(c=>((c.name||'')+' '+(c.phone||'')).toLowerCase().includes(q)).slice(0,8);
+  const qd=q.replace(/\D/g,'');
+  const hits=clients.filter(c=>{ const pd=(c.phone||'').replace(/\D/g,'')+(c.phoneE164||'').replace(/\D/g,''); return ((c.name||'')+' '+(c.phone||'')).toLowerCase().includes(q) || (qd.length>=3 && pd.indexOf(qd)>=0); }).slice(0,8);
   if(!hits.length){ box.style.display='none'; return; }
   box.style.display='block';
   box.innerHTML=hits.map(c=>'<div onclick="svcPickClient(\''+c.id+'\')" style="padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">'+svcEsc(c.name||'')+' <span style="color:var(--muted);">· '+svcEsc(c.phone||'')+'</span></div>').join('');
@@ -3315,7 +3316,7 @@ window.filterApptClients = function(){
   let items=clients.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(terms.length){
     items=items.filter(c=>{
-      const hay=((c.name||'')+' '+(c.phone||'')+' '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.color||'')+' '+(c.vin||'')+' '+(c.vehicles||[]).map(v=>(v.label||'')+' '+(v.vin||'')).join(' ')).toLowerCase();
+      const hay=((c.name||'')+' '+(c.phone||'')+' '+((c.phone||'')+(c.phoneE164||'')).replace(/\D/g,'')+' '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.color||'')+' '+(c.vin||'')+' '+(c.vehicles||[]).map(v=>(v.label||'')+' '+(v.vin||'')).join(' ')).toLowerCase();
       return terms.every(t=>hay.includes(t));
     });
   }
@@ -4421,7 +4422,7 @@ window.renderAll = function() {
 
   const searchTerms = search.trim().split(/\s+/).filter(Boolean);
   let filtered=clients.filter(c=>{
-    const hay=(c.name+' '+c.phone+' '+c.make+' '+c.model+' '+c.year+' '+(c.vin||'')).toLowerCase();
+    const hay=(c.name+' '+c.phone+' '+((c.phone||'')+(c.phoneE164||'')).replace(/\D/g,'')+' '+c.make+' '+c.model+' '+c.year+' '+(c.vin||'')).toLowerCase();
     return searchTerms.every(term=>hay.includes(term));
   });
   
@@ -5403,7 +5404,7 @@ window.renderDelList=function(){
   const list=clients.filter(c=>{
     if(!terms.length) return true;
     const car=`${c.year||''} ${c.make||''} ${c.model||''}`;
-    const hay=((c.name||'')+' '+car+' '+(c.vin||'')+' '+(c.phone||'')).toLowerCase();
+    const hay=((c.name||'')+' '+car+' '+(c.vin||'')+' '+(c.phone||'')+' '+((c.phone||'')+(c.phoneE164||'')).replace(/\D/g,'')).toLowerCase();
     return terms.every(t=>hay.includes(t));
   }).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!list.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:14px;text-align:center;">Sin resultados</div>'; return; }

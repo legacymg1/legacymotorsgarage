@@ -1131,6 +1131,7 @@ function populateCarPicker(){
 window.expCarSearch=function(){
   const inp=document.getElementById('e-car-search'), x=document.getElementById('e-car-x'), box=document.getElementById('e-car-results');
   if(!inp||!box) return;
+  const _wasHidden=(box.style.display==='none');
   const q=(inp.value||'').trim().toLowerCase();
   if(x) x.style.display=q?'':'none';
   const words=q?q.split(/\s+/):[];
@@ -1141,6 +1142,8 @@ window.expCarSearch=function(){
   }).slice(0,60);
   box.style.display='';
   box.innerHTML = list.map(c=>'<div onclick="pickExpCar(\''+c.id+'\')" style="padding:9px 10px;border-radius:8px;cursor:pointer;font-size:14px;">'+carLabelOf(c)+'</div>').join('') || '<div style="padding:9px 10px;color:var(--faint);font-size:13px;">Sin carros que coincidan.</div>';
+  // 📱 iPhone: al abrir la lista, sube el buscador arriba del sheet para que los resultados queden visibles (no tapados por el teclado).
+  if(_wasHidden){ try{ setTimeout(function(){ const w=document.getElementById('e-car-search-wrap'); if(w&&w.scrollIntoView) w.scrollIntoView({block:'start',behavior:'smooth'}); },60); }catch(e){} }
 };
 window.clearExpCarSearch=function(){ const inp=document.getElementById('e-car-search'); if(inp){ inp.value=''; inp.focus(); } const x=document.getElementById('e-car-x'); if(x) x.style.display='none'; expCarSearch(); };
 window.pickExpCar=function(id){
