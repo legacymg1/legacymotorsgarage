@@ -774,7 +774,7 @@
       <input type="hidden" id="e-car">
       <div id="e-car-pick">
         <div id="e-car-search-wrap" style="position:relative;">
-          <input id="e-car-search" oninput="expCarSearch()" onfocus="expCarSearch()" autocomplete="off" placeholder="🔎 Buscar carro (o toca para ver la lista)…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 40px 11px 12px;color:var(--text);font-size:14px;">
+          <input id="e-car-search" readonly onclick="openExpCarPicker()" autocomplete="off" placeholder="🔎 Toca para buscar un carro…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 40px 11px 12px;color:var(--text);font-size:14px;cursor:pointer;">
           <span id="e-car-x" onclick="clearExpCarSearch()" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--border);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;user-select:none;">✕</span>
         </div>
         <div id="e-car-results" style="display:none;margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;max-height:38vh;overflow-y:auto;"></div>
@@ -1145,7 +1145,27 @@ window.expCarSearch=function(){
   // 📱 iPhone: al abrir la lista, sube el buscador arriba del sheet para que los resultados queden visibles (no tapados por el teclado).
   if(_wasHidden){ try{ setTimeout(function(){ const w=document.getElementById('e-car-search-wrap'); if(w&&w.scrollIntoView) w.scrollIntoView({block:'start',behavior:'smooth'}); },60); }catch(e){} }
 };
-window.clearExpCarSearch=function(){ const inp=document.getElementById('e-car-search'); if(inp){ inp.value=''; inp.focus(); } const x=document.getElementById('e-car-x'); if(x) x.style.display='none'; expCarSearch(); };
+window.clearExpCarSearch=function(){ const inp=document.getElementById('e-car-search'); if(inp){ inp.value=''; } const x=document.getElementById('e-car-x'); if(x) x.style.display='none'; const r=document.getElementById('e-car-results'); if(r) r.style.display='none'; };
+// 🔎📱 Buscador de carro a PANTALLA COMPLETA (como iOS): campo arriba, lista scrollea; el teclado nunca lo tapa.
+window.openExpCarPicker=function(){
+  let o=document.getElementById('e-car-pop');
+  if(!o){ o=document.createElement('div'); o.id='e-car-pop'; o.style.cssText='position:fixed;inset:0;z-index:2147483600;background:var(--bg,#060810);display:flex;flex-direction:column;'; document.body.appendChild(o); }
+  o.style.display='flex';
+  o.innerHTML='<div style="flex:0 0 auto;display:flex;gap:8px;align-items:center;padding:calc(12px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--border);background:var(--surface);">'
+    +'<input id="e-carpop-search" oninput="expCarPickerSearch()" placeholder="🔎 Buscar: año, marca, modelo, VIN, #…" autocomplete="off" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:16px;">'
+    +'<button onclick="closeExpCarPicker()" style="flex:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 14px;font-weight:800;cursor:pointer;">✕</button></div>'
+    +'<div id="e-carpop-list" style="flex:1;overflow-y:auto;padding:6px 12px calc(14px + env(safe-area-inset-bottom));"></div>';
+  expCarPickerSearch();
+  setTimeout(function(){ const s=document.getElementById('e-carpop-search'); if(s) s.focus(); },90);
+};
+window.closeExpCarPicker=function(){ const o=document.getElementById('e-car-pop'); if(o) o.style.display='none'; };
+window.expCarPickerSearch=function(){
+  const inp=document.getElementById('e-carpop-search'), box=document.getElementById('e-carpop-list'); if(!box) return;
+  const q=(inp?inp.value:'').trim().toLowerCase(); const words=q?q.split(/\s+/):[];
+  const list=[...inventory].sort((a,b)=>(parseInt(b.inventoryNum)||0)-(parseInt(a.inventoryNum)||0)).filter(c=>{ if(!words.length) return true; const hay=('#'+(c.inventoryNum||'')+' '+[c.year,c.make,c.model,c.color,c.vin].filter(Boolean).join(' ')).toLowerCase(); return words.every(w=>hay.indexOf(w)>=0); }).slice(0,150);
+  box.innerHTML=list.map(c=>'<div onclick="expCarPickerPick(\''+c.id+'\')" style="padding:13px 12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;font-size:15px;color:var(--text);">'+carLabelOf(c)+'</div>').join('') || '<div style="padding:20px;color:var(--faint);text-align:center;font-size:14px;">Sin carros que coincidan.</div>';
+};
+window.expCarPickerPick=function(id){ pickExpCar(id); closeExpCarPicker(); };
 window.pickExpCar=function(id){
   const c=inventory.find(x=>x.id===id); if(!c) return;
   const car=document.getElementById('e-car'); car.value=id; car.dataset.label=carLabelOf(c);
