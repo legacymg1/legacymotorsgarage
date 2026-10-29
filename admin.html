@@ -2256,7 +2256,7 @@ window.svcCliSearch=function(){
   box.style.display='block';
   box.innerHTML=hits.map(c=>'<div onclick="svcPickClient(\''+c.id+'\')" style="padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">'+svcEsc(c.name||'')+' <span style="color:var(--muted);">· '+svcEsc(c.phone||'')+'</span></div>').join('');
 };
-window.svcPickClient=function(id){ svcCapture(); window._svcDraft.clientId=id; window._svcDraft.vehPick=''; svcRenderModal(); };
+window.svcPickClient=function(id){ svcCapture(); window._svcDraft.clientId=id; window._svcDraft.vehPick=''; try{ const c=clients.find(x=>x.id===id); if(c&&c.lang) window._svcDraft.lang=c.lang; }catch(e){}  /* 🌐 la orden/estimado/SMS respeta el idioma del cliente (no siempre español) */ svcRenderModal(); };
 window.svcClearClient=function(){ svcCapture(); window._svcDraft.clientId=''; window._svcDraft.vehPick=''; svcRenderModal(); };
 // 💾 Guardar CLIENTE y continuar (sin tener que llenar toda la orden) — para no perder datos si algo pasa.
 window.svcSaveClient=async function(btn){
@@ -2362,7 +2362,10 @@ function svcRenderModal(){
     const c=clients.find(x=>x.id===d.clientId);
     cliHtml='<div style="background:var(--surface3);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
       +'<div><div style="font-weight:800;">'+svcEsc(titleCase(c?c.name:''))+'</div><div style="font-size:12px;color:var(--muted);">'+svcEsc(c?_fmtPhone(c.phone||c.phoneE164||''):'')+'</div></div>'
-      +'<button onclick="svcClearClient()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;">Cambiar</button></div>';
+      +'<div style="display:flex;align-items:center;gap:8px;">'
+      /* 🌐 idioma de la orden (estimado + SMS) — por defecto el del cliente, se puede cambiar aquí */
+      +'<select id="svc-new-lang" onchange="svcCapture()" title="Idioma del estimado y mensajes" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:6px 8px;font-size:12px;font-family:inherit;cursor:pointer;"><option value="es"'+(d.lang==='es'?' selected':'')+'>🇲🇽 Español</option><option value="en"'+(d.lang==='en'?' selected':'')+'>🇺🇸 English</option></select>'
+      +'<button onclick="svcClearClient()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;">Cambiar</button></div></div>';
   } else {
     cliHtml='<input id="svc-cli-search" oninput="svcCliSearch()" placeholder="🔍 Buscar cliente existente…" style="'+SVC_IN+'">'
       +'<div id="svc-cli-results" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:6px;max-height:180px;overflow-y:auto;"></div>'
