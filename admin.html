@@ -1603,7 +1603,7 @@ function svcStatusLabel(o){
 }
 function svcBucket(o){
   if(window.LMG && LMG.svcBucketOf) return LMG.svcBucketOf(o);
-  if(o.paid===true || o.status==='entregado') return 'completadas';
+  if(o.paid || o.status==='entregado') return 'completadas';   // fallback (paid verdadero o entregado)
   if(o.estimateStatus==='accepted' || ['arrancado','recibido','en_proceso','pausado_partes','listo'].indexOf(o.status)>=0) return 'activas';
   return 'estimados';
 }
@@ -1893,8 +1893,10 @@ window.svcPromSave=async function(){
     await updateDoc(doc(db,'serviceOrders',id), { promises:list, promisedAt:'', promisedAmtCents:0 });
     const _o=svcOrders.find(x=>x.id===id); if(_o){ _o.promises=list; _o.promisedAt=''; _o.promisedAmtCents=0; }
     try{ renderTodayBox(); }catch(e){}
-    const ov=document.getElementById('svc-caja'); if(ov) ov.remove();
-    alert('📅 '+list.length+(list.length===1?' promesa guardada.':' promesas guardadas.')+'\nCada una te sale en "Pagos de hoy" el día que toque.');
+    // 📱 iOS-style: NO cerrar la ventana. Deja la palomita y sigue abierta para que puedas pasar al contrato.
+    window._svcPromDraft=list.map(p=>({ amt:(p.amtCents/100), date:p.date }));
+    try{ svcPromRender(); }catch(e){}
+    try{ if(window.svcToast) svcToast('📅 '+list.length+(list.length===1?' promesa guardada':' promesas guardadas')+' · cada una sale en Pagos de hoy'); }catch(e){}
   }catch(e){ alert('No se pudieron guardar: '+((e&&e.message)||e)); }
 };
 window.svcPromClearAll=async function(){
@@ -1996,9 +1998,15 @@ window.svcToContract=async function(id){
     await updateDoc(doc(db,'clients',c.id), { addons: arrayUnion(addon) });
     c.addons=[...(c.addons||[]), addon];
     const _o=svcOrders.find(x=>x.id===id); if(_o){ _o.paidCents=(Number(_o.paidCents)||0)+Math.round(amt*100); _o.balanceCents=Math.max(0,(Number(_o.grandTotalCents)||0)-(Number(_o.paidCents)||0)); if(_o.balanceCents<=0){ _o.paid=true; } }
-    const ov=document.getElementById('svc-caja'); if(ov) ov.remove();
     try{ renderAll&&renderAll(); }catch(e){} try{ renderTodayBox(); }catch(e){}
-    if(confirm('✅ '+formatMoney(amt)+' agregado al contrato de '+(c.name||'')+' (1 pago, sin interés).\n\n¿Generar el contrato del cargo para que lo firme en la tableta?')){ try{ openAddonContract(c, addon); }catch(e){ alert('Cargo creado, pero no se pudo abrir el contrato: '+((e&&e.message)||e)); } }
+    try{ if(window.svcToast) svcToast('🏷️ '+formatMoney(amt)+' al contrato de '+(c.name||'')+' (1 pago, sin interés)'); }catch(e){}
+    if(confirm('✅ '+formatMoney(amt)+' agregado al contrato de '+(c.name||'')+' (1 pago, sin interés).\n\n¿Generar el contrato del cargo para que lo firme en la tableta?')){
+      const ov=document.getElementById('svc-caja'); if(ov) ov.remove();
+      try{ openAddonContract(c, addon); }catch(e){ alert('Cargo creado, pero no se pudo abrir el contrato: '+((e&&e.message)||e)); }
+    } else {
+      // 📱 iOS-style: la ventana se queda abierta y se repinta con el saldo ya actualizado.
+      try{ svcChargeOpen(id); }catch(e){}
+    }
   }catch(e){ alert('No se pudo mandar al contrato: '+((e&&e.message)||e)); }
 };
 

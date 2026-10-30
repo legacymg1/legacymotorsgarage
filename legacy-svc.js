@@ -65,7 +65,7 @@
   // Cubeta del CRM: completadas / activas / estimados.
   LMG.svcBucketOf = function (o) {
     o = o || {};
-    if (o.paid === true || o.status === 'entregado') return 'completadas';
+    if (o.paid || o.status === 'entregado') return 'completadas';   // paid "verdadero" (no sólo ===true) o entregado → completada
     if (o.estimateStatus === 'accepted' || ['arrancado', 'recibido', 'en_proceso', 'pausado_partes', 'listo'].indexOf(o.status) >= 0) return 'activas';
     return 'estimados';
   };
