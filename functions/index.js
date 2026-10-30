@@ -819,6 +819,7 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
     const os = await tx.get(oref);
     const cur = os.exists ? (os.data() || {}) : o;
     const total = Number(cur.grandTotalCents) || 0;
+    const toContract = Number(cur.toContractCents) || 0;   // 🏷️ lo que se mandó al contrato (no es dinero pagado aquí)
     const newPaid = (Number(cur.paidCents) || 0) + Math.round(amountCents);
     tx.set(txRef, {
       entryId, type: "income", dept: "dealer", category: "Servicio", saleType: "servicio", private: !!priv,
@@ -828,8 +829,8 @@ async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, 
       note: "Orden de servicio #" + (cur.orderNum || orderId) + (newPaid < total ? " (abono)" : "") + ((sq && Number(sq.feeCents) > 0) ? (" · bruto $" + (sq.grossCents / 100).toFixed(2) + " · comisión $" + (sq.feeCents / 100).toFixed(2) + " · neto $" + (sq.netCents / 100).toFixed(2)) : ""), createdAt: nowISO, createdBy: who || method || "service-caja", source: "service-caja",
       ...(sq ? { sqPaymentId: sq.payId || "", sqTotalCents: Math.round(sq.grossCents || 0), sqFeeCents: Math.round(sq.feeCents || 0), sqNetCents: Math.round(sq.netCents || 0), sqLast4: sq.last4 || "" } : {}),
     });
-    const fullyPaid = (newPaid >= total && total > 0);
-    const patch = { paidCents: newPaid, paid: fullyPaid, paidAt: nowISO, payMethod: method || "cash", updatedAt: nowISO };
+    const fullyPaid = ((newPaid + toContract) >= total && total > 0);   // pagado + al-contrato cubre el total
+    const patch = { paidCents: newPaid, paid: fullyPaid, paidAt: nowISO, payMethod: method || "cash", balanceCents: Math.max(0, total - newPaid - toContract), updatedAt: nowISO };
     if (priv) patch.private = true;
     if (cur.estimateStatus !== "accepted") { patch.estimateStatus = "accepted"; if (!cur.estimateAcceptedAt) patch.estimateAcceptedAt = nowISO; }   // 💡 pagar = aceptar
     if (fullyPaid) { patch.status = "entregado"; if (!cur.deliveredAt) patch.deliveredAt = nowISO; }
@@ -894,13 +895,28 @@ exports.svcCharge = onCall({ secrets: [SQUARE_ACCESS_TOKEN], timeoutSeconds: 30 
   const priv = !!d.private;   // 🔒 "fuera de Legacy": entra a Finanzas pero privado (no cuenta en los números de Legacy)
   if (!(amountCents > 0)) throw new HttpsError("invalid-argument", "Monto inválido.");
   if (amountCents > 2000000) throw new HttpsError("invalid-argument", "Monto demasiado alto.");
+  // 🏷️ MOVER AL CONTRATO DEL DEALER: NO es dinero que pagó el cliente → va a un casillero aparte (toContractCents),
+  // NUNCA a paidCents. Así "pagado" refleja solo lo que de verdad entregó; el ingreso real entra cuando se cobre el cargo.
+  if (method === "contract") {
+    if (!id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+    const nowISO = new Date().toISOString();
+    const curContract = Number(o.toContractCents) || 0;
+    const curPaid = Number(o.paidCents) || 0;
+    const newContract = curContract + amountCents;
+    const bal = Math.max(0, total - curPaid - newContract);
+    const patch = { toContractCents: newContract, balanceCents: bal, reconciled: true, updatedAt: nowISO };
+    if (o.estimateStatus !== "accepted") { patch.estimateStatus = "accepted"; if (!o.estimateAcceptedAt) patch.estimateAcceptedAt = nowISO; }
+    await oref.set(patch, { merge: true });
+    return { ok: true, toContractCents: newContract, balanceCents: bal };
+  }
   // ✅ "YA ESTÁ EN FINANZAS" (reconcile): cuadra la orden SIN crear transacción ni postear ingreso (el dinero ya se registró por otro lado).
   if (d.reconcile) {
     if (!id.isOwner) throw new HttpsError("permission-denied", "Solo dueños pueden conciliar.");
     const newPaid = already + amountCents;
-    const fullyPaid = (newPaid >= total && total > 0);
+    const toContractR = Number(o.toContractCents) || 0;
+    const fullyPaid = ((newPaid + toContractR) >= total && total > 0);
     const nowISO = new Date().toISOString();
-    const patch = { paidCents: newPaid, paid: fullyPaid, paidAt: nowISO, payMethod: method || "cash", reconciled: true, balanceCents: Math.max(0, total - newPaid), updatedAt: nowISO };
+    const patch = { paidCents: newPaid, paid: fullyPaid, paidAt: nowISO, payMethod: method || "cash", reconciled: true, balanceCents: Math.max(0, total - newPaid - toContractR), updatedAt: nowISO };
     if (o.estimateStatus !== "accepted") { patch.estimateStatus = "accepted"; if (!o.estimateAcceptedAt) patch.estimateAcceptedAt = nowISO; }
     if (fullyPaid) { patch.status = "entregado"; if (!o.deliveredAt) patch.deliveredAt = nowISO; }
     const linkTx = String(d.linkTxId || "");   // opcional: liga la transacción ya existente a la orden
@@ -2292,7 +2308,7 @@ function _estPayload(o, en) {
     services,
     laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
     deposit: c(o.depositCents), balance: c(o.balanceCents),
-    paid: !!o.paid, paidCents: Number(o.paidCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
+    paid: !!o.paid, paidCents: Number(o.paidCents) || 0, toContractCents: Number(o.toContractCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
     sentAt: o.estimateSentAt || "", acceptedAt: o.estimateAcceptedAt || "", createdAt: o.createdAt || "", partsReadyAt: o.partsReadyAt || "", partsPaidAt: o.partsPaidAt || "",
     scheduledAt: o.scheduledAt || "", receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", promisedAt: o.promisedAt || "", deliveredAt: o.deliveredAt || "",
     promises: (Array.isArray(o.promises) ? o.promises.map((p) => ({ date: p.date || "", amtCents: Number(p.amtCents) || 0 })) : []),

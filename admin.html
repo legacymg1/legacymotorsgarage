@@ -1792,11 +1792,12 @@ function svcCard(o){
     +(o.estimateStatus==='accepted'?'<div style="font-size:12px;font-weight:800;color:#28b463;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.35);border-radius:9px;padding:6px 9px;">✅ Cliente aceptó el estimado'+(o.estimateAcceptedAt?(' · '+new Date(o.estimateAcceptedAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'})):'')+'</div>':(o.estimateStatus==='sent'?'<div style="font-size:12px;color:var(--gold);background:rgba(232,182,74,.08);border:1px solid var(--border);border-radius:9px;padding:6px 9px;">🧾 Estimado enviado · esperando al cliente</div>':''))
     +((!o.paid && o.estimateStatus!=='accepted' && Array.isArray(o.services) && o.services.length)?'<button onclick="event.stopPropagation();svcResend(\''+o.id+'\')" style="width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:10px;padding:9px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">📤 '+(o.estimateStatus==='sent'?'Reenviar estimado al cliente':'Enviar estimado al cliente')+'</button>':'')
     +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);gap:8px;"><span>'+when+'</span><span style="text-align:right;">👤 '+svcEsc(assign)+'</span></div>'
-    +((Number(o.grandTotalCents)||0)>0 ? (o.paid
-        ? '<div style="display:flex;gap:7px;align-items:center;"><div style="flex:1;font-size:12px;font-weight:800;color:#28b463;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.35);border-radius:9px;padding:6px 9px;">✅ Pagado · '+formatMoney((o.paidCents||o.grandTotalCents||0)/100)+(o.payMethod==='cash'?' · efectivo':(o.payMethod&&o.payMethod.indexOf('square')===0?' · tarjeta':''))+(o.private?' · 🔒':'')+'</div><button onclick="event.stopPropagation();svcOpenReceipt(\''+o.id+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🧾 Recibo</button></div>'
-        : ((Number(o.paidCents)||0)>0
-            ? '<div style="font-size:11px;color:var(--muted);margin-bottom:5px;">💵 Abonado '+formatMoney((o.paidCents||0)/100)+' de '+formatMoney((o.grandTotalCents||0)/100)+'</div><button onclick="event.stopPropagation();svcChargeOpen(\''+o.id+'\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💵 Cobrar saldo '+formatMoney(((o.grandTotalCents||0)-(o.paidCents||0))/100)+'</button>'
-            : '<button onclick="event.stopPropagation();svcChargeOpen(\''+o.id+'\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💵 Cobrar '+formatMoney((o.grandTotalCents||0)/100)+'</button>')) : '')
+    +((Number(o.grandTotalCents)||0)>0 ? (function(){ var gt=(Number(o.grandTotalCents)||0),pc=(Number(o.paidCents)||0),tc=(Number(o.toContractCents)||0),saldo=Math.max(0,gt-pc-tc),M=function(x){return formatMoney(x/100);};
+        if(o.paid) return '<div style="display:flex;gap:7px;align-items:center;"><div style="flex:1;font-size:12px;font-weight:800;color:#28b463;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.35);border-radius:9px;padding:6px 9px;">✅ Pagado · '+M(o.paidCents||o.grandTotalCents||0)+(o.payMethod==='cash'?' · efectivo':(o.payMethod&&o.payMethod.indexOf('square')===0?' · tarjeta':''))+(o.private?' · 🔒':'')+'</div><button onclick="event.stopPropagation();svcOpenReceipt(\''+o.id+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🧾 Recibo</button></div>';
+        if(saldo>0) return (pc>0||tc>0?('<div style="font-size:11px;color:var(--muted);margin-bottom:5px;">'+(pc>0?('💵 Abonó '+M(pc)):'')+(tc>0?((pc>0?' · ':'')+'🏷️ '+M(tc)+' al contrato'):'')+' · de '+M(gt)+'</div>'):'')+'<button onclick="event.stopPropagation();svcChargeOpen(\''+o.id+'\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💵 '+((pc>0||tc>0)?'Cobrar saldo ':'Cobrar ')+M(saldo)+'</button>';
+        if(tc>0) return '<div style="display:flex;gap:7px;align-items:center;"><div style="flex:1;font-size:12px;font-weight:800;color:#4d9bff;background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.35);border-radius:9px;padding:6px 9px;">📄 Plan de pagos · 🏷️ '+M(tc)+' al contrato'+(pc>0?(' · abonó '+M(pc)):'')+'</div><button onclick="event.stopPropagation();svcOpenReceipt(\''+o.id+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🧾 Recibo</button></div>';
+        return '';
+      })() : '')
     +'<div style="display:flex;gap:7px;align-items:center;margin-top:3px;">'
     +'<select onclick="event.stopPropagation()" onchange="event.stopPropagation();svcSetStatus(\''+o.id+'\',this.value)" style="flex:1;padding:7px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-family:inherit;">'+stOpts+'</select>'
     +(phone?'<a href="sms:'+phone+'" onclick="event.stopPropagation()" style="text-decoration:none;background:var(--surface3);border:1px solid var(--border);border-radius:9px;padding:7px 11px;font-size:13px;">💬</a>':'')
@@ -1808,15 +1809,13 @@ window.svcSetStatus=async function(id,st){ const patch={status:st, updatedAt:new
 // Permite ABONO (monto parcial editable) y "🔒 fuera de Legacy" (privado: entra a Finanzas pero no cuenta en Legacy).
 window.svcChargeOpen=function(id){
   const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
-  const total=(Number(o.grandTotalCents)||0)/100, paid=(Number(o.paidCents)||0)/100, due=Math.max(0,total-paid);
+  const total=(Number(o.grandTotalCents)||0)/100, paid=(Number(o.paidCents)||0)/100, toContract=(Number(o.toContractCents)||0)/100, due=Math.max(0,total-paid-toContract);
   const _promDef=o.promisedAt||(function(){ const d=new Date(); d.setDate(d.getDate()+7); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); })();
   const _promAmt=(Number(o.promisedAmtCents)||0)>0?(o.promisedAmtCents/100):due;   // monto específico de la promesa (edita si ya existía)
   const _cliHasAcct=!!(o.clientId && clients.find(x=>x.id===o.clientId));           // ¿el cliente tiene cuenta para mandarle al contrato?
-  // 📅 Lista de promesas (varias fechas y montos). Migra la promesa vieja (1 sola) si existía.
-  window._svcPromCtx={ orderId:id };
-  window._svcPromDraft=(Array.isArray(o.promises)&&o.promises.length)
-    ? o.promises.map(p=>({ amt:((Number(p.amtCents)||0)/100), date:p.date||'' }))
-    : (o.promisedAt ? [{ amt:_promAmt, date:o.promisedAt }] : [{ amt:due, date:_promDef }]);
+  // 📄 Plan de pagos del adendum: arranca con 1 pago = todo el saldo (fecha +7). Se editan/agregan filas.
+  window._svcAdeCtx={ orderId:id, due:due };
+  window._svcAdeDraft=[{ amt:due, mode:'date', date:_promDef }];
   const IN='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--text);font-size:16px;';
   let ov=document.getElementById('svc-caja');
   if(!ov){ ov=document.createElement('div'); ov.id='svc-caja'; ov.style.cssText='position:fixed;inset:0;z-index:2147483200;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) ov.remove(); }; document.body.appendChild(ov); }
@@ -1825,8 +1824,9 @@ window.svcChargeOpen=function(id){
     +'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;font-size:14px;">'
       +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Cliente</span><b>'+svcEsc(o.clientName||'')+'</b></div>'
       +'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Total</span><b>'+formatMoney(total)+'</b></div>'
-      +(paid>0?'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Abonado</span><b>'+formatMoney(paid)+'</b></div>':'')
-      +'<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid var(--border);margin-top:4px;"><span style="font-weight:700;">Saldo</span><b style="color:var(--gold);">'+formatMoney(due)+'</b></div>'
+      +(paid>0?'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:var(--muted);">Abonado (pagó)</span><b>'+formatMoney(paid)+'</b></div>':'')
+      +(toContract>0?'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:#4d9bff;">🏷️ Al contrato</span><b style="color:#4d9bff;">'+formatMoney(toContract)+'</b></div>':'')
+      +'<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid var(--border);margin-top:4px;"><span style="font-weight:700;">Saldo por cobrar</span><b style="color:var(--gold);">'+formatMoney(due)+'</b></div>'
     +'</div>'
     +(due>0
       ? '<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">💵 Cobrar ahora (puedes cobrar todo o un abono)</label>'
@@ -1838,33 +1838,79 @@ window.svcChargeOpen=function(id){
         +'<button onclick="svcChargeDo(\''+id+'\',\'terminal\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💳 Tarjeta en persona (registrar monto a mano)</button>'
         +'<button onclick="svcChargeDo(\''+id+'\',\'square\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💳 Enviar link de pago (Square)</button>'
         +'<div id="svc-caja-msg" style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;"></div>'
-        /* ───── o deja el saldo pendiente ───── */
-        +'<div style="text-align:center;color:var(--faint);font-size:12px;margin:16px 0 12px;border-top:1px solid var(--border);padding-top:14px;">— o deja el saldo pendiente —</div>'
-        /* 📅 PROMESAS DE PAGO — varias fechas y montos; se guardan/editan sin cobrar */
-        +'<div style="background:rgba(240,192,64,.07);border:1px solid rgba(240,192,64,.35);border-radius:12px;padding:12px;margin-bottom:12px;">'
-          +'<div style="font-weight:800;font-size:14px;margin-bottom:8px;color:#f0c040;">📅 Promesas de pago <span style="font-size:11px;color:var(--muted);font-weight:600;">(puedes poner varias fechas)</span></div>'
-          +'<div id="svc-prom-list"></div>'
-          +'<button onclick="svcPromAddRow()" style="width:100%;background:transparent;border:1px dashed rgba(240,192,64,.6);color:#f0c040;border-radius:10px;padding:9px;font-weight:700;font-size:12px;cursor:pointer;margin:2px 0 10px;">➕ Agregar otra fecha</button>'
-          +'<div style="display:flex;gap:8px;">'
-            +'<button onclick="svcPromSave()" style="flex:1;background:var(--gold);color:var(--navy3);border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;">💾 Guardar promesas</button>'
-            +(o.promisedAt||(Array.isArray(o.promises)&&o.promises.length)?'<button onclick="svcPromClearAll()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:11px 14px;font-size:13px;font-weight:700;cursor:pointer;">Quitar todas</button>':'')
-          +'</div>'
-          +'<div style="font-size:11px;color:var(--faint);margin-top:7px;line-height:1.4;">Cada promesa te sale en <b>Pagos de hoy</b> el día que toque con su monto. El resto del saldo sigue pendiente.</div>'
-        +'</div>'
-        /* 🏷️ MANDAR AL CONTRATO DEL DEALER — cualquier parte del saldo, 1 pago sin interés, al final del contrato */
-        +'<div style="background:rgba(31,111,235,.07);border:1px solid rgba(31,111,235,.35);border-radius:12px;padding:12px;">'
-          +'<div style="font-weight:800;font-size:14px;margin-bottom:6px;color:#4d9bff;">🏷️ Mandar al contrato del dealer</div>'
+        /* ───── o: PLAN DE PAGOS (ADENDUM) del saldo ───── */
+        +'<div style="text-align:center;color:var(--faint);font-size:12px;margin:16px 0 12px;border-top:1px solid var(--border);padding-top:14px;">— o arma el plan de pagos del saldo —</div>'
+        +'<div style="background:rgba(240,192,64,.07);border:1px solid rgba(240,192,64,.35);border-radius:12px;padding:12px;">'
+          +'<div style="font-weight:800;font-size:14px;margin-bottom:4px;color:#f0c040;">📄 Adendum · Plan de pagos del saldo</div>'
+          +'<div style="font-size:11px;color:var(--faint);margin-bottom:10px;line-height:1.4;">Divide el <b>saldo ('+formatMoney(due)+')</b> en pagos. Cada pago lleva un <b>monto</b> y una <b>fecha</b>, o se va <b>al último pago de su contrato</b>. Se firma como adendum al contrato de venta y al cliente le salen sus pagos en la app.</div>'
+          +'<div id="svc-ade-list"></div>'
+          +'<button onclick="svcAdeAddRow()" style="width:100%;background:transparent;border:1px dashed rgba(240,192,64,.6);color:#f0c040;border-radius:10px;padding:9px;font-weight:700;font-size:12px;cursor:pointer;margin:2px 0 8px;">➕ Agregar pago</button>'
+          +'<div id="svc-ade-sum" style="font-size:12px;font-weight:700;text-align:center;margin:4px 0 10px;"></div>'
           +(_cliHasAcct
-            ? '<div style="font-size:11px;color:var(--faint);margin-bottom:9px;line-height:1.4;">Pasa parte del saldo a su cuenta como <b>cargo de 1 solo pago, sin interés</b>, que se cobra <b>al final de su contrato</b>. Quita ese monto del saldo de la orden.</div>'
-              +'<label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Monto al contrato</label>'
-              +'<input id="svc-caja-contract-amt" type="number" inputmode="decimal" step="0.01" value="'+due.toFixed(2)+'" style="'+IN+'margin-bottom:10px;">'
-              +'<button onclick="svcToContract(\''+id+'\')" style="width:100%;background:rgba(31,111,235,.15);border:1px solid #1f6feb;color:#4d9bff;border-radius:10px;padding:12px;font-weight:800;font-size:13px;cursor:pointer;">🏷️ Mandar al contrato</button>'
-            : '<div style="font-size:12px;color:var(--muted);line-height:1.5;">Esta orden no está ligada a un cliente con cuenta. Liga o crea el cliente en la orden para poder mandar saldo a su contrato.</div>')
+            ? '<button onclick="svcAdeCreate(\''+id+'\')" style="width:100%;background:var(--gold);color:var(--navy3);border:none;border-radius:10px;padding:12px;font-weight:800;font-size:13px;cursor:pointer;">📄 Crear adendum y plan de pagos</button>'
+            : '<div style="font-size:12px;color:var(--muted);line-height:1.5;">Esta orden no está ligada a un cliente con cuenta. Liga o crea el cliente en la orden para armar el adendum.</div>')
         +'</div>'
       : '<div style="text-align:center;color:#28b463;font-weight:800;padding:8px 0 14px;">✅ Ya está pagada.</div>'
         +'<button onclick="document.getElementById(\'svc-caja\').remove();svcOpenReceipt(\''+id+'\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;">🧾 Ver recibo</button>')
   +'</div>';
-  if(due>0){ try{ svcPromRender(); }catch(e){} }   // 📅 pinta las filas de promesas
+  if(due>0){ try{ svcAdeRender(); }catch(e){} }   // 📄 pinta las filas del plan de pagos (adendum)
+};
+// 📄 PLAN DE PAGOS (ADENDUM): filas = {amt, mode:'date'|'end', date}. Suma debe = saldo.
+const _adeIN='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--text);font-size:15px;';
+function _svcAdeSum(){ const sumEl=document.getElementById('svc-ade-sum'); if(!sumEl) return; const l=window._svcAdeDraft||[]; const due=(window._svcAdeCtx&&window._svcAdeCtx.due)||0; const sum=l.reduce((s,p)=>s+(Number(p.amt)||0),0); const ok=Math.abs(sum-due)<0.005; sumEl.innerHTML=(ok?'<span style="color:#28b463;">✅ ':'<span style="color:#ff8a4c;">⚠️ ')+'Suma: '+formatMoney(sum)+' / saldo '+formatMoney(due)+(ok?'':' — deben ser iguales')+'</span>'; }
+window.svcAdeRender=function(){
+  const box=document.getElementById('svc-ade-list'); if(!box) return;
+  const list=window._svcAdeDraft||[];
+  box.innerHTML=list.map(function(p,i){ const isEnd=(p.mode==='end');
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:9px;margin-bottom:8px;">'
+      +'<div style="display:flex;gap:7px;align-items:flex-end;">'
+        +'<div style="flex:1;"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:2px;">Pago '+(i+1)+' · monto</label><input type="number" inputmode="decimal" step="0.01" value="'+(Number(p.amt)||0).toFixed(2)+'" oninput="svcAdeSet('+i+',\'amt\',this.value)" style="'+_adeIN+'"></div>'
+        +(list.length>1?'<button onclick="svcAdeDelRow('+i+')" title="Quitar" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:9px 11px;font-size:14px;cursor:pointer;line-height:1;">🗑</button>':'')
+      +'</div>'
+      +'<div style="display:flex;gap:7px;margin-top:7px;">'
+        +'<button onclick="svcAdeSet('+i+',\'mode\',\'date\')" style="flex:1;background:'+(!isEnd?'var(--gold)':'var(--surface3)')+';color:'+(!isEnd?'var(--navy3)':'var(--muted)')+';border:1px solid '+(!isEnd?'var(--gold)':'var(--border)')+';border-radius:9px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;">📅 En fecha</button>'
+        +'<button onclick="svcAdeSet('+i+',\'mode\',\'end\')" style="flex:1;background:'+(isEnd?'#4d9bff':'var(--surface3)')+';color:'+(isEnd?'#061024':'var(--muted)')+';border:1px solid '+(isEnd?'#1f6feb':'var(--border)')+';border-radius:9px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;">🏁 Al final del contrato</button>'
+      +'</div>'
+      +(isEnd?'':'<input type="date" value="'+(p.date||'')+'" oninput="svcAdeSet('+i+',\'date\',this.value)" style="'+_adeIN+';margin-top:7px;">')
+    +'</div>';
+  }).join('');
+  _svcAdeSum();
+};
+window.svcAdeSet=function(i,k,v){ const l=window._svcAdeDraft||[]; if(!l[i]) return; l[i][k]=v; if(k==='mode'){ svcAdeRender(); } else if(k==='amt'){ _svcAdeSum(); } };
+window.svcAdeAddRow=function(){
+  const l=window._svcAdeDraft||(window._svcAdeDraft=[]);
+  let base=new Date(); const last=l[l.length-1]; if(last&&last.mode==='date'&&last.date){ const d=new Date(last.date+'T12:00:00'); if(!isNaN(d)) base=d; }
+  base.setDate(base.getDate()+7); const p=n=>String(n).padStart(2,'0'); const ds=base.getFullYear()+'-'+p(base.getMonth()+1)+'-'+p(base.getDate());
+  l.push({ amt:0, mode:'date', date:ds }); svcAdeRender();
+};
+window.svcAdeDelRow=function(i){ const l=window._svcAdeDraft||[]; l.splice(i,1); svcAdeRender(); };
+window.svcAdeCreate=async function(id){
+  const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
+  const c=clients.find(x=>x.id===o.clientId); if(!o.clientId||!c){ alert('Liga o crea el cliente en la orden primero.'); return; }
+  const total=(Number(o.grandTotalCents)||0)/100, paid=(Number(o.paidCents)||0)/100, cont=(Number(o.toContractCents)||0)/100;
+  const due=Math.max(0, total-paid-cont); const dueC=Math.round(due*100);
+  const list=(window._svcAdeDraft||[]).map(p=>({ amtCents:Math.round((Number(p.amt)||0)*100), mode:(p.mode==='end'?'end':'date'), date:(p.mode==='end'?'':String(p.date||'')) })).filter(p=>p.amtCents>0);
+  if(!list.length){ alert('Agrega al menos un pago.'); return; }
+  for(const p of list){ if(p.mode==='date' && !p.date){ alert('Cada pago con fecha necesita su día (o ponlo "al final del contrato").'); return; } }
+  const sum=list.reduce((s,p)=>s+p.amtCents,0);
+  if(Math.abs(sum-dueC)>1){ alert('La suma de los pagos ('+formatMoney(sum/100)+') debe ser igual al saldo ('+formatMoney(due)+').'); return; }
+  const human=list.map(p=>'• '+formatMoney(p.amtCents/100)+' '+(p.mode==='end'?'al final del contrato':('el '+p.date))).join('\n');
+  if(!confirm('📄 Crear adendum para '+(c.name||'este cliente')+' por '+formatMoney(due)+':\n\n'+human+'\n\nSe agrega a su contrato de venta y al cliente le salen estos pagos en su app. ¿Crear?')) return;
+  try{
+    const installments=list.map((p,i)=>({ id:'in_'+Date.now().toString(36)+'_'+i, amtCents:p.amtCents, due:(p.mode==='end'?'contract_end':p.date), paidCents:0, paidAt:null }));
+    const addonId='ad_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    const contractNumber='LMG-ADD-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5);
+    const concept='Servicio'+(o.orderNum?(' orden #'+o.orderNum):'')+(o.vehicleLabel?(' · '+o.vehicleLabel):(o.plate?(' · '+o.plate):''));
+    const addon={ id:addonId, concept, principalCents:dueC, financeChargeCents:0, totalCents:dueC, numPay:list.length, freq:'custom', installments, breakdown:{ partsCents:Number(o.partsTotalCents)||0, laborCents:Number(o.laborTotalCents)||0 }, payments:[], settled:false, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', contractNumber, signedContract:null, sourceOrderId:id, kind:'service-adendum' };
+    await httpsCallable(functions,'svcCharge')({ orderId:id, method:'contract', amountCents:dueC, reconcile:true });   // 1) saldo → contrato (toContractCents)
+    await updateDoc(doc(db,'clients',c.id), { addons: arrayUnion(addon) });                                            // 2) crea adendum
+    c.addons=[...(c.addons||[]), addon];
+    try{ await updateDoc(doc(db,'serviceOrders',id), { promises:[], promisedAt:'', promisedAmtCents:0 }); }catch(e){}   // 3) limpia promesas viejas
+    const _o=svcOrders.find(x=>x.id===id); if(_o){ _o.toContractCents=(Number(_o.toContractCents)||0)+dueC; _o.balanceCents=0; _o.promises=[]; }
+    const ov=document.getElementById('svc-caja'); if(ov) ov.remove();
+    try{ renderAll&&renderAll(); }catch(e){} try{ renderTodayBox(); }catch(e){}
+    if(confirm('✅ Adendum creado ('+formatMoney(due)+', '+list.length+' pago'+(list.length>1?'s':'')+').\n\n¿Generar el adendum para firmar en la tableta?')){ try{ openAddonContract(c, addon); }catch(e){ alert('Adendum creado, pero no se pudo abrir el documento: '+((e&&e.message)||e)); } }
+  }catch(e){ alert('No se pudo crear el adendum: '+((e&&e.message)||e)); }
 };
 // 📅 Promesas de pago (varias): render/añadir/quitar filas, leer y guardar la lista.
 const _promIN='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--text);font-size:15px;';
