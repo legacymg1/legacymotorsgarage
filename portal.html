@@ -556,11 +556,18 @@ window.verifyCode = async function(){
 function _showPreviewBanner(){
   if(document.getElementById('preview-banner')) return;
   const b=document.createElement('div'); b.id='preview-banner';
-  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483646;background:linear-gradient(135deg,#6b4ea8,#8a63c9);color:#fff;font-weight:800;font-size:13px;text-align:center;padding:9px 12px;box-shadow:0 2px 10px rgba(0,0,0,.3);';
-  b.innerHTML='👁️ Vista previa — esto es lo que ve <b>'+((currentClient&&currentClient.name)?String(currentClient.name):'el cliente')+'</b> (solo lectura)';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483646;background:linear-gradient(135deg,#6b4ea8,#8a63c9);color:#fff;font-weight:800;font-size:13px;padding:9px 12px;box-shadow:0 2px 10px rgba(0,0,0,.3);display:flex;align-items:center;gap:10px;cursor:pointer;';
+  b.innerHTML='<span style="flex:1;text-align:center;">👁️ Vista previa — esto es lo que ve <b>'+((currentClient&&currentClient.name)?String(currentClient.name):'el cliente')+'</b> (solo lectura)</span>'
+    +'<button onclick="exitPreview()" style="flex:none;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">✕ Salir</button>';
   document.body.appendChild(b);
-  try{ document.body.style.paddingTop='38px'; }catch(e){}
+  try{ document.body.style.paddingTop='42px'; }catch(e){}
 }
+// ✕ Salir de la vista previa de dueño: cierra la pestaña si se abrió con "Ver como cliente", o regresa a admin.
+window.exitPreview=function(){
+  try{ window.close(); }catch(e){}
+  // Si no se pudo cerrar (no fue abierta por script), regresa a admin.
+  setTimeout(function(){ try{ location.href='admin.html'; }catch(e){} }, 120);
+};
 onAuthStateChanged(auth, async (user)=>{
   // 👁️ VISTA PREVIA DE DUEÑO: portal.html?preview=<clientId> abierto desde admin por un staff (mismo origen, misma sesión).
   const _prevId=new URLSearchParams(location.search).get('preview');
