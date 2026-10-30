@@ -2944,8 +2944,15 @@ window.svcTogglePart=async function(orderId, kEnc){
   const key=p=>((p.desc||'')+'|'+(p.priceCents!=null?p.priceCents:Math.round((Number(p.price)||0)*100)));
   const all=parts.length>0 && parts.every(p=>recv[key(p)]);
   const patch={ partsRecv:recv, updatedAt:new Date().toISOString() };
-  if(all && !o.partsReadyAt) patch.partsReadyAt=new Date().toISOString();   // 🔔 dispara aviso al cliente (onServiceStatus)
-  try{ await updateDoc(doc(db,'serviceOrders',orderId), patch); if(window._svcDraft) svcRenderModal(); }catch(e){ alert('No se pudo actualizar: '+((e&&e.message)||e)); }
+  if(all){
+    if(!o.partsReadyAt) patch.partsReadyAt=new Date().toISOString();   // 🔔 dispara aviso al cliente (onServiceStatus)
+    // ✅ Ya llegaron TODAS → sale de "Esperando partes". El trabajo puede continuar.
+    if(o.status==='pausado_partes' || o.status==='arrancado'){ patch.status='en_proceso'; if(!o.startedAt) patch.startedAt=new Date().toISOString(); }
+  } else {
+    // Si quitas una refacción (vuelve a faltar) y estaba "en proceso" por partes → regresa a "Esperando partes".
+    if(o.status==='en_proceso' && o.partsReadyAt){ patch.status='pausado_partes'; patch.partsReadyAt=null; }
+  }
+  try{ await updateDoc(doc(db,'serviceOrders',orderId), patch); const _o=svcOrders.find(x=>x.id===orderId); if(_o){ Object.assign(_o, patch); } if(window._svcDraft){ if(patch.status) window._svcDraft.status=patch.status; svcRenderModal(); } }catch(e){ alert('No se pudo actualizar: '+((e&&e.message)||e)); }
 };
 window.svcEstPrint=function(){ const html=window._svcEstHtml||''; const w=window.open('','_blank'); if(!w){ alert('Permite las ventanas emergentes para imprimir.'); return; } w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Legacy Motors Garage</title></head><body>'+html+'</body></html>'); w.document.close(); w.focus(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400); };
 // 🧾 RECIBO de una orden (pagada o no): misma hoja, modo recibo (sello PAGADO + pagado/saldo). Imprimir o enviar link del portal.
