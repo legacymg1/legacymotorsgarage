@@ -1542,6 +1542,9 @@ const SVC_STATUS = {
 };
 const SVC_IN='width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box;';
 function svcEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+// 🖥️ En Mac, hacer clic en un campo de fecha NO abre el calendario (solo el iconito). Esto hace que al tocar
+// cualquier parte del campo se abra el calendario nativo (igual que en iPhone). Aplica a TODOS los <input type=date/time>.
+try{ document.addEventListener('click', function(e){ const t=e.target; if(t && t.tagName==='INPUT' && (t.type==='date'||t.type==='datetime-local'||t.type==='time'||t.type==='month') && typeof t.showPicker==='function'){ try{ t.showPicker(); }catch(_){} } }, true); }catch(e){}
 function SVC_SEC(title,inner){ return '<div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'+title+'</div>'+inner+'</div>'; }
 
 // 🔔 Aviso visible (toast) — el admin no tenía ninguno. Salta aunque no estés en la vista de servicio.
