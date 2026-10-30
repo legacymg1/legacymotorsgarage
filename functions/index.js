@@ -1875,6 +1875,38 @@ exports.addonSign = onCall({ timeoutSeconds: 60 }, async (request) => {
   await ref.set({ addons: updated }, { merge: true });
   return { ok: true, url };
 });
+// 🧰 TEMP (quitar tras usar): inspeccionar/corregir una orden de servicio (pagado real, al-contrato, saldo).
+exports.svcFixTmp = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
+  const db = admin.firestore();
+  const q = req.query || {};
+  if (q.apply === "1") {
+    const orderId = String(q.orderId || ""); if (!orderId) { res.json({ error: "orderId requerido" }); return; }
+    const oref = db.collection("serviceOrders").doc(orderId);
+    const os = await oref.get(); if (!os.exists) { res.json({ error: "orden no existe" }); return; }
+    const o = os.data() || {};
+    const total = Number(o.grandTotalCents) || 0;
+    const paidCents = q.paidCents != null ? Math.round(Number(q.paidCents)) : (Number(o.paidCents) || 0);
+    const toContractCents = q.toContract != null ? Math.round(Number(q.toContract)) : (Number(o.toContractCents) || 0);
+    const bal = Math.max(0, total - paidCents - toContractCents);
+    const patch = { paidCents, toContractCents, balanceCents: bal, paid: (bal <= 0 && total > 0), promises: [], promisedAt: "", promisedAmtCents: 0, updatedAt: new Date().toISOString() };
+    if (bal > 0 && o.status === "entregado") patch.status = "en_proceso";   // ya no está entregada si debe
+    await oref.set(patch, { merge: true });
+    let removed = 0;
+    if (q.rmAddons === "1" && o.clientId) {
+      const cref = db.collection("clients").doc(o.clientId);
+      const cs = await cref.get();
+      if (cs.exists) { const cd = cs.data() || {}; const addons = Array.isArray(cd.addons) ? cd.addons : []; const keep = addons.filter((a) => !(a && a.sourceOrderId === orderId)); removed = addons.length - keep.length; await cref.set({ addons: keep }, { merge: true }); }
+    }
+    res.json({ ok: true, orderId, applied: patch, removedAddons: removed }); return;
+  }
+  const find = String(q.find || "").toLowerCase();
+  const snap = await db.collection("serviceOrders").get();
+  const rows = [];
+  snap.forEach((d) => { const o = d.data() || {}; if (find && !String(o.clientName || "").toLowerCase().includes(find) && !String(o.orderNum || "").includes(find)) return; rows.push({ id: d.id, orderNum: o.orderNum || null, clientName: o.clientName || "", clientId: o.clientId || "", grandTotalCents: o.grandTotalCents || 0, paidCents: o.paidCents || 0, toContractCents: o.toContractCents || 0, balanceCents: o.balanceCents, paid: !!o.paid, status: o.status || "", promises: (o.promises || []).length }); });
+  const out = { ok: true, count: rows.length, rows };
+  if (find && rows.length) { try { const cids = Array.from(new Set(rows.map((r) => r.clientId).filter(Boolean))); out.addons = {}; for (const cid of cids) { const cs = await db.collection("clients").doc(cid).get(); if (cs.exists) { out.addons[cid] = (Array.isArray(cs.data().addons) ? cs.data().addons : []).map((a) => ({ id: a.id, concept: a.concept, totalCents: a.totalCents, sourceOrderId: a.sourceOrderId || "", signed: !!(a.signedContract && a.signedContract.url) })); } } } catch (e) {} }
+  res.json(out);
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
