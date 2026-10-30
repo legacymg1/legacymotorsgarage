@@ -1816,6 +1816,7 @@ window.svcChargeOpen=function(id){
   // 📄 Plan de pagos del adendum: arranca con 1 pago = todo el saldo (fecha +7). Se editan/agregan filas.
   window._svcAdeCtx={ orderId:id, due:due };
   window._svcAdeDraft=[{ amt:due, mode:'date', date:_promDef }];
+  window._svcAdeInterest=false;   // 💵 interés opcional (toggle); por defecto SIN interés
   const IN='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--text);font-size:16px;';
   let ov=document.getElementById('svc-caja');
   if(!ov){ ov=document.createElement('div'); ov.id='svc-caja'; ov.style.cssText='position:fixed;inset:0;z-index:2147483200;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) ov.remove(); }; document.body.appendChild(ov); }
@@ -1843,6 +1844,10 @@ window.svcChargeOpen=function(id){
         +'<div style="background:rgba(240,192,64,.07);border:1px solid rgba(240,192,64,.35);border-radius:12px;padding:12px;">'
           +'<div style="font-weight:800;font-size:14px;margin-bottom:4px;color:#f0c040;">📄 Adendum · Plan de pagos del saldo</div>'
           +'<div style="font-size:11px;color:var(--faint);margin-bottom:10px;line-height:1.4;">Divide el <b>saldo ('+formatMoney(due)+')</b> en pagos. Cada pago lleva un <b>monto</b> y una <b>fecha</b>, o se va <b>al último pago de su contrato</b>. Se firma como adendum al contrato de venta y al cliente le salen sus pagos en la app.</div>'
+          +'<div style="display:flex;gap:7px;margin-bottom:10px;">'
+            +'<button id="svc-ade-noint" onclick="svcAdeInterestSet(false)" style="flex:1;border-radius:9px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;">Sin interés</button>'
+            +'<button id="svc-ade-int" onclick="svcAdeInterestSet(true)" style="flex:1;border-radius:9px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;">Con interés (20%/6m)</button>'
+          +'</div>'
           +'<div id="svc-ade-list"></div>'
           +'<button onclick="svcAdeAddRow()" style="width:100%;background:transparent;border:1px dashed rgba(240,192,64,.6);color:#f0c040;border-radius:10px;padding:9px;font-weight:700;font-size:12px;cursor:pointer;margin:2px 0 8px;">➕ Agregar pago</button>'
           +'<div id="svc-ade-sum" style="font-size:12px;font-weight:700;text-align:center;margin:4px 0 10px;"></div>'
@@ -1855,9 +1860,30 @@ window.svcChargeOpen=function(id){
   +'</div>';
   if(due>0){ try{ svcAdeRender(); }catch(e){} }   // 📄 pinta las filas del plan de pagos (adendum)
 };
-// 📄 PLAN DE PAGOS (ADENDUM): filas = {amt, mode:'date'|'end', date}. Suma debe = saldo.
+// 📄 PLAN DE PAGOS (ADENDUM): filas = {amt, mode:'date'|'end', date}. Suma debe = objetivo (saldo, o saldo+interés).
 const _adeIN='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--text);font-size:15px;';
-function _svcAdeSum(){ const sumEl=document.getElementById('svc-ade-sum'); if(!sumEl) return; const l=window._svcAdeDraft||[]; const due=(window._svcAdeCtx&&window._svcAdeCtx.due)||0; const sum=l.reduce((s,p)=>s+(Number(p.amt)||0),0); const ok=Math.abs(sum-due)<0.005; sumEl.innerHTML=(ok?'<span style="color:#28b463;">✅ ':'<span style="color:#ff8a4c;">⚠️ ')+'Suma: '+formatMoney(sum)+' / saldo '+formatMoney(due)+(ok?'':' — deben ser iguales')+'</span>'; }
+// 💵 Interés OPCIONAL: 20%/6 meses prorrateado por el plazo (de hoy al último pago CON FECHA). Sin fecha = sin interés.
+function _svcAdeFC(){
+  if(!window._svcAdeInterest) return 0;
+  const due=(window._svcAdeCtx&&window._svcAdeCtx.due)||0; if(due<=0) return 0;
+  let maxD=null; (window._svcAdeDraft||[]).forEach(p=>{ if(p.mode!=='end' && p.date){ const d=new Date(p.date+'T12:00:00'); if(!isNaN(d)&&(!maxD||d>maxD)) maxD=d; } });
+  if(!maxD) return 0;
+  const months=Math.max(0.25,(maxD-new Date())/(1000*60*60*24*30.44));
+  return Math.round(due*0.20*(months/6)*100)/100;
+}
+function _svcAdeIntStyle(){
+  const on=!!window._svcAdeInterest; const a=document.getElementById('svc-ade-noint'), b=document.getElementById('svc-ade-int');
+  if(a){ a.style.cssText='flex:1;border-radius:9px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;border:1px solid '+(!on?'var(--gold)':'var(--border)')+';background:'+(!on?'var(--gold)':'var(--surface3)')+';color:'+(!on?'var(--navy3)':'var(--muted)')+';'; }
+  if(b){ b.style.cssText='flex:1;border-radius:9px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;border:1px solid '+(on?'#f0c040':'var(--border)')+';background:'+(on?'#f0c040':'var(--surface3)')+';color:'+(on?'var(--navy3)':'var(--muted)')+';'; }
+}
+window.svcAdeInterestSet=function(on){ window._svcAdeInterest=!!on; _svcAdeIntStyle(); _svcAdeSum(); };
+function _svcAdeSum(){ const sumEl=document.getElementById('svc-ade-sum'); if(!sumEl) return;
+  const l=window._svcAdeDraft||[]; const due=(window._svcAdeCtx&&window._svcAdeCtx.due)||0;
+  const fc=_svcAdeFC(); const target=due+fc; const sum=l.reduce((s,p)=>s+(Number(p.amt)||0),0); const ok=Math.abs(sum-target)<0.005;
+  const head=(ok?'<span style="color:#28b463;">✅ ':'<span style="color:#ff8a4c;">⚠️ ')+'Suma: '+formatMoney(sum)+' / objetivo '+formatMoney(target)+(ok?'':' — deben ser iguales')+'</span>';
+  const line=fc>0?('<div style="font-size:11px;color:var(--muted);margin-top:3px;">saldo '+formatMoney(due)+' + interés '+formatMoney(fc)+' = '+formatMoney(target)+'</div>'):'';
+  sumEl.innerHTML=head+line;
+}
 window.svcAdeRender=function(){
   const box=document.getElementById('svc-ade-list'); if(!box) return;
   const list=window._svcAdeDraft||[];
@@ -1874,9 +1900,9 @@ window.svcAdeRender=function(){
       +(isEnd?'':'<input type="date" value="'+(p.date||'')+'" oninput="svcAdeSet('+i+',\'date\',this.value)" style="'+_adeIN+';margin-top:7px;">')
     +'</div>';
   }).join('');
-  _svcAdeSum();
+  _svcAdeIntStyle(); _svcAdeSum();
 };
-window.svcAdeSet=function(i,k,v){ const l=window._svcAdeDraft||[]; if(!l[i]) return; l[i][k]=v; if(k==='mode'){ svcAdeRender(); } else if(k==='amt'){ _svcAdeSum(); } };
+window.svcAdeSet=function(i,k,v){ const l=window._svcAdeDraft||[]; if(!l[i]) return; l[i][k]=v; if(k==='mode'){ svcAdeRender(); } else { _svcAdeSum(); } };   // amt o date → recalcula (el interés depende de la última fecha)
 window.svcAdeAddRow=function(){
   const l=window._svcAdeDraft||(window._svcAdeDraft=[]);
   let base=new Date(); const last=l[l.length-1]; if(last&&last.mode==='date'&&last.date){ const d=new Date(last.date+'T12:00:00'); if(!isNaN(d)) base=d; }
@@ -1893,15 +1919,16 @@ window.svcAdeCreate=async function(id){
   if(!list.length){ alert('Agrega al menos un pago.'); return; }
   for(const p of list){ if(p.mode==='date' && !p.date){ alert('Cada pago con fecha necesita su día (o ponlo "al final del contrato").'); return; } }
   const sum=list.reduce((s,p)=>s+p.amtCents,0);
-  if(Math.abs(sum-dueC)>1){ alert('La suma de los pagos ('+formatMoney(sum/100)+') debe ser igual al saldo ('+formatMoney(due)+').'); return; }
+  const fcC=Math.round(_svcAdeFC()*100); const targetC=dueC+fcC;   // objetivo = saldo (+ interés si está activo)
+  if(Math.abs(sum-targetC)>1){ alert('La suma de los pagos ('+formatMoney(sum/100)+') debe ser igual al objetivo ('+formatMoney(targetC/100)+(fcC>0?(' = saldo '+formatMoney(due)+' + interés '+formatMoney(fcC/100)):'')+').'); return; }
   const human=list.map(p=>'• '+formatMoney(p.amtCents/100)+' '+(p.mode==='end'?'al final del contrato':('el '+p.date))).join('\n');
-  if(!confirm('📄 Crear adendum para '+(c.name||'este cliente')+' por '+formatMoney(due)+':\n\n'+human+'\n\nSe agrega a su contrato de venta y al cliente le salen estos pagos en su app. ¿Crear?')) return;
+  if(!confirm('📄 Crear adendum para '+(c.name||'este cliente')+' por '+formatMoney(targetC/100)+(fcC>0?(' (saldo '+formatMoney(due)+' + interés '+formatMoney(fcC/100)+')'):'')+':\n\n'+human+'\n\nSe agrega a su contrato de venta y al cliente le salen estos pagos en su app. ¿Crear?')) return;
   try{
     const installments=list.map((p,i)=>({ id:'in_'+Date.now().toString(36)+'_'+i, amtCents:p.amtCents, due:(p.mode==='end'?'contract_end':p.date), paidCents:0, paidAt:null }));
     const addonId='ad_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
     const contractNumber='LMG-ADD-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5);
     const concept='Servicio'+(o.orderNum?(' orden #'+o.orderNum):'')+(o.vehicleLabel?(' · '+o.vehicleLabel):(o.plate?(' · '+o.plate):''));
-    const addon={ id:addonId, concept, principalCents:dueC, financeChargeCents:0, totalCents:dueC, numPay:list.length, freq:'custom', installments, breakdown:{ partsCents:Number(o.partsTotalCents)||0, laborCents:Number(o.laborTotalCents)||0 }, payments:[], settled:false, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', contractNumber, signedContract:null, sourceOrderId:id, kind:'service-adendum' };
+    const addon={ id:addonId, concept, principalCents:dueC, financeChargeCents:fcC, totalCents:targetC, numPay:list.length, freq:'custom', interest:(fcC>0), installments, breakdown:{ partsCents:Number(o.partsTotalCents)||0, laborCents:Number(o.laborTotalCents)||0 }, payments:[], settled:false, createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'', contractNumber, signedContract:null, sourceOrderId:id, kind:'service-adendum' };
     await httpsCallable(functions,'svcCharge')({ orderId:id, method:'contract', amountCents:dueC, reconcile:true });   // 1) saldo → contrato (toContractCents)
     await updateDoc(doc(db,'clients',c.id), { addons: arrayUnion(addon) });                                            // 2) crea adendum
     c.addons=[...(c.addons||[]), addon];
