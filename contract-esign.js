@@ -200,6 +200,22 @@ window.signAndSave = async function(){
     var db=FS.getFirestore(app);
     var snap=await FS.getDoc(FS.doc(db,'clients',clientId));
     var data=snap.exists()?snap.data():{};
+    // ➕ PÁGINA DE ADENDUM (cargo adicional): mira SOLO la firma del cargo. NUNCA el contrato del carro,
+    // así no bloquea ni se confunde con él, y jamás lo puede anular/reemplazar.
+    var addonId=q.get('addonId');
+    if(addonId){
+      var _a=(Array.isArray(data.addons)?data.addons:[]).filter(function(x){return x&&x.id===addonId;})[0];
+      var _asc=_a&&_a.signedContract;
+      if(correcting){
+        var bA=document.createElement('div'); bA.className='lmg-banner no-print';
+        bA.style.cssText='position:sticky;top:0;z-index:9998;background:#b45309;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;text-align:center;';
+        bA.innerHTML='✏️ CORRIGIENDO EL ADENDUM — al firmar se reemplaza la firma de ESTE cargo. El contrato del carro NO se toca.';
+        document.body.insertBefore(bA, document.body.firstChild);
+        return;
+      }
+      if(_asc && _asc.status==='active'){ lockContract(_asc, []); }
+      return;   // nunca caer al bloqueo del contrato del carro
+    }
     if(correcting){
       var reason=''; try{ reason=sessionStorage.getItem('correctionReason')||''; }catch(e){}
       var nextV=((data.signedContractVersions||[]).length)+1;

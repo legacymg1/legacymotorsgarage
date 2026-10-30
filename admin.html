@@ -1328,8 +1328,16 @@ window.saveAddon=async function(){
   }catch(e){ alert('Error: '+((e&&e.message)||e)); }
   if(btn){ btn.disabled=false; btn.textContent='Guardar y firmar contrato'; }
 };
+// 📅 Fecha en que se COBRA el cargo: al FINAL del contrato del carro = su último pago programado.
+// (Si ya guardamos una en el addon, se respeta; si no, se toma del calendario del cliente.)
+function _addonDueDate(c, addon){
+  try{ if(addon && addon.dueDate) return addon.dueDate; }catch(e){}
+  try{ const s=Array.isArray(c.schedule)?c.schedule:[]; if(s.length) return s[s.length-1]; }catch(e){}
+  return '';
+}
 window.openAddonContract=function(c, addon){
   const g=id=>{ const el=document.getElementById(id); return el?(el.value||''):''; };
+  const due=_addonDueDate(c, addon);   // cuándo se cobra (último pago del carro)
   const params=new URLSearchParams({
     clientId:c.id, addonId:addon.id, contractNum:addon.contractNumber,
     name:c.name||'', phone:c.phone||'', dob:c.dob||'', address:c.address||'',
@@ -1338,7 +1346,7 @@ window.openAddonContract=function(c, addon){
     year:c.year||'', make:c.make||'', model:c.model||'', trim:c.trim||'', color:c.color||'', vin:c.vin||'', miles:c.miles||'',
     concept:addon.concept||'', principal:(addon.principalCents/100).toFixed(2), financeCharge:(addon.financeChargeCents/100).toFixed(2),
     total:(addon.totalCents/100).toFixed(2), numPay:addon.numPay||0, weekly:Number(addon.weekly||0).toFixed(2), lastPayment:Number(addon.lastPayment||addon.weekly||0).toFixed(2), freq:addon.freq||'weekly',
-    lang:c.lang||'es', contractDate:today()
+    lang:c.lang||'es', contractDate:today(), firstDue:due
   });
   _showContractLinks('contracts_addon.html?'+params.toString()+'&_cb='+Date.now(), '');
 };

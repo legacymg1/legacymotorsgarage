@@ -283,13 +283,16 @@
   const freqAdj  = { weekly:'weekly', biweekly:'bi-weekly', monthly:'monthly' }[freq] || 'weekly';
   const freqWordEs = { weekly:'semanales', biweekly:'quincenales', monthly:'mensuales' }[freq] || 'semanales';
   const freqAdjEs  = { weekly:'semanal', biweekly:'quincenal', monthly:'mensual' }[freq] || 'semanal';
-  // Primer pago = un periodo después de la fecha del contrato (editable antes de firmar)
+  // Fecha del contrato
   const cd = p.get('contractDate') ? new Date(p.get('contractDate')+'T12:00:00') : new Date();
-  const first = new Date(cd);
-  if(freq==='monthly') first.setMonth(first.getMonth()+1);
-  else first.setDate(first.getDate() + (freq==='biweekly'?14:7));
+  // Primer pago: si viene firstDue (se cobra AL FINAL del contrato del carro = su último pago), se usa esa.
+  // Si no, cae al cálculo viejo (un periodo después). Editable antes de firmar.
+  let first;
+  const fd = p.get('firstDue');
+  if(fd){ first = new Date(fd+'T12:00:00'); }
+  else { first = new Date(cd); if(freq==='monthly') first.setMonth(first.getMonth()+1); else first.setDate(first.getDate() + (freq==='biweekly'?14:7)); }
   const contDateStr = cd.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
-  const firstStr = first.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
+  const firstStr = (first && !isNaN(first.getTime())) ? first.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}) : '';
 
   document.body.innerHTML = document.body.innerHTML
     .replace(/{{CONTRACT_NUMBER}}/g, p.get('contractNum')||'')
@@ -325,6 +328,6 @@
   document.querySelectorAll('.payment-row span:last-child').forEach(el=>{ el.contentEditable='true'; el.style.cursor='text'; el.style.outline='none'; el.style.minWidth='60px'; el.style.display='inline-block'; });
 })();
 </script>
-<script type="module" src="contract-esign.js?v=3"></script>
+<script type="module" src="contract-esign.js?v=4"></script>
 </body>
 </html>
