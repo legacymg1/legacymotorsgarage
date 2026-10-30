@@ -1234,37 +1234,69 @@ async function checkSquareReturn(){
   }catch(e){}
 }
 
-// 📄 SECCIÓN "MIS CONTRATOS" — solo para clientes que YA firmaron electrónicamente.
-// Devuelve '' (nada) si el cliente no tiene ningún contrato firmado.
+// 📅 Cuándo se cobra el cargo = último pago del carro (para el "first payment" del adendum).
+function _portalAddonDue(c){ try{ const s=Array.isArray(c.schedule)?c.schedule:[]; if(s.length) return s[s.length-1]; }catch(e){} return ''; }
+// ✍️ Abre el contrato del cargo para que el CLIENTE lo firme desde su app (misma sesión, firma vía Cloud Function).
+window.portalSignAddon=function(addonId){
+  const c=currentClient||{}; const a=(c.addons||[]).find(x=>x&&x.id===addonId); if(!a){ return; }
+  const due=_portalAddonDue(c);
+  const p=new URLSearchParams({
+    clientId:c.id||'', addonId:a.id, contractNum:a.contractNumber||'',
+    name:c.name||'', phone:c.phone||'', dob:c.dob||'', address:c.address||'',
+    city:c.city||'', state:c.state||'', zip:c.zip||'',
+    idType:c.idType||'', idNumber:c.idNumber||'', idState:c.idState||'CA', idExpiry:c.idExpiry||'',
+    year:c.year||'', make:c.make||'', model:c.model||'', trim:c.trim||'', color:c.color||'', vin:c.vin||'', miles:c.miles||'',
+    concept:a.concept||'', principal:((a.principalCents||0)/100).toFixed(2), financeCharge:((a.financeChargeCents||0)/100).toFixed(2),
+    total:((a.totalCents||0)/100).toFixed(2), numPay:a.numPay||0, weekly:Number(a.weekly||0).toFixed(2), lastPayment:Number(a.lastPayment||a.weekly||0).toFixed(2), freq:a.freq||'weekly',
+    lang:(L==='en'?'en':'es'), contractDate:(new Date()).toISOString().slice(0,10), firstDue:due
+  });
+  window.location.href='contracts_addon.html?'+p.toString()+'&_cb='+Date.now();
+};
+// 📄 SECCIÓN "MIS CONTRATOS" — muestra los contratos firmados (compra + cargos) Y los cargos POR FIRMAR.
 function contractsSectionHTML(c){
   const items = [];
   const sc = c.signedContract;
   if(sc && sc.url && (sc.status==='active' || !sc.status)){
-    items.push({label:(L==='en'?'Purchase contract':'Contrato de compra'), num:sc.contractNumber, date:sc.signedAt, url:sc.url});
+    items.push({label:(L==='en'?'Purchase contract':'Contrato de compra'), num:sc.contractNumber, date:sc.signedAt, url:sc.url, signed:true});
   }
   (c.addons||[]).forEach(function(a){
-    const asc = a && a.signedContract;
+    if(!a) return;
+    const asc = a.signedContract;
     if(asc && asc.url && (asc.status==='active' || !asc.status)){
-      items.push({label:(L==='en'?'Additional charge agreement':'Contrato de cargo adicional'), num:asc.contractNumber, date:asc.signedAt, url:asc.url});
+      items.push({label:(L==='en'?'Additional charge agreement':'Contrato de cargo adicional'), num:asc.contractNumber, date:asc.signedAt, url:asc.url, signed:true});
+    } else {
+      // Cargo SIN firmar → tarjeta "por firmar" (el cliente lo firma desde su app).
+      items.push({label:(L==='en'?'Additional charge agreement':'Contrato de cargo adicional'), num:a.contractNumber, addonId:a.id, concept:a.concept||'', signed:false});
     }
   });
   if(!items.length) return '';
   const rows = items.map(function(it){
-    let ds='';
-    try{ const d=new Date(it.date); ds=isNaN(d.getTime())?(it.date||''):d.toLocaleDateString(L==='en'?'en-US':'es-US',{year:'numeric',month:'short',day:'numeric'}); }catch(e){ ds=it.date||''; }
+    if(it.signed){
+      let ds='';
+      try{ const d=new Date(it.date); ds=isNaN(d.getTime())?(it.date||''):d.toLocaleDateString(L==='en'?'en-US':'es-US',{year:'numeric',month:'short',day:'numeric'}); }catch(e){ ds=it.date||''; }
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-top:1px solid var(--border);">
+        <div style="min-width:0;">
+          <div style="font-weight:600;font-size:14px;color:var(--white);">${it.label}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${it.num?('#'+it.num+' · '):''}${L==='en'?'Signed':'Firmado'} ${ds}</div>
+        </div>
+        <a href="${it.url}" target="_blank" rel="noopener" style="flex:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap;">${L==='en'?'View':'Ver'}</a>
+      </div>`;
+    }
+    // Por firmar
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-top:1px solid var(--border);">
       <div style="min-width:0;">
-        <div style="font-weight:600;font-size:14px;color:var(--white);">${it.label}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${it.num?('#'+it.num+' · '):''}${L==='en'?'Signed':'Firmado'} ${ds}</div>
+        <div style="font-weight:600;font-size:14px;color:var(--white);">${it.label}${it.concept?(' <span style="color:var(--muted);font-weight:400;">· '+String(it.concept)+'</span>'):''}</div>
+        <div style="font-size:12px;color:#f0c040;margin-top:2px;font-weight:700;">⚠️ ${L==='en'?'Pending your signature':'Pendiente de tu firma'}</div>
       </div>
-      <a href="${it.url}" target="_blank" rel="noopener" style="flex:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap;">${L==='en'?'View':'Ver'}</a>
+      <button onclick="portalSignAddon('${it.addonId}')" style="flex:none;background:#f0c040;color:var(--navy3);border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">✍️ ${L==='en'?'Sign now':'Firmar ahora'}</button>
     </div>`;
   }).join('');
+  const anyPending = items.some(it=>!it.signed);
   return `<div class="insurance-section" id="contracts-section" style="margin-top:16px;">
     <div style="display:flex;align-items:center;gap:8px;">
       <span style="font-weight:600;font-size:15px;">📄 ${L==='en'?'My contracts':'Mis contratos'}</span>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin-top:4px;">${L==='en'?'Your signed documents, available anytime.':'Tus documentos firmados, disponibles cuando quieras.'}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">${anyPending?(L==='en'?'Sign your pending agreement, and view your signed documents anytime.':'Firma tu contrato pendiente y consulta tus documentos firmados cuando quieras.'):(L==='en'?'Your signed documents, available anytime.':'Tus documentos firmados, disponibles cuando quieras.')}</div>
     ${rows}
   </div>`;
 }

@@ -1787,6 +1787,54 @@ async function _actorIdentity(request) {
   }
   return null;
 }
+// ✍️ FIRMA DEL ADENDUM (cargo adicional) — la puede guardar el STAFF (email) o el PROPIO cliente (teléfono).
+// Sube el HTML firmado a Storage y escribe la firma SOLO en c.addons[].signedContract. NUNCA toca el contrato del carro.
+// (Los clientes por teléfono no pueden escribir su doc por reglas de Firestore → por eso pasa por aquí con admin SDK.)
+exports.addonSign = onCall({ timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const tok = request.auth.token || {};
+  const email = String(tok.email || "").toLowerCase();
+  const phone = String(tok.phone_number || "");
+  const d = request.data || {};
+  const clientId = String(d.clientId || "");
+  const addonId = String(d.addonId || "");
+  const html = String(d.snapshotHTML || "");
+  const contractNum = String(d.contractNum || ("LMG-ADD-" + new Date().getFullYear() + "-" + String(Date.now()).slice(-5)));
+  const hash = String(d.hash || "");
+  if (!clientId || !addonId || !html) throw new HttpsError("invalid-argument", "Faltan datos del contrato.");
+  if (html.length > 6000000) throw new HttpsError("invalid-argument", "Documento demasiado grande.");
+  const db = admin.firestore();
+  const ref = db.collection("clients").doc(clientId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Cliente no encontrado.");
+  const c = snap.data() || {};
+  // Autorización: staff (cualquier email autenticado) o el PROPIO cliente (su teléfono coincide con el del expediente).
+  const isStaff = !!email;
+  let isSelf = false;
+  if (phone) {
+    const digits = phone.replace(/\D/g, "");
+    const cand = [c.phoneE164, c.phone].map((x) => String(x || "").replace(/\D/g, "")).filter(Boolean);
+    isSelf = cand.some((x) => x === digits || x.slice(-10) === digits.slice(-10));
+  }
+  if (!isStaff && !isSelf) throw new HttpsError("permission-denied", "No autorizado para firmar este contrato.");
+  // 1) Guarda el HTML firmado en Storage con token de descarga (URL que el cliente puede abrir).
+  const bucket = admin.storage().bucket();
+  const key = "contracts/" + clientId + "/addon-" + addonId + "-" + contractNum + ".html";
+  let token; try { token = require("crypto").randomUUID(); } catch (e) { token = Date.now() + "-" + Math.random().toString(36).slice(2); }
+  await bucket.file(key).save(Buffer.from(html, "utf8"), { contentType: "text/html; charset=utf-8", resumable: false, metadata: { cacheControl: "public,max-age=31536000", metadata: { firebaseStorageDownloadTokens: token } } });
+  const url = wmTokenUrl(bucket.name, key, token);
+  // 2) Escribe la firma SOLO en el cargo (nunca signedContract/signedContractVersions del carro).
+  const nowISO = new Date().toISOString();
+  const addons = Array.isArray(c.addons) ? c.addons.slice() : [];
+  let found = false;
+  const updated = addons.map((a) => {
+    if (a && a.id === addonId) { found = true; return Object.assign({}, a, { signedContract: { url, contractNumber: contractNum, signedAt: nowISO, method: "esign", status: "active", hash, signedBy: (email || phone || "cliente") } }); }
+    return a;
+  });
+  if (!found) throw new HttpsError("not-found", "Cargo no encontrado.");
+  await ref.set({ addons: updated }, { merge: true });
+  return { ok: true, url };
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");

@@ -147,9 +147,19 @@ window.signAndSave = async function(){
     var db=FS.getFirestore(app), st=ST.getStorage(app);
     var cnum=q.get('contractNum')||('LMG-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-5));
     var addonId=q.get('addonId');
+    // ➕ CARGO ADICIONAL firmado por el CLIENTE (teléfono, sin email): va por Cloud Function (admin SDK).
+    // Se hace ANTES de leer el doc para no chocar con reglas de Firestore (el cliente no puede leer/escribir por id).
+    if(addonId && !(__user && __user.email)){
+      var FN=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js');
+      var fns=FN.getFunctions(app);
+      await FN.httpsCallable(fns,'addonSign')({ clientId:clientId, addonId:addonId, contractNum:cnum, snapshotHTML:snapshotHTML, hash:hashHex });
+      alert('¡Contrato del cargo firmado y guardado! Numero: '+cnum+'.');
+      var _u3A=new URL(window.location.href); _u3A.searchParams.set('_cb', String(Date.now())); window.location.href=_u3A.toString();
+      return;
+    }
     var snap=await FS.getDoc(FS.doc(db,'clients',clientId));
     var existing=snap.exists()?snap.data():{};
-    // ➕ CARGO ADICIONAL: la firma se guarda EN el cargo (c.addons[]), sin tocar el contrato del carro.
+    // ➕ CARGO ADICIONAL firmado por STAFF (email): ruta directa a Storage + Firestore (como hoy). Nunca toca el contrato del carro.
     if(addonId){
       var _nowA=new Date().toISOString();
       var _addons=Array.isArray(existing.addons)?existing.addons.slice():[];
