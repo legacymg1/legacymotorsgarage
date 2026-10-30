@@ -1992,6 +1992,9 @@ window.svcToContract=async function(id){
   const amtEl=document.getElementById('svc-caja-contract-amt');
   let amt=amtEl?Number(amtEl.value):due; if(!(amt>0)){ alert('Escribe el monto que vas a mandar al contrato.'); return; }
   if(amt>due+0.004) amt=due;
+  // 🛡️ Evita duplicados: si ya mandaste un cargo de ESTA orden al contrato, pregunta antes de crear otro.
+  const _dup=(Array.isArray(c.addons)?c.addons:[]).find(a=>a&&a.sourceOrderId===id);
+  if(_dup && !confirm('⚠️ Ya mandaste un cargo de esta orden al contrato de '+(c.name||'este cliente')+' ('+formatMoney((Number(_dup.totalCents)||0)/100)+').\n\n¿Mandar OTRO cargo igual? (normalmente NO).')) return;
   const concept='Servicio'+(o.orderNum?(' orden #'+o.orderNum):'')+(o.vehicleLabel?(' · '+o.vehicleLabel):(o.plate?(' · '+o.plate):''));
   if(!confirm('¿Mandar '+formatMoney(amt)+' al contrato de '+(c.name||'este cliente')+'?\n\nSe agrega como cargo de 1 solo pago (SIN interés) a su cuenta y se cobra al FINAL de su contrato.\nEsto quita ese monto del saldo de la orden de servicio.')) return;
   try{

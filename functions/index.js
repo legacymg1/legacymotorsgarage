@@ -1277,6 +1277,30 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
       p = { title: "🗓️ Tu cita quedó agendada", body: "Te esperamos" + (dt ? (" el " + dt) : "") + " para " + veh + fol + ".", titleEn: "🗓️ Your appointment is set", bodyEn: "See you" + (dtEn ? (" on " + dtEn) : "") + " for " + vehEn + fol + "." };
     }
     if (ownerP) { try { await _pushToOwners(ownerP); } catch (e) {} }   // 📦 avisa a los dueños (refacciones completas)
+    // 🔧 Servicio COMPLETADO (pagado o entregado) → actualiza "último servicio" del cliente y del vehículo.
+    // Así el "Próximo servicio" (3 meses) del portal se recalcula solo (antes se quedaba con la fecha vieja).
+    try {
+      const justDone = ((!before.paid && after.paid) || (before.status !== "entregado" && after.status === "entregado"));
+      if (justDone && after.clientId) {
+        const dstr = ((new Date().toLocaleString("en-CA", { timeZone: "America/Los_Angeles" }).split(",")[0]) || "").trim(); // YYYY-MM-DD en LA
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dstr)) {
+          const cref = admin.firestore().collection("clients").doc(after.clientId);
+          const csnap = await cref.get();
+          if (csnap.exists) {
+            const cd = csnap.data() || {};
+            const patch = { lastServiceDate: dstr };
+            if (Array.isArray(cd.vehicles) && cd.vehicles.length) {
+              const vin = String(after.vin || "").toUpperCase();
+              patch.vehicles = cd.vehicles.map((v) => {
+                if (v && ((vin && String(v.vin || "").toUpperCase() === vin) || (!vin && String(v.label || "") === String(after.vehicleLabel || "")))) { return Object.assign({}, v, { lastServiceDate: dstr }); }
+                return v;
+              });
+            }
+            await cref.set(patch, { merge: true });
+          }
+        }
+      }
+    } catch (e) { console.log("lastService update", e); }
     if (!p) return;
     p.url = "/portal.html?order=" + event.params.id;
     await _pushToClient(after.clientId || "", after.clientPhone || "", p);
@@ -2271,6 +2295,7 @@ function _estPayload(o, en) {
     paid: !!o.paid, paidCents: Number(o.paidCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
     sentAt: o.estimateSentAt || "", acceptedAt: o.estimateAcceptedAt || "", createdAt: o.createdAt || "", partsReadyAt: o.partsReadyAt || "", partsPaidAt: o.partsPaidAt || "",
     scheduledAt: o.scheduledAt || "", receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", promisedAt: o.promisedAt || "", deliveredAt: o.deliveredAt || "",
+    promises: (Array.isArray(o.promises) ? o.promises.map((p) => ({ date: p.date || "", amtCents: Number(p.amtCents) || 0 })) : []),
   };
 }
 // El PORTAL del cliente lee sus estimados por aquí (no puede leer serviceOrders directo: no es staff).
