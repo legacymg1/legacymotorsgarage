@@ -1221,6 +1221,32 @@ window.portalPayAdendum = async function(addonId, amountCents){
     window.location.href = j.url;
   }catch(e){ alert((es?'No se pudo iniciar el pago: ':'Could not start payment: ')+((e&&e.message)||e)); }
 };
+// 💳 Saldo de un cargo (addon): si tiene cuotas, suma lo pendiente; si es cargo viejo, total − pagos.
+function _portalAddonBal(a){
+  if(Array.isArray(a.installments)&&a.installments.length) return a.installments.reduce((s,x)=>s+Math.max(0,(Number(x.amtCents)||0)-(Number(x.paidCents)||0)),0)/100;
+  const paid=(a.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0);
+  return Math.max(0, (Number(a.totalCents)||0)/100 - paid);
+}
+// 💳 "CARGOS ADICIONALES" — cada deuda extra con Legacy, por separado (cargos SIN cuotas; los planes salen en su orden).
+function extraDebtsHTML(c){
+  const es=L!=='en';
+  const freqW={weekly:(es?'semanal':'weekly'),biweekly:(es?'quincenal':'bi-weekly'),monthly:(es?'mensual':'monthly')};
+  const list=(c.addons||[]).filter(a=> a && !(Array.isArray(a.installments)&&a.installments.length) && _portalAddonBal(a)>0.005);
+  if(!list.length) return '';
+  const rows=list.map(function(a){ const bal=_portalAddonBal(a); const w=Number(a.weekly)||0; const fq=freqW[a.freq||'weekly']||freqW.weekly;
+    return `<div style="padding:13px 0;border-top:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="min-width:0;"><div style="font-weight:600;font-size:14px;color:var(--white);">${escPortal(a.concept||(es?'Cargo adicional':'Additional charge'))}</div>
+          ${w>0?`<div style="font-size:12px;color:var(--muted);margin-top:2px;">${formatMoney(w)} ${fq}</div>`:''}</div>
+        <div style="flex:none;text-align:right;"><div style="font-size:15px;font-weight:800;color:var(--gold);">${formatMoney(bal)}</div><div style="font-size:11px;color:var(--muted);">${es?'pendiente':'remaining'}</div></div>
+      </div></div>`;
+  }).join('');
+  return `<div class="insurance-section" style="margin-top:16px;">
+    <div style="display:flex;align-items:center;gap:8px;"><span style="font-weight:600;font-size:15px;">💳 ${es?'Cargos adicionales':'Additional charges'}</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">${es?'Se cobran junto con tus pagos del vehículo.':'Collected together with your vehicle payments.'}</div>
+    ${rows}
+  </div>`;
+}
 // 📄 "TU PLAN DE PAGOS" — cada cuota con su fecha y su botón; + pagar todo. Se aplica FIFO al más próximo.
 // orderId opcional: si se pasa, solo el plan ligado a ESA orden (para mostrarlo INLINE en la tarjeta de la orden).
 function adendumPlanHTML(c, orderId){
@@ -1532,7 +1558,9 @@ function renderPortal() {
     ${insComplete ? insSectionHTML : ''}
     ${idComplete ? idSectionHTML : ''}
 
-    <!-- El plan de pagos ahora sale INLINE dentro de la tarjeta de su orden (no aquí abajo). -->
+    <!-- El plan de pagos de servicio sale INLINE dentro de la tarjeta de su orden. -->
+    <!-- 💳 CARGOS ADICIONALES (deudas extra sin cuotas) — cada una por separado -->
+    ${extraDebtsHTML(c)}
     <!-- 📄 MIS CONTRATOS (solo si el cliente ya firmó electrónicamente) -->
     ${contractsSectionHTML(c)}
 
