@@ -2002,6 +2002,21 @@ exports.addonSign = onCall({ timeoutSeconds: 60 }, async (request) => {
   await ref.set({ addons: updated }, { merge: true });
   return { ok: true, url };
 });
+// 🧰 TEMP (quitar): ver teléfono exacto (+ clave de 10 dígitos) por nombre, o corregir uno.
+exports.cliPhoneTmp = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
+  const db = admin.firestore(); const q = req.query || {};
+  const key = (s) => { const d = String(s || "").replace(/\D/g, ""); return d.length >= 10 ? d.slice(-10) : ("(<10:" + d + ")"); };
+  if (q.apply === "setphone") {
+    const clientId = String(q.clientId || ""); const phone = String(q.phone || "").replace(/\D/g, "");
+    if (!clientId || phone.length !== 10) { res.json({ error: "clientId + phone(10)" }); return; }
+    await db.collection("clients").doc(clientId).set({ phone: phone, phoneE164: "+1" + phone }, { merge: true });
+    res.json({ ok: true, clientId, phone, phoneE164: "+1" + phone }); return;
+  }
+  const find = String(q.find || "").toLowerCase(); const out = [];
+  const cs = await db.collection("clients").get();
+  cs.forEach((d) => { const c = d.data() || {}; if (find && !String(c.name || "").toLowerCase().includes(find)) return; out.push({ id: d.id, name: c.name || "", phone: c.phone || "", phoneE164: c.phoneE164 || "", key10: key(c.phoneE164 || c.phone), vin: c.vin || "" }); });
+  res.json({ out });
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
