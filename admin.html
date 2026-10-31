@@ -2710,14 +2710,16 @@ function svcRenderModal(){
   let bannerHtml='';
   if(isEdit){
     const sl=(typeof svcStatusLabel==='function')?svcStatusLabel(_svcOrd):{txt:'',col:'var(--muted)'};
-    const _pc=Number(_svcOrd.paidCents)||0, _tot=Number(_svcOrd.grandTotalCents)||0;
-    const _bal=_svcOrd.balanceCents!=null?Number(_svcOrd.balanceCents):Math.max(0,_tot-_pc);
+    const _pc=Number(_svcOrd.paidCents)||0, _tot=Number(_svcOrd.grandTotalCents)||0, _tc=Number(_svcOrd.toContractCents)||0;
+    const _bal=_svcOrd.balanceCents!=null?Number(_svcOrd.balanceCents):Math.max(0,_tot-_pc-_tc);
+    const _planBit=_tc>0?(' · 🏷️ '+formatMoney(_tc/100)+' en plan de pagos'):'';
     const _m=(_svcOrd.payMethod==='cash')?' · efectivo':((_svcOrd.payMethod==='terminal')?' · tarjeta (en persona)':(((_svcOrd.payMethod||'').indexOf('square')===0)?' · tarjeta':''));
     const _dt=_svcOrd.paidAt?(' · '+new Date(_svcOrd.paidAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})):'';
     let paidBit='', paidCol='#28b463';
     if(_svcOrd.paid){ paidBit='✅ Pagado '+formatMoney((_pc||_tot)/100)+_m+(_svcOrd.private?' · 🔒':'')+_dt; }
-    else if(_pc>0){ paidBit='💵 Abonado '+formatMoney(_pc/100)+' · Saldo '+formatMoney(_bal/100)+_m+(_svcOrd.reconciled?' · ✅ ya en Finanzas':'')+_dt; paidCol='var(--gold)'; }
-    const showRcpt=(_svcOrd.paid||_pc>0);
+    else if(_pc>0){ paidBit='💵 Abonado '+formatMoney(_pc/100)+_planBit+' · Saldo '+formatMoney(_bal/100)+_m+(_svcOrd.reconciled?' · ✅ ya en Finanzas':'')+_dt; paidCol='var(--gold)'; }
+    else if(_tc>0){ paidBit='🏷️ '+formatMoney(_tc/100)+' en plan de pagos · Saldo '+formatMoney(_bal/100); paidCol='#4d9bff'; }
+    const showRcpt=(_svcOrd.paid||_pc>0||_tc>0);
     bannerHtml='<div style="background:'+sl.col+'1f;border:1px solid '+sl.col+';border-radius:12px;padding:10px 13px;margin-bottom:'+(paidBit?'8px':'14px')+';display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">'
       +'<span style="font-weight:800;color:'+sl.col+';font-size:14px;">'+sl.txt+'</span>'
       +'<span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
