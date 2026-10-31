@@ -2063,6 +2063,23 @@ exports.svcReminderBackfillTmp = onRequest({ cors: true, timeoutSeconds: 120 }, 
   }
   res.json({ ok: true, apply, changedCount: changed.length, changed });
 });
+// 🧰 TEMP (quitar): encuentra CLIENTES duplicados (mismo teléfono, o mismo nombre normalizado). Solo lee.
+exports.dupClientsTmp = onRequest({ cors: true, timeoutSeconds: 60 }, async (req, res) => {
+  const db = admin.firestore();
+  const normName = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+  const normPh = (s) => String(s || "").replace(/\D/g, "").slice(-10);
+  const byPhone = {}, byName = {};
+  const cs = await db.collection("clients").get();
+  cs.forEach((d) => {
+    const c = d.data() || {};
+    const info = { id: d.id, name: c.name || "", phone: c.phone || c.phoneE164 || "", kind: c.kind || "", hasContract: !!(c.signedContract && c.signedContract.url), vehicles: (Array.isArray(c.vehicles) ? c.vehicles.length : 0), payments: (Array.isArray(c.payments) ? c.payments.length : 0), addons: (Array.isArray(c.addons) ? c.addons.length : 0), total: c.total || 0 };
+    const ph = normPh(c.phone || c.phoneE164); if (ph && ph.length === 10) { (byPhone[ph] = byPhone[ph] || []).push(info); }
+    const nm = normName(c.name); if (nm) { (byName[nm] = byName[nm] || []).push(info); }
+  });
+  const dupPhone = Object.keys(byPhone).filter((k) => byPhone[k].length > 1).map((k) => ({ phone: k, clients: byPhone[k] }));
+  const dupName = Object.keys(byName).filter((k) => byName[k].length > 1).map((k) => ({ name: k, clients: byName[k] }));
+  res.json({ ok: true, totalClients: cs.size, dupByPhoneCount: dupPhone.length, dupByNameCount: dupName.length, dupPhone, dupName });
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
