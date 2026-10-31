@@ -1464,6 +1464,13 @@ function _normName(s){ return String(s||'').toLowerCase().normalize('NFD').repla
 // Agrupamos por teléfono en las vistas, sin migrar datos. [[multi-car-per-client]]
 function _phoneKey(c){ const d=String((c&&(c.phoneE164||c.phone))||'').replace(/\D/g,''); return d.length>=10?d.slice(-10):''; }   // últimos 10 dígitos (tolera +1 / formatos)
 function _clientGroup(c){ if(!c) return []; const k=_phoneKey(c); if(!k) return [c]; const g=clients.filter(x=>_phoneKey(x)===k); return g.length?g:[c]; }
+// Colapsa una lista de clientes a UNO por teléfono (rep = carro activo + teléfono con formato bonito). [[multi-car-per-client]]
+function _dedupeByPhone(arr){ const byPhone={}, noPhone=[]; (arr||[]).forEach(c=>{ const ph=_phoneKey(c); if(!ph){ noPhone.push(c); return; } (byPhone[ph]=byPhone[ph]||[]).push(c); });
+  const pretty=c=> /[()\-\s]/.test(String(c.phone||''))?1:0;
+  const score=c=> (!isPaidOff(c)?100:0)+(pretty(c)?20:0)+((c.signedContract&&c.signedContract.url)?8:0)+((c.payments||[]).length?2:0)+((c.vin||Number(c.total)>0)?1:0);
+  const reps=Object.keys(byPhone).map(ph=>{ const g=byPhone[ph]; if(g.length===1) return g[0]; g.sort((a,b)=> score(b)-score(a) || String(b.contractDate||b.createdAt||'').localeCompare(String(a.contractDate||a.createdAt||''))); return g[0]; });
+  return reps.concat(noPhone);
+}
 // Todos los vehículos del grupo (dedupe por VIN), con su registro dueño y si está financiado.
 function _groupVehicles(c){ const grp=_clientGroup(c); const out=[]; const seen=new Set();
   grp.forEach(gm=>{ (clientVehicles(gm)||[]).forEach((v,i)=>{ const vk=(v.vin||'').toUpperCase(); if(vk){ if(seen.has(vk)) return; seen.add(vk); }
@@ -2220,7 +2227,7 @@ window.c360Search=async function(){
   if(!q){ box.style.display='none'; box.innerHTML=''; return; }
   await c360LoadQuotes();
   const terms=q.split(/\s+/).filter(Boolean);
-  const hitC=clients.filter(c=>{ const hay=((c.name||'')+' '+(c.phone||'')+' '+((c.phone||'')+(c.phoneE164||'')).replace(/\D/g,'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.year||'')+' '+(c.vin||'')+' '+(c.plate||'')).toLowerCase(); return terms.every(t=>hay.indexOf(t)>=0); }).slice(0,50);
+  const hitC=_dedupeByPhone(clients.filter(c=>{ const hay=((c.name||'')+' '+(c.phone||'')+' '+((c.phone||'')+(c.phoneE164||'')).replace(/\D/g,'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.year||'')+' '+(c.vin||'')+' '+(c.plate||'')).toLowerCase(); return terms.every(t=>hay.indexOf(t)>=0); })).slice(0,50);
   const cliPhones=new Set(clients.map(c=>c.phoneE164).filter(Boolean));
   const seen=new Set(), leads=[];
   (_c360Quotes||[]).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).forEach(qz=>{ const ph=qz.phoneE164||''; if(ph&&cliPhones.has(ph))return; const hay=((qz.customer||'')+' '+(qz.phone||'')+' '+((qz.options&&qz.options[0]&&qz.options[0].car)||'')).toLowerCase(); if(!terms.every(t=>hay.indexOf(t)>=0))return; const k=ph||qz.phone||qz.id; if(seen.has(k))return; seen.add(k); leads.push(qz); });
@@ -4708,15 +4715,8 @@ window.renderAll = function() {
     const hay=(c.name+' '+c.phone+' '+((c.phone||'')+(c.phoneE164||'')).replace(/\D/g,'')+' '+c.make+' '+c.model+' '+c.year+' '+(c.vin||'')).toLowerCase();
     return searchTerms.every(term=>hay.includes(term));
   });
-  // 🚗👥 MULTICARRO: UNA fila por cliente (teléfono). Deja el registro principal; los demás carros se ven dentro de su tarjeta. [[multi-car-per-client]]
-  (function(){ const byPhone={}, noPhone=[];
-    filtered.forEach(c=>{ const ph=_phoneKey(c); if(!ph){ noPhone.push(c); return; } (byPhone[ph]=byPhone[ph]||[]).push(c); });
-    // Rep principal: prefiere el carro ACTIVO (no liquidado) → el cliente queda en "Pagos activos"; luego el de teléfono con formato bonito.
-    const pretty=c=> /[()\-\s]/.test(String(c.phone||''))?1:0;
-    const score=c=> (!isPaidOff(c)?100:0)+(pretty(c)?20:0)+((c.signedContract&&c.signedContract.url)?8:0)+((c.payments||[]).length?2:0)+((c.vin||Number(c.total)>0)?1:0);
-    const reps=Object.keys(byPhone).map(ph=>{ const g=byPhone[ph]; if(g.length===1) return g[0]; g.sort((a,b)=> score(b)-score(a) || String(b.contractDate||b.createdAt||'').localeCompare(String(a.contractDate||a.createdAt||''))); return g[0]; });
-    filtered = reps.concat(noPhone);
-  })();
+  // 🚗👥 MULTICARRO: UNA fila por cliente (teléfono). Los demás carros se ven dentro de su tarjeta. [[multi-car-per-client]]
+  filtered = _dedupeByPhone(filtered);
 
   // Apply sort
   if(currentSort==='next'){
@@ -5113,11 +5113,11 @@ window.cotCustomerSuggest=async function(val){
   if(q.length<2 && qDigits.length<3){ box.style.display='none'; box.innerHTML=''; return; }
   const terms=q.split(/\s+/).filter(Boolean);
   // 1) clientes de la base (cualquiera: dealer, servicio, partes, los que compraron)
-  const hitC=(clients||[]).filter(c=>{
+  const hitC=_dedupeByPhone((clients||[]).filter(c=>{
     if(qDigits.length>=3 && String(c.phone||'').replace(/[^0-9]/g,'').indexOf(qDigits)>=0) return true;
     const hay=((c.name||'')+' '+(c.phone||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.year||'')+' '+(c.vin||'')+' '+(c.plate||'')).toLowerCase();
     return terms.every(t=>hay.indexOf(t)>=0);
-  }).slice(0,8);
+  })).slice(0,8);
   // 2) cotizaciones (cotizaron pero quizá aún no son cliente) — sin duplicar los que ya están como cliente
   try{ if(_c360Quotes===null) await c360LoadQuotes(); }catch(e){}
   const cliPhones=new Set((clients||[]).map(c=>c.phoneE164).filter(Boolean));
