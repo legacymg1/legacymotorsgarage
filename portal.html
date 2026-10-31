@@ -1012,7 +1012,7 @@ function estimateCardHTML(o){
         </div>`}
     ${(!o.paid && Number(o.balance)>0 && !(Number(o.planTotalCents)>0))?
       `<button onclick="portalPayService('${o.id}')" style="width:100%;margin-top:10px;${accepted?'background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;':'background:transparent;border:1.5px solid var(--gold);color:var(--gold);'}border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">💳 ${es?'Pagar saldo':'Pay balance'} · ${formatMoney(o.balance)}</button><div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">${es?'Pago seguro por Square · puedes pagar todo o una parte · pagar también aprueba':'Secure payment by Square · full or partial · paying also approves'}</div>`
-    :((!o.paid && Number(o.balance)>0 && Number(o.planTotalCents)>0)?`<div style="margin-top:10px;background:rgba(31,111,235,.1);border:1px solid rgba(31,111,235,.4);color:#8fc0ff;border-radius:12px;padding:12px;font-size:13px;text-align:center;font-weight:700;">📄 ${es?'Tienes un plan de pagos — págalo abajo 👇':'You have a payment plan — pay it below 👇'}</div>`:'')}`;
+    :((!o.paid && Number(o.planTotalCents)>0)?adendumPlanHTML(currentClient, o.id):'')}`;
   return `
   <div class="info-card" id="est-${o.id}" style="margin-top:16px;${focus?'border:1px solid var(--gold);box-shadow:0 0 0 2px rgba(200,162,74,.25);':''}">
     <div ${o.paid?`onclick="portalToggleRcpt('${o.id}')" style="cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;"`:`style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"`}>
@@ -1222,9 +1222,11 @@ window.portalPayAdendum = async function(addonId, amountCents){
   }catch(e){ alert((es?'No se pudo iniciar el pago: ':'Could not start payment: ')+((e&&e.message)||e)); }
 };
 // 📄 "TU PLAN DE PAGOS" — cada cuota con su fecha y su botón; + pagar todo. Se aplica FIFO al más próximo.
-function adendumPlanHTML(c){
+// orderId opcional: si se pasa, solo el plan ligado a ESA orden (para mostrarlo INLINE en la tarjeta de la orden).
+function adendumPlanHTML(c, orderId){
   const es = L!=='en';
-  const plans = (c.addons||[]).filter(a=> a && Array.isArray(a.installments) && a.installments.length);
+  let plans = (c.addons||[]).filter(a=> a && Array.isArray(a.installments) && a.installments.length);
+  if(orderId) plans = plans.filter(a=> a.sourceOrderId===orderId);
   if(!plans.length) return '';
   return plans.map(function(a){
     const inst = a.installments.slice().sort(function(x,y){ const dx=x.due==='contract_end'?'9999-12-31':(x.due||'9999-12-30'); const dy=y.due==='contract_end'?'9999-12-31':(y.due||'9999-12-30'); return dx<dy?-1:(dx>dy?1:0); });
@@ -1530,8 +1532,8 @@ function renderPortal() {
     ${insComplete ? insSectionHTML : ''}
     ${idComplete ? idSectionHTML : ''}
 
+    <!-- El plan de pagos ahora sale INLINE dentro de la tarjeta de su orden (no aquí abajo). -->
     <!-- 📄 MIS CONTRATOS (solo si el cliente ya firmó electrónicamente) -->
-    ${adendumPlanHTML(c)}
     ${contractsSectionHTML(c)}
 
     <!-- MENSAJES DE TEXTO (discreto) -->
