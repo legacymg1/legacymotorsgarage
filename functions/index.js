@@ -734,6 +734,10 @@ async function _sqRecordOrderId(orderId) {
   if (order.metadata && order.metadata.kind === "service" && order.metadata.serviceOrderId) {
     return await _sqRecordServiceCharge(order);
   }
+  // 📄 ADENDUM (plan de pagos de servicio): el pago abona una CUOTA (FIFO) del adendum, no al carro.
+  if (order.metadata && order.metadata.kind === "adendum" && order.metadata.addonId) {
+    return await _sqRecordAdendumCharge(order);
+  }
   const tenders = Array.isArray(order.tenders) ? order.tenders : [];
   const paid = order.state === "COMPLETED" || (order.net_amount_due_money && Number(order.net_amount_due_money.amount) === 0 && tenders.length);
   if (!paid) { return { ok: false, status: order.state || "PENDING" }; }
@@ -805,6 +809,84 @@ async function _sqRecordServiceCharge(order) {
   return { ok: true, amount: Math.round(amountCents) / 100 };
 }
 
+// 📄 Aplica un pago a las CUOTAS de un adendum (FIFO: la más próxima a vencer primero; 'contract_end' al último).
+// Reduce installments[].paidCents, guarda el pago en addon.payments[], postea el INGRESO a Finanzas (category Servicio).
+// Idempotente por entryId. sq = {payId, grossCents, feeCents, netCents, last4} para el desglose de tarjeta (opcional).
+async function _adendumApplyPayment(db, clientId, addonId, amountCents, entryId, method, who, sq, priv) {
+  const nowISO = new Date().toISOString();
+  const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const cref = db.collection("clients").doc(clientId);
+  let clientName = "", concept = "", applied = 0, settled = false;
+  await db.runTransaction(async (tx) => {
+    const cs = await tx.get(cref);
+    if (!cs.exists) return;
+    const c = cs.data() || {}; clientName = c.name || "";
+    const addons = Array.isArray(c.addons) ? c.addons.map((a) => Object.assign({}, a)) : [];
+    const idx = addons.findIndex((a) => a && a.id === addonId);
+    if (idx < 0) return;
+    const a = addons[idx];
+    const pays = Array.isArray(a.payments) ? a.payments.slice() : [];
+    if (pays.some((p) => p && p.entryId === entryId)) { applied = -1; return; }   // ya registrado (idempotente)
+    concept = a.concept || "Plan de pagos";
+    // FIFO: ordenar cuotas por fecha (con fecha primero, 'contract_end' al final)
+    const inst = Array.isArray(a.installments) ? a.installments.map((x) => Object.assign({}, x)) : [];
+    const order = inst.map((x, i) => i).sort((i, j) => {
+      const di = inst[i].due === "contract_end" ? "9999-12-31" : (inst[i].due || "9999-12-30");
+      const dj = inst[j].due === "contract_end" ? "9999-12-31" : (inst[j].due || "9999-12-30");
+      return di < dj ? -1 : (di > dj ? 1 : 0);
+    });
+    let left = Math.round(amountCents);
+    for (const i of order) {
+      if (left <= 0) break;
+      const rem = Math.max(0, (Number(inst[i].amtCents) || 0) - (Number(inst[i].paidCents) || 0));
+      if (rem <= 0) continue;
+      const take = Math.min(rem, left);
+      inst[i].paidCents = (Number(inst[i].paidCents) || 0) + take;
+      if (inst[i].paidCents >= (Number(inst[i].amtCents) || 0)) inst[i].paidAt = nowISO;
+      left -= take;
+    }
+    applied = Math.round(amountCents) - left;   // lo que sí se aplicó a cuotas (sin sobrepago)
+    pays.push({ entryId, amtCents: Math.round(amountCents), applied, date: dateStr, method: method || "square", createdAt: nowISO, createdBy: who || method || "" });
+    a.installments = inst; a.payments = pays;
+    const bal = inst.reduce((s, x) => s + Math.max(0, (Number(x.amtCents) || 0) - (Number(x.paidCents) || 0)), 0);
+    a.settled = bal <= 0; settled = a.settled;
+    addons[idx] = a;
+    tx.update(cref, { addons });
+    // Ingreso a Finanzas (category Servicio). Bruto si vino tarjeta (sq.grossCents), si no el monto base.
+    tx.set(db.doc("transactions/" + entryId), {
+      entryId, type: "income", dept: "dealer", category: "Servicio", saleType: "servicio", private: !!priv,
+      clientId, clientName, addonId, amountCents: (sq && sq.grossCents) ? Math.round(sq.grossCents) : Math.round(amountCents),
+      method: method || "square", date: dateStr, createdAt: nowISO, createdBy: who || method || "adendum",
+      note: "Plan de pagos de servicio · " + concept + ((sq && Number(sq.feeCents) > 0) ? (" · bruto $" + (sq.grossCents / 100).toFixed(2) + " · comisión $" + (sq.feeCents / 100).toFixed(2) + " · neto $" + (sq.netCents / 100).toFixed(2)) : ""),
+      source: "adendum",
+      ...(sq ? { sqPaymentId: sq.payId || "", sqTotalCents: Math.round(sq.grossCents || 0), sqFeeCents: Math.round(sq.feeCents || 0), sqNetCents: Math.round(sq.netCents || 0), sqLast4: sq.last4 || "" } : {}),
+    });
+  });
+  // 💳 Gasto "Comisión Square" (idempotente por payId) si vino por tarjeta.
+  if (sq && sq.payId && Number(sq.feeCents) > 0) {
+    try { await _sqWriteFeeExpense(db, sq.payId, { feeCents: sq.feeCents, dept: "dealer", private: !!priv, clientId, clientName, dateStr, last4: sq.last4 || "", refNote: "Plan de pagos servicio" }); } catch (e) { console.error("sqfee adendum", e); }
+  }
+  return { ok: true, applied, settled, clientName };
+}
+// 📄 Registra el pago por Square de una CUOTA del adendum (idempotente por id del pago).
+async function _sqRecordAdendumCharge(order) {
+  const tenders = Array.isArray(order.tenders) ? order.tenders : [];
+  const paid = order.state === "COMPLETED" || (order.net_amount_due_money && Number(order.net_amount_due_money.amount) === 0 && tenders.length);
+  if (!paid) return { ok: false, status: order.state || "PENDING" };
+  const clientId = String(order.metadata.clientId || order.reference_id || "");
+  const addonId = String(order.metadata.addonId || "");
+  if (!clientId || !addonId) return { ok: false, error: "no_ref" };
+  let amountCents = 0;
+  try { amountCents = parseInt(order.metadata.baseCents, 10) || 0; } catch (e) {}
+  if (!amountCents) amountCents = Math.round((order.net_amounts && order.net_amounts.line_item_total_money && order.net_amounts.line_item_total_money.amount) || (order.total_money && order.total_money.amount) || 0);
+  const payId = (tenders[0] && tenders[0].id) || order.id;
+  const feePayId = (tenders[0] && (tenders[0].payment_id || tenders[0].id)) || order.id;
+  const db = admin.firestore();
+  const fee = await _sqGetFee(feePayId);
+  const gross = Math.round((order.total_money && Number(order.total_money.amount)) || (amountCents + Math.round(amountCents * 0.029)));
+  const sq = { payId: feePayId, grossCents: gross, feeCents: fee.feeCents, netCents: Math.max(0, gross - fee.feeCents), last4: fee.last4 };
+  return await _adendumApplyPayment(db, clientId, addonId, amountCents, "sq_" + payId, "square-link", "square", sq, order.metadata.priv === "1");
+}
 // Postea el ingreso de SERVICIO (bolsa dealer, category Servicio) + marca la orden pagada/entregada. Idempotente por entryId.
 // priv=true → transacción PRIVADA ("fuera de Legacy"): entra a Finanzas pero NO cuenta en los números de Legacy.
 async function _postServiceIncome(db, o, orderId, amountCents, method, entryId, who, priv, sq) {
@@ -1016,6 +1098,49 @@ exports.createServiceCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors
     const link = j.payment_link || {};
     res.status(200).json({ url: link.url || link.long_url || "", orderId: link.order_id || "" });
   } catch (e) { console.error("createServiceCheckout", e); res.status(500).json({ error: String((e && e.message) || e) }); }
+});
+
+// 📄 El CLIENTE paga una CUOTA de su adendum (plan de pagos de servicio) con tarjeta. Verifica que el adendum sea suyo (por teléfono).
+exports.createAdendumCheckout = onRequest({ secrets: [SQUARE_ACCESS_TOKEN], cors: true, timeoutSeconds: 30 }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
+  try {
+    const body = req.body || {};
+    const idToken = String(body.idToken || "");
+    if (!idToken) { res.status(401).json({ error: "auth" }); return; }
+    let decoded; try { decoded = await admin.auth().verifyIdToken(idToken); } catch (e) { res.status(401).json({ error: "auth" }); return; }
+    const phone = String(decoded.phone_number || "");
+    const clientId = String(body.clientId || "").slice(0, 80);
+    const addonId = String(body.addonId || "").slice(0, 80);
+    if (!clientId || !addonId) { res.status(400).json({ error: "args" }); return; }
+    const db = admin.firestore();
+    const cs = await db.collection("clients").doc(clientId).get();
+    if (!cs.exists) { res.status(404).json({ error: "client" }); return; }
+    const c = cs.data() || {};
+    if (!(phone && (c.phoneE164 || "") === phone)) { res.status(403).json({ error: "not_yours" }); return; }
+    const a = (Array.isArray(c.addons) ? c.addons : []).find((x) => x && x.id === addonId);
+    if (!a) { res.status(404).json({ error: "addon" }); return; }
+    const inst = Array.isArray(a.installments) ? a.installments : [];
+    const bal = inst.length ? inst.reduce((s, x) => s + Math.max(0, (Number(x.amtCents) || 0) - (Number(x.paidCents) || 0)), 0) : Math.max(0, (Number(a.totalCents) || 0) - (Array.isArray(a.payments) ? a.payments.reduce((s, p) => s + (Number(p.applied) || 0), 0) : 0));
+    let amountCents = body.amountCents != null ? Math.round(Number(body.amountCents)) : bal;
+    if (amountCents > bal) amountCents = bal;
+    if (!(amountCents >= 100)) { res.status(400).json({ error: "amount_min" }); return; }
+    const payload = {
+      idempotency_key: (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)),
+      order: {
+        location_id: SQUARE_LOCATION_ID, reference_id: clientId,
+        line_items: [{ name: "Plan de pagos — " + (a.concept || "Servicio"), quantity: "1", base_price_money: { amount: amountCents, currency: "USD" } }],
+        service_charges: [{ name: "Cargo por servicio / Service fee (2.9%)", percentage: "2.9", calculation_phase: "SUBTOTAL_PHASE" }],
+        metadata: { kind: "adendum", clientId, addonId, baseCents: String(amountCents) },
+      },
+      checkout_options: { redirect_url: "https://legacymotorsgarage.com/portal.html?sqdone=1", ask_for_shipping_address: false, accepted_payment_methods: { apple_pay: true, google_pay: true, cash_app_pay: true, afterpay_clearpay: false } },
+    };
+    const r = await fetch(SQUARE_API + "/v2/online-checkout/payment-links", { method: "POST", headers: _sqHeaders(), body: JSON.stringify(payload) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { console.error("createAdendumCheckout", JSON.stringify(j)); res.status(502).json({ error: (j.errors && j.errors[0] && j.errors[0].detail) || "square_error" }); return; }
+    const link = j.payment_link || {};
+    res.status(200).json({ url: link.url || link.long_url || "", orderId: link.order_id || "" });
+  } catch (e) { console.error("createAdendumCheckout", e); res.status(500).json({ error: String((e && e.message) || e) }); }
 });
 
 // 📟 VINCULAR SQUARE TERMINAL — paso 1: genera un código para teclear en el Terminal (Terminal API).

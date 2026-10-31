@@ -1200,6 +1200,51 @@ window.portalPayService = async function(orderId, mode){
     window.location.href = j.url;   // página segura de Square
   }catch(e){ alert((es?'No se pudo iniciar el pago: ':'Could not start payment: ')+((e&&e.message)||e)); }
 };
+// 📄 El cliente paga una cuota (o todo) de su PLAN DE PAGOS (adendum) con tarjeta. FIFO en el backend.
+window.portalPayAdendum = async function(addonId, amountCents){
+  const c = currentClient || {}; const es = L!=='en';
+  const a = (c.addons||[]).find(x=>x&&x.id===addonId); if(!a){ return; }
+  const inst = Array.isArray(a.installments)?a.installments:[];
+  const bal = inst.reduce((s,x)=>s+Math.max(0,(Number(x.amtCents)||0)-(Number(x.paidCents)||0)),0);
+  if(!(bal>0)){ alert(es?'Ya está pagado.':'Already paid.'); return; }
+  let suggest = (amountCents!=null)? Math.min(Math.round(amountCents), bal) : bal;
+  const v = prompt(es?('¿Cuánto quieres pagar con tarjeta? (todo o una parte)\nSaldo del plan: '+formatMoney(bal/100)+'\n\nNota: tu pago se aplica al pago más próximo a vencer.'):('How much to pay by card? (full or partial)\nPlan balance: '+formatMoney(bal/100)+'\n\nNote: your payment applies to the soonest due first.'), (suggest/100).toFixed(2));
+  if(v===null) return;
+  let amt = Math.round(parseFloat(String(v).replace(/[^0-9.]/g,''))*100);
+  if(!(amt>=100)){ alert(es?'Mínimo $1.00':'Minimum $1.00'); return; }
+  if(amt>bal) amt=bal;
+  try{
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(SQ_FN+'/createAdendumCheckout',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ idToken, clientId:c.id, addonId, amountCents:amt }) });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || !j.url){ throw new Error(j.error||('HTTP '+r.status)); }
+    window.location.href = j.url;
+  }catch(e){ alert((es?'No se pudo iniciar el pago: ':'Could not start payment: ')+((e&&e.message)||e)); }
+};
+// 📄 "TU PLAN DE PAGOS" — cada cuota con su fecha y su botón; + pagar todo. Se aplica FIFO al más próximo.
+function adendumPlanHTML(c){
+  const es = L!=='en';
+  const plans = (c.addons||[]).filter(a=> a && Array.isArray(a.installments) && a.installments.length);
+  if(!plans.length) return '';
+  return plans.map(function(a){
+    const inst = a.installments.slice().sort(function(x,y){ const dx=x.due==='contract_end'?'9999-12-31':(x.due||'9999-12-30'); const dy=y.due==='contract_end'?'9999-12-31':(y.due||'9999-12-30'); return dx<dy?-1:(dx>dy?1:0); });
+    const bal = inst.reduce((s,x)=>s+Math.max(0,(Number(x.amtCents)||0)-(Number(x.paidCents)||0)),0);
+    const rows = inst.map(function(p){
+      const amt=Number(p.amtCents)||0, pd=Number(p.paidCents)||0, rem=Math.max(0,amt-pd);
+      const done = rem<=0; const partial = pd>0 && !done;
+      let ds = (p.due==='contract_end') ? (es?'Al final de tu contrato':'At the end of your contract') : (function(){ try{ return new Date(p.due+'T12:00:00').toLocaleDateString(es?'es-US':'en-US',{year:'numeric',month:'short',day:'numeric'}); }catch(e){ return p.due||''; } })();
+      const tag = done?('<span style="color:#49d17f;font-weight:700;">✅ '+(es?'Pagado':'Paid')+'</span>') : (partial?('<span style="color:#f0c040;font-weight:700;">🔵 '+formatMoney(pd/100)+' / '+formatMoney(amt/100)+'</span>'):('<span style="color:var(--white);font-weight:700;">'+formatMoney(amt/100)+'</span>'));
+      const btn = (!done && bal>0)?('<button onclick="portalPayAdendum(\''+a.id+'\','+rem+')" style="flex:none;background:var(--card);border:1px solid var(--gold);color:var(--gold);border-radius:9px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">'+(es?'Pagar':'Pay')+' '+formatMoney(rem/100)+'</button>'):'';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-top:1px solid var(--border);"><div style="min-width:0;"><div style="font-size:13px;color:var(--muted);">📅 '+ds+'</div><div style="font-size:14px;margin-top:2px;">'+tag+'</div></div>'+btn+'</div>';
+    }).join('');
+    const payAll = (bal>0)?('<button onclick="portalPayAdendum(\''+a.id+'\','+bal+')" style="width:100%;margin-top:12px;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">💳 '+(es?'Pagar todo el plan':'Pay the whole plan')+' · '+formatMoney(bal/100)+'</button><div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">'+(es?'Pago seguro por Square · todo o una parte · se aplica al más próximo a vencer':'Secure payment by Square · full or partial · applies to the soonest due')+'</div>'):('<div style="margin-top:10px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:800;text-align:center;">✅ '+(es?'Plan pagado — ¡gracias!':'Plan paid — thank you!')+'</div>');
+    return '<div class="insurance-section" style="margin-top:16px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;"><span style="font-weight:600;font-size:15px;">📄 '+(es?'Tu plan de pagos':'Your payment plan')+'</span></div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-top:4px;">'+escPortal(a.concept||'')+' · '+(es?'saldo':'balance')+' '+formatMoney(bal/100)+'</div>'
+      +rows+payAll
+    +'</div>';
+  }).join('');
+}
 // 📲 INSTALAR LA APP (PWA) desde el portal: botón real en Android/Chrome; en iPhone muestra "Compartir → Agregar a inicio".
 (function(){
   let _dp=null;
@@ -1486,6 +1531,7 @@ function renderPortal() {
     ${idComplete ? idSectionHTML : ''}
 
     <!-- 📄 MIS CONTRATOS (solo si el cliente ya firmó electrónicamente) -->
+    ${adendumPlanHTML(c)}
     ${contractsSectionHTML(c)}
 
     <!-- MENSAJES DE TEXTO (discreto) -->

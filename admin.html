@@ -1813,6 +1813,15 @@ window.svcChargeOpen=function(id){
   const _promDef=o.promisedAt||(function(){ const d=new Date(); d.setDate(d.getDate()+7); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); })();
   const _promAmt=(Number(o.promisedAmtCents)||0)>0?(o.promisedAmtCents/100):due;   // monto específico de la promesa (edita si ya existía)
   const _cliHasAcct=!!(o.clientId && clients.find(x=>x.id===o.clientId));           // ¿el cliente tiene cuenta para mandarle al contrato?
+  // 🧾 Desglose de pagos RECIBIDOS (fecha + monto): el pago de la orden + los pagos de las cuotas del adendum ligado.
+  const _pagos=[];
+  if((Number(o.paidCents)||0)>0){ _pagos.push({ amt:(Number(o.paidCents)||0)/100, date:(o.paidAt||'').slice(0,10), method:(o.payMethod||'') }); }
+  try{ const _cl=clients.find(x=>x.id===o.clientId); if(_cl){ (_cl.addons||[]).forEach(a=>{ if(a&&a.sourceOrderId===id){ (a.payments||[]).forEach(p=>{ _pagos.push({ amt:(Number(p.applied!=null?p.applied:p.amtCents)||0)/100, date:(p.date||''), method:(p.method||''), plan:true }); }); } }); } }catch(e){}
+  const _mLbl=m=>(m==='cash'?'efectivo':(m&&String(m).indexOf('square')===0?'tarjeta':(m||'')));
+  const _pagosHtml=_pagos.length?('<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;font-size:13px;">'
+    +'<div style="font-weight:800;margin-bottom:6px;color:#49d17f;">🧾 Pagos recibidos</div>'
+    +_pagos.map(p=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;"><span style="color:var(--muted);">'+(p.plan?'📄 ':'💵 ')+(p.date||'—')+(p.method?(' · '+_mLbl(p.method)):'')+'</span><b>'+formatMoney(p.amt)+'</b></div>').join('')
+  +'</div>'):'';
   // 📄 Plan de pagos del adendum: arranca con 1 pago = todo el saldo (fecha +7). Se editan/agregan filas.
   window._svcAdeCtx={ orderId:id, due:due };
   window._svcAdeDraft=[{ amt:due, mode:'date', date:_promDef }];
@@ -1829,6 +1838,7 @@ window.svcChargeOpen=function(id){
       +(toContract>0?'<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:#4d9bff;">🏷️ Al contrato</span><b style="color:#4d9bff;">'+formatMoney(toContract)+'</b></div>':'')
       +'<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid var(--border);margin-top:4px;"><span style="font-weight:700;">Saldo por cobrar</span><b style="color:var(--gold);">'+formatMoney(due)+'</b></div>'
     +'</div>'
+    +_pagosHtml
     +(due>0
       ? '<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">💵 Cobrar ahora (puedes cobrar todo o un abono)</label>'
         +'<input id="svc-caja-amt" type="number" inputmode="decimal" step="0.01" value="'+due.toFixed(2)+'" style="'+IN+'margin-bottom:10px;">'
