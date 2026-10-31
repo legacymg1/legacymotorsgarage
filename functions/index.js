@@ -2443,7 +2443,7 @@ function _estPayload(o, en, planPaidCents, planTotalCents) {
   };
 }
 // El PORTAL del cliente lee sus estimados por aquí (no puede leer serviceOrders directo: no es staff).
-exports.svcPortalEstimates = onCall({ timeoutSeconds: 20 }, async (request) => {
+exports.svcPortalEstimates = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }, async (request) => {
   const cli = await _portalClient(request);
   const en = ((cli.data.lang || "") === "en");
   const db = admin.firestore();
@@ -2452,6 +2452,20 @@ exports.svcPortalEstimates = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!docs.length) { try { const s2 = await db.collection("serviceOrders").where("clientPhone", "==", cli.data.phone || "").get(); docs = s2.docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) {} }
   const withEst = docs.filter((o) => (o.estimateStatus === "sent" || o.estimateStatus === "accepted") || (Array.isArray(o.services) && o.services.length));
   withEst.sort((a, b) => ((b.createdAt || "") < (a.createdAt || "") ? -1 : 1));
+  // 🌐 Relleno bilingüe: el cliente SIEMPRE ve su idioma. Si una línea no tiene traducción real (sin _tr),
+  // se traduce (ES+EN) y se GUARDA en la orden (una sola vez por orden). Tope de 6 órdenes por carga para no tardar.
+  let _trCalls = 0;
+  for (const o of withEst) {
+    const svcs = Array.isArray(o.services) ? o.services : [];
+    if (!svcs.length || !svcs.some((s) => s && s.desc && !s._tr)) continue;
+    if (_trCalls >= 6) break; _trCalls++;
+    try {
+      const r = await _svcFixText(svcs.map((s) => (s && s.desc) || ""));
+      const fixed = svcs.map((s, i) => Object.assign({}, s, { desc: (r.es[i] || (s && s.desc) || ""), descEn: (r.en[i] || (s && s.desc) || ""), _tr: true }));
+      o.services = fixed;
+      await db.collection("serviceOrders").doc(o.id).set({ services: fixed }, { merge: true });
+    } catch (e) { console.error("portal tr", e); }
+  }
   // 📄 Pagado del plan (adendum) por orden: suma de installments.paidCents de los addons ligados (sourceOrderId).
   const planPaidByOrder = {}, planTotalByOrder = {};
   try { (Array.isArray(cli.data.addons) ? cli.data.addons : []).forEach((a) => { if (a && a.sourceOrderId && Array.isArray(a.installments)) { planPaidByOrder[a.sourceOrderId] = (planPaidByOrder[a.sourceOrderId] || 0) + a.installments.reduce((s, x) => s + (Number(x.paidCents) || 0), 0); planTotalByOrder[a.sourceOrderId] = (planTotalByOrder[a.sourceOrderId] || 0) + a.installments.reduce((s, x) => s + (Number(x.amtCents) || 0), 0); } }); } catch (e) {}
@@ -2480,11 +2494,10 @@ exports.svcClientAccept = onCall({ timeoutSeconds: 20 }, async (request) => {
 });
 
 // ✨ CORRECTOR + BILINGÜE de los trabajos de una orden de servicio. Entra una lista (ES/EN/mixto, con typos) → sale corregida en ES y EN (misma longitud/orden).
-exports.svcFixText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
-  const items = Array.isArray((request.data || {}).items)
-    ? request.data.items.map((x) => String(x || "").slice(0, 300)).filter(Boolean).slice(0, 20) : [];
-  if (!items.length) return { es: [], en: [] };
+// 🔤 Núcleo de corrección + traducción ES/EN de líneas de servicio (lo usan svcFixText y el relleno del portal).
+async function _svcFixText(rawItems) {
+  const items = (Array.isArray(rawItems) ? rawItems : []).map((x) => String(x || "").slice(0, 300)).slice(0, 20);
+  if (!items.filter(Boolean).length) return { es: items, en: items, fixed: items };
   const sys = "You clean up short auto-shop service line items written by shop staff. The input is a JSON array of strings; each is a service/job note that may be in Spanish, English, or mixed, with typos or abbreviations. " +
     "For EACH item: fix spelling and obvious grammar and keep it concise and faithful to the meaning. Do NOT add, merge, split, remove, reorder or invent items. Keep standard automotive part/term names. " +
     "Return ONLY strict JSON {\"es\":[...],\"en\":[...],\"fixed\":[...]} where \"es\" is each item corrected in natural Spanish, \"en\" each item corrected in natural English, and \"fixed\" each item corrected IN ITS OWN original language (Spanish stays Spanish, English stays English, mixed is cleaned up but not forced to one language — only fix spelling/grammar, do NOT translate). All three arrays have the SAME length and SAME order as the input. No prose, no code fences.";
@@ -2503,14 +2516,18 @@ exports.svcFixText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, as
     let es = Array.isArray(out.es) ? out.es.map((x) => String(x || "").slice(0, 300)) : [];
     let en = Array.isArray(out.en) ? out.en.map((x) => String(x || "").slice(0, 300)) : [];
     let fixed = Array.isArray(out.fixed) ? out.fixed.map((x) => String(x || "").slice(0, 300)) : [];
-    es = items.map((it, i) => es[i] || it);   // si la IA se desalinea o falta, cae al original
+    es = items.map((it, i) => es[i] || it);
     en = items.map((it, i) => en[i] || it);
     fixed = items.map((it, i) => fixed[i] || es[i] || it);
     return { es, en, fixed };
-  } catch (e) {
-    console.error("svcFixText", e);
-    return { es: items, en: items, fixed: items };   // si falla, no bloquea: regresa el original
-  }
+  } catch (e) { console.error("_svcFixText", e); return { es: items, en: items, fixed: items }; }
+}
+exports.svcFixText = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const items = Array.isArray((request.data || {}).items)
+    ? request.data.items.map((x) => String(x || "").slice(0, 300)).filter(Boolean).slice(0, 20) : [];
+  if (!items.length) return { es: [], en: [] };
+  return await _svcFixText(items);
 });
 
 // ⏱️💵 ESTIMADOR DE LABOR — dado el carro + los trabajos, la IA sugiere tiempo y cuánto cobrar de labor (estimado de referencia).
