@@ -4711,7 +4711,9 @@ window.renderAll = function() {
   // 🚗👥 MULTICARRO: UNA fila por cliente (teléfono). Deja el registro principal; los demás carros se ven dentro de su tarjeta. [[multi-car-per-client]]
   (function(){ const byPhone={}, noPhone=[];
     filtered.forEach(c=>{ const ph=_phoneKey(c); if(!ph){ noPhone.push(c); return; } (byPhone[ph]=byPhone[ph]||[]).push(c); });
-    const score=c=> (c.signedContract&&c.signedContract.url?8:0)+((c.vin||Number(c.total)>0)?4:0)+((c.payments||[]).length?2:0)+((c.schedule||[]).length?1:0);
+    // Rep principal: prefiere el carro ACTIVO (no liquidado) → el cliente queda en "Pagos activos"; luego el de teléfono con formato bonito.
+    const pretty=c=> /[()\-\s]/.test(String(c.phone||''))?1:0;
+    const score=c=> (!isPaidOff(c)?100:0)+(pretty(c)?20:0)+((c.signedContract&&c.signedContract.url)?8:0)+((c.payments||[]).length?2:0)+((c.vin||Number(c.total)>0)?1:0);
     const reps=Object.keys(byPhone).map(ph=>{ const g=byPhone[ph]; if(g.length===1) return g[0]; g.sort((a,b)=> score(b)-score(a) || String(b.contractDate||b.createdAt||'').localeCompare(String(a.contractDate||a.createdAt||''))); return g[0]; });
     filtered = reps.concat(noPhone);
   })();
