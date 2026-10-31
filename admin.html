@@ -1460,14 +1460,17 @@ function calcProgress(c) {
 }
 // ===== VEHÍCULOS: varios carros por cliente, identificados por VIN =====
 function clientVehicles(c){
-  const list=[]; const seen=new Set();
+  const list=[]; const seen=new Set(); const seenLbl=new Set();   // 🚗 dedupe por VIN Y por año/marca/modelo (sin-VIN no duplica a uno ya mostrado)
+  const _nl=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
   const pl=[c.year,c.make,c.model].filter(Boolean).join(' ');
   const pvin=(c.vin||'').toUpperCase();
-  if(pl||pvin){ list.push({vin:pvin, plate:(c.plate||''), label:(pl||('VIN …'+pvin.slice(-6))), color:c.color||'', primary:true, lastServiceDate:c.lastServiceDate||''}); if(pvin) seen.add(pvin); }
-  (c.vehicles||[]).forEach(v=>{
-    const k=(v.vin||'').toUpperCase();
-    if(k && seen.has(k)) return; if(k) seen.add(k);
-    list.push({vin:k, plate:(v.plate||''), label:(v.label||[v.year,v.make,v.model].filter(Boolean).join(' ')||('VIN …'+k.slice(-6))), color:v.color||'', lastServiceDate:v.lastServiceDate||''});
+  if(pl||pvin){ list.push({vin:pvin, plate:(c.plate||''), label:(pl||('VIN …'+pvin.slice(-6))), color:c.color||'', primary:true, lastServiceDate:c.lastServiceDate||''}); if(pvin) seen.add(pvin); if(_nl(pl)) seenLbl.add(_nl(pl)); }
+  // los que SÍ tienen VIN primero (se prefieren), luego los sin VIN
+  (c.vehicles||[]).slice().sort((a,b)=>((a.vin?0:1)-(b.vin?0:1))).forEach(v=>{
+    const k=(v.vin||'').toUpperCase(); const _lbl=(v.label||[v.year,v.make,v.model].filter(Boolean).join(' ')); const lk=_nl(_lbl);
+    if(k){ if(seen.has(k)) return; } else { if(lk && seenLbl.has(lk)) return; }   // sin-VIN que repite un año/marca/modelo ya mostrado = duplicado
+    if(k) seen.add(k); if(lk) seenLbl.add(lk);
+    list.push({vin:k, plate:(v.plate||''), label:(_lbl||('VIN …'+k.slice(-6))), color:v.color||'', lastServiceDate:v.lastServiceDate||''});
   });
   return list;
 }

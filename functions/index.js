@@ -2000,6 +2000,36 @@ exports.addonSign = onCall({ timeoutSeconds: 60 }, async (request) => {
   await ref.set({ addons: updated }, { merge: true });
   return { ok: true, url };
 });
+// 🧰 TEMP (quitar): dedupe MASIVO de vehicles[] en TODOS los clientes (quita carros repetidos: mismo VIN, o
+// sin-VIN que repite un mismo año/marca/modelo ya presente, o que repite el vehículo "primario" del cliente).
+exports.vehDedupeTmp = onRequest({ cors: true, timeoutSeconds: 120 }, async (req, res) => {
+  const db = admin.firestore(); const apply = (req.query || {}).apply === "1";
+  const normVin = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const normLbl = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const changed = [];
+  const cs = await db.collection("clients").get();
+  for (const d of cs.docs) {
+    const c = d.data() || {};
+    let vehs = Array.isArray(c.vehicles) ? c.vehicles.slice() : [];
+    if (vehs.length < 1) continue;
+    const keptVins = new Set(), keptLbls = new Set();
+    const prVin = normVin(c.vin); if (prVin) keptVins.add(prVin);
+    const prLbl = normLbl([c.year, c.make, c.model].filter(Boolean).join(" ")); if (prLbl) keptLbls.add(prLbl);
+    // procesa primero los que SÍ tienen VIN (se prefieren), luego los sin VIN
+    const order = vehs.map((v, i) => i).sort((a, b) => (normVin(vehs[a].vin) ? 0 : 1) - (normVin(vehs[b].vin) ? 0 : 1));
+    const keep = [];
+    for (const i of order) {
+      const v = vehs[i]; const vin = normVin(v.vin); const lbl = normLbl(v.label || [v.year, v.make, v.model].filter(Boolean).join(" "));
+      if (vin) { if (keptVins.has(vin)) continue; keptVins.add(vin); if (lbl) keptLbls.add(lbl); keep.push(v); }
+      else { if (lbl && keptLbls.has(lbl)) continue; if (lbl) keptLbls.add(lbl); keep.push(v); }
+    }
+    if (keep.length !== vehs.length) {
+      changed.push({ id: d.id, name: c.name || "", before: vehs.length, after: keep.length });
+      if (apply) { try { await db.collection("clients").doc(d.id).set({ vehicles: keep }, { merge: true }); } catch (e) {} }
+    }
+  }
+  res.json({ ok: true, apply, totalClients: cs.size, changedCount: changed.length, changed });
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
