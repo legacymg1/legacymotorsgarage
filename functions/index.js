@@ -2002,6 +2002,28 @@ exports.addonSign = onCall({ timeoutSeconds: 60 }, async (request) => {
   await ref.set({ addons: updated }, { merge: true });
   return { ok: true, url };
 });
+// 🧰 TEMP (quitar): re-apuntar órdenes de servicio HUÉRFANAS (su clientId ya no existe) al cliente correcto.
+exports.svcRepointTmp = onRequest({ cors: true, timeoutSeconds: 60 }, async (req, res) => {
+  const db = admin.firestore(); const q = req.query || {};
+  const cs = await db.collection("clients").get();
+  const live = new Set(); cs.forEach((d) => live.add(d.id));
+  const os = await db.collection("serviceOrders").get();
+  const orphans = [];
+  os.forEach((d) => { const o = d.data() || {}; if (o.clientId && !live.has(o.clientId)) orphans.push({ id: d.id, orderNum: o.orderNum || null, clientName: o.clientName || "", clientId: o.clientId, phone: o.clientPhone || "" }); });
+  if (q.apply === "1") {
+    const to = String(q.to || ""); if (!to || !live.has(to)) { res.json({ error: "to (clientId válido) requerido" }); return; }
+    const cTo = (await db.collection("clients").doc(to).get()).data() || {};
+    const fromName = String(q.fromName || "").toLowerCase();
+    let fixed = 0; const done = [];
+    for (const orf of orphans) {
+      if (fromName && String(orf.clientName || "").toLowerCase() !== fromName) continue;
+      await db.collection("serviceOrders").doc(orf.id).set({ clientId: to, clientName: cTo.name || orf.clientName || "", clientPhone: cTo.phone || orf.phone || "" }, { merge: true });
+      fixed++; done.push(orf.id);
+    }
+    res.json({ ok: true, fixed, done }); return;
+  }
+  res.json({ ok: true, orphanCount: orphans.length, orphans });
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
