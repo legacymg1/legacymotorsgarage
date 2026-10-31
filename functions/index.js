@@ -2000,6 +2000,22 @@ exports.addonSign = onCall({ timeoutSeconds: 60 }, async (request) => {
   await ref.set({ addons: updated }, { merge: true });
   return { ok: true, url };
 });
+// 🧰 TEMP (quitar): ver/unificar vehículos de un cliente (quita un duplicado del array vehicles[]).
+exports.cliVehTmp = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
+  const db = admin.firestore(); const q = req.query || {};
+  if (q.apply === "1") {
+    const clientId = String(q.clientId || ""); if (!clientId) { res.json({ error: "clientId" }); return; }
+    const ref = db.collection("clients").doc(clientId); const cs = await ref.get(); if (!cs.exists) { res.json({ error: "no client" }); return; }
+    const c = cs.data() || {}; let vehicles = Array.isArray(c.vehicles) ? c.vehicles.slice() : [];
+    if (q.rmIndex != null && q.rmIndex !== "") { const i = parseInt(q.rmIndex, 10); if (i >= 0 && i < vehicles.length) vehicles.splice(i, 1); }
+    await ref.set({ vehicles }, { merge: true });
+    res.json({ ok: true, vehicles: vehicles.map((v, i) => ({ i, vin: v.vin || "", label: v.label || "", plate: v.plate || "" })) }); return;
+  }
+  const find = String(q.find || "").toLowerCase(); const out = [];
+  const cs = await db.collection("clients").get();
+  cs.forEach((d) => { const c = d.data() || {}; if (find && !String(c.name || "").toLowerCase().includes(find)) return; out.push({ id: d.id, name: c.name || "", primary: { vin: c.vin || "", label: [c.year, c.make, c.model, c.trim].filter(Boolean).join(" "), plate: c.plate || "" }, vehicles: (Array.isArray(c.vehicles) ? c.vehicles.map((v, i) => ({ i, vin: v.vin || "", label: v.label || "", plate: v.plate || "" })) : []) }); });
+  res.json({ out });
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
