@@ -2420,20 +2420,23 @@ async function _portalClient(request) {
   return { id: d.id, phone, data: d.data() || {} };
 }
 // Convierte una orden de servicio a un estimado limpio para el portal del cliente (montos en dólares, idioma del cliente).
-function _estPayload(o, en) {
+function _estPayload(o, en, planPaidCents, planTotalCents) {
   const c = (x) => Math.round(Number(x) || 0) / 100;
   const services = (Array.isArray(o.services) ? o.services : []).map((s) => ({
     desc: (en && s.descEn) ? s.descEn : (s.desc || ""),
     price: c(s.priceCents != null ? s.priceCents : Math.round((Number(s.price) || 0) * 100)),
     parts: (Array.isArray(s.parts) ? s.parts : []).map((p) => ({ desc: p.desc || "", price: c(p.priceCents != null ? p.priceCents : Math.round((Number(p.price) || 0) * 100)) })),
   }));
+  // 🧮 Saldo EN VIVO = Total − pagado de verdad − pagado del plan. Nunca el campo balanceCents (se quedaba viejo).
+  const totalC = Number(o.grandTotalCents) || 0, paidC = Number(o.paidCents) || 0, planPaidC = Number(planPaidCents) || 0;
+  const owedC = Math.max(0, totalC - paidC - planPaidC);
   return {
     id: o.id, orderNum: o.orderNum || null, vehicleLabel: o.vehicleLabel || "", vin: o.vin || "", plate: o.plate || "",
     status: o.status || "", estimateStatus: o.estimateStatus || "",
     services,
     laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
-    deposit: c(o.depositCents), balance: c(o.balanceCents),
-    paid: !!o.paid, paidCents: Number(o.paidCents) || 0, toContractCents: Number(o.toContractCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
+    deposit: c(o.depositCents), balance: owedC / 100,
+    paid: (owedC <= 0 && totalC > 0), paidCents: Number(o.paidCents) || 0, planPaidCents: planPaidC, planTotalCents: Number(planTotalCents) || 0, toContractCents: Number(o.toContractCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
     sentAt: o.estimateSentAt || "", acceptedAt: o.estimateAcceptedAt || "", createdAt: o.createdAt || "", partsReadyAt: o.partsReadyAt || "", partsPaidAt: o.partsPaidAt || "",
     scheduledAt: o.scheduledAt || "", receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", promisedAt: o.promisedAt || "", deliveredAt: o.deliveredAt || "",
     promises: (Array.isArray(o.promises) ? o.promises.map((p) => ({ date: p.date || "", amtCents: Number(p.amtCents) || 0 })) : []),
@@ -2449,7 +2452,10 @@ exports.svcPortalEstimates = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!docs.length) { try { const s2 = await db.collection("serviceOrders").where("clientPhone", "==", cli.data.phone || "").get(); docs = s2.docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) {} }
   const withEst = docs.filter((o) => (o.estimateStatus === "sent" || o.estimateStatus === "accepted") || (Array.isArray(o.services) && o.services.length));
   withEst.sort((a, b) => ((b.createdAt || "") < (a.createdAt || "") ? -1 : 1));
-  return { ok: true, lang: en ? "en" : "es", clientName: cli.data.name || "", orders: withEst.map((o) => _estPayload(o, en)) };
+  // 📄 Pagado del plan (adendum) por orden: suma de installments.paidCents de los addons ligados (sourceOrderId).
+  const planPaidByOrder = {}, planTotalByOrder = {};
+  try { (Array.isArray(cli.data.addons) ? cli.data.addons : []).forEach((a) => { if (a && a.sourceOrderId && Array.isArray(a.installments)) { planPaidByOrder[a.sourceOrderId] = (planPaidByOrder[a.sourceOrderId] || 0) + a.installments.reduce((s, x) => s + (Number(x.paidCents) || 0), 0); planTotalByOrder[a.sourceOrderId] = (planTotalByOrder[a.sourceOrderId] || 0) + a.installments.reduce((s, x) => s + (Number(x.amtCents) || 0), 0); } }); } catch (e) {}
+  return { ok: true, lang: en ? "en" : "es", clientName: cli.data.name || "", orders: withEst.map((o) => _estPayload(o, en, planPaidByOrder[o.id] || 0, planTotalByOrder[o.id] || 0)) };
 });
 // El cliente ACEPTA el estimado desde su teléfono (+ consentimiento SMS opcional). Solo su propia orden.
 exports.svcClientAccept = onCall({ timeoutSeconds: 20 }, async (request) => {

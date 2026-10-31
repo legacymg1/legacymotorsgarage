@@ -1010,9 +1010,9 @@ function estimateCardHTML(o){
           <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
           <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.'}</div>
         </div>`}
-    ${(!o.paid && Number(o.balance)>0)?
+    ${(!o.paid && Number(o.balance)>0 && !(Number(o.planTotalCents)>0))?
       `<button onclick="portalPayService('${o.id}')" style="width:100%;margin-top:10px;${accepted?'background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;':'background:transparent;border:1.5px solid var(--gold);color:var(--gold);'}border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">💳 ${es?'Pagar saldo':'Pay balance'} · ${formatMoney(o.balance)}</button><div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">${es?'Pago seguro por Square · puedes pagar todo o una parte · pagar también aprueba':'Secure payment by Square · full or partial · paying also approves'}</div>`
-    :''}`;
+    :((!o.paid && Number(o.balance)>0 && Number(o.planTotalCents)>0)?`<div style="margin-top:10px;background:rgba(31,111,235,.1);border:1px solid rgba(31,111,235,.4);color:#8fc0ff;border-radius:12px;padding:12px;font-size:13px;text-align:center;font-weight:700;">📄 ${es?'Tienes un plan de pagos — págalo abajo 👇':'You have a payment plan — pay it below 👇'}</div>`:'')}`;
   return `
   <div class="info-card" id="est-${o.id}" style="margin-top:16px;${focus?'border:1px solid var(--gold);box-shadow:0 0 0 2px rgba(200,162,74,.25);':''}">
     <div ${o.paid?`onclick="portalToggleRcpt('${o.id}')" style="cursor:pointer;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;"`:`style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;"`}>
