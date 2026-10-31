@@ -1460,6 +1460,17 @@ function calcProgress(c) {
 }
 // Nombre normalizado (para evitar crear clientes duplicados cuando se teclea sin teléfono).
 function _normName(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
+// 🚗👥 MULTICARRO: un "cliente" = todos los registros con el MISMO teléfono (cada registro = un carro con su financiamiento).
+// Agrupamos por teléfono en las vistas, sin migrar datos. [[multi-car-per-client]]
+function _clientGroup(c){ if(!c) return []; const ph=(c.phoneE164||'').trim(); if(!ph) return [c]; const g=clients.filter(x=>(x.phoneE164||'')===ph); return g.length?g:[c]; }
+// Todos los vehículos del grupo (dedupe por VIN), con su registro dueño y si está financiado.
+function _groupVehicles(c){ const grp=_clientGroup(c); const out=[]; const seen=new Set();
+  grp.forEach(gm=>{ (clientVehicles(gm)||[]).forEach((v,i)=>{ const vk=(v.vin||'').toUpperCase(); if(vk){ if(seen.has(vk)) return; seen.add(vk); }
+    const isFin=!!(gm.vin && v.vin && (gm.vin||'').toUpperCase()===(v.vin||'').toUpperCase());
+    out.push({ ownerId:gm.id, owner:gm, idx:i, v:v, isFin:isFin });
+  }); });
+  return out;
+}
 // ===== VEHÍCULOS: varios carros por cliente, identificados por VIN =====
 function clientVehicles(c){
   const list=[]; const seen=new Set(); const seenLbl=new Set();   // 🚗 dedupe por VIN Y por año/marca/modelo (sin-VIN no duplica a uno ya mostrado)
@@ -2191,7 +2202,7 @@ function _c360Timeout(p,ms){ return Promise.race([p, new Promise((_,r)=>setTimeo
 async function c360LoadQuotes(){ if(_c360Quotes!==null) return; _c360Quotes=[]; try{ const snap=await _c360Timeout(getDocs(collection(db,'quotes')),8000); const a=[]; snap.forEach(d=>a.push(Object.assign({id:d.id},d.data()))); _c360Quotes=a; }catch(e){ _c360Quotes=[]; } }
 async function c360LoadInv(){ if(_c360Inv!==null) return; _c360Inv=[]; try{ const snap=await _c360Timeout(getDocs(collection(db,'inventory')),8000); const a=[]; snap.forEach(d=>a.push(Object.assign({id:d.id},d.data()))); _c360Inv=a; }catch(e){ _c360Inv=[]; } }
 async function c360LoadAppts(){ if(_c360Appts!==null) return; _c360Appts=[]; try{ const snap=await _c360Timeout(getDocs(collection(db,'appointments')),8000); const a=[]; snap.forEach(d=>a.push(Object.assign({id:d.id},d.data()))); _c360Appts=a; }catch(e){ _c360Appts=[]; } }
-window.c360NewService=function(id){ try{ svcNewOrder(); window._svcDraft.clientId=id; svcRenderModal(); }catch(e){} };
+window.c360NewService=function(id){ try{ c360Close(); svcNewOrder(); window._svcDraft.clientId=id; const c=clients.find(x=>x.id===id); if(c&&c.lang) window._svcDraft.lang=c.lang; svcRenderModal(); }catch(e){} };   // cierra la tarjeta primero (si no, la orden abre detrás)
 window.c360Cotizar=function(id){ const c=clients.find(x=>x.id===id); try{ c360Close(); }catch(e){} try{ openCotizador(); }catch(e){} setTimeout(function(){ try{ if(c){ const n=document.getElementById('cot-customer'); if(n&&!n.value)n.value=c.name||''; const p=document.getElementById('cot-phone'); if(p&&!p.value)p.value=c.phone||''; const l=document.getElementById('cot-lang'); if(l&&c.lang)l.value=c.lang; } }catch(e){} }, 60); };
 function c360ClientFlags(c){ const f={};
   if(c.kind==='finance' || Number(c.total)>0 || (Array.isArray(c.payments)&&c.payments.length) || c.signedContract) f.buyer=true;
@@ -2330,10 +2341,20 @@ window.renderClient360=function(id){
     +'<button onclick="c360Close();openEditModal(\''+id+'\')" style="flex:1 1 auto;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">✏️ Editar</button>'
     +'<button onclick="viewAsClient(\''+id+'\')" style="flex:1 1 auto;background:#6b4ea8;color:#fff;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:800;cursor:pointer;">👁️ Ver como cliente</button>'
     +'</div>';
-  // 1) Resumen de cuenta (arriba de todo, solo compradores)
-  if(f.buyer){ h+=sec('💵 Resumen de cuenta', _c360FinSummary(c)); }
-  // 2) Vehículos
-  h+=sec('🚗 Vehículos', vehicles.length?vehicles.map((v,i)=>'<div onclick="openVehicle360(\''+id+'\','+i+')" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;"><div style="min-width:0;"><div style="font-weight:700;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN …'+esc(String(v.vin).slice(-6))):'')+'</div></div><span style="color:var(--gold);">›</span></div>').join(''):empty('Sin vehículos registrados.'));
+  // 1) Resumen de cuenta (arriba de todo, solo compradores). Si tiene VARIOS carros → saldo total + ve cada carro abajo.
+  const _grp=_clientGroup(c);
+  if(_grp.length>1){
+    const _grpBal=_grp.reduce((s,gm)=>s+(isPaidOff(gm)?0:(calcBalance(gm)||0))+(addonsBalance(gm)||0),0);
+    const _nCars=_grp.filter(gm=>gm.vin||gm.total||((gm.schedule||[]).length)).length;
+    h+=sec('💵 Resumen de cuenta', '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="color:var(--muted);font-size:13px;">Saldo total · '+_nCars+' carro(s)</span><b style="color:var(--gold);font-size:18px;">'+M(_grpBal)+'</b></div><div style="color:var(--muted);font-size:12px;margin-top:4px;">Toca cada carro abajo para ver su saldo y pagos.</div>');
+  } else if(f.buyer){ h+=sec('💵 Resumen de cuenta', _c360FinSummary(c)); }
+  // 2) Vehículos — TODOS los del cliente (agrupados por teléfono), cada uno con su saldo/estatus. [[multi-car-per-client]]
+  const _gv=_groupVehicles(c);
+  h+=sec('🚗 Vehículos'+(_gv.length>1?(' ('+_gv.length+')'):''), _gv.length?_gv.map(e=>{ const v=e.v, ow=e.owner; let right='';
+      if(e.isFin){ right=isPaidOff(ow)?'<span style="color:#28b463;font-weight:800;font-size:12px;white-space:nowrap;">✅ Pagado</span>':'<span style="color:var(--gold);font-weight:800;font-size:12px;white-space:nowrap;">saldo '+M(calcBalance(ow))+'</span>'; }
+      else { right='<span style="color:var(--muted);font-size:11px;white-space:nowrap;">'+(e.ownerId!==id?'✅ comprado':'🔧 servicio')+'</span>'; }
+      return '<div onclick="openVehicle360(\''+e.ownerId+'\','+e.idx+')" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;"><div style="min-width:0;"><div style="font-weight:700;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN …'+esc(String(v.vin).slice(-6))):'')+'</div></div><div style="display:flex;align-items:center;gap:7px;flex:0 0 auto;">'+right+'<span style="color:var(--gold);">›</span></div></div>';
+    }).join(''):empty('Sin vehículos registrados.'));
   // 3) Servicio: EN CURSO (+ agendar) y ✅ ÓRDENES COMPLETADAS (pagadas → abren el recibo)
   const _svcRow=(o,done)=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; const _sl=(typeof svcStatusLabel==='function')?svcStatusLabel(o):{txt:(done?'✅ Servicio realizado':'🧾 Estimado'),col:'var(--muted)'}; const stl=done?'✅ Servicio realizado':_sl.txt; const _slcol=done?'#28b463':_sl.col; const tot=o.grandTotalCents!=null?M(o.grandTotalCents/100):''; const fol=o.orderNum?('<span style="color:var(--gold);font-weight:800;">#'+o.orderNum+'</span> · '):''; const _ow=svcOwedCents(o); const saldo=(!done && _ow>0)?(' · saldo '+M(_ow/100)):''; const fn=done?('svcOpenReceipt(\''+o.id+'\')'):('svcOpenOrder(\''+o.id+'\')'); return '<div onclick="c360Close();'+fn+'" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+fol+esc(o.reason||'Servicio')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:'+_slcol+';margin-top:3px;font-weight:700;">'+stl+'</div><div style="font-size:11px;color:var(--muted);margin-top:1px;">'+(tot||'')+saldo+(done?' · 🧾 recibo ›':' · ver ›')+'</div></div>'; };
   const _svcActive=sOrders.filter(o=>o.paid!==true), _svcDone=sOrders.filter(o=>o.paid===true);
@@ -4686,7 +4707,14 @@ window.renderAll = function() {
     const hay=(c.name+' '+c.phone+' '+((c.phone||'')+(c.phoneE164||'')).replace(/\D/g,'')+' '+c.make+' '+c.model+' '+c.year+' '+(c.vin||'')).toLowerCase();
     return searchTerms.every(term=>hay.includes(term));
   });
-  
+  // 🚗👥 MULTICARRO: UNA fila por cliente (teléfono). Deja el registro principal; los demás carros se ven dentro de su tarjeta. [[multi-car-per-client]]
+  (function(){ const byPhone={}, noPhone=[];
+    filtered.forEach(c=>{ const ph=(c.phoneE164||'').trim(); if(!ph){ noPhone.push(c); return; } (byPhone[ph]=byPhone[ph]||[]).push(c); });
+    const score=c=> (c.signedContract&&c.signedContract.url?8:0)+((c.vin||Number(c.total)>0)?4:0)+((c.payments||[]).length?2:0)+((c.schedule||[]).length?1:0);
+    const reps=Object.keys(byPhone).map(ph=>{ const g=byPhone[ph]; if(g.length===1) return g[0]; g.sort((a,b)=> score(b)-score(a) || String(b.contractDate||b.createdAt||'').localeCompare(String(a.contractDate||a.createdAt||''))); return g[0]; });
+    filtered = reps.concat(noPhone);
+  })();
+
   // Apply sort
   if(currentSort==='next'){
     filtered.sort((a,b)=>{
