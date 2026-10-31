@@ -2088,6 +2088,32 @@ exports.dupClientsTmp = onRequest({ cors: true, timeoutSeconds: 60 }, async (req
   const dupName = Object.keys(byName).filter((k) => byName[k].length > 1).map((k) => ({ name: k, clients: byName[k] }));
   res.json({ ok: true, totalClients: cs.size, dupByPhoneCount: dupPhone.length, dupByNameCount: dupName.length, dupPhone, dupName });
 });
+// 🧰 TEMP (quitar): arreglar teléfono / borrar clientes VACÍOS (candado: solo borra si no tiene datos).
+exports.cliFixTmp = onRequest({ cors: true, timeoutSeconds: 60 }, async (req, res) => {
+  const db = admin.firestore(); const q = req.query || {};
+  const action = String(q.action || "list");
+  const isEmpty = (c) => !(Array.isArray(c.payments) && c.payments.length) && !(Number(c.total) > 0) && !(c.signedContract && c.signedContract.url) && !(Array.isArray(c.addons) && c.addons.length) && !(Array.isArray(c.vehicles) && c.vehicles.length) && !c.vin;
+  if (action === "setphone") {
+    const clientId = String(q.clientId || ""); const phone = String(q.phone || "").replace(/\D/g, "");
+    if (!clientId || phone.length !== 10) { res.json({ error: "clientId + phone(10)" }); return; }
+    await db.collection("clients").doc(clientId).set({ phone: phone, phoneE164: "+1" + phone }, { merge: true });
+    res.json({ ok: true, clientId, phone, phoneE164: "+1" + phone }); return;
+  }
+  if (action === "delete") {
+    const clientId = String(q.clientId || ""); if (!clientId) { res.json({ error: "clientId" }); return; }
+    const ref = db.collection("clients").doc(clientId); const cs = await ref.get();
+    if (!cs.exists) { res.json({ ok: true, note: "no existe" }); return; }
+    const c = cs.data() || {};
+    if (!isEmpty(c)) { res.json({ error: "NO vacío — no se borra", name: c.name || "" }); return; }
+    await ref.delete();
+    res.json({ ok: true, deleted: clientId, name: c.name || "" }); return;
+  }
+  // list
+  const find = String(q.find || "").toLowerCase(); const out = [];
+  const cs = await db.collection("clients").get();
+  cs.forEach((d) => { const c = d.data() || {}; if (find && !String(c.name || "").toLowerCase().includes(find)) return; out.push({ id: d.id, name: c.name || "", phone: c.phone || "", phoneE164: c.phoneE164 || "", empty: isEmpty(c), veh: (Array.isArray(c.vehicles) ? c.vehicles.length : 0), pagos: (Array.isArray(c.payments) ? c.payments.length : 0) }); });
+  res.json({ out });
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
