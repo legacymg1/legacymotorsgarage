@@ -1458,6 +1458,8 @@ function calcProgress(c) {
   if(!t) return 0;
   return Math.min(100, Math.round(calcPaid(c)/t*100));
 }
+// Nombre normalizado (para evitar crear clientes duplicados cuando se teclea sin teléfono).
+function _normName(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
 // ===== VEHÍCULOS: varios carros por cliente, identificados por VIN =====
 function clientVehicles(c){
   const list=[]; const seen=new Set(); const seenLbl=new Set();   // 🚗 dedupe por VIN Y por año/marca/modelo (sin-VIN no duplica a uno ya mostrado)
@@ -2499,7 +2501,8 @@ window.svcSaveClient=async function(btn){
   if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
   try{
     const e164=(typeof toE164==='function'?toE164(ph):'')||'';
-    const match=e164?clients.find(c=>c.phoneE164===e164):null;
+    let match=e164?clients.find(c=>c.phoneE164===e164):null;
+    if(!match && !e164){ const nn=_normName(nm); if(nn) match=clients.find(c=>_normName(c.name)===nn); }   // sin teléfono → reusa por nombre (no crea duplicado vacío)
     if(match){ d.clientId=match.id; d.clientName=match.name; d.clientPhone=match.phone||ph; }
     else{
       const ref=doc(collection(db,'clients')); d.clientId=ref.id;
@@ -3185,7 +3188,8 @@ window.svcSaveOrder=async function(opts){
     const nm=titleCase((d.clientName||'').trim()), ph=(d.clientPhone||'').trim();
     if(!nm){ alert('Escribe el nombre del cliente.'); return; }
     const e164=(typeof toE164==='function'?toE164(ph):'')||'';
-    const match=e164?clients.find(c=>c.phoneE164===e164):null;
+    let match=e164?clients.find(c=>c.phoneE164===e164):null;
+    if(!match && !e164){ const nn=_normName(nm); if(nn) match=clients.find(c=>_normName(c.name)===nn); }   // sin teléfono → reusa por nombre (no crea duplicado vacío)
     if(match){ clientId=match.id; clientName=match.name; clientPhone=match.phone||ph; }
     else {
       const ref=doc(collection(db,'clients')); clientId=ref.id;
