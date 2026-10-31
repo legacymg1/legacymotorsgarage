@@ -2030,6 +2030,39 @@ exports.vehDedupeTmp = onRequest({ cors: true, timeoutSeconds: 120 }, async (req
   }
   res.json({ ok: true, apply, totalClients: cs.size, changedCount: changed.length, changed });
 });
+// 🧰 TEMP (quitar): backfill de "última fecha de servicio" por cliente, según sus órdenes de servicio reales,
+// para que el recordatorio de "próximo servicio" (3 meses) quede acorde. dry-run por defecto; ?apply=1 aplica.
+exports.svcReminderBackfillTmp = onRequest({ cors: true, timeoutSeconds: 120 }, async (req, res) => {
+  const db = admin.firestore(); const apply = (req.query || {}).apply === "1";
+  const SERVICED = ["recibido", "en_proceso", "pausado_partes", "listo", "entregado"];
+  const svcDate = (o) => String(o.deliveredAt || o.paidAt || o.receivedAt || o.startedAt || o.createdAt || "").slice(0, 10);
+  // 1) junta la fecha de servicio MÁS RECIENTE por cliente
+  const latestByClient = {}; const vinByClient = {};
+  const os = await db.collection("serviceOrders").get();
+  os.forEach((d) => {
+    const o = d.data() || {}; const cid = o.clientId || ""; if (!cid) return;
+    const isService = !!o.paid || SERVICED.indexOf(o.status || "") >= 0 || !!o.deliveredAt || !!o.receivedAt;
+    if (!isService) return;
+    const ds = svcDate(o); if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) return;
+    if (!latestByClient[cid] || ds > latestByClient[cid]) { latestByClient[cid] = ds; vinByClient[cid] = String(o.vin || "").toUpperCase(); }
+  });
+  // 2) por cliente, actualiza lastServiceDate si la fecha de servicio es MÁS NUEVA que la actual
+  const changed = [];
+  for (const cid of Object.keys(latestByClient)) {
+    const newDate = latestByClient[cid];
+    const cs = await db.collection("clients").doc(cid).get(); if (!cs.exists) continue;
+    const c = cs.data() || {}; const cur = String(c.lastServiceDate || "").slice(0, 10);
+    if (cur && cur >= newDate) continue;   // ya tiene una fecha igual o más nueva → no regresar
+    const patch = { lastServiceDate: newDate };
+    const vin = vinByClient[cid];
+    if (Array.isArray(c.vehicles) && c.vehicles.length) {
+      patch.vehicles = c.vehicles.map((v) => { if (v && ((vin && String(v.vin || "").toUpperCase() === vin) || (!vin))) { return Object.assign({}, v, { lastServiceDate: newDate }); } return v; });
+    }
+    changed.push({ id: cid, name: c.name || "", from: cur || "(sin fecha)", to: newDate });
+    if (apply) { try { await db.collection("clients").doc(cid).set(patch, { merge: true }); } catch (e) {} }
+  }
+  res.json({ ok: true, apply, changedCount: changed.length, changed });
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
