@@ -1462,7 +1462,8 @@ function calcProgress(c) {
 function _normName(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,''); }
 // 🚗👥 MULTICARRO: un "cliente" = todos los registros con el MISMO teléfono (cada registro = un carro con su financiamiento).
 // Agrupamos por teléfono en las vistas, sin migrar datos. [[multi-car-per-client]]
-function _clientGroup(c){ if(!c) return []; const ph=(c.phoneE164||'').trim(); if(!ph) return [c]; const g=clients.filter(x=>(x.phoneE164||'')===ph); return g.length?g:[c]; }
+function _phoneKey(c){ const d=String((c&&(c.phoneE164||c.phone))||'').replace(/\D/g,''); return d.length>=10?d.slice(-10):''; }   // últimos 10 dígitos (tolera +1 / formatos)
+function _clientGroup(c){ if(!c) return []; const k=_phoneKey(c); if(!k) return [c]; const g=clients.filter(x=>_phoneKey(x)===k); return g.length?g:[c]; }
 // Todos los vehículos del grupo (dedupe por VIN), con su registro dueño y si está financiado.
 function _groupVehicles(c){ const grp=_clientGroup(c); const out=[]; const seen=new Set();
   grp.forEach(gm=>{ (clientVehicles(gm)||[]).forEach((v,i)=>{ const vk=(v.vin||'').toUpperCase(); if(vk){ if(seen.has(vk)) return; seen.add(vk); }
@@ -4709,7 +4710,7 @@ window.renderAll = function() {
   });
   // 🚗👥 MULTICARRO: UNA fila por cliente (teléfono). Deja el registro principal; los demás carros se ven dentro de su tarjeta. [[multi-car-per-client]]
   (function(){ const byPhone={}, noPhone=[];
-    filtered.forEach(c=>{ const ph=(c.phoneE164||'').trim(); if(!ph){ noPhone.push(c); return; } (byPhone[ph]=byPhone[ph]||[]).push(c); });
+    filtered.forEach(c=>{ const ph=_phoneKey(c); if(!ph){ noPhone.push(c); return; } (byPhone[ph]=byPhone[ph]||[]).push(c); });
     const score=c=> (c.signedContract&&c.signedContract.url?8:0)+((c.vin||Number(c.total)>0)?4:0)+((c.payments||[]).length?2:0)+((c.schedule||[]).length?1:0);
     const reps=Object.keys(byPhone).map(ph=>{ const g=byPhone[ph]; if(g.length===1) return g[0]; g.sort((a,b)=> score(b)-score(a) || String(b.contractDate||b.createdAt||'').localeCompare(String(a.contractDate||a.createdAt||''))); return g[0]; });
     filtered = reps.concat(noPhone);
