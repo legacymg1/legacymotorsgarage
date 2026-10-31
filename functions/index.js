@@ -2000,6 +2000,15 @@ exports.addonSign = onCall({ timeoutSeconds: 60 }, async (request) => {
   await ref.set({ addons: updated }, { merge: true });
   return { ok: true, url };
 });
+// 🧰 TEMP read-only (quitar): ver cliente + sus addons (con cuotas) + sus órdenes.
+exports.svcInspectTmp = onRequest({ cors: true, timeoutSeconds: 30 }, async (req, res) => {
+  const db = admin.firestore();
+  const find = String((req.query || {}).find || "").toLowerCase();
+  const out = { clients: [] };
+  const cs = await db.collection("clients").get();
+  cs.forEach((d) => { const c = d.data() || {}; if (find && !String(c.name || "").toLowerCase().includes(find)) return; out.clients.push({ id: d.id, name: c.name || "", carBalanceFields: { total: c.total || 0, weekly: c.weekly || 0, scheduleLen: (c.schedule || []).length, paymentsLen: (c.payments || []).length }, addons: (Array.isArray(c.addons) ? c.addons : []).map((a) => ({ id: a.id, concept: a.concept, totalCents: a.totalCents, settled: !!a.settled, sourceOrderId: a.sourceOrderId || "", installments: (Array.isArray(a.installments) ? a.installments.map((x) => ({ amtCents: x.amtCents, due: x.due, paidCents: x.paidCents || 0 })) : null) })) }); });
+  res.json(out);
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
