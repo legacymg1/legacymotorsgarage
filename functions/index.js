@@ -1418,11 +1418,13 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
       p = { title: "🗓️ Tu cita quedó agendada", body: "Te esperamos" + (dt ? (" el " + dt) : "") + " para " + veh + fol + ".", titleEn: "🗓️ Your appointment is set", bodyEn: "See you" + (dtEn ? (" on " + dtEn) : "") + " for " + vehEn + fol + "." };
     }
     if (ownerP) { try { await _pushToOwners(ownerP); } catch (e) {} }   // 📦 avisa a los dueños (refacciones completas)
-    // 🔧 Servicio COMPLETADO (pagado o entregado) → actualiza "último servicio" del cliente y del vehículo.
-    // Así el "Próximo servicio" (3 meses) del portal se recalcula solo (antes se quedaba con la fecha vieja).
+    // 🔧 Servicio COMPLETADO (pagado o entregado) que INCLUYE CAMBIO DE ACEITE → actualiza "último servicio".
+    // El recordatorio de 3 meses SOLO se resetea si el servicio trae cambio de aceite (aunque traiga más trabajos).
     try {
       const justDone = ((!before.paid && after.paid) || (before.status !== "entregado" && after.status === "entregado"));
-      if (justDone && after.clientId) {
+      const _oilRe = /aceite|oil\s*change/i;
+      const hasOil = (Array.isArray(after.services) ? after.services : []).some((s) => s && _oilRe.test(String(s.desc || "") + " " + String(s.descEn || ""))) || _oilRe.test(String(after.reason || "") + " " + String(after.reasonEn || ""));
+      if (justDone && hasOil && after.clientId) {
         const dstr = ((new Date().toLocaleString("en-CA", { timeZone: "America/Los_Angeles" }).split(",")[0]) || "").trim(); // YYYY-MM-DD en LA
         if (/^\d{4}-\d{2}-\d{2}$/.test(dstr)) {
           const cref = admin.firestore().collection("clients").doc(after.clientId);
@@ -2032,33 +2034,39 @@ exports.vehDedupeTmp = onRequest({ cors: true, timeoutSeconds: 120 }, async (req
 });
 // 🧰 TEMP (quitar): backfill de "última fecha de servicio" por cliente, según sus órdenes de servicio reales,
 // para que el recordatorio de "próximo servicio" (3 meses) quede acorde. dry-run por defecto; ?apply=1 aplica.
-exports.svcReminderBackfillTmp = onRequest({ cors: true, timeoutSeconds: 120 }, async (req, res) => {
+exports.svcReminderBackfillTmp = onRequest({ cors: true, timeoutSeconds: 180 }, async (req, res) => {
   const db = admin.firestore(); const apply = (req.query || {}).apply === "1";
   const SERVICED = ["recibido", "en_proceso", "pausado_partes", "listo", "entregado"];
   const svcDate = (o) => String(o.deliveredAt || o.paidAt || o.receivedAt || o.startedAt || o.createdAt || "").slice(0, 10);
-  // 1) junta la fecha de servicio MÁS RECIENTE por cliente
-  const latestByClient = {}; const vinByClient = {};
+  const oilRe = /aceite|oil\s*change/i;
+  const hasOil = (o) => (Array.isArray(o.services) ? o.services : []).some((s) => s && oilRe.test(String(s.desc || "") + " " + String(s.descEn || ""))) || oilRe.test(String(o.reason || "") + " " + String(o.reasonEn || ""));
+  // 1) último CAMBIO DE ACEITE por cliente (solo órdenes que incluyen cambio de aceite)
+  const oilByClient = {}, vinByClient = {};
   const os = await db.collection("serviceOrders").get();
   os.forEach((d) => {
     const o = d.data() || {}; const cid = o.clientId || ""; if (!cid) return;
     const isService = !!o.paid || SERVICED.indexOf(o.status || "") >= 0 || !!o.deliveredAt || !!o.receivedAt;
-    if (!isService) return;
+    if (!isService || !hasOil(o)) return;
     const ds = svcDate(o); if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) return;
-    if (!latestByClient[cid] || ds > latestByClient[cid]) { latestByClient[cid] = ds; vinByClient[cid] = String(o.vin || "").toUpperCase(); }
+    if (!oilByClient[cid] || ds > oilByClient[cid]) { oilByClient[cid] = ds; vinByClient[cid] = String(o.vin || "").toUpperCase(); }
   });
-  // 2) por cliente, actualiza lastServiceDate si la fecha de servicio es MÁS NUEVA que la actual
+  // 2) recalcula lastServiceDate = MAX(fecha de venta, último cambio de aceite) para TODOS (corrige los que estaban mal)
   const changed = [];
-  for (const cid of Object.keys(latestByClient)) {
-    const newDate = latestByClient[cid];
-    const cs = await db.collection("clients").doc(cid).get(); if (!cs.exists) continue;
-    const c = cs.data() || {}; const cur = String(c.lastServiceDate || "").slice(0, 10);
-    if (cur && cur >= newDate) continue;   // ya tiene una fecha igual o más nueva → no regresar
-    const patch = { lastServiceDate: newDate };
+  const cs = await db.collection("clients").get();
+  for (const d of cs.docs) {
+    const c = d.data() || {}; const cid = d.id;
+    const contractDate = String(c.contractDate || "").slice(0, 10);
+    const oil = oilByClient[cid] || "";
+    const target = (oil > contractDate) ? oil : contractDate;   // '' si ambos vacíos
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(target)) continue;
+    const cur = String(c.lastServiceDate || "").slice(0, 10);
+    if (cur === target) continue;
+    const patch = { lastServiceDate: target };
     const vin = vinByClient[cid];
     if (Array.isArray(c.vehicles) && c.vehicles.length) {
-      patch.vehicles = c.vehicles.map((v) => { if (v && ((vin && String(v.vin || "").toUpperCase() === vin) || (!vin))) { return Object.assign({}, v, { lastServiceDate: newDate }); } return v; });
+      patch.vehicles = c.vehicles.map((v) => { if (v && ((vin && String(v.vin || "").toUpperCase() === vin) || (!vin))) { return Object.assign({}, v, { lastServiceDate: target }); } return v; });
     }
-    changed.push({ id: cid, name: c.name || "", from: cur || "(sin fecha)", to: newDate });
+    changed.push({ id: cid, name: c.name || "", from: cur || "(sin fecha)", to: target, basis: (oil && oil >= contractDate) ? "cambio de aceite" : "fecha de venta" });
     if (apply) { try { await db.collection("clients").doc(cid).set(patch, { merge: true }); } catch (e) {} }
   }
   res.json({ ok: true, apply, changedCount: changed.length, changed });
