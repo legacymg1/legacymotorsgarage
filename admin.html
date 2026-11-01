@@ -744,6 +744,7 @@
     </div>
     <div style="font-family:var(--font-display);font-size:16px;color:var(--muted);margin-top:16px;">HISTORIAL</div>
     <div class="payment-history" id="pay-history"></div>
+    <button id="pay-sync-btn" type="button" onclick="syncPaymentsToFinanzas(payingId)" style="display:none;width:100%;margin-top:10px;background:rgba(62,207,142,0.15);color:var(--green);border:1px solid rgba(62,207,142,0.5);border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">🔄 Guardar cambios en Finanzas</button>
     <button type="button" onclick="resendLastReceipt()" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:10px;">📩 Reenviar recibo del último pago</button>
     <button type="button" onclick="sendSquareCharge()" style="width:100%;background:rgba(67,160,71,0.14);border:1px solid #43a047;color:#43a047;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">💳 Enviar cobro por Square (link de pago)</button>
     <button type="button" onclick="closeModal('pay-modal');openApptModal(payingId)" style="width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;margin-top:8px;">📅 Agendar cita de servicio</button>
@@ -5774,8 +5775,8 @@ window.openPayModal=function(id){
           <input type="date" value="${p.date}" oninput="payRowTouched()" onchange="editPayment('${c.id}',${i},'date',this.value)" style="flex:1;background:var(--navy2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;">
           <input type="number" value="${p.amount}" oninput="payRowTouched()" onchange="editPayment('${c.id}',${i},'amount',this.value)" style="width:90px;background:var(--navy2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--green);font-size:12px;font-weight:600;">
         </div>
-      </div>`).join(''))
-    + (hist.length?`<button id="pay-sync-btn" onclick="syncPaymentsToFinanzas('${c.id}')" style="display:none;width:100%;margin-top:10px;background:rgba(62,207,142,0.12);color:var(--green);border:1px solid rgba(62,207,142,0.45);border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .2s;">🔄 Guardar cambios en Finanzas</button>`:'');
+      </div>`).join('');
+  const _sb=document.getElementById('pay-sync-btn'); if(_sb) _sb.style.display='none';   // iOS: oculto hasta tocar un renglón
   document.getElementById('pay-modal').classList.add('active');
 };
 
@@ -6736,7 +6737,7 @@ window.editPayment=async function(clientId, idx, field, value){
 };
 
 // 📱 iOS: el botón "Guardar cambios en Finanzas" aparece SOLO cuando tocas/editas un renglón del historial.
-window.payRowTouched = function(){ const b=document.getElementById('pay-sync-btn'); if(b) b.style.display=''; };
+window.payRowTouched = function(){ const b=document.getElementById('pay-sync-btn'); if(b){ b.style.display=''; try{ b.scrollIntoView({block:'nearest',behavior:'smooth'}); }catch(_){} } };
 
 // 🔄 Empuja el monto/fecha ACTUAL de cada pago del cliente a su transacción en Finanzas (por entryId).
 //    Repara pagos que se editaron antes de que el guardado sincronizara solo. SOLO actualiza transacciones
