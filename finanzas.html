@@ -1525,7 +1525,9 @@ window.renderDevolList = function(){
       +'<button class="btn-add" style="flex:0 0 auto;font-size:13px;" onclick="doDevol(\''+t.id+'\')">Devolver</button></div>';
   }).join('');
 };
+let _devolBusy=false;   // 🔒 evita doble registro mientras se guarda una devolución
 window.doDevol = async function(id){
+  if(_devolBusy) return;   // ya hay una devolución guardándose: ignora el segundo clic
   if(!canEditTx(id)){ alert('Solo puedes devolver gastos de tu bolsa.'); return; }
   const e=txns.find(x=>x.id===id); if(!e) return;
   const full=Number(e.amountCents)||0;
@@ -1540,6 +1542,11 @@ window.doDevol = async function(id){
   const cents=Math.round(Number(v)*100);
   if(!(cents>0)){ alert('Monto inválido.'); return; }
   if(cents>remaining){ alert('No puedes devolver más que el saldo ('+centsToUSD(remaining)+').'); return; }
+  // ⚠️ ANTI-DUPLICADO: ¿ya hay una devolución idéntica de ESTE gasto hace unos minutos? (cachó el caso de
+  //    "se tardó en aparecer y la hice dos veces"). Avisa antes de meter otra igual.
+  const _now=Date.now();
+  const dup=liveTxns().find(t=>t.type==='expense_reversal' && (t.reversalOf===(e.entryId||e.id)) && (Number(t.amountCents)||0)===cents && t.createdAt && (_now-Date.parse(t.createdAt) < 10*60*1000));
+  if(dup && !confirm('⚠️ Ya registraste una devolución de '+centsToUSD(cents)+' de este gasto hace unos minutos.\n\n¿Registrar OTRA de todos modos?')) return;
   const isPartial = (cents<remaining) || already>0;
   // ¿el gasto es de un corte YA cerrado? Solo entonces el reembolso es dinero nuevo que va a fondo;
   // si es del período actual, la reversa ya lo neutraliza (queda como efectivo en la caja, no se reparte).
@@ -1547,18 +1554,25 @@ window.doDevol = async function(id){
   const prior = _since ? ((e.createdAt||e.date||'') <= _since) : false;
   if(!confirm('Devolver '+centsToUSD(cents)+(isPartial?' (parcial)':'')+' de "'+origDesc+'".\n\nEse dinero se queda como FONDO de '+cajaTxt+' (no cuenta como ingreso ni se reparte).'+(cents<remaining?('\n\nQuedará un saldo de '+centsToUSD(remaining-cents)+' por si devuelves otra pieza.'):'')+'\n\n¿Confirmar?')) return;
   const rid='dev_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  const recData={
+    entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id, devolucion:prior, esDevolucion:true, partial:isPartial, origDesc:origDesc,
+    dept:e.dept, category:e.category||'', amountCents:cents,
+    method:e.method||'', date:new Date().toISOString().slice(0,10),
+    vendor:e.vendor||'', carId:e.carId||'', carLabel:e.carLabel||'',
+    note:(isPartial?'Devolución parcial: ':'Devolución: ')+origDesc, createdAt:new Date().toISOString(),
+    createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
+  };
+  _devolBusy=true;
   try{
-    await setDoc(doc(db,'transactions',rid), {
-      entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id, devolucion:prior, esDevolucion:true, partial:isPartial, origDesc:origDesc,
-      dept:e.dept, category:e.category||'', amountCents:cents,
-      method:e.method||'', date:new Date().toISOString().slice(0,10),
-      vendor:e.vendor||'', carId:e.carId||'', carLabel:e.carLabel||'',
-      note:(isPartial?'Devolución parcial: ':'Devolución: ')+origDesc, createdAt:new Date().toISOString(),
-      createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
-    });
+    await setDoc(doc(db,'transactions',rid), recData);
+    // ⚡ ACTUALIZACIÓN OPTIMISTA: mete la devolución en memoria YA, sin esperar a que Firestore refresque.
+    //    Así el saldo baja al instante y NO parece que "no se registró" (eso causaba el doble registro).
+    //    Cuando el snapshot llegue, reemplaza todo el arreglo por el mismo id — no se duplica.
+    txns = txns.filter(t=>t.id!==rid).concat([{id:rid, ...recData}]);
+    renderDevolList(); renderExpenses(); renderBolsas();
     alert('✅ Devolución registrada ('+centsToUSD(cents)+(isPartial?' · parcial':'')+'). Se queda como fondo de '+cajaTxt+'.'+((remaining-cents)>0?(' Saldo restante del gasto: '+centsToUSD(remaining-cents)+'.'):''));
-    setTimeout(renderDevolList, 200);   // refresca saldos y deja el panel abierto para devolver otra pieza
   }catch(err){ alert('Error: '+err.message); }
+  finally{ _devolBusy=false; }
 };
 
 // Todos los movimientos (gastos + ingresos), ordenados FIEL a como se fueron ingresando (más reciente arriba), sin distinción.
@@ -3442,7 +3456,7 @@ function _pnlListHtml(items){
     const income=INCOME_TYPES.includes(t.type);
     const desc=t.note||t.clientName||t.category||(income?'Ingreso':'Gasto');
     const meta=[ (t.note&&t.category)?t.category:'', t.carLabel||'', t.vendor||t.source_name||'' ].filter(Boolean).join(' · ');
-    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">'
+    return '<div onclick="openMovEdit(\''+t.id+'\')" title="Toca para ver / editar / borrar este movimiento" style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;">'
       +'<span style="flex:1;min-width:0;word-break:break-word;font-size:12.5px;color:var(--text);">'+desc
         +(meta?'<span style="color:var(--faint);font-size:11px;"> · '+meta+'</span>':'')
         +'<span style="color:var(--faint);font-size:11px;"> · '+fmtDate(t.date)+'</span></span>'
