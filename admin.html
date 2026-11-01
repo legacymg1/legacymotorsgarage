@@ -5762,7 +5762,7 @@ window.openPayModal=function(id){
   document.getElementById('pay-amount').value=c.weekly;
   document.getElementById('pay-date').value=today();
   const hist=c.payments||[];
-  document.getElementById('pay-history').innerHTML=hist.length===0
+  document.getElementById('pay-history').innerHTML=(hist.length===0
     ?'<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin pagos aún</div>'
     :[...hist].map((p,i)=>`
       <div class="payment-entry" style="flex-direction:column;align-items:flex-start;gap:6px;">
@@ -5771,10 +5771,11 @@ window.openPayModal=function(id){
           <button onclick="deletePayment('${c.id}',${i})" style="background:rgba(255,59,59,0.15);color:var(--red);border:1px solid var(--red);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;">✕</button>
         </div>
         <div style="display:flex;gap:8px;width:100%;">
-          <input type="date" value="${p.date}" onchange="editPayment('${c.id}',${i},'date',this.value)" style="flex:1;background:var(--navy2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;">
-          <input type="number" value="${p.amount}" onchange="editPayment('${c.id}',${i},'amount',this.value)" style="width:90px;background:var(--navy2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--green);font-size:12px;font-weight:600;">
+          <input type="date" value="${p.date}" oninput="payRowTouched()" onchange="editPayment('${c.id}',${i},'date',this.value)" style="flex:1;background:var(--navy2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:12px;">
+          <input type="number" value="${p.amount}" oninput="payRowTouched()" onchange="editPayment('${c.id}',${i},'amount',this.value)" style="width:90px;background:var(--navy2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--green);font-size:12px;font-weight:600;">
         </div>
-      </div>`).join('');
+      </div>`).join(''))
+    + (hist.length?`<button id="pay-sync-btn" onclick="syncPaymentsToFinanzas('${c.id}')" style="display:none;width:100%;margin-top:10px;background:rgba(62,207,142,0.12);color:var(--green);border:1px solid rgba(62,207,142,0.45);border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .2s;">🔄 Guardar cambios en Finanzas</button>`:'');
   document.getElementById('pay-modal').classList.add('active');
 };
 
@@ -6732,6 +6733,35 @@ window.editPayment=async function(clientId, idx, field, value){
       }catch(e){ console.warn('sync tx', e); }
     }
   }catch(e){alert('Error: '+e.message);}
+};
+
+// 📱 iOS: el botón "Guardar cambios en Finanzas" aparece SOLO cuando tocas/editas un renglón del historial.
+window.payRowTouched = function(){ const b=document.getElementById('pay-sync-btn'); if(b) b.style.display=''; };
+
+// 🔄 Empuja el monto/fecha ACTUAL de cada pago del cliente a su transacción en Finanzas (por entryId).
+//    Repara pagos que se editaron antes de que el guardado sincronizara solo. SOLO actualiza transacciones
+//    que ya existen; nunca crea nuevas. Al terminar, esconde el botón otra vez (estilo iOS).
+window.syncPaymentsToFinanzas = async function(clientId){
+  const c=clients.find(x=>x.id===clientId);
+  if(!c||!Array.isArray(c.payments)||!c.payments.length){ alert('Este cliente no tiene pagos.'); return; }
+  let checked=0, synced=0, missing=0;
+  for(const p of c.payments){
+    if(!p.entryId){ missing++; continue; }
+    checked++;
+    try{
+      const ref=doc(db,'transactions',p.entryId);
+      const snap=await getDoc(ref);
+      if(!snap.exists()){ missing++; continue; }
+      const d=snap.data();
+      const wantCents=Math.round((Number(p.amount)||0)*100);
+      const patch={};
+      if((Number(d.amountCents)||0)!==wantCents) patch.amountCents=wantCents;
+      if(p.date && d.date!==p.date) patch.date=p.date;
+      if(Object.keys(patch).length){ await updateDoc(ref,patch); synced++; }
+    }catch(e){ console.warn('sync', p.entryId, e); }
+  }
+  const b=document.getElementById('pay-sync-btn'); if(b) b.style.display='none';
+  alert('🔄 Sincronizado con Finanzas\n\n• Pagos revisados: '+checked+'\n• Corregidos en Finanzas: '+synced+(missing?('\n• Sin transacción ligada: '+missing+' (pagos viejos, no se tocaron)'):''));
 };
 
 // 🧹 Reconciliar: busca PAGOS en Finanzas que ya NO están en el cliente (borrados antes de este arreglo) y los anula.
