@@ -433,7 +433,7 @@
 </div></div>
 
 <div class="search-wrap">
-    <input class="search-input" placeholder="🔍 Buscar cliente, carro o VIN..." id="search-box" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="width:100%;">
+    <input class="search-input" placeholder="🔍 Buscar cliente, carro o VIN..." id="search-box" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" oninput="clearTimeout(window._searchTimer);window._searchTimer=setTimeout(renderAll,200)" style="width:100%;">
   </div>
 
   <main id="main-content"><div class="loading">Cargando clientes...</div></main>
@@ -477,7 +477,7 @@
         <button onclick="closeModal('del-client-modal')" style="background:transparent;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1;">×</button>
       </div>
       <p style="color:var(--muted);font-size:13px;margin-bottom:12px;line-height:1.45;">Busca y elige el cliente a eliminar. Se hace <b>uno a la vez</b> y pedirá confirmación. Esta acción no se puede deshacer.</p>
-      <input class="form-input" id="del-search" placeholder="🔍 Buscar por nombre, carro o VIN..." oninput="renderDelList()" style="margin-bottom:12px;">
+      <input class="form-input" id="del-search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="🔍 Buscar por nombre, carro o VIN..." oninput="renderDelList()" style="margin-bottom:12px;">
       <div id="del-list" style="max-height:52vh;overflow-y:auto;"></div>
     </div>
   </div>
@@ -959,7 +959,7 @@
 <div id="service-view" style="display:none;padding:12px 0 90px;">
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
     <button onclick="svcNewOrder()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:11px 18px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">➕ Nueva orden de servicio</button>
-    <input id="svc-search" oninput="svcRenderOrders()" placeholder="🔍 Buscar cliente, carro, placa o VIN…" style="flex:1 1 220px;max-width:420px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;">
+    <input id="svc-search" oninput="svcRenderOrders()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="🔍 Buscar cliente, carro, placa o VIN…" style="flex:1 1 220px;max-width:420px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;">
   </div>
   <div id="svc-tabs" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;"></div>
   <div id="svc-filters" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;"></div>
@@ -2633,7 +2633,7 @@ function svcRenderModal(){
       +'<select id="svc-new-lang" onchange="svcCapture()" title="Idioma del estimado y mensajes" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:6px 8px;font-size:12px;font-family:inherit;cursor:pointer;"><option value="es"'+(d.lang==='es'?' selected':'')+'>🇲🇽 Español</option><option value="en"'+(d.lang==='en'?' selected':'')+'>🇺🇸 English</option></select>'
       +'<button onclick="svcClearClient()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;">Cambiar</button></div></div>';
   } else {
-    cliHtml='<input id="svc-cli-search" oninput="svcCliSearch()" placeholder="🔍 Buscar cliente existente…" style="'+SVC_IN+'">'
+    cliHtml='<input id="svc-cli-search" oninput="svcCliSearch()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="🔍 Buscar cliente existente…" style="'+SVC_IN+'">'
       +'<div id="svc-cli-results" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:6px;max-height:180px;overflow-y:auto;"></div>'
       +'<div style="text-align:center;color:var(--faint);font-size:12px;margin:10px 0;">— o cliente nuevo —</div>'
       +'<input id="svc-new-name" value="'+svcEsc(d.clientName||'')+'" placeholder="Nombre del cliente" autocapitalize="words" style="'+SVC_IN+';margin-bottom:8px;text-transform:capitalize;">'

@@ -198,7 +198,7 @@
       <p style="font-size:12px;color:var(--faint);line-height:1.5;margin-bottom:10px;">Elige el carro, escribe una palabra (ej. «cmax», «altima gris») y asigna de un jalón todos los gastos que coincidan. Sirve para Dealer y Partes. Solo el dueño.</p>
       <div class="row2">
         <div class="field"><label>Carro</label><select id="bc-car" onchange="bulkAssignPreview()"></select></div>
-        <div class="field"><label>Buscar palabra</label><input id="bc-q" oninput="bulkAssignPreview()" placeholder="cmax, altima gris…"></div>
+        <div class="field"><label>Buscar palabra</label><input id="bc-q" oninput="bulkAssignPreview()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="cmax, altima gris…"></div>
       </div>
       <div id="bc-prog" style="font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:38vh;overflow:auto;font-family:ui-monospace,monospace;margin-top:8px;"></div>
       <div class="modal-actions">
@@ -721,7 +721,10 @@
   <div class="sheet">
     <div class="sheet-head"><div class="sheet-title">↩️ Devolución de gasto</div><button class="close" onclick="closeDevol()">✕</button></div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Elige el gasto de la parte que se devolvió. Se <b>cancela ese gasto</b> y el dinero se queda como <b>fondo de esa caja</b> (no cuenta como ingreso ni se reparte 50/50).</div>
-    <input id="devol-search" oninput="renderDevolList()" placeholder="🔎 Buscar gasto…" style="width:100%;box-sizing:border-box;margin-bottom:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);">
+    <div id="devol-search-wrap" style="position:relative;margin-bottom:12px;">
+      <input id="devol-search" oninput="renderDevolList()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="🔎 Buscar: monto, fecha, nombre, concepto…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 40px 11px 12px;color:var(--text);font-size:14px;">
+      <span id="devol-search-x" onclick="clearDevolSearch()" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--border);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;user-select:none;">✕</span>
+    </div>
     <div id="devol-body" style="max-height:58vh;overflow:auto;"></div>
   </div>
 </div>
@@ -1480,6 +1483,7 @@ window.reverseExp = async function(id){
 // ---------- DEVOLUCIONES (revierte un gasto; el dinero va a FONDO de esa caja, no se reparte) ----------
 window.openDevol = function(){ const s=document.getElementById('devol-search'); if(s) s.value=''; renderDevolList(); document.getElementById('devol-overlay').classList.add('open'); };
 window.closeDevol = function(){ document.getElementById('devol-overlay').classList.remove('open'); };
+window.clearDevolSearch = function(){ const s=document.getElementById('devol-search'); if(s){ s.value=''; renderDevolList(); s.focus(); } };
 // Suma de lo YA devuelto (reversado) por gasto — habilita DEVOLUCIONES PARCIALES (varias piezas de un invoice).
 function _reversedMap(){
   const m={};
@@ -1489,12 +1493,27 @@ function _reversedMap(){
 window.renderDevolList = function(){
   const box=document.getElementById('devol-body'); if(!box) return;
   const q=((document.getElementById('devol-search')||{}).value||'').trim().toLowerCase();
+  const _x=document.getElementById('devol-search-x'); if(_x) _x.style.display=q?'':'none';
   const revMap=_reversedMap();
   const remOf=t=>(Number(t.amountCents)||0)-(revMap[t.entryId||t.id]||0);
   let list=txns.filter(t=>t.type==='expense' && !t.saleRefundOf && remOf(t)>0 && canEditTx(t.id));   // muestra mientras quede saldo por devolver (excluye devoluciones de VENTA)
-  if(q){ const w=q.split(/\s+/); list=list.filter(t=>{ const hay=((t.note||'')+' '+(t.category||'')+' '+(t.vendor||'')+' '+(t.carLabel||'')+' '+((DEPT_LABEL[t.dept]||''))).toLowerCase(); return w.every(x=>hay.indexOf(x)>=0); }); }
+  // 🔎 Mismo buscador inteligente que Finanzas: reconoce FECHA (15/9, «sep 15», «hoy») y MONTO (acepta
+  //    centavos: 5.10) además de nombre/concepto/carro/caja; hace match por TODAS las palabras (AND).
+  if(q){
+    const dp=parseDateQuery(q);
+    const rest=(dp?q.replace(dp.matchedText,' '):q).replace(/\s+/g,' ').trim();
+    const words=rest.split(/\s+/).map(w=>w.replace(/[$,]/g,'')).filter(w=>w && w!=='de' && w!=='del');
+    list=list.filter(t=>{
+      if(dp && !(t.date && dp.test(t.date))) return false;
+      if(!words.length) return true;
+      const dollars=(Number(t.amountCents)||0)/100;
+      const amtForms=[String(Math.round(dollars)), dollars.toFixed(2), dollars.toLocaleString('en-US'), dollars.toLocaleString('en-US',{minimumFractionDigits:2})];
+      const hay=[t.note,t.category,t.vendor,t.carLabel,(DEPT_LABEL[t.dept]||''),t.date,fmtDate(t.date),_fmtDateLong(t.date),...amtForms].join(' ').toLowerCase();
+      return words.every(w=>hay.indexOf(w)>=0);
+    });
+  }
   list.sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||''));
-  if(!list.length){ box.innerHTML='<div style="color:var(--faint);text-align:center;padding:24px;">No hay gastos para devolver.</div>'; return; }
+  if(!list.length){ box.innerHTML='<div style="color:var(--faint);text-align:center;padding:24px;">'+(q?'Sin resultados para esa búsqueda.':'No hay gastos para devolver.')+'</div>'; return; }
   box.innerHTML=list.map(t=>{
     const dept=DEPT_LABEL[t.dept]||t.dept;
     const full=Number(t.amountCents)||0, rem=remOf(t), partial=rem<full;
