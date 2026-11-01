@@ -5763,7 +5763,7 @@ window.openPayModal=function(id){
   document.getElementById('pay-amount').value=c.weekly;
   document.getElementById('pay-date').value=today();
   const hist=c.payments||[];
-  document.getElementById('pay-history').innerHTML=(hist.length===0
+  document.getElementById('pay-history').innerHTML=hist.length===0
     ?'<div style="color:var(--muted);font-size:13px;padding:8px 0;">Sin pagos aún</div>'
     :[...hist].map((p,i)=>`
       <div class="payment-entry" style="flex-direction:column;align-items:flex-start;gap:6px;">
