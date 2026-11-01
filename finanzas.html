@@ -409,7 +409,7 @@
 </div>
 
 <!-- EDITAR MOVIMIENTO + RECIBO -->
-<div class="overlay" id="movedit-overlay">
+<div class="overlay" id="movedit-overlay" style="z-index:9600;">
   <div class="sheet">
     <div class="sheet-head"><div class="sheet-title" id="me-title">Editar movimiento</div><button class="close" onclick="closeMovEdit()">✕</button></div>
     <div id="me-info" style="font-size:13px;color:var(--muted);margin-bottom:12px;"></div>
@@ -3536,7 +3536,7 @@ function _pnlListHtml(items){
     const income=INCOME_TYPES.includes(t.type);
     const desc=t.note||t.clientName||t.category||(income?'Ingreso':'Gasto');
     const meta=[ (t.note&&t.category)?t.category:'', t.carLabel||'', t.vendor||t.source_name||'' ].filter(Boolean).join(' · ');
-    return '<div onclick="openMovEdit(\''+t.id+'\')" title="Toca para ver / editar / borrar este movimiento" style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;">'
+    return '<div onclick="event.stopPropagation(); openMovEdit(\''+t.id+'\')" title="Toca para ver / editar / borrar este movimiento" style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;">'
       +'<span style="flex:1;min-width:0;word-break:break-word;font-size:12.5px;color:var(--text);">'+desc
         +(meta?'<span style="color:var(--faint);font-size:11px;"> · '+meta+'</span>':'')
         +'<span style="color:var(--faint);font-size:11px;"> · '+fmtDate(t.date)+'</span></span>'
