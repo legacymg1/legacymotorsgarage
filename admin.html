@@ -6719,10 +6719,17 @@ window.editPayment=async function(clientId, idx, field, value){
   try{
     await setDoc(doc(db,'clients',clientId),c);
     // 🧾 SYNC FINANZAS: la transacción del pago (id = entryId) tiene que reflejar el mismo monto/fecha,
-    // si no, el cliente queda en $140 pero Finanzas en $135 (bug reportado). Merge por entryId.
+    // si no, el cliente queda en $140 pero Finanzas en $135 (bug reportado).
+    // ⚠️ SOLO ACTUALIZA si la transacción YA existe — nunca la crea (updateDoc, no setDoc/merge),
+    //    para no meter transacciones fantasma por pagos viejos sin su movimiento en Finanzas.
     if(p.entryId){
       const patch = (field==='amount') ? { amountCents: Math.round((Number(value)||0)*100) } : { date: value };
-      try{ await setDoc(doc(db,'transactions',p.entryId), patch, {merge:true}); }catch(e){ console.warn('sync tx', e); }
+      try{
+        const ref=doc(db,'transactions',p.entryId);
+        const snap=await getDoc(ref);
+        if(snap.exists()) await updateDoc(ref, patch);
+        else console.warn('sync tx: no existe la transacción '+p.entryId+' (pago viejo); no se crea ninguna.');
+      }catch(e){ console.warn('sync tx', e); }
     }
   }catch(e){alert('Error: '+e.message);}
 };
