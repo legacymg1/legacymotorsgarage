@@ -2010,14 +2010,14 @@ window.renderCorte = function(){
   const gastosOf=d=>data[d].exp.filter(t=>t.type==='expense');
   const placasOf=d=>data[d].exp.filter(t=>t.type==='dmv_payout');   // salidas de dinero de clientes (placas/DMV) — NO son gasto
   if(carried.dealer>0) html+=fondoLine(carried.dealer);
-  html+=listBlock('📥 Ingresos Dealer','#3ecf8e',data.dealer.inc,dIn);
   if(devsOf('dealer').length) html+=listBlock('↩️ Devoluciones Dealer','#f0c040',devsOf('dealer'),sumA(devsOf('dealer')));
+  html+=listBlock('📥 Ingresos Dealer','#3ecf8e',data.dealer.inc,dIn);
   html+=listBlock('📤 Gastos Dealer','#ff6b6b',gastosOf('dealer'),sumA(gastosOf('dealer')));
   if(placasOf('dealer').length) html+=listBlock('🏛️ Placas / DMV (dinero de clientes)','#c9a84c',placasOf('dealer'),sumA(placasOf('dealer')));
   html+=subT('🚗 Subtotal Dealer',dNet);
   if(carried.parts>0) html+=fondoLine(carried.parts);
-  html+=listBlock('📥 Ingresos Partes','#3ecf8e',data.parts.inc,pIn);
   if(devsOf('parts').length) html+=listBlock('↩️ Devoluciones Partes','#f0c040',devsOf('parts'),sumA(devsOf('parts')));
+  html+=listBlock('📥 Ingresos Partes','#3ecf8e',data.parts.inc,pIn);
   html+=listBlock('📤 Gastos Partes','#ff6b6b',gastosOf('parts'),sumA(gastosOf('parts')));
   html+=subT('🔧 Subtotal Partes',pNet);
   // ----- CUADRE ENTRE SOCIOS (cuenta interna) -----
