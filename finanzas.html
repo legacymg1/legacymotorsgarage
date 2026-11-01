@@ -3114,7 +3114,7 @@ function renderBolsas(){
         const a=Number(it.amountCents)||0;
         let sign='−', color='#ff6b6b';
         if(INCOME_TYPES.includes(it.type) || (it.type==='transfer'&&it.dir==='in') || it.type==='expense_reversal'){ sign='+'; color='#3ecf8e'; }
-        const editable = (it.type==='income' || it.type==='expense');
+        const editable = (it.type==='income' || it.type==='expense' || it.type==='expense_reversal');   // ↩️ devoluciones también: abrir para ver/borrar (ej. una duplicada)
         const clip = it.receiptURL ? `<span style="background:rgba(62,207,142,0.18);color:#3ecf8e;border:1px solid rgba(62,207,142,0.5);border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;margin-right:6px;white-space:nowrap;">📎 ✓</span>` : '';
         const click = editable ? `onclick="event.stopPropagation(); openMovEdit('${it.id}')"` : '';
         const hint = editable ? `<span style="color:var(--faint);font-size:11px;margin-left:6px;">✏️</span>` : '';
