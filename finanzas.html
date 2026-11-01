@@ -1215,6 +1215,8 @@ window.scanReceiptNow=async function(file){
     const dept=document.getElementById('e-dept').value;
     const r=await httpsCallable(functions,'scanReceipt')({ imageBase64:dataUrl, mediaType:'image/jpeg', categories:(EXP_CATS[dept]||[]) });
     const d=(r&&r.data)||{};
+    // ↩️ ¿El ticket es un REEMBOLSO/DEVOLUCIÓN? No es un gasto: cotéjalo con el gasto original y aplica la devolución.
+    if(d.isRefund){ await handleScannedRefund(d, jpg); if(btn) btn.disabled=false; return; }
     // Campos compartidos del recibo
     if(d.date){ document.getElementById('e-date').value=d.date; const d2=document.getElementById('e-date2'); if(d2) d2.value=d.date; }
     if(d.vendor) document.getElementById('e-vendor').value=d.vendor;
@@ -1574,6 +1576,84 @@ window.doDevol = async function(id){
   }catch(err){ alert('Error: '+err.message); }
   finally{ _devolBusy=false; }
 };
+
+// 📝 Escribe UNA devolución (expense_reversal) ligada a un gasto, con actualización optimista inmediata.
+//    Lo usan doDevol (manual) y el lector de recibos (reembolso escaneado). `extra` puede traer receiptURL, etc.
+async function _writeDevolucion(e, cents, isPartial, prior, extra){
+  const rid='dev_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  const origDesc=(e.note||e.category||'gasto')+(e.vendor?(' · '+e.vendor):'')+(e.carLabel?(' · '+e.carLabel):'');
+  const recData=Object.assign({
+    entryId:rid, type:'expense_reversal', reversalOf:e.entryId||e.id, devolucion:prior, esDevolucion:true, partial:isPartial, origDesc:origDesc,
+    dept:e.dept, category:e.category||'', amountCents:cents,
+    method:e.method||'', date:new Date().toISOString().slice(0,10),
+    vendor:e.vendor||'', carId:e.carId||'', carLabel:e.carLabel||'',
+    note:(isPartial?'Devolución parcial: ':'Devolución: ')+origDesc, createdAt:new Date().toISOString(),
+    createdBy:(auth.currentUser&&auth.currentUser.email)||'', source:'finanzas'
+  }, extra||{});
+  await setDoc(doc(db,'transactions',rid), recData);
+  txns = txns.filter(t=>t.id!==rid).concat([{id:rid, ...recData}]);   // optimista (ver doDevol)
+  renderDevolList(); renderExpenses(); renderBolsas();
+  return {rid, origDesc};
+}
+
+// 🔎 Busca el GASTO original que corresponde a un reembolso escaneado (por # de orden+vendedor, luego por
+//    vendedor con saldo que alcance, luego por monto cercano). Solo gastos con saldo por devolver y de tu bolsa.
+function _findRefundTarget(o){
+  const vlc=(o.vendor||'').trim().toLowerCase();
+  const on=(o.orderNo||'').trim().toLowerCase();
+  const cents=Math.round(Number(o.cents)||0);
+  const rev=_reversedMap();
+  const rem=t=>(Number(t.amountCents)||0)-(rev[t.entryId||t.id]||0);
+  const cand=txns.filter(t=>t.type==='expense' && !t.saleRefundOf && rem(t)>0 && canEditTx(t.id));
+  if(on){ const m=cand.find(t=>String(t.orderNo||'').trim().toLowerCase()===on && (!vlc||String(t.vendor||'').trim().toLowerCase()===vlc)); if(m) return m; }
+  if(vlc){
+    const byV=cand.filter(t=>String(t.vendor||'').trim().toLowerCase()===vlc);
+    if(byV.length){
+      const fit=byV.filter(t=>rem(t)>=cents-2).sort((a,b)=>Math.abs(rem(a)-cents)-Math.abs(rem(b)-cents));
+      if(fit.length) return fit[0];
+      return byV.sort((a,b)=>rem(b)-rem(a))[0];
+    }
+  }
+  const byAmt=cand.filter(t=>Math.abs(rem(t)-cents)<2); if(byAmt.length) return byAmt[0];
+  return null;
+}
+
+// ↩️📸 Maneja un ticket que el lector detectó como REEMBOLSO: coteja con el gasto original, propone descontar
+//    SOLO lo devuelto (parcial si aplica), sube la foto del ticket como comprobante y usa la devolución que ya existe.
+async function handleScannedRefund(d, jpg){
+  const st=document.getElementById('scan-status');
+  let cents=Math.round((Number(d.amount)||0)*100);
+  if(!(cents>0)){
+    const v=prompt('📸 Detecté un REEMBOLSO pero no pude leer el monto.\n\n¿Cuánto te devolvieron? ($)','');
+    if(v===null){ if(st) st.textContent=''; return; }
+    cents=Math.round(Number(v)*100);
+    if(!(cents>0)){ if(st) st.innerHTML='<span style="color:#ff9800;">Monto inválido.</span>'; return; }
+  }
+  const e=_findRefundTarget({vendor:d.vendor, orderNo:d.orderNo, cents});
+  const refTxt=centsToUSD(cents)+(d.vendor?(' de '+d.vendor):'');
+  if(!e){
+    if(st) st.innerHTML='<span style="color:#ff9800;font-weight:700;">📸 Reembolso '+refTxt+' detectado, pero no encontré el gasto original. Lo abro en ↩️ Devoluciones para que lo elijas.</span>';
+    setTimeout(()=>{ if(typeof openDevol==='function'){ openDevol(); const s=document.getElementById('devol-search'); if(s){ s.value=(d.vendor||''); renderDevolList(); } } }, 500);
+    return;
+  }
+  const rev=_reversedMap(); const already=(rev[e.entryId||e.id]||0); const remaining=(Number(e.amountCents)||0)-already;
+  let applyCents=cents, capMsg='';
+  if(cents>remaining){ applyCents=remaining; capMsg='\n\n(El gasto solo tiene saldo de '+centsToUSD(remaining)+', se aplicará eso.)'; }
+  const origDesc=(e.note||e.category||'gasto')+(e.vendor?(' · '+e.vendor):'')+(e.carLabel?(' · '+e.carLabel):'');
+  const cajaTxt=(e.dept==='parts')?'🔧 Partes':'🚗 Dealer';
+  if(!confirm('📸 Ticket de REEMBOLSO '+refTxt+' detectado.\n\nLo cotejé con el gasto:\n• '+origDesc+' ('+centsToUSD(e.amountCents)+(remaining<(Number(e.amountCents)||0)?(' · saldo '+centsToUSD(remaining)):'')+')\n\n¿Registrar la devolución de '+centsToUSD(applyCents)+'? Se queda como fondo de '+cajaTxt+'.'+capMsg)){ if(st) st.textContent=''; return; }
+  if(_devolBusy) return; _devolBusy=true;
+  try{
+    let receiptURL='';
+    try{ if(jpg){ if(st) st.textContent='Subiendo ticket…'; const rr=ref(storage,'receipts/dev_'+Date.now()+'/'+(jpg.name||'devolucion.jpg')); await uploadBytes(rr,jpg); receiptURL=await getDownloadURL(rr); } }catch(_){}
+    const isPartial=(applyCents<remaining)||already>0;
+    const _lcD=lastClosing(); const _since=_lcD?(_lcD.closedAt||''):''; const prior=_since?((e.createdAt||e.date||'')<=_since):false;
+    await _writeDevolucion(e, applyCents, isPartial, prior, {receiptURL:receiptURL, scannedRefund:true});
+    if(st) st.innerHTML='<span style="color:#32d74b;">✅ Devolución de '+centsToUSD(applyCents)+' registrada'+(receiptURL?' con su ticket 📎':'')+'. Se quedó como fondo de '+cajaTxt+'.</span>';
+    setTimeout(()=>{ if(typeof closeExp==='function') closeExp(); }, 1400);
+  }catch(err){ if(st) st.innerHTML='<span style="color:#ff9800;">Error: '+err.message+'</span>'; }
+  finally{ _devolBusy=false; }
+}
 
 // Todos los movimientos (gastos + ingresos), ordenados FIEL a como se fueron ingresando (más reciente arriba), sin distinción.
 function _movAll(){

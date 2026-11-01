@@ -447,6 +447,7 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
     "- orderNo: the order / invoice / receipt number printed on the document (e.g. 'Order #', 'Invoice #', 'Receipt #', 'Transaction #'). Letters and digits only as printed. Empty string if none.\n" +
     "- category: choose the SINGLE best match for the WHOLE receipt from the list above, copied EXACTLY. If none fits, use \"Otro\".\n" +
     "- method: one of \"cash\",\"terminal\",\"ach\",\"zelle\". Guess from the receipt (card/VISA/MASTERCARD/DEBIT => \"terminal\"; otherwise \"cash\"). Default \"cash\".\n" +
+    "- isRefund: true if this whole document is a RETURN, REFUND or CREDIT — money given BACK to the customer, NOT a purchase. Signs: words like 'Refund', 'Return', 'Returned', 'Return Receipt', 'Credit', 'Merchandise Credit', 'Devolución', 'Reembolso', 'Nota de crédito', 'Abono', a NEGATIVE grand total, or amounts shown as credited/returned to a card. A normal purchase that merely has a coupon or discount is NOT a refund. Otherwise false. When true, 'amount' must be the POSITIVE dollar magnitude of the money returned.\n" +
     "If a value is unknown use an empty string, except numbers (use 0) and items (use []). Return JSON only.";
   try {
     const AnthropicMod = require("@anthropic-ai/sdk");
@@ -495,6 +496,7 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
       orderNo: String(out.orderNo || "").slice(0, 50),
       category: String(out.category || "").slice(0, 60),
       method: ["cash", "terminal", "ach", "zelle"].includes(out.method) ? out.method : "cash",
+      isRefund: out.isRefund === true,
     };
   } catch (e) {
     console.error("scanReceipt error", e);
