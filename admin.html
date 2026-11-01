@@ -6714,9 +6714,16 @@ function checkStartupOverdue(){
 window.editPayment=async function(clientId, idx, field, value){
   const c=clients.find(x=>x.id===clientId);
   if(!c||!c.payments[idx]) return;
-  c.payments[idx][field] = field==='amount' ? Number(value) : value;
+  const p=c.payments[idx];
+  p[field] = field==='amount' ? Number(value) : value;
   try{
     await setDoc(doc(db,'clients',clientId),c);
+    // 🧾 SYNC FINANZAS: la transacción del pago (id = entryId) tiene que reflejar el mismo monto/fecha,
+    // si no, el cliente queda en $140 pero Finanzas en $135 (bug reportado). Merge por entryId.
+    if(p.entryId){
+      const patch = (field==='amount') ? { amountCents: Math.round((Number(value)||0)*100) } : { date: value };
+      try{ await setDoc(doc(db,'transactions',p.entryId), patch, {merge:true}); }catch(e){ console.warn('sync tx', e); }
+    }
   }catch(e){alert('Error: '+e.message);}
 };
 
