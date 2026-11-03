@@ -2475,13 +2475,23 @@ exports.svcPortalEstimates = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 
   // 🌐 Relleno bilingüe: el cliente SIEMPRE ve su idioma. Si una línea no tiene traducción real (sin _tr),
   // se traduce (ES+EN) y se GUARDA en la orden (una sola vez por orden). Tope de 6 órdenes por carga para no tardar.
   let _trCalls = 0;
+  // Una línea NECESITA traducción si no tiene inglés real: sin descEn, o descEn === desc (señal de que no se tradujo,
+  // p.ej. se guardó rápido sin IA o la IA se tardó). Reintenta hasta 2 veces (atrapa el modelo "frío") y luego ya no,
+  // para no quedarse en español para siempre ni hacer llamadas infinitas en términos que SÍ son iguales en ambos idiomas.
+  const _needsTr = (s) => s && s.desc && (!s.descEn || s.descEn === s.desc) && (Number(s._trTries) || 0) < 2;
   for (const o of withEst) {
     const svcs = Array.isArray(o.services) ? o.services : [];
-    if (!svcs.length || !svcs.some((s) => s && s.desc && !s._tr)) continue;
+    if (!svcs.length || !svcs.some(_needsTr)) continue;
     if (_trCalls >= 6) break; _trCalls++;
     try {
       const r = await _svcFixText(svcs.map((s) => (s && s.desc) || ""));
-      const fixed = svcs.map((s, i) => Object.assign({}, s, { desc: (r.es[i] || (s && s.desc) || ""), descEn: (r.en[i] || (s && s.desc) || ""), _tr: true }));
+      const fixed = svcs.map((s, i) => {
+        const es = r.es[i] || (s && s.desc) || "";
+        const en = r.en[i] || es;
+        // solo cuenta el reintento en las líneas que de verdad necesitaban traducción
+        const tries = _needsTr(s) ? ((Number(s._trTries) || 0) + 1) : (Number(s._trTries) || 0);
+        return Object.assign({}, s, { desc: es, descEn: en, _tr: true, _trTries: tries });
+      });
       o.services = fixed;
       await db.collection("serviceOrders").doc(o.id).set({ services: fixed }, { merge: true });
     } catch (e) { console.error("portal tr", e); }
