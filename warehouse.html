@@ -536,6 +536,7 @@
 </nav>
 
 <script src="legacy-svc.js"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -3010,134 +3011,12 @@ window.dviSubmit=async function(nextStage){
 // ===================== 🗂️ FICHA DEL CARRO (componente compartido, estilo iOS) =====================
 // Se abre desde cualquier lugar donde esté el carro (hoy Pit Crew; se conectará a Inventario/otros). Muestra
 // etapa, quién lo trabajó, cuánto tardó, y abre el reporte Pre-reparación + lista de partes del jacket.
-let _carFichaInsp=null, _carFichaCar=null, _carFichaTick=null;
-function hms(s){ s=Math.max(0,Math.floor(s)); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60; const z=n=>String(n).padStart(2,'0'); return (h>0?(h+':'):'')+z(m)+':'+z(ss); }
-window.carStage2Pause=async function(carId){ try{ await httpsCallable(functions,'mechDvi')(vaData({op:'stage2pause',carId:carId})); }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); } carFichaOpen(carId); };
-window.carStage2Resume=async function(carId){ try{ await httpsCallable(functions,'mechDvi')(vaData({op:'stage2resume',carId:carId})); }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); } carFichaOpen(carId); };
-window.carFichaOpen=async function(carId){
-  let ov=document.getElementById('wh-carficha');
-  if(!ov){ ov=document.createElement('div'); ov.id='wh-carficha'; ov.style.cssText='position:fixed;inset:0;z-index:100075;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
-    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };   // 📱 cerrar al tocar afuera (iOS)
-    const bx=document.createElement('div'); bx.id='wh-carficha-box'; bx.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:460px;width:100%;box-sizing:border-box;cursor:default;margin:auto;overflow:hidden;';
-    ov.appendChild(bx); document.body.appendChild(ov);
-  } else ov.style.display='flex';
-  const box=document.getElementById('wh-carficha-box');
-  box.innerHTML='<div class="faint" style="text-align:center;padding:30px;">'+t('jLoadingTxt')+'</div>';
-  try{ const r=await httpsCallable(functions,'carJacket')(vaData({carId:carId})); carFichaRender((r&&r.data)||{}); }
-  catch(e){ box.innerHTML='<div style="padding:18px;"><div class="faint" style="text-align:center;padding:14px;">'+((e&&e.message)||t('jCouldnt'))+'</div><button class="btn ghost sm" style="width:100%;" onclick="document.getElementById(\'wh-carficha\').remove()">✕</button></div>'; }
-};
-function carStageInfo(stage, waiting){
-  if(waiting) return {t:t('waitParts'), c:'#ff8a4c'};
-  const m={ mecanico:[L2('🔧 Mecánico','🔧 Mechanic'),'#f0c040'], pintura:[L2('🎨 Pintura','🎨 Paint'),'#b58bff'], detalle:[L2('🧽 Detallado','🧽 Detailing'),'#4cc2ff'], listo:[L2('✅ Listo para fotos','✅ Ready for photos'),'#35c46a'] };
-  const o=m[stage]||[stage||'—','#8b93a3']; return {t:o[0], c:o[1]};
-}
-function carFichaRender(d){
-  const box=document.getElementById('wh-carficha-box'); if(!box) return;
-  const c=d.car||{}; const insp=d.inspection||{}; _carFichaInsp=insp; _carFichaCar=c;
-  const inStage2=!!(insp.stage2At && !insp.stage2DoneAt);
-  const waiting=!!(insp.reportAt && insp.waitingParts && !inStage2);
-  const stg=inStage2 ? {t:L2('🏗️ En trabajo · Etapa 2','🏗️ In progress · Stage 2'),c:'#4c9bff'} : carStageInfo(c.reconStage, waiting);
-  const photo=c.photo?('<img src="'+esc(c.photo)+'" style="width:100%;height:170px;object-fit:cover;display:block;">'):'<div style="height:120px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:44px;">🚗</div>';
-  const fmtD=iso=>{ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ return '—'; } };
-  const rows=[];
-  rows.push(['📍 '+L2('Etapa','Stage'), '<span style="color:'+stg.c+';font-weight:800;">'+esc(stg.t)+'</span>']);
-  if(insp.reportAt){
-    rows.push(['👤 '+L2('Inspeccionó','Inspected by'), esc(insp.reportBy||insp.by||'—')]);
-    rows.push(['📅 '+L2('Inspección','Inspection'), fmtD(insp.reportAt)]);
-    if(d.durMin) rows.push(['⏱️ '+L2('Inspección tardó','Inspection took'), _hm(d.durMin)]);
-    if(insp.stage2Mins) rows.push(['🏗️ '+L2('Etapa 2 (trabajo)','Stage 2 (work)'), _hm(insp.stage2Mins)]);
-  } else { rows.push(['🔧 '+L2('Inspección','Inspection'), insp.startedAt?L2('En proceso','In progress'):L2('Pendiente','Pending')]); }
-  const rowHtml=rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);font-size:13.5px;"><span style="color:var(--muted);">'+r[0]+'</span><span style="font-weight:700;text-align:right;">'+r[1]+'</span></div>').join('');
-  const parts=Array.isArray(insp.parts)?insp.parts:[];
-  box.innerHTML=photo
-    +'<div style="padding:16px;">'
-    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="min-width:0;"><div style="font-weight:800;font-size:18px;line-height:1.2;">'+esc(c.label)+'</div>'
-    +'<div class="faint" style="font-size:12px;margin-top:3px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+(c.vin?('VIN '+esc(c.vin)+' · '):'')+(c.miles?(esc(c.miles)+' mi'):'')+'</div></div>'
-    +'<button class="linkbtn" onclick="document.getElementById(\'wh-carficha\').remove()" style="font-size:26px;color:var(--muted);line-height:1;flex:0 0 auto;">×</button></div>'
-    +'<div style="margin-top:8px;">'+rowHtml+'</div>'
-    +(insp.reportAt?('<button class="btn-gold" style="width:100%;margin-top:14px;" onclick="carFichaReport()">📄 '+L2('Ver reporte · Pre-reparación','View report · Pre-repair')+'</button>'):'')
-    +carFichaPartsBlock(c,insp,parts,waiting,inStage2)
-    +'</div>';
-  // ⏱️ Tick en vivo del reloj de Etapa 2 (se auto-limpia al cerrar la ficha o pausar).
-  clearInterval(_carFichaTick); _carFichaTick=null;
-  if(inStage2 && insp.stage2RunningSince){
-    _carFichaTick=setInterval(function(){ const el=document.getElementById('carficha-timer'); const ip=_carFichaInsp||{}; if(!el||!ip.stage2RunningSince){ clearInterval(_carFichaTick); _carFichaTick=null; return; } const secs=(Number(ip.stage2Secs)||0)+Math.max(0,(Date.now()-Date.parse(ip.stage2RunningSince))/1000); el.textContent=hms(secs); },1000);
-  }
-}
-// 🧩 Partes: checklist de recepción (esperando) o estado (en trabajo), + acción de Etapa 2.
-function carFichaPartsBlock(c,insp,parts,waiting,inStage2){
-  const recv=insp.partsRecv||{};
-  const recvCount=parts.filter((p,i)=>recv[String(i)]===true).length;
-  const allIn=parts.length>0 && recvCount===parts.length;
-  let html='';
-  if(parts.length){
-    const title=(waiting||inStage2)?(L2('🧩 Partes — recepción','🧩 Parts — receiving')+' ('+recvCount+'/'+parts.length+')'):(dviT('partsH')+' ('+parts.length+')');
-    html+='<div class="sub" style="font-weight:800;font-size:13.5px;margin:16px 0 6px;">'+title+'</div>';
-    html+=parts.map((p,i)=>{
-      const got=recv[String(i)]===true;
-      const lbl='🧩 '+esc(p.label)+(p.area?(' <span class="faint" style="font-size:11px;">· '+esc(p.area)+'</span>'):'');
-      if(waiting){
-        return '<label style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.06);cursor:pointer;">'
-          +'<input type="checkbox" '+(got?'checked':'')+' onchange="carFichaReceivePart(\''+esc(c.id)+'\','+i+',this.checked)" style="width:20px;height:20px;flex:0 0 auto;accent-color:#35c46a;">'
-          +'<span style="flex:1;min-width:0;font-size:13.5px;'+(got?'color:var(--muted);text-decoration:line-through;':'')+'">'+lbl+'</span></label>';
-      }
-      return '<div style="font-size:13px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06);">'+(got?'✅ ':'🧩 ')+esc(p.label)+(p.area?(' <span class="faint" style="font-size:11px;">· '+esc(p.area)+'</span>'):'')+'</div>';
-    }).join('');
-  }
-  if(waiting){
-    html+='<button class="btn-gold" onclick="carStartStage2(\''+esc(c.id)+'\')" style="width:100%;margin-top:14px;'+(allIn?'':'opacity:.65;')+'">🏁 '+L2('Empezar etapa 2 (trabajo)','Start stage 2 (work)')+'</button>';
-    if(parts.length && !allIn) html+='<div class="faint" style="font-size:11.5px;text-align:center;margin-top:6px;line-height:1.45;">'+L2('Marca las partes que llegaron. Puedes empezar de todos modos.','Check the parts that arrived. You can start anyway.')+'</div>';
-  } else if(inStage2){
-    const running=!!insp.stage2RunningSince;
-    const baseSecs=(Number(insp.stage2Secs)||0)+(running?Math.max(0,(Date.now()-Date.parse(insp.stage2RunningSince))/1000):0);
-    html+='<div style="text-align:center;margin:16px 0 4px;border-top:1px solid rgba(255,255,255,.06);padding-top:14px;">'
-      +'<div class="faint" style="font-size:11.5px;">🏗️ '+L2('Etapa 2 · restauración','Stage 2 · restoration')+(insp.stage2By?(' · '+esc(insp.stage2By)):'')+'</div>'
-      +'<div id="carficha-timer" style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;color:'+(running?'#4c9bff':'var(--muted)')+';margin-top:4px;letter-spacing:1px;">'+hms(baseSecs)+'</div>'
-      +'<div class="faint" style="font-size:11px;">'+(running?('▶️ '+L2('trabajando','working')):('⏸️ '+L2('en pausa','paused')))+'</div></div>'
-      +'<div style="display:flex;gap:8px;margin-top:10px;">'
-      +(running
-          ? '<button class="btn ghost" onclick="carStage2Pause(\''+esc(c.id)+'\')" style="flex:1;">⏸️ '+L2('Pausar','Pause')+'</button>'
-          : '<button class="btn ghost" onclick="carStage2Resume(\''+esc(c.id)+'\')" style="flex:1;">▶️ '+L2('Reanudar','Resume')+'</button>')
-      +'<button class="btn-gold" onclick="carFinishStage2(\''+esc(c.id)+'\')" style="flex:1.4;">✅ '+L2('Terminar','Finish')+'</button></div>'
-      +'<div class="faint" style="font-size:11px;text-align:center;margin-top:6px;">'+L2('Al terminar pasa a detallado.','Finishing moves it to detailing.')+'</div>';
-  }
-  return html;
-}
-window.carFichaReceivePart=async function(carId,idx,received){
-  try{ await httpsCallable(functions,'mechDvi')(vaData({op:'partcheck', carId:carId, partIdx:idx, received:!!received})); carFichaOpen(carId); }
-  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); carFichaOpen(carId); }
-};
-window.carStartStage2=async function(carId){
-  if(!confirm(L2('¿Empezar la etapa 2 (trabajo/restauración) de este carro?','Start stage 2 (work/restoration) for this car?'))) return;
-  try{ await httpsCallable(functions,'mechDvi')(vaData({op:'startstage2', carId:carId})); whToast(L2('🏁 Etapa 2 iniciada','🏁 Stage 2 started')); carFichaOpen(carId); try{ loadMechCars(); }catch(e){} }
-  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
-};
-window.carFinishStage2=async function(carId){
-  if(!confirm(L2('¿Terminar la etapa 2? El carro pasa a detallado.','Finish stage 2? The car moves to detailing.'))) return;
-  try{ await httpsCallable(functions,'mechDvi')(vaData({op:'finishstage2', carId:carId, nextStage:'detalle'})); whToast(L2('✅ Etapa 2 terminada · a detallado','✅ Stage 2 done · to detailing')); const x=document.getElementById('wh-carficha'); if(x)x.remove(); try{ loadMechCars(); }catch(e){} }
-  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
-};
-window.carFichaReport=function(){
-  const insp=_carFichaInsp||{}; const box=document.getElementById('wh-carficha-box'); if(!box) return;
-  const report=Array.isArray(insp.report)?insp.report:[];
-  const all=[]; report.forEach(a=>{ (a.items||[]).forEach(it=>all.push(Object.assign({area:a.title},it))); });
-  const red=all.filter(x=>x.state==='malo'), yellow=all.filter(x=>x.state==='aten'), ok=all.filter(x=>x.state==='bien');
-  const fmtD=iso=>{ try{ return new Date(iso).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return '—'; } };
-  const card=(f,col)=>'<div class="card" style="padding:10px 12px;margin-bottom:8px;border-left:3px solid '+col+';"><div style="font-weight:700;font-size:14px;">'+(f.state==='malo'?'❌ ':(f.fix==='fixed'?'🔧 ':'⚠️ '))+esc(f.label)+'</div>'
-    +'<div class="faint" style="font-size:11.5px;margin-top:2px;">'+esc(f.area||'')+(f.measure?(' · '+esc(f.measure)):'')+'</div>'
-    +(f.note?'<div style="font-size:13px;margin-top:5px;">'+esc(f.note)+'</div>':'')
-    +(f.fix==='fixed'?'<div style="font-size:12.5px;margin-top:4px;color:#35c46a;font-weight:700;">'+dviT('fixedTag')+(f.repair?(': '+esc(f.repair)):'')+'</div>':'')
-    +(f.part?'<div style="font-size:12.5px;margin-top:4px;color:var(--gold);font-weight:700;">🧩 '+esc(f.part)+'</div>':'')
-    +(f.photo?'<img src="'+esc(f.photo)+'" style="margin-top:6px;width:72px;height:72px;object-fit:cover;border-radius:8px;">':'')+'</div>';
-  const sec=(title,col,arr)=> arr.length ? ('<div class="sub" style="font-weight:800;font-size:13.5px;margin:16px 0 8px;color:'+col+';">'+title+' ('+arr.length+')</div>'+arr.map(x=>card(x,col)).join('')) : '';
-  const okHtml = ok.length ? ('<div class="sub" style="font-weight:800;font-size:13.5px;margin:16px 0 8px;color:#35c46a;">'+dviT('okH')+' ('+ok.length+')</div><div class="faint" style="font-size:12.5px;line-height:1.7;">'+ok.map(o=>'✓ '+esc(o.label)).join(' · ')+'</div>') : '';
-  box.innerHTML='<div style="padding:16px;">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;">'+dviT('reportTitle')+'</h2><button class="linkbtn" onclick="carFichaOpen(\''+esc((_carFichaCar||{}).id||'')+'\')" style="font-size:24px;color:var(--muted);line-height:1;">‹</button></div>'
-    +'<div class="faint" style="font-size:12px;margin-bottom:12px;">🚗 '+esc((_carFichaCar||{}).label||'')+' · 📅 '+fmtD(insp.reportAt)+((insp.reportBy||insp.by)?(' · '+dviT('byLbl')+': '+esc(insp.reportBy||insp.by)):'')+'</div>'
-    +sec(dviT('redH'),'#ff5a5a',red)+sec(dviT('fixedH'),'#ffc94d',yellow)+okHtml
-    +((!red.length&&!yellow.length&&!ok.length)?'<div class="faint" style="text-align:center;padding:16px;">'+dviT('noFlags')+'</div>':'')
-    +'<button class="btn ghost" style="width:100%;margin-top:14px;" onclick="document.getElementById(\'wh-carficha\').remove()">'+L2('Cerrar','Close')+'</button></div>';
-};
+// Delega al componente COMPARTIDO legacy-carficha.js (UNA sola fuente — regla un ecosistema).
+function whCarCtx(){ return {
+  call:function(op,data){ return httpsCallable(functions,op)(vaData(data||{})).then(function(r){ return (r&&r.data)||{}; }); },
+  lang:L, who:whoName(), toast:function(m,e){ whToast(m,e); }, onChange:function(){ try{ loadMechCars(); }catch(e){} }
+}; }
+window.carFichaOpen=function(id){ if(window.LMG && LMG.openCarFicha) LMG.openCarFicha(id, whCarCtx()); else whToast(L2('Ficha no disponible — recarga','Jacket unavailable — reload'),true); };
 
 let JOB=null, runIdx=0, stepStart=0, tickHandle=null, TRI={};
 function detailI18n(){

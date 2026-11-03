@@ -606,6 +606,7 @@ document.addEventListener('DOMContentLoaded',function(){var t=document.getElemen
         <option value="listo">4) Detallado — listo para fotos / exhibición</option>
       </select>
       <div style="font-size:11px;color:#9caa88;margin-top:6px;line-height:1.4;">El detallador en su app <b>solo ve los carros en la etapa “Listo para detallar”</b>. Al terminar de detallar, el carro pasa solo a la etapa 4.</div>
+      <button type="button" onclick="openCarFichaIndex()" style="width:100%;margin-top:9px;padding:9px;border-radius:8px;border:1px solid rgba(76,155,255,.5);background:rgba(76,155,255,.12);color:#8fc0ff;font-weight:800;cursor:pointer;font-size:12.5px;">🗂️ Abrir ficha / ciclo del carro</button>
     </div>
     <div id="car-cost-block" style="display:none;">
       <div id="car-cost-editnote" style="display:none;background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:8px;padding:8px 10px;font-size:12px;color:#ffb74d;margin:2px 0 8px;line-height:1.4;">💰 Este carro <b>aún no tiene costo de compra</b>. Puedes registrarlo aquí.</div>
@@ -717,6 +718,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
@@ -731,6 +733,21 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 try{ storage.maxUploadRetryTime = 240000; storage.maxOperationRetryTime = 120000; }catch(e){}   // aguanta conexiones lentas del yonque/celular
+const _cfFns = getFunctions(app);
+// 🗂️ Abre la ficha del carro (componente COMPARTIDO legacy-carficha.js) desde el modal de edición del inventario.
+window.openCarFichaIndex = function(){
+  const id = editingCarId;
+  if(!id){ alert('Guarda el carro primero para ver su ficha.'); return; }
+  if(window.LMG && LMG.openCarFicha){
+    LMG.openCarFicha(id, {
+      call:(op,data)=>httpsCallable(_cfFns,op)(data||{}).then(r=>(r&&r.data)||{}),
+      lang:'es',
+      who:(auth&&auth.currentUser&&auth.currentUser.email)||'',
+      toast:(m,e)=>{ if(e) alert(m); },
+      onChange:function(){}
+    });
+  } else { alert('Recarga la página para ver la ficha.'); }
+};
 
 const STAFF_EMAILS=['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];
 const OWNER_EMAIL='ev@legacymotorsgarage.com';
@@ -1713,6 +1730,7 @@ window.sendMessage = function(){
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});});
 renderCars();
 </script>
+<script src="legacy-carficha.js"></script><!-- 🗂️ ficha del carro compartida (misma que Pit Crew) -->
 <script type="module" src="chat-widget.js"></script>
 <script src="site-bot.js?v=6"></script>
 <!-- 🤖 Conversaciones del bot (en el logo de Inventario — solo dueños) -->
