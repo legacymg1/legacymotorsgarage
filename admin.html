@@ -4087,7 +4087,7 @@ window.cotFilterCars=function(){
   const box=document.getElementById('cot-car-results');
   const xb=document.getElementById('cot-car-x'); if(xb) xb.style.display=q.trim()?'block':'none';
   if(!terms.length){ box.style.display='none'; box.innerHTML=''; return; }   // solo muestra al escribir (no toda la lista)
-  let items=cotInventory.slice();
+  let items=cotInventory.slice().filter(c=>c.status!=='sold');   // no mostrar carros ya VENDIDOS en el cotizador
   if(terms.length) items=items.filter(c=>{ const hay=((c.inventoryNum||'')+' '+(c.year||'')+' '+(c.make||'')+' '+(c.model||'')+' '+(c.color||'')+' '+(c.vin||'')).toLowerCase(); return terms.every(x=>hay.includes(x)); });
   items=items.slice(0,30);
   _cotFiltered=items;   // guarda las coincidencias actuales (para Enter)
