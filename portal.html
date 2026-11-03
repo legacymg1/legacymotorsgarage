@@ -986,6 +986,7 @@ function estimateCardHTML(o){
   const paidLine = o.paid ? `<div style="font-size:12.5px;color:#49d17f;font-weight:800;margin-top:3px;">✅ ${es?'PAGADO':'PAID'} · ${formatMoney((o.paidCents||0)/100||o.total)}${o.paidAt?(' · '+formatDate((o.paidAt||'').slice(0,10))):''}</div>` : '';
   const detail = `
     <div style="font-size:13px;color:var(--muted);margin:8px 0;">🚗 ${escPortal(o.vehicleLabel||o.vin||'')}${o.plate?(' · '+escPortal(o.plate)):''}</div>
+    ${o.warranty?`<div style="margin:8px 0;background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.45);color:#4d9bff;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:800;text-align:center;">🛡️ ${es?'EN GARANTÍA · SIN COSTO PARA USTED':'WARRANTY · NO CHARGE TO YOU'}</div>`:''}
     ${svcStageHero(o)}
     ${showTrack?svcTrackerHTML(o):''}
     ${rows}
@@ -993,6 +994,7 @@ function estimateCardHTML(o){
       <div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label">${es?'Mano de obra':'Labor'}</span><span class="ir-value">${formatMoney(o.laborTotal)}</span></div>
       <div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label">${es?'Partes':'Parts'}</span><span class="ir-value">${formatMoney(o.partsTotal)}</span></div>
       <div class="info-row" style="border:none;padding:4px 0;"><span class="ir-label" style="font-weight:800;color:var(--white);">Total</span><span class="ir-value" style="font-weight:800;color:var(--gold);">${formatMoney(o.total)}</span></div>
+      ${o.warranty?`<div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label" style="color:#4d9bff;">${es?'Cubierto por garantía':'Covered by warranty'}</span><span class="ir-value" style="color:#4d9bff;font-weight:700;">−${formatMoney(o.coveredCents?o.coveredCents/100:o.total)}</span></div><div class="info-row" style="border:none;padding:4px 0;"><span class="ir-label" style="font-weight:800;color:var(--white);">${es?'USTED PAGA':'YOU PAY'}</span><span class="ir-value" style="font-weight:800;color:#49d17f;">${formatMoney(0)}</span></div>`:''}
       ${o.deposit>0?`<div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label">${es?'Anticipo':'Deposit'}</span><span class="ir-value">−${formatMoney(o.deposit)}</span></div><div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label" style="font-weight:700;">${es?'Saldo':'Balance'}</span><span class="ir-value" style="font-weight:700;">${formatMoney(o.balance)}</span></div>`:''}
       ${(!o.paid && (Number(o.paidCents)||0)>0)?`<div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label" style="color:#49d17f;">${es?'Abonado':'Paid so far'}</span><span class="ir-value" style="color:#49d17f;font-weight:700;">${formatMoney((o.paidCents||0)/100)}</span></div><div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label" style="font-weight:800;color:var(--white);">${es?'Saldo':'Balance'}</span><span class="ir-value" style="font-weight:800;color:var(--gold);">${formatMoney(o.balance)}</span></div>`:''}
     </div>

@@ -2442,14 +2442,18 @@ function _estPayload(o, en, planPaidCents, planTotalCents) {
   }));
   // 🧮 Saldo EN VIVO = Total − pagado de verdad − pagado del plan. Nunca el campo balanceCents (se quedaba viejo).
   const totalC = Number(o.grandTotalCents) || 0, paidC = Number(o.paidCents) || 0, planPaidC = Number(planPaidCents) || 0;
-  const owedC = Math.max(0, totalC - paidC - planPaidC);
+  // 🛡️ EN GARANTÍA: el cliente ve el VALOR del trabajo (cubierto) pero paga $0.
+  const warranty = o.warranty === true;
+  const owedC = warranty ? 0 : Math.max(0, totalC - paidC - planPaidC);
   return {
     id: o.id, orderNum: o.orderNum || null, vehicleLabel: o.vehicleLabel || "", vin: o.vin || "", plate: o.plate || "",
     status: o.status || "", estimateStatus: o.estimateStatus || "",
     services,
     laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
+    warranty: warranty, warrantyReason: o.warrantyReason || "", coveredCents: warranty ? totalC : 0,
     deposit: c(o.depositCents), balance: owedC / 100,
-    paid: (owedC <= 0 && totalC > 0), paidCents: Number(o.paidCents) || 0, planPaidCents: planPaidC, planTotalCents: Number(planTotalCents) || 0, toContractCents: Number(o.toContractCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
+    // 🛡️ En garantía el cliente NO paga, pero SÍ autoriza: paid=false para que siga el flujo de aceptar/firmar.
+    paid: warranty ? false : (owedC <= 0 && totalC > 0), paidCents: Number(o.paidCents) || 0, planPaidCents: planPaidC, planTotalCents: Number(planTotalCents) || 0, toContractCents: Number(o.toContractCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
     sentAt: o.estimateSentAt || "", acceptedAt: o.estimateAcceptedAt || "", createdAt: o.createdAt || "", partsReadyAt: o.partsReadyAt || "", partsPaidAt: o.partsPaidAt || "",
     scheduledAt: o.scheduledAt || "", receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", promisedAt: o.promisedAt || "", deliveredAt: o.deliveredAt || "",
     promises: (Array.isArray(o.promises) ? o.promises.map((p) => ({ date: p.date || "", amtCents: Number(p.amtCents) || 0 })) : []),
