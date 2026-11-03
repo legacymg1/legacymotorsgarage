@@ -2718,7 +2718,7 @@ exports.mechDvi = onCall({ timeoutSeconds: 30 }, async (request) => {
     const report = reportIn.slice(0, 40).map((a) => ({
       key: S(a.key, 40), title: S(a.title, 80),
       items: (Array.isArray(a.items) ? a.items : []).slice(0, 40).map((it) => ({
-        label: S(it.label, 120), state: S(it.state, 20), measure: S(it.measure, 40),
+        label: S(it.label, 120), state: S(it.state, 20), measure: S(it.measure, 160),
         note: S(it.note, 400), part: S(it.part, 160), repair: S(it.repair, 300), fix: S(it.fix, 10), photo: S(it.photo, 600),
       })),
     }));

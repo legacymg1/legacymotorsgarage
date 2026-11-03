@@ -2732,11 +2732,19 @@ const TRI_BASE_MIN=40;
 // ===================== 🔧 DVI — Inspección paso a paso del mecánico =====================
 // Áreas gated (una a la vez). Cada ítem: Bien / Atención / Reparar; medida opcional; si no está bien → nota + pieza + foto.
 const DVI_SOP = [
+  { key:'manejo', title:'Prueba de manejo inicial', titleEn:'Initial road test', items:[
+    { id:'arranque', label:'Arranque en frío', labelEn:'Cold start' },
+    { id:'frenado', label:'Frenado', labelEn:'Braking' },
+    { id:'direccion-manejo', label:'Dirección / alineación', labelEn:'Steering / alignment' },
+    { id:'cambios', label:'Cambios de transmisión', labelEn:'Transmission shifting' },
+    { id:'ruidos', label:'Ruidos / vibraciones', labelEn:'Noises / vibrations' },
+  ]},
   { key:'ext', title:'Exterior / Carrocería', titleEn:'Exterior / Body', items:[
     { id:'pintura', label:'Pintura y carrocería', labelEn:'Paint & body' },
     { id:'cristales', label:'Parabrisas y cristales', labelEn:'Windshield & glass' },
     { id:'luces-ext', label:'Luces exteriores (faros/calaveras/direccionales)', labelEn:'Exterior lights (head/tail/turn)' },
-    { id:'espejos', label:'Espejos y limpiabrisas', labelEn:'Mirrors & wipers' },
+    { id:'espejos', label:'Espejos (laterales y retrovisor)', labelEn:'Mirrors (side & rear-view)' },
+    { id:'limpiaparabrisas', label:'Limpiaparabrisas y lavaparabrisas (plumas, bomba y chisguetes)', labelEn:'Wipers & washer (blades, pump & jets)' },
   ]},
   { key:'int', title:'Interior', titleEn:'Interior', items:[
     { id:'testigos', label:'Luces del tablero / testigos (check engine, etc.)', labelEn:'Dash warning lights' },
@@ -2758,10 +2766,9 @@ const DVI_SOP = [
     { id:'fugas-motor', label:'Fugas visibles en el motor', labelEn:'Visible engine leaks' },
   ]},
   { key:'lift', title:'Abajo (en el lift)', titleEn:'Underneath (on the lift)', items:[
-    { id:'balatas-del', label:'Balatas delanteras', labelEn:'Front brake pads', measure:true, unit:'mm' },
-    { id:'balatas-tras', label:'Balatas traseras', labelEn:'Rear brake pads', measure:true, unit:'mm' },
-    { id:'rotores', label:'Rotores / discos', labelEn:'Rotors / discs' },
-    { id:'llantas', label:'Llantas — dibujo', labelEn:'Tires — tread', measure:true, unit:'32nds' },
+    { id:'balatas', label:'Balatas (pastillas de freno)', labelEn:'Brake pads', corners:true, unit:'mm' },
+    { id:'rotores', label:'Rotores / discos', labelEn:'Rotors / discs', corners:true, unit:'mm' },
+    { id:'llantas', label:'Llantas — profundidad de dibujo', labelEn:'Tires — tread depth', corners:true, unit:'/32' },
     { id:'refaccion', label:'Llanta de refacción (gato y herramienta)', labelEn:'Spare tire (jack & tools)' },
     { id:'suspension', label:'Suspensión / amortiguadores', labelEn:'Suspension / shocks' },
     { id:'escape', label:'Sistema de escape', labelEn:'Exhaust system' },
@@ -2774,13 +2781,6 @@ const DVI_SOP = [
     { id:'frenos-liq', label:'Líquido de frenos', labelEn:'Brake fluid' },
     { id:'direccion', label:'Dirección hidráulica', labelEn:'Power steering' },
   ]},
-  { key:'manejo', title:'Prueba de manejo', titleEn:'Road test', items:[
-    { id:'arranque', label:'Arranque en frío', labelEn:'Cold start' },
-    { id:'frenado', label:'Frenado', labelEn:'Braking' },
-    { id:'direccion-manejo', label:'Dirección / alineación', labelEn:'Steering / alignment' },
-    { id:'cambios', label:'Cambios de transmisión', labelEn:'Transmission shifting' },
-    { id:'ruidos', label:'Ruidos / vibraciones', labelEn:'Noises / vibrations' },
-  ]},
 ];
 function dviT(k){ const m={ insp:['Inspección (DVI)','Inspection (DVI)'], bien:['✅ Bien','✅ Good'], aten:['⚠️ Atención','⚠️ Watch'], malo:['❌ Reparar','❌ Repair'],
   note:['Observación…','Note…'], part:['Pieza que necesita…','Part needed…'], photo:['📷 Foto','📷 Photo'], prev:['‹ Anterior','‹ Back'], next:['Siguiente área ›','Next area ›'],
@@ -2791,7 +2791,8 @@ function dviT(k){ const m={ insp:['Inspección (DVI)','Inspection (DVI)'], bien:
   waitParts:['🔧 Esperando partes','🔧 Waiting on parts'], sent:['✅ Reporte enviado','✅ Report sent'], measure:['Medida','Measure'],
   found:['¿Qué encontraste? (el mal)','What did you find?'], fixQ:['¿Lo pudiste resolver aquí?','Could you fix it here?'],
   canFix:['🔧 Lo arreglé','🔧 Fixed it'], needPart:['🧩 Necesita pieza','🧩 Needs a part'],
-  repair:['¿Qué le hiciste? (reparación)','What did you do? (repair)'], fixedTag:['🔧 Reparado en sitio','🔧 Fixed on site'] };
+  repair:['¿Qué le hiciste? (reparación)','What did you do? (repair)'], fixedTag:['🔧 Reparado en sitio','🔧 Fixed on site'],
+  cornLF:['Del. izq.','LF'], cornRF:['Del. der.','RF'], cornLR:['Tras. izq.','LR'], cornRR:['Tras. der.','RR'] };
   const a=m[k]||['','']; return L==='en'?a[1]:a[0]; }
 function dviField(it,f){ return (L==='en' && it[f+'En']!=null) ? it[f+'En'] : it[f]; }
 let DVI=null;
@@ -2829,7 +2830,12 @@ function dviItemRow(it){
   const lbl=dviField(it,'label');
   const btn=(v,txt,col)=>'<button onclick="dviSetState(\''+it.id+'\',\''+v+'\')" style="flex:1;padding:8px 4px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid '+(st===v?col:'var(--border)')+';background:'+(st===v?col:'var(--surface2)')+';color:'+(st===v?'#0b0e14':'var(--text)')+';">'+txt+'</button>';
   let extra='';
-  if(it.measure){ extra+='<input type="text" inputmode="decimal" value="'+esc(d.measure||'')+'" oninput="dviSet(\''+it.id+'\',\'measure\',this.value)" placeholder="'+dviT('measure')+(it.unit?(' ('+it.unit+')'):'')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;">'; }
+  if(it.corners){
+    // 4 esquinas (como taller real): Del. izq / Del. der / Tras. izq / Tras. der
+    const cell=(k,lab)=>'<div style="flex:1 1 44%;min-width:120px;"><label style="font-size:10.5px;color:var(--muted);font-weight:700;display:block;margin-bottom:3px;">'+lab+(it.unit?(' ('+it.unit+')'):'')+'</label><input type="text" inputmode="decimal" value="'+esc(d[k]||'')+'" oninput="dviSet(\''+it.id+'\',\''+k+'\',this.value)" style="width:100%;box-sizing:border-box;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;"></div>';
+    extra+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">'+cell('cLF',dviT('cornLF'))+cell('cRF',dviT('cornRF'))+cell('cLR',dviT('cornLR'))+cell('cRR',dviT('cornRR'))+'</div>';
+  }
+  else if(it.measure){ extra+='<input type="text" inputmode="decimal" value="'+esc(d.measure||'')+'" oninput="dviSet(\''+it.id+'\',\'measure\',this.value)" placeholder="'+dviT('measure')+(it.unit?(' ('+it.unit+')'):'')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;">'; }
   if(st==='aten'||st==='malo'){
     const fx=d.fix||'';
     // 1) ¿Qué encontró? (el mal)
@@ -2872,7 +2878,10 @@ function dviSaveDraft(){ if(_vaReadOnly()) return; try{ httpsCallable(functions,
 function dviCollect(){ const flagged=[], parts=[]; const report=DVI_SOP.map(a=>({ key:a.key, title:(L==='en'?a.titleEn:a.title),
     items:a.items.map(it=>{ const d=DVI.data[it.id]||{};
       const needsPart = d.fix==='part' || (!d.fix && (d.part||'').trim());   // compat: borradores viejos sin 'fix' que ya traen pieza
-      const row={ label:dviField(it,'label'), state:d.state||'', measure:(it.measure&&d.measure)?(d.measure+(it.unit?(' '+it.unit):'')):'', note:d.note||'', part:needsPart?(d.part||''):'', repair:(d.fix==='fixed'?(d.repair||''):''), fix:d.fix||'', photo:d.photo||'' };
+      let measure='';
+      if(it.corners){ measure=[['cLF','cornLF'],['cRF','cornRF'],['cLR','cornLR'],['cRR','cornRR']].filter(p=>(d[p[0]]||'').toString().trim()).map(p=>dviT(p[1])+' '+d[p[0]].toString().trim()+(it.unit?(' '+it.unit):'')).join(' · '); }
+      else if(it.measure&&d.measure){ measure=d.measure+(it.unit?(' '+it.unit):''); }
+      const row={ label:dviField(it,'label'), state:d.state||'', measure:measure, note:d.note||'', part:needsPart?(d.part||''):'', repair:(d.fix==='fixed'?(d.repair||''):''), fix:d.fix||'', photo:d.photo||'' };
       if(d.state==='aten'||d.state==='malo') flagged.push({area:(L==='en'?a.titleEn:a.title), ...row});
       if(needsPart && (d.part||'').trim()) parts.push({ label:d.part.trim(), area:(L==='en'?a.titleEn:a.title), note:d.note||'', photo:d.photo||'' });
       return row; }) })); return { report, flagged, parts }; }
