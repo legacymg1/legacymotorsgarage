@@ -2428,15 +2428,18 @@ window.mechOpenIntake=function(carId){
 };
 window.mechCloseIntake=function(){ document.getElementById('mech-intake').classList.add('hide'); };
 window.mechStartInspection=async function(){
-  if(_vaReadOnly()) return;
-  if(!MECH_CUR) return;
+  // Si Enrique está viendo "como empleado" sin "actuar como", es solo lectura: avisa CLARO (antes solo salía un toast chico y parecía que no pasaba nada).
+  if(_asEmp && !_actAs){ whToast(L==='en'?'Read-only preview. Tap "Act as" on the employee to run the inspection.':'Vista previa (solo lectura). Toca "Actuar como" en el empleado para poder arrancar la inspección.',true); return; }
+  if(!MECH_CUR){ whToast(L==='en'?'Open the car first.':'Abre el carro primero.',true); return; }
   const miles=(document.getElementById('mech-miles').value||'').trim();
   if(!miles){ whToast(L==='en'?'Enter the miles.':'Pon las millas.',true); return; }
-  try{ await httpsCallable(functions,'mechCarIntake')(vaData({ carId:MECH_CUR.id, receivedMiles:miles }));
-    const car=Object.assign({}, MECH_CUR, {receivedMiles:miles});
-    mechCloseIntake();
-    dviOpen(car);   // 🔧 abre el DVI paso a paso
-  }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+  // 🔧 Abre el DVI SIEMPRE y de inmediato — no depende del backend. Las millas se registran en segundo plano;
+  // si ese registro falla, el mecánico igual puede inspeccionar (el DVI guarda su propio borrador) y vemos el error.
+  const car=Object.assign({}, MECH_CUR, {receivedMiles:miles});
+  mechCloseIntake();
+  dviOpen(car);
+  try{ await httpsCallable(functions,'mechCarIntake')(vaData({ carId:car.id, receivedMiles:miles })); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
 };
 async function loadMechTasks(){
   const box=document.getElementById('mech-tasks-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
