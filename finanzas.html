@@ -1647,6 +1647,11 @@ async function handleScannedRefund(d, jpg, opts){
   const origDesc=(e.note||e.category||'gasto')+(e.vendor?(' · '+e.vendor):'')+(e.carLabel?(' · '+e.carLabel):'');
   const cajaTxt=(e.dept==='parts')?'🔧 Partes':'🚗 Dealer';
   const invTxt=(opts.orderNo||d.origInvoice)?('\n(Invoice original: '+(opts.orderNo||d.origInvoice)+')'):'';
+  // ⚠️ ANTI-DUPLICADO (igual que doDevol): si ya hay una devolución idéntica de ESTE gasto hace unos minutos,
+  //    avisa antes de meter otra (cachó el caso de escanear el mismo ticket dos veces).
+  const _nowD=Date.now();
+  const _dupD=liveTxns().find(t=>t.type==='expense_reversal' && (t.reversalOf===(e.entryId||e.id)) && (Number(t.amountCents)||0)===applyCents && t.createdAt && (_nowD-Date.parse(t.createdAt) < 10*60*1000));
+  if(_dupD && !confirm('⚠️ Ya registraste una devolución de '+centsToUSD(applyCents)+' de este gasto hace unos minutos.\n\n¿Registrar OTRA de todos modos?')){ if(st) st.textContent=''; return false; }
   if(!confirm((opts.keepOpen?'↩️ Parte de DEVOLUCIÓN del intercambio\n\n':'📸 Ticket de REEMBOLSO '+refTxt+' detectado.\n\n')+'Lo cotejé con el gasto:\n• '+origDesc+' ('+centsToUSD(e.amountCents)+(remaining<(Number(e.amountCents)||0)?(' · saldo '+centsToUSD(remaining)):'')+')'+invTxt+'\n\n¿Registrar la devolución de '+centsToUSD(applyCents)+'? Se queda como fondo de '+cajaTxt+'.'+capMsg)){ if(st) st.textContent=''; return false; }
   if(_devolBusy) return false; _devolBusy=true;
   try{
