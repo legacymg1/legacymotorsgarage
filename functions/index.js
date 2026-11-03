@@ -2801,18 +2801,37 @@ exports.mechDvi = onCall({ timeoutSeconds: 30 }, async (request) => {
     return { ok: true, allReceived: allIn, received: got, total: parts.length };
   }
 
-  // 🏁 Etapa 2 — Empezar el TRABAJO (restauración). El carro pasa de "esperando partes" a "en trabajo".
+  // 🏁 Etapa 2 — Empezar/REANUDAR el TRABAJO. Arranca el RELOJ (tiempo real trabajado, con pausa).
   if (op === "startstage2") {
     if (!existing.reportAt) throw new HttpsError("failed-precondition", "Aún no hay reporte de inspección.");
-    await ref.set({ inspection: { waitingParts: false, stage2At: existing.stage2At || now, stage2By: (id.name || id.empId || id.email || ""), updatedAt: now } }, { merge: true });
+    const first = !existing.stage2At;
+    const patch = { waitingParts: false, stage2At: existing.stage2At || now, stage2By: existing.stage2By || (id.name || id.empId || id.email || ""), stage2RunningSince: now, updatedAt: now };
+    if (first) patch.stage2Secs = 0;
+    await ref.set({ inspection: patch }, { merge: true });
     return { ok: true };
   }
 
-  // ✅ Etapa 2 — Terminar el trabajo → avanza a detallado (o pintura).
+  // ⏸️ Etapa 2 — Pausar el reloj (acumula el tramo trabajado).
+  if (op === "stage2pause") {
+    let secs = Number(existing.stage2Secs) || 0;
+    if (existing.stage2RunningSince) secs += Math.max(0, Math.round((Date.now() - Date.parse(existing.stage2RunningSince)) / 1000));
+    await ref.set({ inspection: { stage2Secs: secs, stage2RunningSince: null, updatedAt: now } }, { merge: true });
+    return { ok: true, secs };
+  }
+
+  // ▶️ Etapa 2 — Reanudar el reloj.
+  if (op === "stage2resume") {
+    await ref.set({ inspection: { stage2RunningSince: now, updatedAt: now } }, { merge: true });
+    return { ok: true };
+  }
+
+  // ✅ Etapa 2 — Terminar el trabajo → cierra el reloj y avanza a detallado (o pintura).
   if (op === "finishstage2") {
     const next = ["detalle", "pintura"].indexOf(String(d.nextStage || "")) >= 0 ? String(d.nextStage) : "detalle";
-    await ref.set({ inspection: { stage2DoneAt: now, stage2DoneBy: (id.name || id.empId || id.email || ""), updatedAt: now }, reconStage: next }, { merge: true });
-    return { ok: true, nextStage: next };
+    let secs = Number(existing.stage2Secs) || 0;
+    if (existing.stage2RunningSince) secs += Math.max(0, Math.round((Date.now() - Date.parse(existing.stage2RunningSince)) / 1000));
+    await ref.set({ inspection: { stage2DoneAt: now, stage2DoneBy: (id.name || id.empId || id.email || ""), stage2Secs: secs, stage2Mins: Math.round(secs / 60), stage2RunningSince: null, updatedAt: now }, reconStage: next }, { merge: true });
+    return { ok: true, nextStage: next, mins: Math.round(secs / 60) };
   }
 
   throw new HttpsError("invalid-argument", "Operación inválida.");

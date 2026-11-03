@@ -3010,7 +3010,10 @@ window.dviSubmit=async function(nextStage){
 // ===================== 🗂️ FICHA DEL CARRO (componente compartido, estilo iOS) =====================
 // Se abre desde cualquier lugar donde esté el carro (hoy Pit Crew; se conectará a Inventario/otros). Muestra
 // etapa, quién lo trabajó, cuánto tardó, y abre el reporte Pre-reparación + lista de partes del jacket.
-let _carFichaInsp=null, _carFichaCar=null;
+let _carFichaInsp=null, _carFichaCar=null, _carFichaTick=null;
+function hms(s){ s=Math.max(0,Math.floor(s)); const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60; const z=n=>String(n).padStart(2,'0'); return (h>0?(h+':'):'')+z(m)+':'+z(ss); }
+window.carStage2Pause=async function(carId){ try{ await httpsCallable(functions,'mechDvi')(vaData({op:'stage2pause',carId:carId})); }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); } carFichaOpen(carId); };
+window.carStage2Resume=async function(carId){ try{ await httpsCallable(functions,'mechDvi')(vaData({op:'stage2resume',carId:carId})); }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); } carFichaOpen(carId); };
 window.carFichaOpen=async function(carId){
   let ov=document.getElementById('wh-carficha');
   if(!ov){ ov=document.createElement('div'); ov.id='wh-carficha'; ov.style.cssText='position:fixed;inset:0;z-index:100075;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
@@ -3041,7 +3044,8 @@ function carFichaRender(d){
   if(insp.reportAt){
     rows.push(['👤 '+L2('Inspeccionó','Inspected by'), esc(insp.reportBy||insp.by||'—')]);
     rows.push(['📅 '+L2('Inspección','Inspection'), fmtD(insp.reportAt)]);
-    if(d.durMin) rows.push(['⏱️ '+L2('Tardó','Took'), _hm(d.durMin)]);
+    if(d.durMin) rows.push(['⏱️ '+L2('Inspección tardó','Inspection took'), _hm(d.durMin)]);
+    if(insp.stage2Mins) rows.push(['🏗️ '+L2('Etapa 2 (trabajo)','Stage 2 (work)'), _hm(insp.stage2Mins)]);
   } else { rows.push(['🔧 '+L2('Inspección','Inspection'), insp.startedAt?L2('En proceso','In progress'):L2('Pendiente','Pending')]); }
   const rowHtml=rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);font-size:13.5px;"><span style="color:var(--muted);">'+r[0]+'</span><span style="font-weight:700;text-align:right;">'+r[1]+'</span></div>').join('');
   const parts=Array.isArray(insp.parts)?insp.parts:[];
@@ -3054,6 +3058,11 @@ function carFichaRender(d){
     +(insp.reportAt?('<button class="btn-gold" style="width:100%;margin-top:14px;" onclick="carFichaReport()">📄 '+L2('Ver reporte · Pre-reparación','View report · Pre-repair')+'</button>'):'')
     +carFichaPartsBlock(c,insp,parts,waiting,inStage2)
     +'</div>';
+  // ⏱️ Tick en vivo del reloj de Etapa 2 (se auto-limpia al cerrar la ficha o pausar).
+  clearInterval(_carFichaTick); _carFichaTick=null;
+  if(inStage2 && insp.stage2RunningSince){
+    _carFichaTick=setInterval(function(){ const el=document.getElementById('carficha-timer'); const ip=_carFichaInsp||{}; if(!el||!ip.stage2RunningSince){ clearInterval(_carFichaTick); _carFichaTick=null; return; } const secs=(Number(ip.stage2Secs)||0)+Math.max(0,(Date.now()-Date.parse(ip.stage2RunningSince))/1000); el.textContent=hms(secs); },1000);
+  }
 }
 // 🧩 Partes: checklist de recepción (esperando) o estado (en trabajo), + acción de Etapa 2.
 function carFichaPartsBlock(c,insp,parts,waiting,inStage2){
@@ -3079,8 +3088,18 @@ function carFichaPartsBlock(c,insp,parts,waiting,inStage2){
     html+='<button class="btn-gold" onclick="carStartStage2(\''+esc(c.id)+'\')" style="width:100%;margin-top:14px;'+(allIn?'':'opacity:.65;')+'">🏁 '+L2('Empezar etapa 2 (trabajo)','Start stage 2 (work)')+'</button>';
     if(parts.length && !allIn) html+='<div class="faint" style="font-size:11.5px;text-align:center;margin-top:6px;line-height:1.45;">'+L2('Marca las partes que llegaron. Puedes empezar de todos modos.','Check the parts that arrived. You can start anyway.')+'</div>';
   } else if(inStage2){
-    html+='<div class="faint" style="font-size:12px;text-align:center;margin:14px 0 2px;">🏗️ '+L2('En trabajo — Etapa 2 (restauración)','In progress — Stage 2 (restoration)')+(insp.stage2By?(' · '+esc(insp.stage2By)):'')+'</div>'
-      +'<button class="btn-gold" onclick="carFinishStage2(\''+esc(c.id)+'\')" style="width:100%;margin-top:10px;">✅ '+L2('Terminar etapa 2 · listo para detallado','Finish stage 2 · ready for detailing')+'</button>';
+    const running=!!insp.stage2RunningSince;
+    const baseSecs=(Number(insp.stage2Secs)||0)+(running?Math.max(0,(Date.now()-Date.parse(insp.stage2RunningSince))/1000):0);
+    html+='<div style="text-align:center;margin:16px 0 4px;border-top:1px solid rgba(255,255,255,.06);padding-top:14px;">'
+      +'<div class="faint" style="font-size:11.5px;">🏗️ '+L2('Etapa 2 · restauración','Stage 2 · restoration')+(insp.stage2By?(' · '+esc(insp.stage2By)):'')+'</div>'
+      +'<div id="carficha-timer" style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;color:'+(running?'#4c9bff':'var(--muted)')+';margin-top:4px;letter-spacing:1px;">'+hms(baseSecs)+'</div>'
+      +'<div class="faint" style="font-size:11px;">'+(running?('▶️ '+L2('trabajando','working')):('⏸️ '+L2('en pausa','paused')))+'</div></div>'
+      +'<div style="display:flex;gap:8px;margin-top:10px;">'
+      +(running
+          ? '<button class="btn ghost" onclick="carStage2Pause(\''+esc(c.id)+'\')" style="flex:1;">⏸️ '+L2('Pausar','Pause')+'</button>'
+          : '<button class="btn ghost" onclick="carStage2Resume(\''+esc(c.id)+'\')" style="flex:1;">▶️ '+L2('Reanudar','Resume')+'</button>')
+      +'<button class="btn-gold" onclick="carFinishStage2(\''+esc(c.id)+'\')" style="flex:1.4;">✅ '+L2('Terminar','Finish')+'</button></div>'
+      +'<div class="faint" style="font-size:11px;text-align:center;margin-top:6px;">'+L2('Al terminar pasa a detallado.','Finishing moves it to detailing.')+'</div>';
   }
   return html;
 }
