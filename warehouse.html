@@ -2812,8 +2812,11 @@ function dviT(k){ const m={ insp:['Inspección (DVI)','Inspection (DVI)'], bien:
   sendDetalle:['✅ Enviar reporte · Listo para detallado','✅ Send report · Ready for detailing'],
   diagTag:['🔍 Diagnostica la falla aquí','🔍 Diagnose the fault here'],
   diagHint:['Pruébala y revísala aquí mismo e intenta repararla. 1) Anota qué encontraste. 2) Marca si la resolviste o necesita pieza. 3) Si la arreglaste, escribe qué hiciste; si no, pon la pieza.','Test and inspect it right here and try to repair it. 1) Note what you found. 2) Mark if you fixed it or it needs a part. 3) If fixed, write what you did; if not, enter the part.'],
-  closeSec:['✓ Listo · cerrar','✓ Done · close'], editSec:['✏️ Editar','✏️ Edit'], watchTag:['⚠️ Atención','⚠️ Watch'] };
+  closeSec:['✓ Listo · cerrar','✓ Done · close'], editSec:['✏️ Editar','✏️ Edit'], watchTag:['⚠️ Atención','⚠️ Watch'],
+  partsListLbl:['Piezas que necesita (agrégalas una por una)','Parts needed (add them one by one)'], addPart:['Agrega una pieza…','Add a part…'] };
   const a=m[k]||['','']; return L==='en'?a[1]:a[0]; }
+// Lista de piezas de un ítem (compat: 'part' simple viejo → lista de 1).
+function dviPartList(d){ return Array.isArray(d.partList)?d.partList.filter(x=>(x||'').toString().trim()):(((d.part||'').toString().trim())?[d.part.toString().trim()]:[]); }
 function dviField(it,f){ return (L==='en' && it[f+'En']!=null) ? it[f+'En'] : it[f]; }
 let DVI=null;
 window.dviBack=function(){ document.getElementById('view-dvi').classList.add('hide'); try{ loadMechCars(); }catch(e){} };
@@ -2862,7 +2865,7 @@ function dviItemRow(it){
       // Minimizada: resumen compacto + ✏️ editar
       let sum;
       if(fx==='fixed') sum='🔧 '+esc(d.repair||d.note||dviT('fixedTag'));
-      else if(st==='malo'||fx==='part') sum='🧩 '+esc(d.part||d.note||dviT('needPart'));
+      else if(st==='malo'||fx==='part'){ const pl=dviPartList(d); sum='🧩 '+esc(pl.length?pl.join(' · '):(d.note||dviT('needPart'))); }
       else sum=esc(d.note||dviT('watchTag'));
       extra+='<div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
         +'<span style="font-size:12.5px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+sum+'</span>'
@@ -2880,9 +2883,12 @@ function dviItemRow(it){
       if(fx==='fixed'){
         extra+='<input type="text" value="'+esc(d.repair||'')+'" oninput="dviSet(\''+it.id+'\',\'repair\',this.value)" placeholder="'+dviT('repair')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid #2e7d46;background:var(--surface2);color:var(--text);font-size:14px;">';
       }
-      // 3b) No pudo → pieza que necesita (SÍ va a la lista de partes)
+      // 3b) No pudo → piezas que necesita, UNA POR UNA (SÍ van a la lista de partes)
       else if(fx==='part'){
-        extra+='<input type="text" value="'+esc(d.part||'')+'" oninput="dviSet(\''+it.id+'\',\'part\',this.value)" placeholder="'+dviT('part')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid #b5651d;background:var(--surface2);color:var(--text);font-size:14px;">';
+        const pl=dviPartList(d);
+        extra+='<div class="faint" style="font-size:11.5px;font-weight:700;margin-top:10px;">'+dviT('partsListLbl')+'</div>';
+        extra+=pl.map((p,i)=>'<div style="display:flex;align-items:center;gap:8px;margin-top:6px;background:var(--surface2);border:1px solid #b5651d;border-radius:9px;padding:8px 10px;"><span style="flex:1;min-width:0;font-size:13.5px;word-break:break-word;">🧩 '+esc(p)+'</span><button class="linkbtn" onclick="dviRemovePart(\''+it.id+'\','+i+')" style="color:#ff6b6b;font-size:16px;flex:0 0 auto;line-height:1;">🗑️</button></div>').join('');
+        extra+='<div style="display:flex;gap:6px;margin-top:8px;"><input type="text" id="dvi-partin-'+it.id+'" placeholder="'+dviT('addPart')+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();dviAddPart(\''+it.id+'\');}" style="flex:1;min-width:0;box-sizing:border-box;padding:9px;border-radius:9px;border:1px solid #b5651d;background:var(--surface2);color:var(--text);font-size:14px;"><button class="btn-gold" onclick="dviAddPart(\''+it.id+'\')" style="flex:0 0 auto;padding:9px 15px;">➕</button></div>';
       }
       // 4) Foto (siempre disponible)
       extra+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center;">'
@@ -2913,6 +2919,9 @@ window.dviSetFix=function(id,v){ const d=DVI.data[id]||(DVI.data[id]={}); d.fix=
 // Cerrar/minimizar un punto ya diagnosticado (y reabrir para editar).
 window.dviDoneItem=function(id){ const d=DVI.data[id]; if(!d) return; d._min=true; dviRerenderItems(); try{ dviSaveDraft(); }catch(e){} };
 window.dviReopen=function(id){ const d=DVI.data[id]; if(!d) return; d._min=false; dviRerenderItems(); };
+// Piezas una por una
+window.dviAddPart=function(id){ const inp=document.getElementById('dvi-partin-'+id); if(!inp) return; const v=(inp.value||'').trim(); if(!v) return; const d=DVI.data[id]||(DVI.data[id]={}); if(!Array.isArray(d.partList)) d.partList=dviPartList(d); d.partList.push(v); d.part=''; inp.value=''; dviRerenderItems(); try{ dviSaveDraft(); }catch(e){} };
+window.dviRemovePart=function(id,idx){ const d=DVI.data[id]; if(!d) return; if(!Array.isArray(d.partList)) d.partList=dviPartList(d); d.partList.splice(idx,1); d.part=''; dviRerenderItems(); try{ dviSaveDraft(); }catch(e){} };
 window.dviSet=function(id,f,val){ const d=DVI.data[id]||(DVI.data[id]={}); d[f]=val; };
 window.dviPhoto=async function(id,inp){ const f=inp&&inp.files&&inp.files[0]; if(!f) return; const lab=document.getElementById('dvi-ph-'+id);
   if(lab) lab.textContent=(L==='en'?'Uploading…':'Subiendo…');
@@ -2925,13 +2934,15 @@ window.dviNext=function(){ dviSaveDraft(); if(DVI.areaIdx>=DVI_SOP.length-1){ DV
 function dviSaveDraft(){ if(_vaReadOnly()) return; try{ httpsCallable(functions,'mechDvi')(vaData({op:'save', carId:DVI.carId, draft:{data:DVI.data, areaIdx:DVI.areaIdx}})); }catch(e){} }
 function dviCollect(){ const flagged=[], parts=[]; const report=DVI_SOP.map(a=>({ key:a.key, title:(L==='en'?a.titleEn:a.title),
     items:a.items.map(it=>{ const d=DVI.data[it.id]||{};
-      const needsPart = (d.state!=='bien') && ( d.state==='malo' || d.fix==='part' || (!d.fix && (d.part||'').trim()) );   // rojo = necesita pieza (compat con borradores viejos)
+      const pl=dviPartList(d);
+      const needsPart = (d.state!=='bien') && ( d.state==='malo' || d.fix==='part' || (!d.fix && pl.length) );   // rojo = necesita pieza (compat con borradores viejos)
       let measure='';
       if(it.corners){ measure=[['cLF','cornLF'],['cRF','cornRF'],['cLR','cornLR'],['cRR','cornRR']].filter(p=>(d[p[0]]||'').toString().trim()).map(p=>dviT(p[1])+' '+d[p[0]].toString().trim()+(it.unit?(' '+it.unit):'')).join(' · '); }
       else if(it.measure&&d.measure){ measure=d.measure+(it.unit?(' '+it.unit):''); }
-      const row={ label:dviField(it,'label'), state:d.state||'', measure:measure, note:d.note||'', part:needsPart?(d.part||''):'', repair:(d.fix==='fixed'?(d.repair||''):''), fix:d.fix||'', photo:d.photo||'' };
-      if(d.state==='aten'||d.state==='malo') flagged.push({area:(L==='en'?a.titleEn:a.title), ...row});
-      if(needsPart && (d.part||'').trim()) parts.push({ label:d.part.trim(), area:(L==='en'?a.titleEn:a.title), note:d.note||'', photo:d.photo||'' });
+      const area=(L==='en'?a.titleEn:a.title);
+      const row={ label:dviField(it,'label'), state:d.state||'', measure:measure, note:d.note||'', part:needsPart?pl.join(' · '):'', repair:(d.fix==='fixed'?(d.repair||''):''), fix:d.fix||'', photo:d.photo||'' };
+      if(d.state==='aten'||d.state==='malo') flagged.push(Object.assign({area:area}, row));
+      if(needsPart){ pl.forEach(pp=>parts.push({ label:pp, area:area, note:d.note||'', photo:d.photo||'' })); }   // cada pieza va POR SEPARADO a la lista
       return row; }) })); return { report, flagged, parts }; }
 function dviRenderReview(){
   const body=document.getElementById('dvi-body'); if(!body) return;
