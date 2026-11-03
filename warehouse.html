@@ -1028,6 +1028,8 @@ const TITLE_BY_EMAIL={
 };
 function dispName(email){ email=(email||'').toLowerCase(); return NAME_BY_EMAIL[email]||(email.split('@')[0])||email; }
 function whoLabel(email,r){ email=(email||'').toLowerCase(); const ti=TITLE_BY_EMAIL[email]; if(ti) return dispName(email)+' · '+ti; return roleLabel(r); }
+// Nombre de quien está trabajando AHORA (misma fuente que el menú de cuenta) — reusar en todo (DVI, ficha, etc.).
+function whoName(){ try{ if(_asEmp && _viewAsName) return _viewAsName; if(myName) return myName; const e=(myEmail||'').toLowerCase(); if(TITLE_BY_EMAIL[e]) return dispName(e); return (typeof dispName==='function'&&e)?dispName(e):(e||''); }catch(e){ return ''; } }
 
 // ===================== 👤 Barra superior: saludo + nombre + burbuja de perfil =====================
 let _asEmp=false;
@@ -2796,11 +2798,11 @@ const DVI_SOP = [
 ];
 function dviT(k){ const m={ insp:['Inspección (DVI)','Inspection (DVI)'], bien:['✅ Bien','✅ Good'], aten:['⚠️ Atención','⚠️ Watch'], malo:['❌ Reparar','❌ Repair'],
   note:['Observación…','Note…'], part:['Pieza que necesita…','Part needed…'], photo:['📷 Foto','📷 Photo'], prev:['‹ Anterior','‹ Back'], next:['Siguiente área ›','Next area ›'],
-  finish:['Terminar inspección','Finish inspection'], area:['Área','Area'], review:['Revisar y enviar','Review & send'],
-  revH:['Resumen de la inspección','Inspection summary'], noFlags:['Todo salió bien. Sin pendientes.','All good. Nothing flagged.'],
+  finish:['Terminar inspección','Finish inspection'], area:['Área','Area'], review:['Revisar y generar reporte','Review & generate report'],
+  revH:['Resumen de la inspección','Inspection summary'], noFlags:['Todo salió bien. Sin pendientes.','All good. Nothing flagged.'], editOne:['✏️ editar','✏️ edit'],
   partsH:['🧩 Partes que necesita','🧩 Parts needed'], outcomeH:['¿Qué sigue con el carro?','What is next for the car?'],
   toDetalle:['🧽 Listo para detallado','🧽 Ready for detailing'], toPintura:['🎨 Mandar a pintura','🎨 Send to paint'],
-  waitParts:['🔧 Esperando partes','🔧 Waiting on parts'], sent:['✅ Reporte enviado','✅ Report sent'], measure:['Medida','Measure'],
+  waitParts:['🔧 Esperando partes','🔧 Waiting on parts'], sent:['✅ Reporte generado','✅ Report generated'], measure:['Medida','Measure'],
   found:['¿Qué encontraste? (el mal)','What did you find?'], fixQ:['¿Lo pudiste resolver aquí?','Could you fix it here?'],
   canFix:['🔧 Lo arreglé','🔧 Fixed it'], needPart:['🧩 Necesita pieza','🧩 Needs a part'],
   repair:['¿Qué le hiciste? (reparación)','What did you do? (repair)'], fixedTag:['🔧 Reparado en sitio','🔧 Fixed on site'],
@@ -2808,8 +2810,8 @@ function dviT(k){ const m={ insp:['Inspección (DVI)','Inspection (DVI)'], bien:
   reportTitle:['Inspección Inicial · Pre-reparación','Initial · Pre-Repair Inspection'],
   redH:['❌ Necesita reparación / pieza','❌ Needs repair / part'], fixedH:['🔧 Reparado en sitio','🔧 Fixed on site'],
   okH:['✅ En buen estado','✅ In good condition'], byLbl:['Mecánico','Mechanic'],
-  sendWait:['📨 Enviar reporte · Esperando partes','📨 Send report · Waiting on parts'],
-  sendDetalle:['✅ Enviar reporte · Listo para detallado','✅ Send report · Ready for detailing'],
+  sendWait:['📄 Generar reporte · Esperando partes','📄 Generate report · Waiting on parts'],
+  sendDetalle:['📄 Generar reporte · Listo para detallado','📄 Generate report · Ready for detailing'],
   diagTag:['🔍 Diagnostica la falla aquí','🔍 Diagnose the fault here'],
   diagHint:['Pruébala y revísala aquí mismo e intenta repararla. 1) Anota qué encontraste. 2) Marca si la resolviste o necesita pieza. 3) Si la arreglaste, escribe qué hiciste; si no, pon la pieza.','Test and inspect it right here and try to repair it. 1) Note what you found. 2) Mark if you fixed it or it needs a part. 3) If fixed, write what you did; if not, enter the part.'],
   closeSec:['✓ Listo · cerrar','✓ Done · close'], editSec:['✏️ Editar','✏️ Edit'], watchTag:['⚠️ Atención','⚠️ Watch'],
@@ -2947,43 +2949,49 @@ function dviCollect(){ const flagged=[], parts=[]; const report=DVI_SOP.map(a=>(
 function dviRenderReview(){
   const body=document.getElementById('dvi-body'); if(!body) return;
   const c=dviCollect();
-  // Aplana todos los puntos con su área
-  const all=[]; c.report.forEach(a=>a.items.forEach(it=>all.push(Object.assign({area:a.title},it))));
-  const red=all.filter(x=>x.state==='malo');
-  const yellow=all.filter(x=>x.state==='aten');
-  const ok=all.filter(x=>x.state==='bien');
-  // Quién + cuándo (reusa la identidad del Pit Crew)
-  let who=''; try{ who=(typeof _asEmp!=='undefined'&&_asEmp&&_viewAsName)?_viewAsName:((typeof myName!=='undefined'&&myName)?myName:''); }catch(e){}
+  // Aplana con el ÍNDICE de área (para poder editar ese punto de un toque)
+  const red=[],yellow=[],ok=[];
+  c.report.forEach((a,ai)=>a.items.forEach(it=>{ if(!it.state) return; const row=Object.assign({areaIdx:ai},it); if(it.state==='malo')red.push(row); else if(it.state==='aten')yellow.push(row); else if(it.state==='bien')ok.push(row); }));
+  const who=whoName();
   const today=new Date().toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'numeric',month:'long',year:'numeric'});
-  const redCard=f=>'<div class="card" style="padding:10px 12px;margin-bottom:8px;border-left:3px solid #ff5a5a;"><div style="font-weight:700;font-size:14px;">❌ '+esc(f.label)+'</div>'
-    +'<div class="faint" style="font-size:11.5px;margin-top:2px;">'+esc(f.area)+(f.measure?(' · '+esc(f.measure)):'')+'</div>'
-    +(f.note?'<div style="font-size:13px;margin-top:5px;">'+esc(f.note)+'</div>':'')
-    +(f.part?'<div style="font-size:12.5px;margin-top:4px;color:var(--gold);font-weight:700;">🧩 '+esc(f.part)+'</div>':'')
-    +(f.photo?'<img src="'+esc(f.photo)+'" style="margin-top:6px;width:72px;height:72px;object-fit:cover;border-radius:8px;">':'')+'</div>';
-  const yellowCard=f=>'<div class="card" style="padding:10px 12px;margin-bottom:8px;border-left:3px solid #ffc94d;"><div style="font-weight:700;font-size:14px;">'+(f.fix==='fixed'?'🔧 ':'⚠️ ')+esc(f.label)+'</div>'
-    +'<div class="faint" style="font-size:11.5px;margin-top:2px;">'+esc(f.area)+(f.measure?(' · '+esc(f.measure)):'')+'</div>'
-    +(f.note?'<div style="font-size:13px;margin-top:5px;">'+esc(f.note)+'</div>':'')
-    +(f.fix==='fixed'?'<div style="font-size:12.5px;margin-top:4px;color:#35c46a;font-weight:700;">'+dviT('fixedTag')+(f.repair?(': '+esc(f.repair)):'')+'</div>':'')
-    +(f.photo?'<img src="'+esc(f.photo)+'" style="margin-top:6px;width:72px;height:72px;object-fit:cover;border-radius:8px;">':'')+'</div>';
-  const sec=(title,col,inner)=> inner ? ('<div class="sub" style="font-weight:800;font-size:14px;margin:18px 0 8px;color:'+col+';">'+title+'</div>'+inner) : '';
-  const redHtml = sec(dviT('redH')+' ('+red.length+')', '#ff5a5a', red.map(redCard).join(''));
-  const yellowHtml = sec(dviT('fixedH')+' ('+yellow.length+')', '#ffc94d', yellow.map(yellowCard).join(''));
-  const okHtml = ok.length ? ('<div class="sub" style="font-weight:800;font-size:14px;margin:18px 0 8px;color:#35c46a;">'+dviT('okH')+' ('+ok.length+')</div>'
-    + '<div class="faint" style="font-size:12.5px;line-height:1.7;">'+ok.map(o=>'✓ '+esc(o.label)).join(' · ')+'</div>') : '';
-  const partsHtml = c.parts.length ? ('<div class="sub" style="font-weight:800;font-size:14px;margin:18px 0 8px;">'+dviT('partsH')+' ('+c.parts.length+')</div>'
-    + c.parts.map(p=>'<div style="font-size:13.5px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06);">🧩 '+esc(p.label)+' <span class="faint" style="font-size:11px;">· '+esc(p.area)+'</span></div>').join('')) : '';
+  // Tarjeta de un punto — toda la tarjeta es tocable para EDITAR (te lleva a su área).
+  const itemCard=(f,col,icon,extraHtml)=>'<div onclick="dviEditItem('+f.areaIdx+')" style="background:var(--surface);border:1px solid var(--border);border-left:3px solid '+col+';border-radius:12px;padding:11px 13px;margin-bottom:8px;cursor:pointer;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="font-weight:700;font-size:14.5px;line-height:1.3;min-width:0;">'+icon+' '+esc(f.label)+'</div><span style="font-size:11.5px;color:var(--gold);flex:0 0 auto;">'+dviT('editOne')+'</span></div>'
+    +'<div class="faint" style="font-size:11.5px;margin-top:3px;">'+esc(f.area)+(f.measure?(' · '+esc(f.measure)):'')+'</div>'
+    +(f.note?'<div style="font-size:13px;margin-top:6px;line-height:1.45;">'+esc(f.note)+'</div>':'')
+    +(extraHtml||'')
+    +(f.photo?'<img src="'+esc(f.photo)+'" style="margin-top:8px;width:76px;height:76px;object-fit:cover;border-radius:8px;">':'')
+    +'</div>';
+  const redCard=f=>itemCard(f,'#ff5a5a','❌', (f.part?'<div style="font-size:13px;margin-top:6px;color:var(--gold);font-weight:700;">🧩 '+esc(f.part)+'</div>':''));
+  const yellowCard=f=>itemCard(f,'#ffc94d',(f.fix==='fixed'?'🔧':'⚠️'), (f.fix==='fixed'?'<div style="font-size:12.5px;margin-top:6px;color:#35c46a;font-weight:700;">'+dviT('fixedTag')+(f.repair?(': '+esc(f.repair)):'')+'</div>':''));
+  // Píldoras de resumen
+  const pill=(n,txt,col)=>'<span style="display:inline-flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid '+col+';color:'+col+';border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:800;">'+txt+' '+n+'</span>';
+  const pills='<div style="display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 4px;">'+pill(red.length,'❌','#ff5a5a')+pill(yellow.length,'🔧','#ffc94d')+pill(ok.length,'✅','#35c46a')+'</div>';
+  const sec=(title,col,inner)=> inner ? ('<div class="sub" style="font-weight:800;font-size:13.5px;margin:20px 0 9px;color:'+col+';letter-spacing:.2px;">'+title+'</div>'+inner) : '';
+  const redHtml = sec(dviT('redH')+' · '+red.length, '#ff5a5a', red.map(redCard).join(''));
+  const yellowHtml = sec(dviT('fixedH')+' · '+yellow.length, '#ffc94d', yellow.map(yellowCard).join(''));
+  const okHtml = ok.length ? ('<div class="sub" style="font-weight:800;font-size:13.5px;margin:20px 0 9px;color:#35c46a;">'+dviT('okH')+' · '+ok.length+'</div>'
+    + '<div class="faint" style="font-size:12.5px;line-height:1.8;">'+ok.map(o=>'✓ '+esc(o.label)).join('   ·   ')+'</div>') : '';
+  const partsHtml = c.parts.length ? ('<div class="sub" style="font-weight:800;font-size:13.5px;margin:20px 0 9px;color:var(--gold);">'+dviT('partsH')+' · '+c.parts.length+'</div>'
+    + '<div class="card" style="padding:4px 13px;">'+c.parts.map(p=>'<div style="font-size:13.5px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);">🧩 '+esc(p.label)+' <span class="faint" style="font-size:11px;">· '+esc(p.area)+'</span></div>').join('')+'</div>') : '';
   const nothing=(!red.length&&!yellow.length)?'<div class="faint" style="text-align:center;padding:16px;">'+dviT('noFlags')+'</div>':'';
-  body.innerHTML='<h2 style="font-size:21px;margin:0 0 2px;">'+dviT('reportTitle')+'</h2>'
-    +'<div class="faint" style="font-size:12.5px;margin-bottom:4px;">🚗 '+esc(DVI.label)+(DVI.inventoryNum?(' · #'+esc(DVI.inventoryNum)):'')+(DVI.miles?(' · '+esc(DVI.miles)+' mi'):'')+'</div>'
-    +'<div class="faint" style="font-size:12px;margin-bottom:14px;">📅 '+esc(today)+(who?(' · '+dviT('byLbl')+': '+esc(who)):'')+'</div>'
-    +redHtml+partsHtml+yellowHtml+okHtml+nothing
-    +'<div class="sub" style="font-weight:800;font-size:14px;margin:22px 0 10px;">'+dviT('outcomeH')+'</div>'
+  // Encabezado del reporte (tipo documento)
+  const header='<div class="card" style="padding:14px 15px;margin-bottom:4px;">'
+    +'<div style="font-weight:800;font-size:18px;line-height:1.2;">'+dviT('reportTitle')+'</div>'
+    +'<div class="faint" style="font-size:13px;margin-top:6px;">🚗 '+esc(DVI.label)+(DVI.inventoryNum?(' · #'+esc(DVI.inventoryNum)):'')+(DVI.miles?(' · '+esc(DVI.miles)+' mi'):'')+'</div>'
+    +'<div class="faint" style="font-size:12.5px;margin-top:3px;">📅 '+esc(today)+'</div>'
+    +'<div style="font-size:12.5px;margin-top:3px;">👤 '+dviT('byLbl')+': <b>'+esc(who||'—')+'</b></div>'
+    +'</div>';
+  body.innerHTML=header+pills
+    +redHtml+yellowHtml+okHtml+nothing+partsHtml
+    +'<div class="sub" style="font-weight:800;font-size:14px;margin:24px 0 10px;">'+dviT('outcomeH')+'</div>'
     +(c.parts.length
         ? '<button class="btn-gold" onclick="dviSubmit(\'\')" style="width:100%;margin-bottom:10px;background:#ff8a4c;">'+dviT('sendWait')+'</button>'
         : '<button class="btn-gold" onclick="dviSubmit(\'detalle\')" style="width:100%;margin-bottom:10px;">'+dviT('sendDetalle')+'</button>')
-    +'<button class="btn ghost" onclick="dviSubmit(\'pintura\')" style="width:100%;margin-bottom:10px;">'+dviT('toPintura')+'</button>'
-    +'<button class="linkbtn" onclick="dviPrev()" style="width:100%;">'+dviT('prev')+'</button>';
+    +'<button class="linkbtn" onclick="dviPrev()" style="width:100%;">‹ '+(L==='en'?'Back to inspection':'Volver a la inspección')+'</button>';
 }
+// Editar un punto desde el resumen → vuelve a su área.
+window.dviEditItem=function(areaIdx){ if(typeof areaIdx!=='number'||areaIdx<0||areaIdx>=DVI_SOP.length) return; DVI.reviewing=false; DVI.areaIdx=areaIdx; dviRender(); };
 window.dviSubmit=async function(nextStage){
   if(_vaReadOnly()) return;
   const c=dviCollect();
