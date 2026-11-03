@@ -2770,6 +2770,7 @@ const DVI_SOP = [
     { id:'aceite-motor', label:'Aceite (nivel y estado)', labelEn:'Engine oil (level & condition)' },
     { id:'refrigerante', label:'Refrigerante / anticongelante', labelEn:'Coolant' },
     { id:'bateria', label:'Batería', labelEn:'Battery', measure:true, unit:'V' },
+    { id:'terminales', label:'Terminales de batería (limpiar si están sucias)', labelEn:'Battery terminals (clean if dirty)' },
     { id:'bandas', label:'Bandas (serpentina)', labelEn:'Belts' },
     { id:'mangueras', label:'Mangueras', labelEn:'Hoses' },
     { id:'filtro-aire', label:'Filtro de aire', labelEn:'Air filter' },
@@ -2809,7 +2810,9 @@ function dviT(k){ const m={ insp:['Inspección (DVI)','Inspection (DVI)'], bien:
   okH:['✅ En buen estado','✅ In good condition'], byLbl:['Mecánico','Mechanic'],
   sendWait:['📨 Enviar reporte · Esperando partes','📨 Send report · Waiting on parts'],
   sendDetalle:['✅ Enviar reporte · Listo para detallado','✅ Send report · Ready for detailing'],
-  diagTag:['⚠️ En diagnóstico','⚠️ Diagnosing'] };
+  diagTag:['🔍 Diagnostica la falla aquí','🔍 Diagnose the fault here'],
+  diagHint:['Pruébala y revísala aquí mismo e intenta repararla. 1) Anota qué encontraste. 2) Marca si la resolviste o necesita pieza. 3) Si la arreglaste, escribe qué hiciste; si no, pon la pieza.','Test and inspect it right here and try to repair it. 1) Note what you found. 2) Mark if you fixed it or it needs a part. 3) If fixed, write what you did; if not, enter the part.'],
+  closeSec:['✓ Listo · cerrar','✓ Done · close'], editSec:['✏️ Editar','✏️ Edit'], watchTag:['⚠️ Atención','⚠️ Watch'] };
   const a=m[k]||['','']; return L==='en'?a[1]:a[0]; }
 function dviField(it,f){ return (L==='en' && it[f+'En']!=null) ? it[f+'En'] : it[f]; }
 let DVI=null;
@@ -2855,33 +2858,50 @@ function dviItemRow(it){
   else if(it.measure){ extra+='<input type="text" inputmode="decimal" value="'+esc(d.measure||'')+'" oninput="dviSet(\''+it.id+'\',\'measure\',this.value)" placeholder="'+dviT('measure')+(it.unit?(' ('+it.unit+')'):'')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;">'; }
   if(st==='aten'||st==='malo'){
     const fx=d.fix||'';
-    // 1) ¿Qué encontró? (el mal)
-    extra+='<textarea oninput="dviSet(\''+it.id+'\',\'note\',this.value)" placeholder="'+dviT('found')+'" rows="2" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;resize:vertical;">'+esc(d.note||'')+'</textarea>';
-    // 2) ¿Lo arreglaste aquí o necesita pieza?
-    const fxbtn=(v,txt,col)=>'<button onclick="dviSetFix(\''+it.id+'\',\''+v+'\')" style="flex:1;padding:8px 4px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid '+(fx===v?col:'var(--border)')+';background:'+(fx===v?col:'var(--surface2)')+';color:'+(fx===v?'#0b0e14':'var(--text)')+';">'+txt+'</button>';
-    extra+='<div class="faint" style="font-size:12px;font-weight:700;margin-top:11px;">'+dviT('fixQ')+'</div>'
-      +'<div style="display:flex;gap:6px;margin-top:6px;">'+fxbtn('fixed',dviT('canFix'),'#35c46a')+fxbtn('part',dviT('needPart'),'#ff8a4c')+'</div>';
-    // 3a) Lo arregló → qué hizo (NO va a la lista de partes)
-    if(fx==='fixed'){
-      extra+='<input type="text" value="'+esc(d.repair||'')+'" oninput="dviSet(\''+it.id+'\',\'repair\',this.value)" placeholder="'+dviT('repair')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid #2e7d46;background:var(--surface2);color:var(--text);font-size:14px;">';
+    if(d._min){
+      // Minimizada: resumen compacto + ✏️ editar
+      let sum;
+      if(fx==='fixed') sum='🔧 '+esc(d.repair||d.note||dviT('fixedTag'));
+      else if(st==='malo'||fx==='part') sum='🧩 '+esc(d.part||d.note||dviT('needPart'));
+      else sum=esc(d.note||dviT('watchTag'));
+      extra+='<div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+        +'<span style="font-size:12.5px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+sum+'</span>'
+        +'<button class="linkbtn" onclick="dviReopen(\''+it.id+'\')" style="font-size:12.5px;color:var(--gold);flex:0 0 auto;">'+dviT('editSec')+'</button></div>';
+    } else {
+      // Instrucción PASO A PASO: el diagnóstico se hace AQUÍ mismo.
+      extra+='<div class="faint" style="font-size:11.5px;margin-top:8px;line-height:1.5;border-left:2px solid #ffc94d;padding-left:8px;">'+dviT('diagHint')+'</div>';
+      // 1) ¿Qué encontró? (el mal)
+      extra+='<textarea oninput="dviSet(\''+it.id+'\',\'note\',this.value)" placeholder="'+dviT('found')+'" rows="2" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;resize:vertical;">'+esc(d.note||'')+'</textarea>';
+      // 2) ¿Lo arreglaste aquí o necesita pieza?
+      const fxbtn=(v,txt,col)=>'<button onclick="dviSetFix(\''+it.id+'\',\''+v+'\')" style="flex:1;padding:8px 4px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid '+(fx===v?col:'var(--border)')+';background:'+(fx===v?col:'var(--surface2)')+';color:'+(fx===v?'#0b0e14':'var(--text)')+';">'+txt+'</button>';
+      extra+='<div class="faint" style="font-size:12px;font-weight:700;margin-top:11px;">'+dviT('fixQ')+'</div>'
+        +'<div style="display:flex;gap:6px;margin-top:6px;">'+fxbtn('fixed',dviT('canFix'),'#35c46a')+fxbtn('part',dviT('needPart'),'#ff8a4c')+'</div>';
+      // 3a) Lo arregló → qué hizo (NO va a la lista de partes)
+      if(fx==='fixed'){
+        extra+='<input type="text" value="'+esc(d.repair||'')+'" oninput="dviSet(\''+it.id+'\',\'repair\',this.value)" placeholder="'+dviT('repair')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid #2e7d46;background:var(--surface2);color:var(--text);font-size:14px;">';
+      }
+      // 3b) No pudo → pieza que necesita (SÍ va a la lista de partes)
+      else if(fx==='part'){
+        extra+='<input type="text" value="'+esc(d.part||'')+'" oninput="dviSet(\''+it.id+'\',\'part\',this.value)" placeholder="'+dviT('part')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid #b5651d;background:var(--surface2);color:var(--text);font-size:14px;">';
+      }
+      // 4) Foto (siempre disponible)
+      extra+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center;">'
+        +(d.photo?'<img src="'+esc(d.photo)+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;">':'')
+        +'<label class="btn ghost sm" style="cursor:pointer;margin:0;">'+(d.photo? (L==='en'?'Change':'Cambiar') : dviT('photo'))+'<input type="file" accept="image/*" style="display:none;" onchange="dviPhoto(\''+it.id+'\',this)"></label>'
+        +'<span class="faint" id="dvi-ph-'+it.id+'" style="font-size:11px;"></span></div>';
+      // 5) Cerrar / minimizar esta sección
+      extra+='<button class="btn ghost" onclick="dviDoneItem(\''+it.id+'\')" style="width:100%;margin-top:12px;">'+dviT('closeSec')+'</button>';
     }
-    // 3b) No pudo → pieza que necesita (SÍ va a la lista de partes)
-    else if(fx==='part'){
-      extra+='<input type="text" value="'+esc(d.part||'')+'" oninput="dviSet(\''+it.id+'\',\'part\',this.value)" placeholder="'+dviT('part')+'" style="width:100%;box-sizing:border-box;margin-top:8px;padding:9px;border-radius:9px;border:1px solid #b5651d;background:var(--surface2);color:var(--text);font-size:14px;">';
-    }
-    // 4) Foto (siempre disponible)
-    extra+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center;">'
-      +(d.photo?'<img src="'+esc(d.photo)+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;">':'')
-      +'<label class="btn ghost sm" style="cursor:pointer;margin:0;">'+(d.photo? (L==='en'?'Change':'Cambiar') : dviT('photo'))+'<input type="file" accept="image/*" style="display:none;" onchange="dviPhoto(\''+it.id+'\',this)"></label>'
-      +'<span class="faint" id="dvi-ph-'+it.id+'" style="font-size:11px;"></span></div>';
   }
   // Entrada: Bien o Atención. El ROJO (Reparar) es un RESULTADO: aparece solo si en Atención elige "Necesita pieza".
   const atenActive=(st==='aten'||st==='malo');
   const borderCol = st==='malo'?'#ff5a5a':(st==='aten'?'#ffc94d':(st==='bien'?'#35c46a':'var(--border)'));
   let chip='';
-  if(st==='malo') chip='<div style="margin-top:9px;font-size:12.5px;font-weight:800;color:#ff5a5a;">'+dviT('redH')+'</div>';
-  else if(st==='aten'&&d.fix==='fixed') chip='<div style="margin-top:9px;font-size:12.5px;font-weight:800;color:#35c46a;">'+dviT('fixedTag')+'</div>';
-  else if(st==='aten') chip='<div style="margin-top:9px;font-size:12px;font-weight:700;color:#ffc94d;">'+dviT('diagTag')+'</div>';
+  if(!d._min){   // minimizada = el resumen compacto + el borde de color ya dicen el estado
+    if(st==='malo') chip='<div style="margin-top:9px;font-size:12.5px;font-weight:800;color:#ff5a5a;">'+dviT('redH')+'</div>';
+    else if(st==='aten'&&d.fix==='fixed') chip='<div style="margin-top:9px;font-size:12.5px;font-weight:800;color:#35c46a;">'+dviT('fixedTag')+'</div>';
+    else if(st==='aten') chip='<div style="margin-top:9px;font-size:12.5px;font-weight:800;color:#ffc94d;">'+dviT('diagTag')+'</div>';
+  }
   return '<div class="card" style="padding:12px;margin-bottom:10px;border-left:4px solid '+borderCol+';"><div style="font-size:14.5px;font-weight:600;margin-bottom:9px;line-height:1.35;">'+esc(lbl)+'</div>'
     +'<div style="display:flex;gap:6px;">'+btn('bien',dviT('bien'),'#35c46a',st==='bien')+btn('aten',dviT('aten'),'#ffc94d',atenActive)+'</div>'
     +chip+extra+'</div>';
@@ -2890,6 +2910,9 @@ function dviRerenderItems(){ const box=document.getElementById('dvi-items'); if(
 window.dviSetState=function(id,v){ const d=DVI.data[id]||(DVI.data[id]={}); d.state=v; if(v==='bien'){ d.fix=''; } dviRerenderItems(); };
 // En Atención: "Necesita pieza" → ROJO (malo); "Lo arreglé" o sin elegir → AMARILLO (aten).
 window.dviSetFix=function(id,v){ const d=DVI.data[id]||(DVI.data[id]={}); d.fix=(d.fix===v?'':v); d.state=(d.fix==='part')?'malo':'aten'; dviRerenderItems(); };
+// Cerrar/minimizar un punto ya diagnosticado (y reabrir para editar).
+window.dviDoneItem=function(id){ const d=DVI.data[id]; if(!d) return; d._min=true; dviRerenderItems(); try{ dviSaveDraft(); }catch(e){} };
+window.dviReopen=function(id){ const d=DVI.data[id]; if(!d) return; d._min=false; dviRerenderItems(); };
 window.dviSet=function(id,f,val){ const d=DVI.data[id]||(DVI.data[id]={}); d[f]=val; };
 window.dviPhoto=async function(id,inp){ const f=inp&&inp.files&&inp.files[0]; if(!f) return; const lab=document.getElementById('dvi-ph-'+id);
   if(lab) lab.textContent=(L==='en'?'Uploading…':'Subiendo…');
