@@ -1005,12 +1005,18 @@ function estimateCardHTML(o){
         <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;">${es?'Puedes pagar antes si quieres — abajo con tarjeta, o en persona/efectivo.':'You can pay earlier if you want — below by card, or in person/cash.'}</div>
       </div>`:''}
     ${o.paid
-      ? `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:800;text-align:center;">✅ ${es?'PAGADO':'PAID'} · ${formatMoney((o.paidCents||0)/100||o.total)}${o.payMethod==='cash'?(es?' · efectivo':' · cash'):((o.payMethod||'').indexOf('square')===0?(es?' · tarjeta':' · card'):'')}${o.paidAt?(' · '+formatDate((o.paidAt||'').slice(0,10))):''}<div style="font-size:11px;font-weight:600;color:#49d17f;margin-top:4px;">${es?'Gracias — este es tu recibo.':'Thank you — this is your receipt.'}</div></div>`
+      ? (o.warranty
+          ? `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:800;text-align:center;">✅ ${es?'COMPLETADO · EN GARANTÍA · $0':'COMPLETED · WARRANTY · $0'}${o.deliverySignedAt?(' · '+(es?'firmado':'signed')+' '+formatDate((o.deliverySignedAt||'').slice(0,10))):''}${o.deliverySignature?`<div style="margin-top:8px;background:#fff;border-radius:8px;padding:6px;"><img src="${o.deliverySignature}" alt="firma" style="max-height:56px;max-width:100%;display:block;margin:0 auto;"></div>`:''}<div style="font-size:11px;font-weight:600;color:#49d17f;margin-top:6px;">${es?'Recibiste tu vehículo. Este es tu invoice — sin costo (garantía).':'You received your vehicle. This is your invoice — no charge (warranty).'}</div></div>`
+          : `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:800;text-align:center;">✅ ${es?'PAGADO':'PAID'} · ${formatMoney((o.paidCents||0)/100||o.total)}${o.payMethod==='cash'?(es?' · efectivo':' · cash'):((o.payMethod||'').indexOf('square')===0?(es?' · tarjeta':' · card'):'')}${o.paidAt?(' · '+formatDate((o.paidAt||'').slice(0,10))):''}<div style="font-size:11px;font-weight:600;color:#49d17f;margin-top:4px;">${es?'Gracias — este es tu recibo.':'Thank you — this is your receipt.'}</div></div>`)
       : accepted
-      ? `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:700;text-align:center;">✅ ${es?'Aceptaste este estimado':'You approved this estimate'}${o.acceptedAt?(' · '+formatDate((o.acceptedAt||'').slice(0,10))):''}</div>`
+      ? ((o.warranty && !o.deliverySignedAt && (o.status==='listo'||o.status==='entregado'))
+          ? `<div style="margin-top:12px;background:rgba(40,180,99,.10);border:1px solid rgba(40,180,99,.35);color:#49d17f;border-radius:12px;padding:10px;font-size:13px;font-weight:700;text-align:center;margin-bottom:8px;">✅ ${es?'Aprobaste · tu vehículo está listo':'Approved · your vehicle is ready'}</div>
+             <button onclick="portalSignDelivery('${o.id}')" style="width:100%;background:linear-gradient(135deg,#1f6feb,#4d9bff);color:#fff;border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">🖊️ ${es?'Firmar entrega de mi vehículo':'Sign vehicle delivery'}</button>
+             <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Confirma que recibiste tu vehículo. En garantía: sin costo para ti.':'Confirm you received your vehicle. Warranty: no charge to you.'}</div>`
+          : `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:700;text-align:center;">✅ ${es?'Aceptaste este estimado':'You approved this estimate'}${o.acceptedAt?(' · '+formatDate((o.acceptedAt||'').slice(0,10))):''}${o.warranty?`<div style="font-size:11px;font-weight:600;color:#49d17f;margin-top:4px;">${es?'Al recoger tu vehículo firmarás la entrega (sin costo).':'You will sign delivery when you pick up (no charge).'}</div>`:''}</div>`)
       : `<div style="margin-top:12px;">
           <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
-          <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.'}</div>
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${o.warranty?(es?'Autorizas el trabajo en garantía — sin costo para ti.':'You authorize the warranty work — no charge to you.'):(es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.')}</div>
         </div>`}
     ${(!o.paid && Number(o.balance)>0 && !(Number(o.planTotalCents)>0))?
       `<button onclick="portalPayService('${o.id}')" style="width:100%;margin-top:10px;${accepted?'background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;':'background:transparent;border:1.5px solid var(--gold);color:var(--gold);'}border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">💳 ${es?'Pagar saldo':'Pay balance'} · ${formatMoney(o.balance)}</button><div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">${es?'Pago seguro por Square · puedes pagar todo o una parte · pagar también aprueba':'Secure payment by Square · full or partial · paying also approves'}</div>`
@@ -1041,6 +1047,57 @@ window.portalAcceptEstimate = async function(orderId){
   }catch(e){
     if(btn){ btn.disabled=false; btn.textContent=(L==='en'?'✅ Approve estimate':'✅ Aceptar estimado'); }
     alert((L==='en'?'Could not save: ':'No se pudo guardar: ')+((e&&e.message)||e));
+  }
+};
+// 🖊️ FIRMA DE ENTREGA: el cliente confirma que recibió su vehículo (en garantía, sin costo) y firma con el dedo.
+//    Al firmar, la orden queda COMPLETADA ($0) y su invoice firmado queda de registro en el portal.
+let _signPad=null;
+function _signPadInit(){
+  const c=document.getElementById('sign-pad'); if(!c) return;
+  const r=c.getBoundingClientRect(); const dpr=window.devicePixelRatio||1;
+  c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr);
+  const ctx=c.getContext('2d'); ctx.scale(dpr,dpr); ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#0b0e14';
+  let drawing=false, ink=false, last=null;
+  const pos=e=>{ const b=c.getBoundingClientRect(); const t=(e.touches&&e.touches[0])?e.touches[0]:e; return {x:(t.clientX-b.left),y:(t.clientY-b.top)}; };
+  const start=e=>{ drawing=true; last=pos(e); e.preventDefault(); };
+  const move=e=>{ if(!drawing) return; const p=pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; ink=true; e.preventDefault(); };
+  const end=()=>{ drawing=false; };
+  c.addEventListener('mousedown',start); c.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
+  c.addEventListener('touchstart',start,{passive:false}); c.addEventListener('touchmove',move,{passive:false}); c.addEventListener('touchend',end);
+  _signPad={ canvas:c, hasInk:()=>ink, clear:()=>{ ctx.clearRect(0,0,c.width,c.height); ink=false; } };
+}
+window._signClear=function(){ if(_signPad) _signPad.clear(); };
+window.portalSignDelivery=function(orderId){
+  const es=L!=='en';
+  const ov=document.createElement('div'); ov.id='sign-overlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:2147483600;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:16px;cursor:pointer;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--navy,#0f1320);border:1px solid var(--border,#2a3350);border-radius:18px;max-width:440px;width:100%;padding:20px;color:var(--text,#fff);max-height:92vh;overflow:auto;cursor:default;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;font-size:17px;">🖊️ '+(es?'Firmar entrega':'Sign delivery')+'</div><button onclick="document.getElementById(\'sign-overlay\').remove()" style="background:transparent;border:none;color:var(--muted,#9aa);font-size:24px;cursor:pointer;line-height:1;">×</button></div>'
+    +'<label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:13px;line-height:1.45;margin-bottom:12px;"><input type="checkbox" id="sign-ack" style="width:20px;height:20px;flex:none;margin-top:1px;"><span>'+(es?'Confirmo que <b>recibí mi vehículo</b> y que el servicio fue <b>en garantía, sin costo</b> para mí.':'I confirm I <b>received my vehicle</b> and the service was <b>under warranty, at no cost</b> to me.')+'</span></label>'
+    +'<div style="font-size:12px;color:var(--muted,#9aa);margin-bottom:5px;">'+(es?'Firma con tu dedo:':'Sign with your finger:')+'</div>'
+    +'<canvas id="sign-pad" style="width:100%;height:170px;border:1px solid var(--border,#2a3350);border-radius:10px;background:#fff;touch-action:none;display:block;"></canvas>'
+    +'<button onclick="_signClear()" style="background:transparent;border:1px solid var(--border,#2a3350);color:var(--muted,#9aa);border-radius:8px;padding:5px 12px;font-size:12px;margin-top:6px;cursor:pointer;">'+(es?'Borrar':'Clear')+'</button>'
+    +'<button id="sign-submit" onclick="_signSubmit(\''+orderId+'\')" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#1f6feb,#4d9bff);color:#fff;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:800;cursor:pointer;">✅ '+(es?'Firmar y aceptar entrega':'Sign & accept delivery')+'</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+  setTimeout(_signPadInit, 30);
+};
+window._signSubmit=async function(orderId){
+  const es=L!=='en';
+  const ack=document.getElementById('sign-ack');
+  if(!ack||!ack.checked){ alert(es?'Marca la casilla para confirmar que recibiste tu vehículo.':'Check the box to confirm you received your vehicle.'); return; }
+  if(!_signPad||!_signPad.hasInk()){ alert(es?'Firma con tu dedo en el recuadro.':'Please sign in the box.'); return; }
+  const btn=document.getElementById('sign-submit'); if(btn){ btn.disabled=true; btn.textContent=es?'Guardando…':'Saving…'; }
+  let sig=''; try{ sig=_signPad.canvas.toDataURL('image/png'); }catch(e){}
+  try{
+    await httpsCallable(functions,'svcClientDeliverySign')({ orderId:orderId, signature:sig, ack:true });
+    const ov=document.getElementById('sign-overlay'); if(ov) ov.remove();
+    await loadPortalEstimates();
+    const card=document.getElementById('est-'+orderId); if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent=(es?'✅ Firmar y aceptar entrega':'✅ Sign & accept delivery'); }
+    alert((es?'No se pudo guardar: ':'Could not save: ')+((e&&e.message)||e));
   }
 };
 window.togglePaySchedule = function(){

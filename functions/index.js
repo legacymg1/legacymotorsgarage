@@ -2444,6 +2444,7 @@ function _estPayload(o, en, planPaidCents, planTotalCents) {
   const totalC = Number(o.grandTotalCents) || 0, paidC = Number(o.paidCents) || 0, planPaidC = Number(planPaidCents) || 0;
   // 🛡️ EN GARANTÍA: el cliente ve el VALOR del trabajo (cubierto) pero paga $0.
   const warranty = o.warranty === true;
+  const deliverySigned = !!(o.delivery && o.delivery.signedAt);   // 🖊️ ¿ya firmó la entrega el cliente?
   const owedC = warranty ? 0 : Math.max(0, totalC - paidC - planPaidC);
   return {
     id: o.id, orderNum: o.orderNum || null, vehicleLabel: o.vehicleLabel || "", vin: o.vin || "", plate: o.plate || "",
@@ -2452,8 +2453,10 @@ function _estPayload(o, en, planPaidCents, planTotalCents) {
     laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
     warranty: warranty, warrantyReason: o.warrantyReason || "", coveredCents: warranty ? totalC : 0,
     deposit: c(o.depositCents), balance: owedC / 100,
-    // 🛡️ En garantía el cliente NO paga, pero SÍ autoriza: paid=false para que siga el flujo de aceptar/firmar.
-    paid: warranty ? false : (owedC <= 0 && totalC > 0), paidCents: Number(o.paidCents) || 0, planPaidCents: planPaidC, planTotalCents: Number(planTotalCents) || 0, toContractCents: Number(o.toContractCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
+    // 🛡️ En garantía el cliente NO paga, pero SÍ autoriza: queda "completado" cuando FIRMA la entrega.
+    paid: warranty ? deliverySigned : (owedC <= 0 && totalC > 0), paidCents: Number(o.paidCents) || 0, planPaidCents: planPaidC, planTotalCents: Number(planTotalCents) || 0, toContractCents: Number(o.toContractCents) || 0, paidAt: o.paidAt || "", payMethod: o.payMethod || "",
+    // 🖊️ Entrega firmada por el cliente (registro): fecha + imagen de firma para su invoice.
+    deliverySignedAt: (o.delivery && o.delivery.signedAt) || "", deliverySignature: (o.delivery && o.delivery.signature) || "", deliveryAck: !!(o.delivery && o.delivery.ack),
     sentAt: o.estimateSentAt || "", acceptedAt: o.estimateAcceptedAt || "", createdAt: o.createdAt || "", partsReadyAt: o.partsReadyAt || "", partsPaidAt: o.partsPaidAt || "",
     scheduledAt: o.scheduledAt || "", receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", promisedAt: o.promisedAt || "", deliveredAt: o.deliveredAt || "",
     promises: (Array.isArray(o.promises) ? o.promises.map((p) => ({ date: p.date || "", amtCents: Number(p.amtCents) || 0 })) : []),
@@ -2508,6 +2511,34 @@ exports.svcClientAccept = onCall({ timeoutSeconds: 20 }, async (request) => {
   const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";
   await _pushToOwners({ title: "✅ Estimado aceptado", body: _nm + " aceptó el estimado" + _fol + (o.vehicleLabel ? (" · " + o.vehicleLabel) : ""), titleEn: "✅ Estimate approved", bodyEn: _nm + " approved the estimate" + _fol, url: "/admin.html" });
   return { ok: true };
+});
+
+// 🖊️ El cliente FIRMA la ENTREGA del vehículo desde su portal: acepta que lo recibió; en garantía, que no tuvo costo.
+//    Marca la orden ENTREGADA y, en garantía, COMPLETADA ($0). Guarda la firma como registro en la orden (su invoice).
+//    No toca Finanzas (en garantía no hay ingreso). Espejo de svcClientAccept.
+exports.svcClientDeliverySign = onCall({ timeoutSeconds: 20 }, async (request) => {
+  const cli = await _portalClient(request);
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  let sig = String(d.signature || "");
+  if (sig && sig.length > 800000) sig = "";   // firma demasiado grande: guarda el registro sin la imagen
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const mine = (o.clientId && o.clientId === cli.id) || (o.clientPhone && o.clientPhone === (cli.data.phone || ""));
+  if (!mine) throw new HttpsError("permission-denied", "No es tu orden.");
+  const now = new Date().toISOString();
+  const warranty = o.warranty === true;
+  const delivery = { signedAt: now, by: cli.phone || "", ack: true, signature: sig, warranty: warranty };
+  const patch = { delivery: delivery, status: "entregado", delivered: true, deliveredAt: o.deliveredAt || now, updatedAt: now };
+  if (warranty) { patch.paid = true; patch.paidAt = o.paidAt || now; patch.payMethod = "warranty"; }   // completado $0, sin Finanzas
+  await ref.set(patch, { merge: true });
+  const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";
+  await _pushToOwners({ title: "🖊️ Entrega firmada", body: _nm + " firmó la entrega" + _fol + (warranty ? " (garantía · $0)" : ""), titleEn: "🖊️ Delivery signed", bodyEn: _nm + " signed vehicle delivery" + _fol, url: "/admin.html" });
+  return { ok: true, warranty: warranty };
 });
 
 // ✨ CORRECTOR + BILINGÜE de los trabajos de una orden de servicio. Entra una lista (ES/EN/mixto, con typos) → sale corregida en ES y EN (misma longitud/orden).
