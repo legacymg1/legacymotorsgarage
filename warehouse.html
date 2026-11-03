@@ -2792,7 +2792,13 @@ function dviT(k){ const m={ insp:['Inspección (DVI)','Inspection (DVI)'], bien:
   found:['¿Qué encontraste? (el mal)','What did you find?'], fixQ:['¿Lo pudiste resolver aquí?','Could you fix it here?'],
   canFix:['🔧 Lo arreglé','🔧 Fixed it'], needPart:['🧩 Necesita pieza','🧩 Needs a part'],
   repair:['¿Qué le hiciste? (reparación)','What did you do? (repair)'], fixedTag:['🔧 Reparado en sitio','🔧 Fixed on site'],
-  cornLF:['Del. izq.','LF'], cornRF:['Del. der.','RF'], cornLR:['Tras. izq.','LR'], cornRR:['Tras. der.','RR'] };
+  cornLF:['Del. izq.','LF'], cornRF:['Del. der.','RF'], cornLR:['Tras. izq.','LR'], cornRR:['Tras. der.','RR'],
+  reportTitle:['Inspección Inicial · Pre-reparación','Initial · Pre-Repair Inspection'],
+  redH:['❌ Necesita reparación / pieza','❌ Needs repair / part'], fixedH:['🔧 Reparado en sitio','🔧 Fixed on site'],
+  okH:['✅ En buen estado','✅ In good condition'], byLbl:['Mecánico','Mechanic'],
+  sendWait:['📨 Enviar reporte · Esperando partes','📨 Send report · Waiting on parts'],
+  sendDetalle:['✅ Enviar reporte · Listo para detallado','✅ Send report · Ready for detailing'],
+  diagTag:['⚠️ En diagnóstico','⚠️ Diagnosing'] };
   const a=m[k]||['','']; return L==='en'?a[1]:a[0]; }
 function dviField(it,f){ return (L==='en' && it[f+'En']!=null) ? it[f+'En'] : it[f]; }
 let DVI=null;
@@ -2828,7 +2834,7 @@ function dviRenderArea(){
 function dviItemRow(it){
   const d=DVI.data[it.id]||{}; const st=d.state||'';
   const lbl=dviField(it,'label');
-  const btn=(v,txt,col)=>'<button onclick="dviSetState(\''+it.id+'\',\''+v+'\')" style="flex:1;padding:8px 4px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid '+(st===v?col:'var(--border)')+';background:'+(st===v?col:'var(--surface2)')+';color:'+(st===v?'#0b0e14':'var(--text)')+';">'+txt+'</button>';
+  const btn=(v,txt,col,active)=>'<button onclick="dviSetState(\''+it.id+'\',\''+v+'\')" style="flex:1;padding:9px 4px;border-radius:9px;font-size:12.5px;font-weight:700;cursor:pointer;border:1px solid '+(active?col:'var(--border)')+';background:'+(active?col:'var(--surface2)')+';color:'+(active?'#0b0e14':'var(--text)')+';">'+txt+'</button>';
   let extra='';
   if(it.corners){
     // 4 esquinas (como taller real): Del. izq / Del. der / Tras. izq / Tras. der
@@ -2858,13 +2864,21 @@ function dviItemRow(it){
       +'<label class="btn ghost sm" style="cursor:pointer;margin:0;">'+(d.photo? (L==='en'?'Change':'Cambiar') : dviT('photo'))+'<input type="file" accept="image/*" capture="environment" style="display:none;" onchange="dviPhoto(\''+it.id+'\',this)"></label>'
       +'<span class="faint" id="dvi-ph-'+it.id+'" style="font-size:11px;"></span></div>';
   }
-  return '<div class="card" style="padding:12px;margin-bottom:10px;"><div style="font-size:14.5px;font-weight:600;margin-bottom:9px;line-height:1.35;">'+esc(lbl)+'</div>'
-    +'<div style="display:flex;gap:6px;">'+btn('bien',dviT('bien'),'#35c46a')+btn('aten',dviT('aten'),'#ffc94d')+btn('malo',dviT('malo'),'#ff5a5a')+'</div>'
-    +extra+'</div>';
+  // Entrada: Bien o Atención. El ROJO (Reparar) es un RESULTADO: aparece solo si en Atención elige "Necesita pieza".
+  const atenActive=(st==='aten'||st==='malo');
+  const borderCol = st==='malo'?'#ff5a5a':(st==='aten'?'#ffc94d':(st==='bien'?'#35c46a':'var(--border)'));
+  let chip='';
+  if(st==='malo') chip='<div style="margin-top:9px;font-size:12.5px;font-weight:800;color:#ff5a5a;">'+dviT('redH')+'</div>';
+  else if(st==='aten'&&d.fix==='fixed') chip='<div style="margin-top:9px;font-size:12.5px;font-weight:800;color:#35c46a;">'+dviT('fixedTag')+'</div>';
+  else if(st==='aten') chip='<div style="margin-top:9px;font-size:12px;font-weight:700;color:#ffc94d;">'+dviT('diagTag')+'</div>';
+  return '<div class="card" style="padding:12px;margin-bottom:10px;border-left:4px solid '+borderCol+';"><div style="font-size:14.5px;font-weight:600;margin-bottom:9px;line-height:1.35;">'+esc(lbl)+'</div>'
+    +'<div style="display:flex;gap:6px;">'+btn('bien',dviT('bien'),'#35c46a',st==='bien')+btn('aten',dviT('aten'),'#ffc94d',atenActive)+'</div>'
+    +chip+extra+'</div>';
 }
-window.dviSetState=function(id,v){ const d=DVI.data[id]||(DVI.data[id]={}); d.state=v; const box=document.getElementById('dvi-items'); if(box){ // re-render solo esa fila
-    const a=DVI_SOP[DVI.areaIdx]; box.innerHTML=a.items.map(it=>dviItemRow(it)).join(''); } };
-window.dviSetFix=function(id,v){ const d=DVI.data[id]||(DVI.data[id]={}); d.fix=(d.fix===v?'':v); const box=document.getElementById('dvi-items'); if(box){ const a=DVI_SOP[DVI.areaIdx]; box.innerHTML=a.items.map(it=>dviItemRow(it)).join(''); } };
+function dviRerenderItems(){ const box=document.getElementById('dvi-items'); if(box){ const a=DVI_SOP[DVI.areaIdx]; box.innerHTML=a.items.map(it=>dviItemRow(it)).join(''); } }
+window.dviSetState=function(id,v){ const d=DVI.data[id]||(DVI.data[id]={}); d.state=v; if(v==='bien'){ d.fix=''; } dviRerenderItems(); };
+// En Atención: "Necesita pieza" → ROJO (malo); "Lo arreglé" o sin elegir → AMARILLO (aten).
+window.dviSetFix=function(id,v){ const d=DVI.data[id]||(DVI.data[id]={}); d.fix=(d.fix===v?'':v); d.state=(d.fix==='part')?'malo':'aten'; dviRerenderItems(); };
 window.dviSet=function(id,f,val){ const d=DVI.data[id]||(DVI.data[id]={}); d[f]=val; };
 window.dviPhoto=async function(id,inp){ const f=inp&&inp.files&&inp.files[0]; if(!f) return; const lab=document.getElementById('dvi-ph-'+id);
   if(lab) lab.textContent=(L==='en'?'Uploading…':'Subiendo…');
@@ -2877,7 +2891,7 @@ window.dviNext=function(){ dviSaveDraft(); if(DVI.areaIdx>=DVI_SOP.length-1){ DV
 function dviSaveDraft(){ if(_vaReadOnly()) return; try{ httpsCallable(functions,'mechDvi')(vaData({op:'save', carId:DVI.carId, draft:{data:DVI.data, areaIdx:DVI.areaIdx}})); }catch(e){} }
 function dviCollect(){ const flagged=[], parts=[]; const report=DVI_SOP.map(a=>({ key:a.key, title:(L==='en'?a.titleEn:a.title),
     items:a.items.map(it=>{ const d=DVI.data[it.id]||{};
-      const needsPart = d.fix==='part' || (!d.fix && (d.part||'').trim());   // compat: borradores viejos sin 'fix' que ya traen pieza
+      const needsPart = (d.state!=='bien') && ( d.state==='malo' || d.fix==='part' || (!d.fix && (d.part||'').trim()) );   // rojo = necesita pieza (compat con borradores viejos)
       let measure='';
       if(it.corners){ measure=[['cLF','cornLF'],['cRF','cornRF'],['cLR','cornLR'],['cRR','cornRR']].filter(p=>(d[p[0]]||'').toString().trim()).map(p=>dviT(p[1])+' '+d[p[0]].toString().trim()+(it.unit?(' '+it.unit):'')).join(' · '); }
       else if(it.measure&&d.measure){ measure=d.measure+(it.unit?(' '+it.unit):''); }
@@ -2888,23 +2902,40 @@ function dviCollect(){ const flagged=[], parts=[]; const report=DVI_SOP.map(a=>(
 function dviRenderReview(){
   const body=document.getElementById('dvi-body'); if(!body) return;
   const c=dviCollect();
-  const flagHtml = c.flagged.length ? c.flagged.map(f=>{
-    const col=f.state==='malo'?'#ff5a5a':'#ffc94d';
-    return '<div class="card" style="padding:10px 12px;margin-bottom:8px;border-left:3px solid '+col+';"><div style="font-weight:700;font-size:14px;">'+(f.state==='malo'?'❌ ':'⚠️ ')+esc(f.label)+'</div>'
-      +'<div class="faint" style="font-size:11.5px;margin-top:2px;">'+esc(f.area)+(f.measure?(' · '+esc(f.measure)):'')+'</div>'
-      +(f.note?'<div style="font-size:13px;margin-top:5px;">'+esc(f.note)+'</div>':'')
-      +(f.fix==='fixed'?'<div style="font-size:12.5px;margin-top:4px;color:#35c46a;font-weight:700;">'+dviT('fixedTag')+(f.repair?(': '+esc(f.repair)):'')+'</div>':'')
-      +(f.part?'<div style="font-size:12.5px;margin-top:4px;color:var(--gold);">🧩 '+esc(f.part)+'</div>':'')
-      +(f.photo?'<img src="'+esc(f.photo)+'" style="margin-top:6px;width:72px;height:72px;object-fit:cover;border-radius:8px;">':'')+'</div>';
-  }).join('') : '<div class="faint" style="text-align:center;padding:18px;">'+dviT('noFlags')+'</div>';
-  const partsHtml = c.parts.length ? ('<div class="sub" style="font-weight:800;font-size:14px;margin:16px 0 8px;">'+dviT('partsH')+' ('+c.parts.length+')</div>'
+  // Aplana todos los puntos con su área
+  const all=[]; c.report.forEach(a=>a.items.forEach(it=>all.push(Object.assign({area:a.title},it))));
+  const red=all.filter(x=>x.state==='malo');
+  const yellow=all.filter(x=>x.state==='aten');
+  const ok=all.filter(x=>x.state==='bien');
+  // Quién + cuándo (reusa la identidad del Pit Crew)
+  let who=''; try{ who=(typeof _asEmp!=='undefined'&&_asEmp&&_viewAsName)?_viewAsName:((typeof myName!=='undefined'&&myName)?myName:''); }catch(e){}
+  const today=new Date().toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'numeric',month:'long',year:'numeric'});
+  const redCard=f=>'<div class="card" style="padding:10px 12px;margin-bottom:8px;border-left:3px solid #ff5a5a;"><div style="font-weight:700;font-size:14px;">❌ '+esc(f.label)+'</div>'
+    +'<div class="faint" style="font-size:11.5px;margin-top:2px;">'+esc(f.area)+(f.measure?(' · '+esc(f.measure)):'')+'</div>'
+    +(f.note?'<div style="font-size:13px;margin-top:5px;">'+esc(f.note)+'</div>':'')
+    +(f.part?'<div style="font-size:12.5px;margin-top:4px;color:var(--gold);font-weight:700;">🧩 '+esc(f.part)+'</div>':'')
+    +(f.photo?'<img src="'+esc(f.photo)+'" style="margin-top:6px;width:72px;height:72px;object-fit:cover;border-radius:8px;">':'')+'</div>';
+  const yellowCard=f=>'<div class="card" style="padding:10px 12px;margin-bottom:8px;border-left:3px solid #ffc94d;"><div style="font-weight:700;font-size:14px;">'+(f.fix==='fixed'?'🔧 ':'⚠️ ')+esc(f.label)+'</div>'
+    +'<div class="faint" style="font-size:11.5px;margin-top:2px;">'+esc(f.area)+(f.measure?(' · '+esc(f.measure)):'')+'</div>'
+    +(f.note?'<div style="font-size:13px;margin-top:5px;">'+esc(f.note)+'</div>':'')
+    +(f.fix==='fixed'?'<div style="font-size:12.5px;margin-top:4px;color:#35c46a;font-weight:700;">'+dviT('fixedTag')+(f.repair?(': '+esc(f.repair)):'')+'</div>':'')
+    +(f.photo?'<img src="'+esc(f.photo)+'" style="margin-top:6px;width:72px;height:72px;object-fit:cover;border-radius:8px;">':'')+'</div>';
+  const sec=(title,col,inner)=> inner ? ('<div class="sub" style="font-weight:800;font-size:14px;margin:18px 0 8px;color:'+col+';">'+title+'</div>'+inner) : '';
+  const redHtml = sec(dviT('redH')+' ('+red.length+')', '#ff5a5a', red.map(redCard).join(''));
+  const yellowHtml = sec(dviT('fixedH')+' ('+yellow.length+')', '#ffc94d', yellow.map(yellowCard).join(''));
+  const okHtml = ok.length ? ('<div class="sub" style="font-weight:800;font-size:14px;margin:18px 0 8px;color:#35c46a;">'+dviT('okH')+' ('+ok.length+')</div>'
+    + '<div class="faint" style="font-size:12.5px;line-height:1.7;">'+ok.map(o=>'✓ '+esc(o.label)).join(' · ')+'</div>') : '';
+  const partsHtml = c.parts.length ? ('<div class="sub" style="font-weight:800;font-size:14px;margin:18px 0 8px;">'+dviT('partsH')+' ('+c.parts.length+')</div>'
     + c.parts.map(p=>'<div style="font-size:13.5px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06);">🧩 '+esc(p.label)+' <span class="faint" style="font-size:11px;">· '+esc(p.area)+'</span></div>').join('')) : '';
-  body.innerHTML='<h2 style="font-size:22px;margin:0 0 4px;">'+dviT('revH')+'</h2>'
-    +'<div class="faint" style="font-size:13px;margin-bottom:14px;">'+esc(DVI.label)+(DVI.miles?(' · '+esc(DVI.miles)+' mi'):'')+'</div>'
-    +flagHtml+partsHtml
-    +'<div class="sub" style="font-weight:800;font-size:14px;margin:20px 0 10px;">'+dviT('outcomeH')+'</div>'
-    +(c.parts.length?'<button class="btn-gold" onclick="dviSubmit(\'\')" style="width:100%;margin-bottom:10px;background:#ff8a4c;">'+dviT('waitParts')+'</button>':'')
-    +'<button class="btn-gold" onclick="dviSubmit(\'detalle\')" style="width:100%;margin-bottom:10px;">'+dviT('toDetalle')+'</button>'
+  const nothing=(!red.length&&!yellow.length)?'<div class="faint" style="text-align:center;padding:16px;">'+dviT('noFlags')+'</div>':'';
+  body.innerHTML='<h2 style="font-size:21px;margin:0 0 2px;">'+dviT('reportTitle')+'</h2>'
+    +'<div class="faint" style="font-size:12.5px;margin-bottom:4px;">🚗 '+esc(DVI.label)+(DVI.inventoryNum?(' · #'+esc(DVI.inventoryNum)):'')+(DVI.miles?(' · '+esc(DVI.miles)+' mi'):'')+'</div>'
+    +'<div class="faint" style="font-size:12px;margin-bottom:14px;">📅 '+esc(today)+(who?(' · '+dviT('byLbl')+': '+esc(who)):'')+'</div>'
+    +redHtml+partsHtml+yellowHtml+okHtml+nothing
+    +'<div class="sub" style="font-weight:800;font-size:14px;margin:22px 0 10px;">'+dviT('outcomeH')+'</div>'
+    +(c.parts.length
+        ? '<button class="btn-gold" onclick="dviSubmit(\'\')" style="width:100%;margin-bottom:10px;background:#ff8a4c;">'+dviT('sendWait')+'</button>'
+        : '<button class="btn-gold" onclick="dviSubmit(\'detalle\')" style="width:100%;margin-bottom:10px;">'+dviT('sendDetalle')+'</button>')
     +'<button class="btn ghost" onclick="dviSubmit(\'pintura\')" style="width:100%;margin-bottom:10px;">'+dviT('toPintura')+'</button>'
     +'<button class="linkbtn" onclick="dviPrev()" style="width:100%;">'+dviT('prev')+'</button>';
 }

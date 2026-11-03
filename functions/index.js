@@ -2646,6 +2646,7 @@ exports.mechCars = onCall({ timeoutSeconds: 30 }, async (request) => {
   snap.forEach((d) => {
     const c = d.data() || {};
     if ((c.reconStage || "mecanico") !== "mecanico") return;   // solo los que esperan inspección inicial
+    if (c.inspection && c.inspection.reportAt) return;          // ya se envió el reporte → sale de la lista/burbuja de inspección inicial (queda en el jacket, esperando partes)
     const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
     const photo = (Array.isArray(c.photos) && c.photos[0]) || c.img || "";
     const insp = c.inspection || {};
