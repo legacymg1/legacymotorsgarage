@@ -2825,6 +2825,7 @@ function svcRenderModal(){
         : ('<button onclick="svcGenEstimate(this)" style="width:100%;margin-top:8px;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">📄 Generar / enviar estimado</button>'
           +'<button onclick="svcSaveOrder()" style="width:100%;margin-top:8px;padding:11px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;">✅ Crear orden directa (sin estimado)</button>')))
     +((d.editId && _svcOrd && _svcOrd.estimateStatus==='sent' && !_svcOrd.paid)?'<button onclick="svcResend(\''+d.editId+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid var(--gold);background:rgba(232,182,74,.08);color:var(--gold);font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">📤 Reenviar estimado al cliente</button>':'')
+    +(isEdit?'<button onclick="svcSendInvoiceSMS(\''+d.editId+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid #25d366;background:rgba(37,211,102,.10);color:#25d366;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">💬 Enviar invoice/orden por SMS</button>':'')
     +((isEdit && _svcOrd && !_svcOrd.paid)
         ? (_svcOrd.warranty
             ? '<div style="width:100%;margin-top:10px;padding:11px;border-radius:12px;border:1px solid rgba(31,111,235,.45);background:rgba(31,111,235,.10);color:#4d9bff;font-weight:800;font-size:13px;text-align:center;">🛡️ En garantía · sin costo al cliente</div>'
@@ -3157,6 +3158,20 @@ window.svcReceiptSend=function(){
   if(phone){ location.href='sms:'+phone+'?body='+encodeURIComponent(body); }
   else if(navigator.share){ navigator.share({text:body}).catch(()=>{}); }
   else { try{ navigator.clipboard.writeText(body); alert('Recibo copiado.'); }catch(e){} }
+};
+// 💬 Enviar el INVOICE/ORDEN por SMS (un toque, desde la orden): manda el link al portal del cliente.
+//    Sirve para cualquier orden — incluida GARANTÍA (ahí el cliente abre y firma la entrega). Como el recordatorio de los carros.
+window.svcSendInvoiceSMS=function(id){
+  const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
+  const phone=(o.clientPhone||'').replace(/[^0-9+]/g,''); const en=(o.lang==='en'); const link=PORTAL_URL+'?order='+id; const fol=o.orderNum?(' #'+o.orderNum):'';
+  const body = o.warranty
+    ? (en?('Legacy Motors Garage'+fol+': your service invoice (warranty — no charge). Open it and sign delivery here: '+link)
+          :('Legacy Motors Garage'+fol+': tu invoice de servicio (garantía — sin costo). Ábrelo y firma la entrega aquí: '+link))
+    : (en?('Legacy Motors Garage'+fol+': your service invoice/order. View it in your portal: '+link)
+          :('Legacy Motors Garage'+fol+': tu invoice/orden de servicio. Ábrelo en tu portal: '+link));
+  if(phone){ location.href='sms:'+phone+'?body='+encodeURIComponent(body); }
+  else if(navigator.share){ navigator.share({text:body}).catch(()=>{}); }
+  else { try{ navigator.clipboard.writeText(body); alert('Link copiado.'); }catch(e){} }
 };
 // 📸 Snapshot INMUTABLE de un documento (estimado inicial/final o invoice) desde el payload/orden.
 function svcSnap(o){ o=o||{}; return { at:new Date().toISOString(), by:(auth.currentUser&&auth.currentUser.email)||'', orderNum:o.orderNum||null, services:JSON.parse(JSON.stringify(o.services||[])), parts:JSON.parse(JSON.stringify(o.parts||[])), laborTotalCents:o.laborTotalCents||0, partsTotalCents:o.partsTotalCents||0, grandTotalCents:o.grandTotalCents||0, depositCents:o.depositCents||0, balanceCents:(o.balanceCents!=null?o.balanceCents:Math.max(0,(o.grandTotalCents||0)-(o.depositCents||0))) }; }
