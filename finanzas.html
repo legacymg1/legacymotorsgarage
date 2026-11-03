@@ -158,6 +158,10 @@
 
   <h1 class="page">Finanzas</h1>
   <div class="page-sub">Gastos, ingresos y cortes de caja del negocio — en un solo lugar.</div>
+  <div id="sales-push-bar" style="display:none;margin:14px 0 0;background:rgba(62,207,142,0.1);border:1px solid rgba(62,207,142,0.35);border-radius:12px;padding:12px 14px;align-items:center;gap:12px;">
+    <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:14px;">🔔 Avisos de ventas</div><div style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4;">Recibe un aviso en tu iPhone cada vez que entra dinero (venta de carro, parte o servicio).</div></div>
+    <button class="btn-add" onclick="enableSalesPush(this)" style="flex:0 0 auto;padding:10px 16px;font-weight:800;">Activar</button>
+  </div>
   <div style="margin:14px 0 16px;display:flex;gap:10px;">
     <button class="btn-add" onclick="openInc()" style="flex:1;font-size:16px;padding:14px;font-weight:700;">＋ Ingreso</button>
     <button class="btn-add" onclick="openExp()" style="flex:1;font-size:16px;padding:14px;font-weight:700;">＋ Gasto</button>
@@ -846,6 +850,7 @@ import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
+import { getMessaging, getToken, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrCMJQclGosVp3EV49vmwKDnji-Oti5j0",
@@ -860,6 +865,35 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 const functions = getFunctions(app);
+
+// ---- 🔔 PUSH DE VENTAS (cha-ching al dueño) — reusa firebase-messaging-sw.js + el trigger onMoneyIn ----
+const VAPID_KEY="BDUfgtFZl2cfkkTcFSdGmXScxn0_Y-hthANv1DTW6S8EQJk_Abh6Zx6MCg8xdltHn-WEiwBjRjoV_OtClRhmOmU";
+let _fmsg=null, _salesPushReg=null, _salesPushErr='';
+async function ensureSalesPush(){
+  _salesPushErr='';
+  try{
+    if(!('Notification' in window) || Notification.permission!=='granted'){ _salesPushErr='sin permiso'; return false; }
+    if(!(await isSupported())){ _salesPushErr='no soporta (instala la app / iOS 16.4+)'; return false; }
+    try{ _salesPushReg=await navigator.serviceWorker.register('firebase-messaging-sw.js'); }catch(e){ _salesPushReg=await navigator.serviceWorker.ready; }
+    await navigator.serviceWorker.ready;
+    if(!_fmsg) _fmsg=getMessaging(app);
+    const tok=await getToken(_fmsg,{vapidKey:VAPID_KEY, serviceWorkerRegistration:_salesPushReg});
+    if(tok){ const em=(auth.currentUser&&auth.currentUser.email)||''; await setDoc(doc(db,'push_tokens',tok),{ token:tok, email:em, role:'owner', lang:'es', ts:new Date().toISOString() }); return true; }
+    _salesPushErr='sin token';
+  }catch(e){ _salesPushErr=(e&&(e.message||e.code))||String(e); console.log('salespush',e); }
+  return false;
+}
+window.enableSalesPush=async function(btn){
+  try{
+    if(!('Notification' in window) || !(await isSupported())){ alert('Para recibir avisos en el iPhone:\n\n1) Toca Compartir → "Agregar a inicio".\n2) Abre Finanzas DESDE ese ícono.\n3) Vuelve aquí y toca Activar.\n\n(Requiere iOS 16.4 o más.)'); return; }
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){ alert('No se activaron. Si están bloqueadas, actívalas en Ajustes del iPhone → Notificaciones.'); refreshSalesPushBar(); return; }
+    const ok=await ensureSalesPush();
+    alert(ok?'🔔 Listo — te avisaremos en el teléfono cada vez que entre dinero (ventas de carro, partes y servicio).':('No se pudo activar.\n\n['+_salesPushErr+']'));
+    refreshSalesPushBar();
+  }catch(e){ alert('Error: '+((e&&e.message)||e)); }
+};
+window.refreshSalesPushBar=function(){ const b=document.getElementById('sales-push-bar'); if(!b) return; const granted=('Notification' in window)&&Notification.permission==='granted'; b.style.display=granted?'none':'flex'; };
 
 // Convierte cualquier foto (incluida HEIC del iPhone) a JPEG en el telefono.
 function _loadScriptOnce(src){ return new Promise(function(res,rej){ if(Array.prototype.some.call(document.scripts,function(s){return s.src===src;})) return res(); var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=function(){rej(new Error('load '+src));}; document.head.appendChild(s); }); }
@@ -991,6 +1025,7 @@ onAuthStateChanged(auth,(user)=>{
     if(_cn) _cn.style.display=_canCerrar?'none':'';
     if(!_listening){ _listening=true; startListening(); }
     if(!_deepLinkDone){ _deepLinkDone=true; handleDeepLink(); }
+    try{ refreshSalesPushBar(); }catch(e){}   // 🔔 muestra "Activar avisos de ventas" si aún no están activadas
   } else {
     document.getElementById('app').style.display='none';
     document.getElementById('login').style.display='flex';
