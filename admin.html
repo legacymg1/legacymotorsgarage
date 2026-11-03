@@ -1612,6 +1612,17 @@ function startSvcListening(){
       const sv=document.getElementById('service-view');
       if(sv && sv.style.display!=='none') svcRenderOrders();
       try{ renderTodayBox(); }catch(e){}   // 💵 refresca "Pagos de hoy" (promesas de servicio)
+      // 🔗 Deep-link: admin.html?svc=<id> → abre esa orden (ej. desde Pit Crew). Solo una vez.
+      try{
+        if(!window._svcDeepDone){
+          const did=new URLSearchParams(location.search).get('svc');
+          if(did && svcOrders.some(o=>o.id===did)){
+            window._svcDeepDone=true;
+            if(window.setCliView) setCliView('service');
+            setTimeout(function(){ try{ if(window.svcOpenOrder) svcOpenOrder(did); }catch(e){} }, 120);
+          }
+        }
+      }catch(e){}
     }, (e)=>{ console.warn('serviceOrders offline', e); });
   }catch(e){ console.warn('startSvcListening', e); }
 }

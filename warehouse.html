@@ -2036,7 +2036,9 @@ window.svcOpsView=function(id){
       +(paid>0?('<div style="display:flex;justify-content:space-between;color:#35c46a;font-weight:700;font-size:13px;margin-top:3px;"><span>'+L2('Pagado','Paid')+(o.payMethod?(' · '+esc(o.payMethod)):'')+'</span><span>'+m(paid)+'</span></div>'):'')
       +(bal>0.004?('<div style="display:flex;justify-content:space-between;color:#ff6b6b;font-weight:700;font-size:13px;margin-top:3px;"><span>'+L2('Saldo','Balance')+'</span><span>'+m(bal)+'</span></div>'):'')
     +'</div>'
-    +'<div class="faint" style="font-size:11px;margin-top:12px;text-align:center;line-height:1.5;">'+L2('Vista de solo lectura. Para editar o cobrar, usa Clientes.','Read-only. To edit or charge, use the Clients app.')+'</div>';
+    +((role==='owner' && !_asEmp)
+        ? '<button onclick="location.href=\'admin.html?svc='+o.id+'\'" style="width:100%;margin-top:14px;background:linear-gradient(135deg,var(--gold2,#d9b85a),var(--gold,#c9a84c));color:#0b0e14;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;">📋 '+L2('Abrir orden (editar / cobrar)','Open order (edit / charge)')+'</button>'
+        : '<div class="faint" style="font-size:11px;margin-top:12px;text-align:center;line-height:1.5;">'+L2('Vista de solo lectura. Para editar o cobrar, usa Clientes.','Read-only. To edit or charge, use the Clients app.')+'</div>');
   ov.appendChild(box); document.body.appendChild(ov);
 };
 // 👥 Órdenes de UN cliente de servicio (read-only) desde el Centro.
