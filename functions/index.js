@@ -447,7 +447,12 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
     "- orderNo: the order / invoice / receipt number printed on the document (e.g. 'Order #', 'Invoice #', 'Receipt #', 'Transaction #'). Letters and digits only as printed. Empty string if none.\n" +
     "- category: choose the SINGLE best match for the WHOLE receipt from the list above, copied EXACTLY. If none fits, use \"Otro\".\n" +
     "- method: one of \"cash\",\"terminal\",\"ach\",\"zelle\". Guess from the receipt (card/VISA/MASTERCARD/DEBIT => \"terminal\"; otherwise \"cash\"). Default \"cash\".\n" +
-    "- isRefund: true if this whole document is a RETURN, REFUND or CREDIT — money given BACK to the customer, NOT a purchase. Signs: words like 'Refund', 'Return', 'Returned', 'Return Receipt', 'Credit', 'Merchandise Credit', 'Devolución', 'Reembolso', 'Nota de crédito', 'Abono', a NEGATIVE grand total, or amounts shown as credited/returned to a card. A normal purchase that merely has a coupon or discount is NOT a refund. Otherwise false. When true, 'amount' must be the POSITIVE dollar magnitude of the money returned.\n" +
+    "- isRefund: true ONLY if the document is PURELY a return/refund (just returns, NO newly purchased items). Signs: words like 'Refund', 'Return', 'Returned', 'Return Receipt', 'Credit', 'Merchandise Credit', 'Devolución', 'Reembolso', 'Nota de crédito', 'Abono', a NEGATIVE grand total, or amounts shown as credited/returned to a card. A normal purchase that merely has a coupon or discount is NOT a refund. Otherwise false. When true, 'amount' must be the POSITIVE dollar magnitude of the money returned.\n" +
+    "- Some receipts are MIXED / an EXCHANGE: they have BOTH newly purchased items AND returned/refunded items on the SAME receipt, and the printed grand total is only the NET difference. Handle these by direction PER LINE:\n" +
+    "- In each 'items' element add \"kind\": \"buy\" for a normally purchased product, or \"return\" for a line that is a RETURN/REFUND of a previously bought item (money back). A return line's \"amount\" must be NEGATIVE. A plain coupon/discount on a purchased item stays kind \"buy\" (negative amount), NOT a \"return\".\n" +
+    "- purchaseTotal: sum of the BUY items in dollars (after their discounts), the money actually spent on new items. 0 if none.\n" +
+    "- refundTotal: the POSITIVE dollar magnitude of ALL return items together, the money given back. 0 if none.\n" +
+    "- origInvoice: if a return/refund line references the ORIGINAL purchase's invoice/order/receipt number (e.g. 'Original Invoice #', 'Return of Invoice', 'Orig Receipt #', 'RA#'), put that number here as printed. Empty string if none.\n" +
     "If a value is unknown use an empty string, except numbers (use 0) and items (use []). Return JSON only.";
   try {
     const AnthropicMod = require("@anthropic-ai/sdk");
@@ -471,6 +476,7 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
       amount: Math.round((Number(it && it.amount) || 0) * 100) / 100,
       qty: Number(it && it.qty) || 1,
       category: String((it && it.category) || "").slice(0, 60),
+      kind: (it && it.kind === "return") ? "return" : "buy",
     })).filter((it) => it.description || it.amount);
     // 🔎 Reconciliación del TOTAL: nunca puede ser menor que el subtotal (o la suma de productos) antes de impuestos.
     // Atrapa el caso donde el modelo agarró un número chico al azar en vez del total.
@@ -497,6 +503,9 @@ exports.scanReceipt = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 45 }, a
       category: String(out.category || "").slice(0, 60),
       method: ["cash", "terminal", "ach", "zelle"].includes(out.method) ? out.method : "cash",
       isRefund: out.isRefund === true,
+      purchaseTotal: Math.round((Number(out.purchaseTotal) || 0) * 100) / 100,
+      refundTotal: Math.round((Number(out.refundTotal) || 0) * 100) / 100,
+      origInvoice: String(out.origInvoice || "").slice(0, 50),
     };
   } catch (e) {
     console.error("scanReceipt error", e);

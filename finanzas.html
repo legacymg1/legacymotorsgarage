@@ -1215,8 +1215,12 @@ window.scanReceiptNow=async function(file){
     const dept=document.getElementById('e-dept').value;
     const r=await httpsCallable(functions,'scanReceipt')({ imageBase64:dataUrl, mediaType:'image/jpeg', categories:(EXP_CATS[dept]||[]) });
     const d=(r&&r.data)||{};
-    // ↩️ ¿El ticket es un REEMBOLSO/DEVOLUCIÓN? No es un gasto: cotéjalo con el gasto original y aplica la devolución.
-    if(d.isRefund){ await handleScannedRefund(d, jpg); if(btn) btn.disabled=false; return; }
+    const _refundC=Math.round((Number(d.refundTotal)||0)*100);
+    const _buyC=Math.round((Number(d.purchaseTotal)||0)*100);
+    // 🔄 Ticket MIXTO (intercambio): trae compra Y devolución; se separan y se confirman por partes.
+    if(_refundC>0 && _buyC>0){ await handleMixedReceipt(d, jpg, _refundC, _buyC); if(btn) btn.disabled=false; return; }
+    // ↩️ Reembolso PURO: no es un gasto — cotéjalo con el gasto original (usa el invoice original si viene) y aplica la devolución.
+    if(d.isRefund || (_refundC>0 && _buyC<=0)){ await handleScannedRefund(d, jpg, { cents:(_refundC||Math.round((Number(d.amount)||0)*100)), orderNo:(d.origInvoice||d.orderNo) }); if(btn) btn.disabled=false; return; }
     // Campos compartidos del recibo
     if(d.date){ document.getElementById('e-date').value=d.date; const d2=document.getElementById('e-date2'); if(d2) d2.value=d.date; }
     if(d.vendor) document.getElementById('e-vendor').value=d.vendor;
@@ -1620,29 +1624,31 @@ function _findRefundTarget(o){
 
 // ↩️📸 Maneja un ticket que el lector detectó como REEMBOLSO: coteja con el gasto original, propone descontar
 //    SOLO lo devuelto (parcial si aplica), sube la foto del ticket como comprobante y usa la devolución que ya existe.
-async function handleScannedRefund(d, jpg){
+async function handleScannedRefund(d, jpg, opts){
+  opts=opts||{};
   const st=document.getElementById('scan-status');
-  let cents=Math.round((Number(d.amount)||0)*100);
+  let cents = (opts.cents!=null) ? Math.round(opts.cents) : Math.round((Number(d.amount)||0)*100);
   if(!(cents>0)){
     const v=prompt('📸 Detecté un REEMBOLSO pero no pude leer el monto.\n\n¿Cuánto te devolvieron? ($)','');
-    if(v===null){ if(st) st.textContent=''; return; }
+    if(v===null){ if(st) st.textContent=''; return false; }
     cents=Math.round(Number(v)*100);
-    if(!(cents>0)){ if(st) st.innerHTML='<span style="color:#ff9800;">Monto inválido.</span>'; return; }
+    if(!(cents>0)){ if(st) st.innerHTML='<span style="color:#ff9800;">Monto inválido.</span>'; return false; }
   }
-  const e=_findRefundTarget({vendor:d.vendor, orderNo:d.orderNo, cents});
+  const e=_findRefundTarget({vendor:d.vendor, orderNo:(opts.orderNo||d.origInvoice||d.orderNo), cents});
   const refTxt=centsToUSD(cents)+(d.vendor?(' de '+d.vendor):'');
   if(!e){
     if(st) st.innerHTML='<span style="color:#ff9800;font-weight:700;">📸 Reembolso '+refTxt+' detectado, pero no encontré el gasto original. Lo abro en ↩️ Devoluciones para que lo elijas.</span>';
     setTimeout(()=>{ if(typeof openDevol==='function'){ openDevol(); const s=document.getElementById('devol-search'); if(s){ s.value=(d.vendor||''); renderDevolList(); } } }, 500);
-    return;
+    return false;
   }
   const rev=_reversedMap(); const already=(rev[e.entryId||e.id]||0); const remaining=(Number(e.amountCents)||0)-already;
   let applyCents=cents, capMsg='';
   if(cents>remaining){ applyCents=remaining; capMsg='\n\n(El gasto solo tiene saldo de '+centsToUSD(remaining)+', se aplicará eso.)'; }
   const origDesc=(e.note||e.category||'gasto')+(e.vendor?(' · '+e.vendor):'')+(e.carLabel?(' · '+e.carLabel):'');
   const cajaTxt=(e.dept==='parts')?'🔧 Partes':'🚗 Dealer';
-  if(!confirm('📸 Ticket de REEMBOLSO '+refTxt+' detectado.\n\nLo cotejé con el gasto:\n• '+origDesc+' ('+centsToUSD(e.amountCents)+(remaining<(Number(e.amountCents)||0)?(' · saldo '+centsToUSD(remaining)):'')+')\n\n¿Registrar la devolución de '+centsToUSD(applyCents)+'? Se queda como fondo de '+cajaTxt+'.'+capMsg)){ if(st) st.textContent=''; return; }
-  if(_devolBusy) return; _devolBusy=true;
+  const invTxt=(opts.orderNo||d.origInvoice)?('\n(Invoice original: '+(opts.orderNo||d.origInvoice)+')'):'';
+  if(!confirm((opts.keepOpen?'↩️ Parte de DEVOLUCIÓN del intercambio\n\n':'📸 Ticket de REEMBOLSO '+refTxt+' detectado.\n\n')+'Lo cotejé con el gasto:\n• '+origDesc+' ('+centsToUSD(e.amountCents)+(remaining<(Number(e.amountCents)||0)?(' · saldo '+centsToUSD(remaining)):'')+')'+invTxt+'\n\n¿Registrar la devolución de '+centsToUSD(applyCents)+'? Se queda como fondo de '+cajaTxt+'.'+capMsg)){ if(st) st.textContent=''; return false; }
+  if(_devolBusy) return false; _devolBusy=true;
   try{
     let receiptURL='';
     try{ if(jpg){ if(st) st.textContent='Subiendo ticket…'; const rr=ref(storage,'receipts/dev_'+Date.now()+'/'+(jpg.name||'devolucion.jpg')); await uploadBytes(rr,jpg); receiptURL=await getDownloadURL(rr); } }catch(_){}
@@ -1650,9 +1656,35 @@ async function handleScannedRefund(d, jpg){
     const _lcD=lastClosing(); const _since=_lcD?(_lcD.closedAt||''):''; const prior=_since?((e.createdAt||e.date||'')<=_since):false;
     await _writeDevolucion(e, applyCents, isPartial, prior, {receiptURL:receiptURL, scannedRefund:true});
     if(st) st.innerHTML='<span style="color:#32d74b;">✅ Devolución de '+centsToUSD(applyCents)+' registrada'+(receiptURL?' con su ticket 📎':'')+'. Se quedó como fondo de '+cajaTxt+'.</span>';
-    setTimeout(()=>{ if(typeof closeExp==='function') closeExp(); }, 1400);
-  }catch(err){ if(st) st.innerHTML='<span style="color:#ff9800;">Error: '+err.message+'</span>'; }
+    if(!opts.keepOpen) setTimeout(()=>{ if(typeof closeExp==='function') closeExp(); }, 1400);
+    return true;
+  }catch(err){ if(st) st.innerHTML='<span style="color:#ff9800;">Error: '+err.message+'</span>'; return false; }
   finally{ _devolBusy=false; }
+}
+
+// 🔄📸 Ticket MIXTO / intercambio: separa la DEVOLUCIÓN y la COMPRA y las registra por partes (cada una se confirma).
+//    1) aplica la devolución cotejada (con el invoice original si viene); 2) deja la COMPRA lista en el formulario para que la revises y guardes.
+async function handleMixedReceipt(d, jpg, refundC, buyC){
+  const st=document.getElementById('scan-status');
+  const netC=Math.abs(Math.round((Number(d.amount)||0)*100)) || Math.abs(buyC-refundC);
+  if(!confirm('📸 Este ticket es un INTERCAMBIO (compra + devolución):\n\n↩️ Devolución: '+centsToUSD(refundC)+'\n🛒 Compra: '+centsToUSD(buyC)+'\n= Neto: '+centsToUSD(netC)+(d.vendor?('\n\nTienda: '+d.vendor):'')+'\n\nVamos a registrar cada parte por separado. Primero la DEVOLUCIÓN.')){ if(st) st.textContent=''; return; }
+  // 1) DEVOLUCIÓN (cotejada por invoice original/vendedor, con foto; NO cierra el modal)
+  const okDev = await handleScannedRefund(d, jpg, { cents:refundC, orderNo:(d.origInvoice||d.orderNo), keepOpen:true });
+  // 2) COMPRA → llena el formulario de gasto con la parte comprada (solo renglones kind 'buy') para que la revises y guardes.
+  const buyItems=(Array.isArray(d.items)?d.items:[]).filter(it=> (it.kind!=='return') && (Number(it.amount)||0) > 0)
+    .map(it=>({ description:String(it.description||''), amount:Number(it.amount)||0, category:_validCat(it.category, (document.getElementById('e-dept')||{}).value||'dealer'), carId:'', carLabel:'' }));
+  if(d.date){ const e1=document.getElementById('e-date'); if(e1) e1.value=d.date; const e2=document.getElementById('e-date2'); if(e2) e2.value=d.date; }
+  if(d.vendor){ const ev=document.getElementById('e-vendor'); if(ev) ev.value=d.vendor; }
+  if(d.orderNo){ const eo=document.getElementById('e-orderno'); if(eo) eo.value=d.orderNo; }
+  if(d.method){ const em=document.getElementById('e-method'); if(em) em.value=d.method; }
+  if(buyItems.length>1){
+    EXP_ITEMS=buyItems; const _tx=document.getElementById('exp-tax'); if(_tx) _tx.value=''; showExpItems(true); renderExpItems();
+  } else {
+    showExpItems(false);
+    const ea=document.getElementById('e-amount'); if(ea) ea.value=(buyC/100).toFixed(2);
+    const en=document.getElementById('e-note'); if(en && (buyItems[0]||d.note)) en.value=(buyItems[0]?buyItems[0].description:d.note)||'';
+  }
+  if(st) st.innerHTML='<span style="color:#32d74b;">'+(okDev?'✅ Devolución lista. ':'⚠️ Devolución no aplicada (revísala). ')+'Ahora revisa la 🛒 COMPRA de '+centsToUSD(buyC)+' (abajo) y dale Guardar.</span>';
 }
 
 // Todos los movimientos (gastos + ingresos), ordenados FIEL a como se fueron ingresando (más reciente arriba), sin distinción.
