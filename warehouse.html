@@ -2872,7 +2872,7 @@ function dviItemRow(it){
     // 4) Foto (siempre disponible)
     extra+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center;">'
       +(d.photo?'<img src="'+esc(d.photo)+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;">':'')
-      +'<label class="btn ghost sm" style="cursor:pointer;margin:0;">'+(d.photo? (L==='en'?'Change':'Cambiar') : dviT('photo'))+'<input type="file" accept="image/*" capture="environment" style="display:none;" onchange="dviPhoto(\''+it.id+'\',this)"></label>'
+      +'<label class="btn ghost sm" style="cursor:pointer;margin:0;">'+(d.photo? (L==='en'?'Change':'Cambiar') : dviT('photo'))+'<input type="file" accept="image/*" style="display:none;" onchange="dviPhoto(\''+it.id+'\',this)"></label>'
       +'<span class="faint" id="dvi-ph-'+it.id+'" style="font-size:11px;"></span></div>';
   }
   // Entrada: Bien o Atención. El ROJO (Reparar) es un RESULTADO: aparece solo si en Atención elige "Necesita pieza".
