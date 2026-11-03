@@ -2021,9 +2021,9 @@ window.svcOpsView=function(id){
   const tot=(Number(o.grandTotalCents)||0)/100, paid=(Number(o.paidCents)||0)/100, bal=(Number(o.balanceCents)||0)/100;
   const phone=String(o.clientPhone||'').replace(/[^\d+]/g,'');
   const telRow=phone?('<div style="display:flex;gap:8px;margin:10px 0;"><a href="tel:'+phone+'" style="flex:1;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px;font-weight:800;font-size:13px;text-decoration:none;color:var(--text);">📞 '+L2('Llamar','Call')+'</a><a href="sms:'+phone+'" style="flex:1;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px;font-weight:800;font-size:13px;text-decoration:none;color:var(--text);">💬 SMS</a></div>'):'';
-  const ov=document.createElement('div'); ov.id='svcops-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2147483200;display:flex;align-items:flex-end;justify-content:center;padding:0;cursor:pointer;';
+  const ov=document.createElement('div'); ov.id='svcops-ov'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2147483200;display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  const box=document.createElement('div'); box.style.cssText='background:var(--surface,#12151c);color:var(--text,#fff);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px 28px;cursor:default;';
+  const box=document.createElement('div'); box.style.cssText='background:var(--surface,#12151c);color:var(--text,#fff);width:100%;max-width:560px;border-radius:18px;padding:16px 16px 22px;cursor:default;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);';
   box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;">'
     +'<div style="font-weight:800;font-size:16px;">'+(o.orderNum?('<span style="color:var(--gold);">#'+o.orderNum+'</span> '):'')+esc(o.clientName||(en?'Customer':'Cliente'))+'</div>'
     +'<button onclick="var x=document.getElementById(\'svcops-ov\');if(x)x.remove();" style="background:var(--surface2);border:none;border-radius:9px;padding:7px 11px;font-weight:800;cursor:pointer;color:var(--text);">✕</button></div>'
@@ -2036,9 +2036,7 @@ window.svcOpsView=function(id){
       +(paid>0?('<div style="display:flex;justify-content:space-between;color:#35c46a;font-weight:700;font-size:13px;margin-top:3px;"><span>'+L2('Pagado','Paid')+(o.payMethod?(' · '+esc(o.payMethod)):'')+'</span><span>'+m(paid)+'</span></div>'):'')
       +(bal>0.004?('<div style="display:flex;justify-content:space-between;color:#ff6b6b;font-weight:700;font-size:13px;margin-top:3px;"><span>'+L2('Saldo','Balance')+'</span><span>'+m(bal)+'</span></div>'):'')
     +'</div>'
-    +((role==='owner' && !_asEmp)
-        ? '<button onclick="location.href=\'admin.html?svc='+o.id+'\'" style="width:100%;margin-top:14px;background:linear-gradient(135deg,var(--gold2,#d9b85a),var(--gold,#c9a84c));color:#0b0e14;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;">📋 '+L2('Abrir orden (editar / cobrar)','Open order (edit / charge)')+'</button>'
-        : '<div class="faint" style="font-size:11px;margin-top:12px;text-align:center;line-height:1.5;">'+L2('Vista de solo lectura. Para editar o cobrar, usa Clientes.','Read-only. To edit or charge, use the Clients app.')+'</div>');
+    +'<div class="faint" style="font-size:11px;margin-top:14px;text-align:center;line-height:1.5;">'+L2('Editar y cobrar la orden aquí mismo — próxima fase.','Edit & charge the order right here — coming soon.')+'</div>';
   ov.appendChild(box); document.body.appendChild(ov);
 };
 // 👥 Órdenes de UN cliente de servicio (read-only) desde el Centro.
