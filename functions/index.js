@@ -2642,7 +2642,7 @@ exports.mechCars = onCall({ timeoutSeconds: 30 }, async (request) => {
   let snap;
   try { snap = await db.collection("inventory").where("status", "==", "prep").get(); }
   catch (e) { throw new HttpsError("internal", "No se pudo leer el inventario."); }
-  const cars = [], waiting = [];
+  const cars = [], waiting = [], working = [];
   snap.forEach((d) => {
     const c = d.data() || {};
     if ((c.reconStage || "mecanico") !== "mecanico") return;   // solo la línea del mecánico
@@ -2655,19 +2655,24 @@ exports.mechCars = onCall({ timeoutSeconds: 30 }, async (request) => {
       receivedMiles: String(c.receivedMiles || ""),
     };
     if (insp.reportAt) {
-      // Ya se envió el reporte → sale de la inspección inicial y entra a "esperando partes" (sigue alcanzable por la ficha).
+      if (insp.stage2DoneAt) return;   // ya terminó etapa 2 (debería haber cambiado de etapa)
       let durMin = 0; try { if (insp.startedAt) durMin = Math.max(0, Math.round((Date.parse(insp.reportAt) - Date.parse(insp.startedAt)) / 60000)); } catch (e) { durMin = 0; }
-      waiting.push(Object.assign({}, base, {
+      const recv = insp.partsRecv || {};
+      const partsCount = Array.isArray(insp.parts) ? insp.parts.length : 0;
+      const partsRecvCount = Object.keys(recv).filter((k) => recv[k] === true).length;
+      const row = Object.assign({}, base, {
         reportBy: String(insp.reportBy || insp.by || ""), reportAt: insp.reportAt || "",
-        waitingParts: !!insp.waitingParts, partsCount: Array.isArray(insp.parts) ? insp.parts.length : 0, durMin,
-      }));
+        waitingParts: !!insp.waitingParts, partsCount, partsRecvCount, durMin,
+      });
+      if (insp.stage2At) working.push(row);   // Etapa 2 — en trabajo
+      else waiting.push(row);                  // esperando partes / reporte listo
       return;
     }
     cars.push(Object.assign({}, base, { inspStarted: !!insp.startedAt, inspDone: false }));
   });
-  cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
-  waiting.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
-  return { ok: true, cars, waiting };
+  const byNum = (a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true });
+  cars.sort(byNum); waiting.sort(byNum); working.sort(byNum);
+  return { ok: true, cars, waiting, working };
 });
 
 // 🗂️ Ficha/jacket del carro — datos completos para la ficha tipo iOS (etapa, quién, tiempo, reporte, partes).
@@ -2781,6 +2786,33 @@ exports.mechDvi = onCall({ timeoutSeconds: 30 }, async (request) => {
     if (miles) patch.receivedMiles = miles;
     await ref.set(patch, { merge: true });
     return { ok: true, outcome: insp.outcome, nextStage, parts: parts.length };
+  }
+
+  // 🧩 Etapa 2 — Checklist de RECEPCIÓN de partes (marcar llegó/falta).
+  if (op === "partcheck") {
+    const parts = Array.isArray(existing.parts) ? existing.parts : [];
+    const idx = parseInt(d.partIdx, 10);
+    if (!(idx >= 0 && idx < parts.length)) throw new HttpsError("invalid-argument", "Pieza inválida.");
+    const recv = Object.assign({}, existing.partsRecv || {});
+    recv[String(idx)] = !!d.received;
+    const allIn = parts.length > 0 && parts.every((_, i) => recv[String(i)] === true);
+    await ref.set({ inspection: { partsRecv: recv, partsAllInAt: allIn ? (existing.partsAllInAt || now) : null, updatedAt: now } }, { merge: true });
+    const got = Object.keys(recv).filter((k) => recv[k] === true).length;
+    return { ok: true, allReceived: allIn, received: got, total: parts.length };
+  }
+
+  // 🏁 Etapa 2 — Empezar el TRABAJO (restauración). El carro pasa de "esperando partes" a "en trabajo".
+  if (op === "startstage2") {
+    if (!existing.reportAt) throw new HttpsError("failed-precondition", "Aún no hay reporte de inspección.");
+    await ref.set({ inspection: { waitingParts: false, stage2At: existing.stage2At || now, stage2By: (id.name || id.empId || id.email || ""), updatedAt: now } }, { merge: true });
+    return { ok: true };
+  }
+
+  // ✅ Etapa 2 — Terminar el trabajo → avanza a detallado (o pintura).
+  if (op === "finishstage2") {
+    const next = ["detalle", "pintura"].indexOf(String(d.nextStage || "")) >= 0 ? String(d.nextStage) : "detalle";
+    await ref.set({ inspection: { stage2DoneAt: now, stage2DoneBy: (id.name || id.empId || id.email || ""), updatedAt: now }, reconStage: next }, { merge: true });
+    return { ok: true, nextStage: next };
   }
 
   throw new HttpsError("invalid-argument", "Operación inválida.");
