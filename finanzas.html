@@ -322,6 +322,13 @@
         </label>
       </div>
     </div>
+    <div class="field"><label>Termina después de (opcional)</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="f-end-count" type="number" inputmode="numeric" min="1" placeholder="10" oninput="subEndPreview()" style="flex:1;">
+        <span style="color:var(--muted);font-size:13px;white-space:nowrap;">cobros</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Déjalo vacío si NO termina. Ej: <b>10</b> = se cobra 10 veces (desde la próxima renovación) y se detiene solo. <span id="f-end-when" style="color:var(--text);"></span></div>
+    </div>
     <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:14px;font-size:14px;color:var(--text);line-height:1.4;">
       <input type="checkbox" id="f-trial" style="width:18px;height:18px;margin-top:1px;flex:none;">
       <span>🎁 Es prueba gratis — avísame 1 día antes de que termine<br><span style="font-size:12px;color:var(--muted);">La fecha de arriba es cuando termina la prueba. (Las pruebas NO se registran como gasto.)</span></span>
@@ -1825,11 +1832,15 @@ window.render = function(){
     const d=daysUntil(s.nextDue);
     const chip = d==null?'' : d<0?`<span class="chip due-soon">vencido</span>` : d<=7?`<span class="chip due-week">en ${d}d</span>` : '';
     const trialChip = s.isTrial ? `<span class="chip" style="background:rgba(255,107,107,0.15);color:#ff6b6b;">🎁 prueba</span>` : '';
-    return `<div class="row" onclick="openSub('${s.id}')">
+    const ended = s.endDate && (s.nextDue||'') >= s.endDate;
+    const endChip = s.endDate ? ( ended
+        ? `<span class="chip" style="background:rgba(130,130,130,.2);color:var(--muted);">✓ terminó${s.endCount?(' · '+s.endCount+' cobros'):''}</span>`
+        : `<span class="chip" style="background:rgba(240,200,80,.15);color:#f0c040;">⏳ termina ${fmtDate(s.endDate)}${s.endCount?(' · '+s.endCount+'×'):''}</span>` ) : '';
+    return `<div class="row" onclick="openSub('${s.id}')"${ended?' style="opacity:.6;"':''}>
       <div class="row-ic">${s.isTrial?'🎁':catIcon(s.category)}</div>
       <div class="row-main">
         <div class="row-name">${s.name||'(sin nombre)'}</div>
-        <div class="row-meta"><span class="chip">${s.category||'Otro'}</span><span>${s.isTrial?'Termina':'Renueva'} ${fmtDate(s.nextDue)}</span>${trialChip}${chip}</div>
+        <div class="row-meta"><span class="chip">${s.category||'Otro'}</span><span>${s.isTrial?'Termina':'Renueva'} ${fmtDate(s.nextDue)}</span>${trialChip}${endChip}${chip}</div>
       </div>
       <div class="row-amt"><div class="row-amt-val">${money2(s.amount)}</div><div class="row-amt-int">${intervalLabel(s.interval)}</div></div>
     </div>`;
@@ -1861,7 +1872,7 @@ async function runRecurringCatchup(){
       const amt=Number(s.amount)||0; if(amt<=0) continue;
       let due=(s.nextDue||'').slice(0,10); if(!due) continue;
       let guard=0, advanced=false;
-      while(due && due<=todayISO && guard<120){
+      while(due && due<=todayISO && (!s.endDate || due < s.endDate) && guard<120){   // se detiene al llegar al límite de cobros
         guard++;
         const exId='recur_'+s.id+'_'+due;
         try{
@@ -1905,8 +1916,22 @@ window.openSub = function(id){
   if(document.getElementById('f-autopost')) document.getElementById('f-autopost').checked = s ? (s.autopost!==false) : true;
   document.getElementById('f-note').value = s?.note||'';
   document.getElementById('f-trial').checked = !!(s && s.isTrial);
+  if(document.getElementById('f-end-count')) document.getElementById('f-end-count').value = (s && s.endCount) ? s.endCount : '';
   document.getElementById('del-btn').style.display = s?'block':'none';
   document.getElementById('sheet-overlay').classList.add('open');
+  try{ subEndPreview(); }catch(e){}
+};
+// Vista previa: muestra en qué fecha se detendría (N cobros desde la próxima renovación).
+window.subEndPreview=function(){
+  const el=document.getElementById('f-end-when'); if(!el) return;
+  const n=parseInt((document.getElementById('f-end-count')||{}).value,10);
+  const next=(document.getElementById('f-next')||{}).value||'';
+  const interval=(document.getElementById('f-interval')||{}).value||'monthly';
+  if(!n||n<=0||!next){ el.textContent=''; return; }
+  let ed=next.slice(0,10); for(let i=0;i<n;i++){ const nx=_addInterval(ed, interval); if(!nx) break; ed=nx; }
+  // última fecha de cobro = ed − 1 intervalo
+  let last=next.slice(0,10); for(let i=0;i<n-1;i++){ const nx=_addInterval(last, interval); if(!nx) break; last=nx; }
+  el.textContent = '→ último cobro ~'+fmtDate(last)+' ('+n+' cobros).';
 };
 window.closeSub = function(){ document.getElementById('sheet-overlay').classList.remove('open'); };
 
@@ -1928,10 +1953,18 @@ window.saveSub = async function(){
     isTrial: document.getElementById('f-trial').checked,
     note: document.getElementById('f-note').value.trim(),
     active: true,
+    endCount: 0, endDate: '',
     createdAt: existing.createdAt || Date.now(),
     createdBy: (auth.currentUser&&auth.currentUser.email)||'',
     updatedAt: Date.now()
   };
+  // Límite opcional: N cobros desde la próxima renovación → calcula la fecha de fin (se detiene al llegar).
+  const endCount=parseInt(document.getElementById('f-end-count') ? document.getElementById('f-end-count').value : '',10);
+  if(endCount && endCount>0 && data.nextDue){
+    let ed=data.nextDue.slice(0,10);
+    for(let i=0;i<endCount;i++){ const n=_addInterval(ed, data.interval); if(!n) break; ed=n; }
+    data.endCount=endCount; data.endDate=ed;   // auto-registro se detiene cuando la fecha a cobrar >= endDate
+  }
   try{ await setDoc(doc(db,'subscriptions',id), data); closeSub(); }
   catch(e){ alert('Error: '+e.message); }
   btn.disabled=false; btn.textContent='Guardar';
