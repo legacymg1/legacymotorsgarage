@@ -1250,7 +1250,7 @@ function clientAddons(c){ return Array.isArray(c.addons)?c.addons:[]; }
 // 📄 Info del plan de pagos (adendum) LIGADO a una orden: cuánto está en el plan y cuánto ya se pagó del plan.
 // El saldo de una orden = Total − pagado de verdad (paidCents) − pagado del plan. Nunca usamos el campo balanceCents (se quedaba viejo).
 function _svcPlanInfo(o){ let pt=0, pp=0; try{ const c=clients.find(x=>x.id===(o&&o.clientId)); if(c){ (c.addons||[]).forEach(a=>{ if(a&&a.sourceOrderId===o.id&&Array.isArray(a.installments)){ a.installments.forEach(x=>{ pt+=(Number(x.amtCents)||0); pp+=(Number(x.paidCents)||0); }); } }); } }catch(e){} return {planTotalCents:pt, planPaidCents:pp}; }
-function svcOwedCents(o){ const t=Number(o.grandTotalCents)||0, pc=Number(o.paidCents)||0, pp=_svcPlanInfo(o).planPaidCents; return Math.max(0, t-pc-pp); }
+function svcOwedCents(o){ if(o && o.warranty) return 0;   /* 🛡️ orden en garantía: el cliente no paga nada */ const t=Number(o.grandTotalCents)||0, pc=Number(o.paidCents)||0, pp=_svcPlanInfo(o).planPaidCents; return Math.max(0, t-pc-pp); }
 // Lo pagado de un cargo: si tiene cuotas (adendum), suma los paidCents de las cuotas; si no, los pagos viejos.
 function addonPaid(a){ if(Array.isArray(a.installments)&&a.installments.length) return a.installments.reduce((s,x)=>s+(Number(x.paidCents)||0),0)/100; return (a.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0); }
 function addonBalance(a){ if(!a||a.settled===true) return 0; return Math.max(0, ((Number(a.totalCents)||0)/100) - addonPaid(a)); }
@@ -1825,7 +1825,9 @@ function svcCard(o){
     +((Number(o.grandTotalCents)||0)>0 ? (function(){ var gt=(Number(o.grandTotalCents)||0),pc=(Number(o.paidCents)||0),M=function(x){return formatMoney(x/100);};
         var owed=svcOwedCents(o), pi=_svcPlanInfo(o), pend=Math.max(0,pi.planTotalCents-pi.planPaidCents), unplanned=Math.max(0,owed-pend);
         var note=(pc>0||pend>0)?('<div style="font-size:11px;color:var(--muted);margin-bottom:5px;">'+(pc>0?('💵 Abonó '+M(pc)):'')+(pend>0?((pc>0?' · ':'')+'📄 '+M(pend)+' en plan'):'')+' · de '+M(gt)+'</div>'):'';
-        if(owed<=0) return '<div style="display:flex;gap:7px;align-items:center;"><div style="flex:1;font-size:12px;font-weight:800;color:#28b463;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.35);border-radius:9px;padding:6px 9px;">✅ Pagado · '+M(pc||gt)+(o.payMethod==='cash'?' · efectivo':(o.payMethod&&o.payMethod.indexOf('square')===0?' · tarjeta':''))+(o.private?' · 🔒':'')+'</div><button onclick="event.stopPropagation();svcOpenReceipt(\''+o.id+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🧾 Recibo</button></div>';
+        if(owed<=0) return o.warranty
+            ? '<div style="display:flex;gap:7px;align-items:center;"><div style="flex:1;font-size:12px;font-weight:800;color:#4d9bff;background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.35);border-radius:9px;padding:6px 9px;">🛡️ En garantía · sin costo · '+M(gt)+'</div><button onclick="event.stopPropagation();svcOpenReceipt(\''+o.id+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🧾 Recibo</button></div>'
+            : '<div style="display:flex;gap:7px;align-items:center;"><div style="flex:1;font-size:12px;font-weight:800;color:#28b463;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.35);border-radius:9px;padding:6px 9px;">✅ Pagado · '+M(pc||gt)+(o.payMethod==='cash'?' · efectivo':(o.payMethod&&o.payMethod.indexOf('square')===0?' · tarjeta':''))+(o.private?' · 🔒':'')+'</div><button onclick="event.stopPropagation();svcOpenReceipt(\''+o.id+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🧾 Recibo</button></div>';
         if(unplanned>0) return note+'<button onclick="event.stopPropagation();svcChargeOpen(\''+o.id+'\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:10px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">💵 '+((pc>0||pend>0)?'Cobrar saldo ':'Cobrar ')+M(owed)+'</button>';
         return note+'<div style="display:flex;gap:7px;align-items:center;"><div style="flex:1;font-size:12px;font-weight:800;color:#4d9bff;background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.35);border-radius:9px;padding:6px 9px;">📄 Plan de pagos · saldo '+M(owed)+'</div><button onclick="event.stopPropagation();svcChargeOpen(\''+o.id+'\')" style="background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Ver</button></div>';
       })() : '')
@@ -1884,6 +1886,9 @@ window.svcChargeOpen=function(id){
         +'<button onclick="svcChargeDo(\''+id+'\',\'terminal\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:10px;">💳 Tarjeta en persona (registrar monto a mano)</button>'
         +'<button onclick="svcChargeDo(\''+id+'\',\'square\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💳 Enviar link de pago (Square)</button>'
         +'<div id="svc-caja-msg" style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5;"></div>'
+        /* 🛡️ GARANTÍA: cierra la orden SIN costo al cliente (recibo con el trabajo, saldo $0, NO entra a Finanzas) */
+        +'<div style="text-align:center;color:var(--faint);font-size:12px;margin:14px 0 10px;border-top:1px solid var(--border);padding-top:12px;">— o cierra sin cobrar —</div>'
+        +'<button onclick="svcMarkWarranty(\''+id+'\')" style="width:100%;background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.45);color:#4d9bff;border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;">🛡️ En garantía (sin costo al cliente)</button>'
         /* ───── o: PLAN DE PAGOS (ADENDUM) del saldo ───── */
         +'<div style="text-align:center;color:var(--faint);font-size:12px;margin:16px 0 12px;border-top:1px solid var(--border);padding-top:14px;">— o arma el plan de pagos del saldo —</div>'
         +'<div style="background:rgba(240,192,64,.07);border:1px solid rgba(240,192,64,.35);border-radius:12px;padding:12px;">'
@@ -2103,6 +2108,26 @@ window.svcChargeDo=async function(id, method){
         +'</div><div style="margin-top:8px;font-size:11px;">Cuando el cliente pague, la orden se marca pagada sola.</div>';
     }
   }catch(e){ if(msg) msg.textContent='Error: '+((e&&e.message)||e); else alert('Error: '+((e&&e.message)||e)); }
+};
+
+// 🛡️ GARANTÍA: cierra la orden SIN costo al cliente. Conserva el trabajo y los montos en el recibo (para el
+//    expediente), pone el saldo en $0 y NO registra ningún ingreso en Finanzas (no se cobró nada).
+window.svcMarkWarranty=async function(id){
+  const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
+  if(o.warranty){ alert('Esta orden ya está marcada en garantía.'); return; }
+  if((Number(o.paidCents)||0)>0 && !confirm('⚠️ Esta orden ya tiene '+formatMoney((Number(o.paidCents)||0)/100)+' abonado en Finanzas.\n\nMarcar en garantía pone el saldo en $0 pero NO borra ni devuelve ese abono (si quieres devolverlo, hazlo aparte).\n\n¿Continuar?')) return;
+  const total=(Number(o.grandTotalCents)||0)/100;
+  if(!confirm('🛡️ Marcar la orden'+(o.orderNum?(' #'+o.orderNum):'')+' EN GARANTÍA (sin costo al cliente).\n\n• El recibo conserva el trabajo y los montos ('+formatMoney(total)+') para el expediente.\n• Saldo del cliente = $0.\n• NO entra dinero a Finanzas (no se cobró nada).\n\n¿Confirmar?')) return;
+  const reason=prompt('Motivo de la garantía (opcional, sale en el registro):', o.warrantyReason||'Garantía')||'';
+  try{
+    const patch={ warranty:true, warrantyReason:reason, warrantyAt:new Date().toISOString(), warrantyBy:(auth.currentUser&&auth.currentUser.email)||'', status:'entregado', paid:true, promisedAt:'', promisedAmtCents:0, promises:[] };
+    await updateDoc(doc(db,'serviceOrders',id), patch);
+    Object.assign(o, patch);
+    const ov=document.getElementById('svc-caja'); if(ov) ov.remove();
+    try{ renderAll&&renderAll(); }catch(e){} try{ svcRenderOrders&&svcRenderOrders(); }catch(e){}
+    try{ if(window.svcToast) svcToast('🛡️ Orden'+(o.orderNum?(' #'+o.orderNum):'')+' en garantía · saldo $0'); }catch(e){}
+    if(confirm('✅ Orden marcada EN GARANTÍA (saldo $0, no entró a Finanzas).\n\n¿Ver el recibo?')){ try{ svcOpenReceipt(id); }catch(e){} }
+  }catch(e){ alert('No se pudo marcar en garantía: '+((e&&e.message)||e)); }
 };
 
 // 🏷️ Mandar parte del saldo AL CONTRATO del dealer: crea un cargo (addon) de 1 pago SIN interés en la cuenta
@@ -2978,7 +3003,9 @@ function svcEstimateSheetHTML(d, services, opts){
     +'.estsheet .disc{font-size:10.5px;color:#888;border-top:1px solid #ddd;margin-top:16px;padding-top:10px;line-height:1.5;}'
     +'.estsheet .foot{text-align:center;font-size:12px;color:#555;margin-top:12px;line-height:1.6;}'
     +'@media print{body{padding:0;}}';
-  const stamp=(receipt && o.paid)?('<div style="text-align:center;margin:10px 0 2px;"><span style="display:inline-block;border:2.5px solid #0a7a35;color:#0a7a35;font-weight:900;letter-spacing:2px;font-size:15px;padding:5px 16px;border-radius:8px;transform:rotate(-4deg);">✓ '+(en?'PAID':'PAGADO')+(payMethodTxt?(' · '+payMethodTxt):'')+'</span></div>'):'';
+  const stamp=(receipt && o.warranty)
+    ?('<div style="text-align:center;margin:10px 0 2px;"><span style="display:inline-block;border:2.5px solid #1f6feb;color:#1f6feb;font-weight:900;letter-spacing:2px;font-size:15px;padding:5px 16px;border-radius:8px;transform:rotate(-4deg);">🛡️ '+(en?'WARRANTY · NO CHARGE':'EN GARANTÍA · SIN COSTO')+'</span></div>')
+    :((receipt && o.paid)?('<div style="text-align:center;margin:10px 0 2px;"><span style="display:inline-block;border:2.5px solid #0a7a35;color:#0a7a35;font-weight:900;letter-spacing:2px;font-size:15px;padding:5px 16px;border-radius:8px;transform:rotate(-4deg);">✓ '+(en?'PAID':'PAGADO')+(payMethodTxt?(' · '+payMethodTxt):'')+'</span></div>'):'');
   const body='<div class="estsheet"><div class="h"><h1>LEGACY MOTORS GARAGE</h1><div class="s">'+L.sub+(folio?(' · '+folio):'')+'</div></div>'
     +stamp
     +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(titleCase(d.clientName)||'—')+(d.clientPhone?(' · '+svcEsc(_fmtPhone(d.clientPhone))):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+(receipt&&paidDate?paidDate:dstr)+(folio?('<br><b>'+L.ord+':</b> '+folio):'')+'</div>'
@@ -2988,7 +3015,9 @@ function svcEstimateSheetHTML(d, services, opts){
         ? ('<div class="line"><span style="color:#777;">'+L.subt+'</span><b>'+money(grand)+'</b></div><div class="line"><span style="color:#777;">'+surchLabel+(o.sqLast4?(' ····'+o.sqLast4):'')+'</span><b>+'+money(surcharge)+'</b></div><div class="line grand"><span>'+L.total+'</span><span>'+money(finalTotal)+'</span></div>')
         : ('<div class="line grand"><span>'+L.total+'</span><span>'+money(grand)+'</span></div>'))
     +(receipt
-        ? ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+(payMethodTxt?(' · '+payMethodTxt):'')+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):''))
+        ? (o.warranty
+            ? ('<div class="line" style="font-weight:800;color:#1f6feb;"><span>'+(en?'Covered by warranty':'Cubierto por garantía')+'</span><span>−'+money(finalTotal)+'</span></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.due+'</span><span>'+money(0)+'</span></div>')
+            : ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+(payMethodTxt?(' · '+payMethodTxt):'')+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):'')))
         : (dep>0?('<div class="line"><span style="color:#777;">'+L.dep+'</span><b>−'+money(dep)+'</b></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.bal+'</span><span>'+money(bal)+'</span></div>'):''))+'</div>'
     +'<div class="disc">'+L.disc+'</div>'
     +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California BAR Reg. No. ARD 317673 · Automotive Repair Dealer</div></div>';
