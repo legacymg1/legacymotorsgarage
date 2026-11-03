@@ -2431,8 +2431,15 @@ window.mechStartInspection=async function(){
   // Si Enrique está viendo "como empleado" sin "actuar como", es solo lectura: avisa CLARO (antes solo salía un toast chico y parecía que no pasaba nada).
   if(_asEmp && !_actAs){ whToast(L==='en'?'Read-only preview. Tap "Act as" on the employee to run the inspection.':'Vista previa (solo lectura). Toca "Actuar como" en el empleado para poder arrancar la inspección.',true); return; }
   if(!MECH_CUR){ whToast(L==='en'?'Open the car first.':'Abre el carro primero.',true); return; }
-  const miles=(document.getElementById('mech-miles').value||'').trim();
-  if(!miles){ whToast(L==='en'?'Enter the miles.':'Pon las millas.',true); return; }
+  const milesEl=document.getElementById('mech-miles');
+  const miles=((milesEl&&milesEl.value)||'').trim();
+  if(!miles){ whToast(L==='en'?'Enter the miles first.':'Primero pon las millas.',true);
+    // 🔴 No se nota el toast chico en el iPhone: enfoca y parpadea el campo en rojo.
+    if(milesEl){ try{ milesEl.focus(); }catch(e){} const _b=milesEl.style.border, _s=milesEl.style.boxShadow;
+      milesEl.style.border='2px solid #ff4d4f'; milesEl.style.boxShadow='0 0 0 4px rgba(255,77,79,.25)';
+      try{ milesEl.scrollIntoView({block:'center',behavior:'smooth'}); }catch(e){}
+      setTimeout(function(){ milesEl.style.border=_b; milesEl.style.boxShadow=_s; },1600); }
+    return; }
   // 🔧 Abre el DVI SIEMPRE y de inmediato — no depende del backend. Las millas se registran en segundo plano;
   // si ese registro falla, el mecánico igual puede inspeccionar (el DVI guarda su propio borrador) y vemos el error.
   const car=Object.assign({}, MECH_CUR, {receivedMiles:miles});
