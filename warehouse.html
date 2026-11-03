@@ -2370,7 +2370,7 @@ window.loadCarsProc=async function(){
 const SVC_ST={ agendado:{k:'svcAgendado',c:'#0a84ff'}, por_recibir:{k:'svcPorRecibir',c:'#c9a84c'}, recibido:{k:'svcRecibido',c:'#c9a84c'}, en_proceso:{k:'svcEnProceso',c:'#32d74b'}, pausado_partes:{k:'svcPausado',c:'#ff9800'}, listo:{k:'svcListo',c:'#32d74b'}, entregado:{k:'svcEntregado',c:'#8a8fa8'} };
 function svcStLabel(st){ const s=SVC_ST[st]; return s?t(s.k):st; }
 const MECH_TASK_ST={ cola:{k:'stCola',c:'#c9a84c'}, en_proceso:{k:'stProc',c:'#32d74b'}, hecho:{k:'stDone',c:'#8a8fa8'} };
-let SVC_MY=[], MECH_CARS=[], MECH_CUR=null, MECH_TASKS=[], MECH_PREP=[], MECH_ADDCAR=null;
+let SVC_MY=[], MECH_CARS=[], MECH_WAITING=[], MECH_CUR=null, MECH_TASKS=[], MECH_PREP=[], MECH_ADDCAR=null;
 window.openService=function(){
   document.getElementById('view-service').classList.remove('hide');
   const isMech=(_myRoles&&_myRoles.indexOf('Mecánico')>=0)||(role==='owner'&&!_asEmp);
@@ -2394,22 +2394,33 @@ window.loadMyService=async function(){
 };
 async function loadMechCars(){
   const box=document.getElementById('mech-cars-list'); if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jLoadingTxt')+'</div>';
-  try{ const r=await httpsCallable(functions,'mechCars')(vaData({})); MECH_CARS=((r&&r.data)||{}).cars||[]; }
-  catch(e){ MECH_CARS=[]; if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jCouldnt')+'</div>'; return; }
+  try{ const r=await httpsCallable(functions,'mechCars')(vaData({})); const dd=(r&&r.data)||{}; MECH_CARS=dd.cars||[]; MECH_WAITING=dd.waiting||[]; }
+  catch(e){ MECH_CARS=[]; MECH_WAITING=[]; if(box) box.innerHTML='<div class="faint" style="text-align:center;padding:16px;">'+t('jCouldnt')+'</div>'; return; }
   renderMechCars();
 }
 function renderMechCars(){
   const box=document.getElementById('mech-cars-list'); if(!box) return;
-  if(!MECH_CARS.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:16px;line-height:1.5;">'+t('noCars')+'</div>'; return; }
-  box.innerHTML=MECH_CARS.map(c=>{
+  if(!MECH_CARS.length && !MECH_WAITING.length){ box.innerHTML='<div class="faint" style="text-align:center;padding:16px;line-height:1.5;">'+t('noCars')+'</div>'; return; }
+  const photoFor=c=>c.photo?('<img src="'+c.photo+'" alt="" style="width:54px;height:54px;border-radius:10px;object-fit:cover;flex:0 0 auto;">'):'<div style="width:54px;height:54px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px;flex:0 0 auto;">🚗</div>';
+  // Tocar la tarjeta abre la FICHA del carro (componente compartido); el botón hace su acción.
+  const inspCard=c=>{
     const when=c.createdAt?(t('received')+' '+new Date(c.createdAt).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'2-digit',month:'short'})):'';
-    const photo=c.photo?('<img src="'+c.photo+'" alt="" style="width:54px;height:54px;border-radius:10px;object-fit:cover;flex:0 0 auto;">'):'<div style="width:54px;height:54px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:24px;flex:0 0 auto;">🚗</div>';
-    return '<div class="card" style="padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:center;">'+photo
+    return '<div class="card" style="padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:center;cursor:pointer;" onclick="carFichaOpen(\''+c.id+'\')">'+photoFor(c)
       +'<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:15px;">'+esc(c.label)+'</div>'
       +'<div class="faint" style="font-size:12px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+when+'</div>'
       +(c.inspStarted?'<div style="font-size:11px;color:var(--gold);margin-top:2px;">'+t('inspStarted')+'</div>':'')+'</div>'
-      +'<button class="btn-gold" style="width:auto;padding:9px 13px;font-size:13px;flex:0 0 auto;" onclick="mechOpenIntake(\''+c.id+'\')">'+(c.inspStarted?t('continueBtn'):t('inspectBtn'))+'</button></div>';
-  }).join('');
+      +'<button class="btn-gold" style="width:auto;padding:9px 13px;font-size:13px;flex:0 0 auto;" onclick="event.stopPropagation();mechOpenIntake(\''+c.id+'\')">'+(c.inspStarted?t('continueBtn'):t('inspectBtn'))+'</button></div>';
+  };
+  const waitCard=c=>'<div class="card" style="padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:center;cursor:pointer;border-left:4px solid #ff8a4c;" onclick="carFichaOpen(\''+c.id+'\')">'+photoFor(c)
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:15px;">'+esc(c.label)+'</div>'
+      +'<div class="faint" style="font-size:12px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+(c.partsCount?(c.partsCount+' '+L2('partes por llegar','parts to arrive')):L2('esperando partes','waiting on parts'))+'</div>'
+      +(c.reportBy?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+L2('Inspeccionó','Inspected by')+': '+esc(c.reportBy)+'</div>':'')+'</div>'
+      +'<button class="btn ghost" style="width:auto;padding:9px 13px;font-size:13px;flex:0 0 auto;" onclick="event.stopPropagation();carFichaOpen(\''+c.id+'\')">'+L2('Ficha','Jacket')+'</button></div>';
+  let html = MECH_CARS.map(inspCard).join('');
+  if(MECH_WAITING.length){
+    html += '<div class="sub" style="font-weight:800;font-size:13px;margin:16px 0 8px;color:#ff8a4c;">'+t('waitParts')+' ('+MECH_WAITING.length+')</div>' + MECH_WAITING.map(waitCard).join('');
+  }
+  box.innerHTML=html;
   // Si venimos del Centro con un carro Dealer específico, abre su recepción/DVI directamente.
   if(_pendingMechCar){ const pc=_pendingMechCar; _pendingMechCar=''; if(MECH_CARS.find(x=>x.id===pc)) setTimeout(function(){ try{ mechOpenIntake(pc); }catch(e){} },70); }
 }
@@ -2945,6 +2956,77 @@ window.dviSubmit=async function(nextStage){
   try{ const r=await httpsCallable(functions,'mechDvi')(vaData({ op:'finish', carId:DVI.carId, report:c.report, parts:c.parts, nextStage:nextStage, miles:DVI.miles }));
     whToast(dviT('sent')); document.getElementById('view-dvi').classList.add('hide'); try{ loadMechCars(); }catch(e){}
   }catch(e){ whToast((e&&e.message)||t('jCouldnt'),true); }
+};
+
+// ===================== 🗂️ FICHA DEL CARRO (componente compartido, estilo iOS) =====================
+// Se abre desde cualquier lugar donde esté el carro (hoy Pit Crew; se conectará a Inventario/otros). Muestra
+// etapa, quién lo trabajó, cuánto tardó, y abre el reporte Pre-reparación + lista de partes del jacket.
+let _carFichaInsp=null, _carFichaCar=null;
+window.carFichaOpen=async function(carId){
+  let ov=document.getElementById('wh-carficha');
+  if(!ov){ ov=document.createElement('div'); ov.id='wh-carficha'; ov.style.cssText='position:fixed;inset:0;z-index:100075;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 12px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;cursor:pointer;overflow:auto;';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };   // 📱 cerrar al tocar afuera (iOS)
+    const bx=document.createElement('div'); bx.id='wh-carficha-box'; bx.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:460px;width:100%;box-sizing:border-box;cursor:default;margin:auto;overflow:hidden;';
+    ov.appendChild(bx); document.body.appendChild(ov);
+  } else ov.style.display='flex';
+  const box=document.getElementById('wh-carficha-box');
+  box.innerHTML='<div class="faint" style="text-align:center;padding:30px;">'+t('jLoadingTxt')+'</div>';
+  try{ const r=await httpsCallable(functions,'carJacket')(vaData({carId:carId})); carFichaRender((r&&r.data)||{}); }
+  catch(e){ box.innerHTML='<div style="padding:18px;"><div class="faint" style="text-align:center;padding:14px;">'+((e&&e.message)||t('jCouldnt'))+'</div><button class="btn ghost sm" style="width:100%;" onclick="document.getElementById(\'wh-carficha\').remove()">✕</button></div>'; }
+};
+function carStageInfo(stage, waiting){
+  if(waiting) return {t:t('waitParts'), c:'#ff8a4c'};
+  const m={ mecanico:[L2('🔧 Mecánico','🔧 Mechanic'),'#f0c040'], pintura:[L2('🎨 Pintura','🎨 Paint'),'#b58bff'], detalle:[L2('🧽 Detallado','🧽 Detailing'),'#4cc2ff'], listo:[L2('✅ Listo para fotos','✅ Ready for photos'),'#35c46a'] };
+  const o=m[stage]||[stage||'—','#8b93a3']; return {t:o[0], c:o[1]};
+}
+function carFichaRender(d){
+  const box=document.getElementById('wh-carficha-box'); if(!box) return;
+  const c=d.car||{}; const insp=d.inspection||{}; _carFichaInsp=insp; _carFichaCar=c;
+  const waiting=!!(insp.reportAt && insp.waitingParts);
+  const stg=carStageInfo(c.reconStage, waiting);
+  const photo=c.photo?('<img src="'+esc(c.photo)+'" style="width:100%;height:170px;object-fit:cover;display:block;">'):'<div style="height:120px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:44px;">🚗</div>';
+  const fmtD=iso=>{ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ return '—'; } };
+  const rows=[];
+  rows.push(['📍 '+L2('Etapa','Stage'), '<span style="color:'+stg.c+';font-weight:800;">'+esc(stg.t)+'</span>']);
+  if(insp.reportAt){
+    rows.push(['👤 '+L2('Inspeccionó','Inspected by'), esc(insp.reportBy||insp.by||'—')]);
+    rows.push(['📅 '+L2('Inspección','Inspection'), fmtD(insp.reportAt)]);
+    if(d.durMin) rows.push(['⏱️ '+L2('Tardó','Took'), _hm(d.durMin)]);
+  } else { rows.push(['🔧 '+L2('Inspección','Inspection'), insp.startedAt?L2('En proceso','In progress'):L2('Pendiente','Pending')]); }
+  const rowHtml=rows.map(r=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);font-size:13.5px;"><span style="color:var(--muted);">'+r[0]+'</span><span style="font-weight:700;text-align:right;">'+r[1]+'</span></div>').join('');
+  const parts=Array.isArray(insp.parts)?insp.parts:[];
+  box.innerHTML=photo
+    +'<div style="padding:16px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="min-width:0;"><div style="font-weight:800;font-size:18px;line-height:1.2;">'+esc(c.label)+'</div>'
+    +'<div class="faint" style="font-size:12px;margin-top:3px;">'+(c.inventoryNum?('#'+esc(c.inventoryNum)+' · '):'')+(c.vin?('VIN '+esc(c.vin)+' · '):'')+(c.miles?(esc(c.miles)+' mi'):'')+'</div></div>'
+    +'<button class="linkbtn" onclick="document.getElementById(\'wh-carficha\').remove()" style="font-size:26px;color:var(--muted);line-height:1;flex:0 0 auto;">×</button></div>'
+    +'<div style="margin-top:8px;">'+rowHtml+'</div>'
+    +(insp.reportAt?('<button class="btn-gold" style="width:100%;margin-top:14px;" onclick="carFichaReport()">📄 '+L2('Ver reporte · Pre-reparación','View report · Pre-repair')+'</button>'):'')
+    +(parts.length?('<div class="sub" style="font-weight:800;font-size:13.5px;margin:16px 0 6px;">'+dviT('partsH')+' ('+parts.length+')</div>'
+        + parts.map(p=>'<div style="font-size:13px;padding:6px 0;border-top:1px solid rgba(255,255,255,.06);">🧩 '+esc(p.label)+(p.area?(' <span class="faint" style="font-size:11px;">· '+esc(p.area)+'</span>'):'')+'</div>').join('')):'')
+    +(waiting?('<div class="faint" style="font-size:12px;text-align:center;margin-top:14px;line-height:1.5;">'+L2('Cuando lleguen las partes, aquí empezará la etapa 2 (restauración). Próxima fase.','When the parts arrive, stage 2 (restoration) will start here. Coming soon.')+'</div>'):'')
+    +'</div>';
+}
+window.carFichaReport=function(){
+  const insp=_carFichaInsp||{}; const box=document.getElementById('wh-carficha-box'); if(!box) return;
+  const report=Array.isArray(insp.report)?insp.report:[];
+  const all=[]; report.forEach(a=>{ (a.items||[]).forEach(it=>all.push(Object.assign({area:a.title},it))); });
+  const red=all.filter(x=>x.state==='malo'), yellow=all.filter(x=>x.state==='aten'), ok=all.filter(x=>x.state==='bien');
+  const fmtD=iso=>{ try{ return new Date(iso).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'numeric',month:'long',year:'numeric'}); }catch(e){ return '—'; } };
+  const card=(f,col)=>'<div class="card" style="padding:10px 12px;margin-bottom:8px;border-left:3px solid '+col+';"><div style="font-weight:700;font-size:14px;">'+(f.state==='malo'?'❌ ':(f.fix==='fixed'?'🔧 ':'⚠️ '))+esc(f.label)+'</div>'
+    +'<div class="faint" style="font-size:11.5px;margin-top:2px;">'+esc(f.area||'')+(f.measure?(' · '+esc(f.measure)):'')+'</div>'
+    +(f.note?'<div style="font-size:13px;margin-top:5px;">'+esc(f.note)+'</div>':'')
+    +(f.fix==='fixed'?'<div style="font-size:12.5px;margin-top:4px;color:#35c46a;font-weight:700;">'+dviT('fixedTag')+(f.repair?(': '+esc(f.repair)):'')+'</div>':'')
+    +(f.part?'<div style="font-size:12.5px;margin-top:4px;color:var(--gold);font-weight:700;">🧩 '+esc(f.part)+'</div>':'')
+    +(f.photo?'<img src="'+esc(f.photo)+'" style="margin-top:6px;width:72px;height:72px;object-fit:cover;border-radius:8px;">':'')+'</div>';
+  const sec=(title,col,arr)=> arr.length ? ('<div class="sub" style="font-weight:800;font-size:13.5px;margin:16px 0 8px;color:'+col+';">'+title+' ('+arr.length+')</div>'+arr.map(x=>card(x,col)).join('')) : '';
+  const okHtml = ok.length ? ('<div class="sub" style="font-weight:800;font-size:13.5px;margin:16px 0 8px;color:#35c46a;">'+dviT('okH')+' ('+ok.length+')</div><div class="faint" style="font-size:12.5px;line-height:1.7;">'+ok.map(o=>'✓ '+esc(o.label)).join(' · ')+'</div>') : '';
+  box.innerHTML='<div style="padding:16px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;">'+dviT('reportTitle')+'</h2><button class="linkbtn" onclick="carFichaOpen(\''+esc((_carFichaCar||{}).id||'')+'\')" style="font-size:24px;color:var(--muted);line-height:1;">‹</button></div>'
+    +'<div class="faint" style="font-size:12px;margin-bottom:12px;">🚗 '+esc((_carFichaCar||{}).label||'')+' · 📅 '+fmtD(insp.reportAt)+((insp.reportBy||insp.by)?(' · '+dviT('byLbl')+': '+esc(insp.reportBy||insp.by)):'')+'</div>'
+    +sec(dviT('redH'),'#ff5a5a',red)+sec(dviT('fixedH'),'#ffc94d',yellow)+okHtml
+    +((!red.length&&!yellow.length&&!ok.length)?'<div class="faint" style="text-align:center;padding:16px;">'+dviT('noFlags')+'</div>':'')
+    +'<button class="btn ghost" style="width:100%;margin-top:14px;" onclick="document.getElementById(\'wh-carficha\').remove()">'+L2('Cerrar','Close')+'</button></div>';
 };
 
 let JOB=null, runIdx=0, stepStart=0, tickHandle=null, TRI={};

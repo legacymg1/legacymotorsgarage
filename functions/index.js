@@ -2642,22 +2642,59 @@ exports.mechCars = onCall({ timeoutSeconds: 30 }, async (request) => {
   let snap;
   try { snap = await db.collection("inventory").where("status", "==", "prep").get(); }
   catch (e) { throw new HttpsError("internal", "No se pudo leer el inventario."); }
-  const cars = [];
+  const cars = [], waiting = [];
   snap.forEach((d) => {
     const c = d.data() || {};
-    if ((c.reconStage || "mecanico") !== "mecanico") return;   // solo los que esperan inspección inicial
-    if (c.inspection && c.inspection.reportAt) return;          // ya se envió el reporte → sale de la lista/burbuja de inspección inicial (queda en el jacket, esperando partes)
+    if ((c.reconStage || "mecanico") !== "mecanico") return;   // solo la línea del mecánico
     const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
     const photo = (Array.isArray(c.photos) && c.photos[0]) || c.img || "";
     const insp = c.inspection || {};
-    cars.push({
+    const base = {
       id: d.id, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""),
       photo: String(photo || ""), createdAt: c.createdAt || null, miles: String(c.miles || ""),
-      receivedMiles: String(c.receivedMiles || ""), inspStarted: !!insp.startedAt, inspDone: !!insp.reportAt,
-    });
+      receivedMiles: String(c.receivedMiles || ""),
+    };
+    if (insp.reportAt) {
+      // Ya se envió el reporte → sale de la inspección inicial y entra a "esperando partes" (sigue alcanzable por la ficha).
+      let durMin = 0; try { if (insp.startedAt) durMin = Math.max(0, Math.round((Date.parse(insp.reportAt) - Date.parse(insp.startedAt)) / 60000)); } catch (e) { durMin = 0; }
+      waiting.push(Object.assign({}, base, {
+        reportBy: String(insp.reportBy || insp.by || ""), reportAt: insp.reportAt || "",
+        waitingParts: !!insp.waitingParts, partsCount: Array.isArray(insp.parts) ? insp.parts.length : 0, durMin,
+      }));
+      return;
+    }
+    cars.push(Object.assign({}, base, { inspStarted: !!insp.startedAt, inspDone: false }));
   });
   cars.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
-  return { ok: true, cars };
+  waiting.sort((a, b) => String(a.inventoryNum).localeCompare(String(b.inventoryNum), undefined, { numeric: true }));
+  return { ok: true, cars, waiting };
+});
+
+// 🗂️ Ficha/jacket del carro — datos completos para la ficha tipo iOS (etapa, quién, tiempo, reporte, partes).
+exports.carJacket = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const isMech = id.isOwner || id.email || (Array.isArray(id.roles) && id.roles.indexOf("Mecánico") >= 0);
+  if (!isMech) throw new HttpsError("permission-denied", "No autorizado.");
+  const carId = String((request.data || {}).carId || ""); if (!carId) throw new HttpsError("invalid-argument", "Falta el carro.");
+  const db = admin.firestore();
+  const snap = await db.collection("inventory").doc(carId).get();
+  if (!snap.exists) throw new HttpsError("not-found", "El carro no existe.");
+  const c = snap.data() || {};
+  const insp = c.inspection || {};
+  const label = [c.year, c.make, c.model].filter(Boolean).join(" ") || c.title || ("#" + (c.inventoryNum || ""));
+  const photo = (Array.isArray(c.photos) && c.photos[0]) || c.img || "";
+  let durMin = 0; try { if (insp.startedAt && insp.reportAt) durMin = Math.max(0, Math.round((Date.parse(insp.reportAt) - Date.parse(insp.startedAt)) / 60000)); } catch (e) { durMin = 0; }
+  return {
+    ok: true,
+    car: {
+      id: carId, label, inventoryNum: String(c.inventoryNum || ""), vin: String(c.vin || ""),
+      photo: String(photo || ""), miles: String(c.receivedMiles || c.miles || ""),
+      reconStage: String(c.reconStage || "mecanico"), status: String(c.status || ""), createdAt: c.createdAt || null,
+    },
+    inspection: insp, durMin,
+  };
 });
 
 // 🔧 El mecánico registra las MILLAS con las que recibe el carro y ARRANCA la inspección.
