@@ -337,7 +337,7 @@
       <span style="font-weight:800;font-size:17px;" id="op-title">📊 Centro de Operaciones</span>
       <button class="linkbtn" onclick="loadOwnerPanel()" style="font-size:18px;" title="↻">↻</button>
     </div>
-    <div id="op-summary" style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:11px 13px;margin-bottom:12px;"></div>
+    <div id="op-summary" style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:10px 12px;margin:0 0 12px auto;width:min(100%,290px);box-sizing:border-box;box-shadow:0 6px 18px rgba(0,0,0,.18);"></div>
     <div style="position:relative;margin-bottom:12px;"><input id="op-search" type="search" oninput="opSearch(this.value)" data-i18n-ph="opSearchPh" placeholder="🔎 Buscar carro, orden, tarea o empleado…" autocomplete="off" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 12px;color:var(--text);font-size:15px;"></div>
     <div id="op-results" style="display:none;margin-bottom:14px;"></div>
     <div id="op-normal">
@@ -2190,30 +2190,28 @@ window.opSetTab=function(tk){ _opTab=tk; try{ sessionStorage.setItem('lmg_op_tab
 function _opDiv(label,count){ if(window.LMG && LMG.softDivider) return LMG.softDivider(label,count); return '<div style="display:flex;align-items:center;gap:10px;margin:16px 2px 8px;"><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">'+label+'</span><span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);"></span>'+(count==null?'':'<span style="font-size:11px;color:var(--faint);">'+count+'</span>')+'</div>'; }
 // --- Builders de cada parte (regresan HTML string) ---
 function _opTeamHtml(){
-  // 👥 Presencia estilo iOS: primero QUIÉN ESTÁ AQUÍ (fichado, punto verde), luego —apagados—
-  // los que tienen trabajo abierto pero NO están en turno (p.ej. dejaron una tarea sin pausar, o dueños que no fichan).
+  // 👥 Widget compacto estilo iOS: SOLO quién está AQUÍ (fichado, punto verde). Los que tienen tarea abierta
+  //    pero NO ficharon NO se muestran como fila (no ocupan espacio); solo un conteo discreto abajo.
+  const en=(L==='en');
   const doneCount={}; (OP_DONE||[]).forEach(p=>{ doneCount[(p.name||'').trim().toLowerCase()]=p.count; });
-  if(!OP_TEAM||!OP_TEAM.length) return _opErr.clock?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nobody clocked in right now.':'Nadie fichado ahora.')+'</div>';
-  const onList=OP_TEAM.filter(e=>e.open).sort((a,b)=>Number(!!b.task)-Number(!!a.task)||(b.hours||0)-(a.hours||0));
-  const offList=OP_TEAM.filter(e=>!e.open).sort((a,b)=>(b.hours||0)-(a.hours||0));
-  const hdr=txt=>'<div class="faint" style="font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:9px 2px 5px;opacity:.7;">'+txt+'</div>';
-  const row=(e,present)=>{
-    const hrs=(e.open||e.hours)?(' <span class="faint" style="font-weight:400;font-size:12px;">· '+Number(e.hours||0).toFixed(1)+' h</span>'):'';
+  const onList=(OP_TEAM||[]).filter(e=>e.open).sort((a,b)=>Number(!!b.task)-Number(!!a.task)||(b.hours||0)-(a.hours||0));
+  const offN=(OP_TEAM||[]).filter(e=>!e.open).length;
+  const foot=offN?('<div class="faint" style="font-size:10.5px;margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.06);">⚪ '+offN+' '+(en?('with '+(offN===1?'an open task':'open tasks')+', off shift'):('con '+(offN===1?'tarea abierta':'tareas abiertas')+', sin fichar'))+'</div>'):'';
+  if(!onList.length){
+    const base=_opErr.clock?_opErrMsg():'<div class="faint" style="font-size:12px;padding:3px 1px;">'+(en?'Nobody clocked in.':'Nadie en turno.')+'</div>';
+    return base+foot;
+  }
+  const rows=onList.map(e=>{
     const dc=doneCount[(e.name||'').trim().toLowerCase()]||0;
-    const doneBadge=dc?(' <span style="font-size:11px;color:#35c46a;font-weight:700;">· ✅ '+dc+'</span>'):'';
+    const done=dc?(' <span style="color:#35c46a;font-weight:700;">✅'+dc+'</span>'):'';
     const nm=(typeof whEscA==='function'?whEscA(e.name||''):String(e.name||'')).replace(/\x27/g,'');
-    const sub=e.task
-      ? ('<span style="color:var(--text);">'+esc(e.task.title)+'</span> '+lineBadge(e.task.line)+' · '+_opStatusLabel('en_proceso'))
-      : (present?(L==='en'?'Clocked in · no active task':'Fichado · sin tarea activa'):(L==='en'?'Open task · not clocked in':'Tarea abierta · sin fichar'));
-    const dotColor=present?'#35c46a':'#8a93a6';
-    const av='<span style="position:relative;flex:none;"><span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--surface);font-weight:800;font-size:12px;'+(present?'':'opacity:.6;')+'">'+whInitials(e.name)+'</span><span style="position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:'+dotColor+';border:2px solid var(--surface2);"></span></span>';
-    return '<div onclick="whEmpReport(\'\',\''+nm+'\',\'\')" style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;'+(present?'':'opacity:.7;')+'">'+av+'<div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:14px;">'+esc(e.name||'—')+hrs+doneBadge+'</div><div class="faint" style="font-size:12px;">'+sub+'</div></div><span style="color:var(--muted);">›</span></div>';
-  };
-  let h='';
-  h+=hdr('🟢 '+(L==='en'?'Here now':'Aquí ahora')+' · '+onList.length);
-  h+= onList.length ? onList.map(e=>row(e,true)).join('') : '<div class="faint" style="font-size:13px;padding:4px 2px 2px;">'+(L==='en'?'Nobody clocked in.':'Nadie en turno.')+'</div>';
-  if(offList.length){ h+=hdr('⚪ '+(L==='en'?'Not clocked in':'Sin fichar')+' · '+offList.length)+offList.map(e=>row(e,false)).join(''); }
-  return h;
+    const sub=e.task?esc(e.task.title):(en?'No active task':'Sin tarea activa');
+    const av='<span style="position:relative;flex:none;"><span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--surface);font-weight:800;font-size:10.5px;">'+whInitials(e.name)+'</span><span style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:#35c46a;border:2px solid var(--surface2);"></span></span>';
+    return '<div onclick="whEmpReport(\'\',\''+nm+'\',\'\')" style="display:flex;align-items:center;gap:8px;padding:5px 1px;cursor:pointer;">'+av
+      +'<div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(e.name||'—')+done+'</div>'
+      +'<div class="faint" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+sub+'</div></div></div>';
+  }).join('');
+  return rows+foot;
 }
 function _opDoneHtml(){
   if(!OP_DONE.length) return _opErr.done?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nothing completed yet today.':'Aún nada terminado hoy.')+'</div>';
@@ -2328,7 +2326,7 @@ function renderOwnerPanel(){
   if(_opTab==='equipo') _opTab='todo';   // el Equipo ya vive arriba (caja fija) → quitamos su pestaña
   // 👥 EQUIPO arriba (caja protagonista): quién está en qué trabajo + estatus. Reemplaza las cajas de conteo (los números ya van en las pestañas).
   const sum=document.getElementById('op-summary');
-  if(sum) sum.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-weight:800;font-size:14px;">👥 '+L2('Equipo','Team')+'</span><span class="lmg-pill" style="color:#35c46a;background:rgba(53,196,106,.14);border-color:#35c46a;">🟢 '+onShift+' '+L2('en turno','on shift')+'</span></div>'+_opTeamHtml();
+  if(sum) sum.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:7px;"><span style="font-weight:800;font-size:13px;">👥 '+L2('Equipo','Team')+'</span><span class="lmg-pill" style="color:#35c46a;background:rgba(53,196,106,.14);border-color:#35c46a;font-size:11px;padding:2px 8px;">🟢 '+onShift+'</span></div>'+_opTeamHtml();
   // Pestañas
   const tabsArr=[['todo','🗂️ '+L2('Todo','All'),OP_DEALER.length+OP_SVC.length+OP_DIS.length+OP_TASKS.length],['dealer','🚗 Dealer',OP_DEALER.length],['service','🔧 Service',OP_SVC.length],['dis','🧩 Dismantling',OP_DIS.length],['pit','📋 Pit',OP_TASKS.length]];
   const tabsBox=document.getElementById('op-tabs'); const cur=_opTab;
