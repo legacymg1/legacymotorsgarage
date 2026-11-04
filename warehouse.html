@@ -1038,8 +1038,8 @@ const NAME_BY_EMAIL={
   'mechanic@legacymotorsgarage.com':'Mecánico','mecanico@legacymotorsgarage.com':'Mecánico'
 };
 const TITLE_BY_EMAIL={
-  'ev@legacymotorsgarage.com':'Supervisor Pit Crew',        // Enrique
-  'ivan.garcia@legacymotorsgarage.com':'Supervisor Pit Crew' // Ivan
+  'ev@legacymotorsgarage.com':'Supervisor Pit Crew',          // Enrique
+  'ivan.garcia@legacymotorsgarage.com':'Supervisor Dismantling' // Ivan — Dismantling/Yarda
 };
 function dispName(email){ email=(email||'').toLowerCase(); return NAME_BY_EMAIL[email]||(email.split('@')[0])||email; }
 function whoLabel(email,r){ email=(email||'').toLowerCase(); const ti=TITLE_BY_EMAIL[email]; if(ti) return dispName(email)+' · '+ti; return roleLabel(r); }
