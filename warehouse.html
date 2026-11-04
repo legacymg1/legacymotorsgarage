@@ -162,7 +162,7 @@
   <div class="head" data-legacy-bar>
     <div style="flex:1;min-width:0;">
       <div class="sub" id="who-greet" style="font-size:12px;line-height:1.2;"></div>
-      <div id="who" style="font-size:21px;font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+      <div id="who" style="font-size:clamp(17px,5.4vw,21px);font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
     </div>
     <button id="clk-pill" onclick="clkTap()" style="display:none;align-self:center;margin-right:10px;border:none;border-radius:999px;padding:9px 15px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;transition:transform .12s ease;color:#0b0e14;background:#35c46a;">Clock In</button>
     <button id="acct-btn" class="wh-avatar" onclick="toggleAcct(event)" aria-label="Perfil">?</button>
@@ -1054,7 +1054,7 @@ function setHeaderIdentity(){
   // Al "ver como empleado", el encabezado muestra a ESE empleado (para que se sienta su perfil).
   const name = (_asEmp && _viewAsName) ? _viewAsName : (myName || whoLabel(myEmail,role) || '');
   const g=document.getElementById('who-greet'); if(g) g.textContent=whGreet();
-  const w=document.getElementById('who'); if(w) w.textContent=name||'—';
+  const w=document.getElementById('who'); if(w) w.textContent=(String(name||'').split(' · ')[0].trim()||name||'—');   // saludo: nombre SIN el "· Título" (el rol ya sale en el menú) — evita el "Enrique Supervi…" cortado
   const ini=whInitials(name || '');
   const ab=document.getElementById('acct-btn'); if(ab && !ab.querySelector('img')) ab.textContent=ini;
   const av=document.getElementById('acct-ava'); if(av && !av.querySelector('img')) av.textContent=ini;
