@@ -2146,7 +2146,8 @@ function _opDealerHtml(){
     else if(c.inspDone) dvi='<span style="color:#35c46a;">✓ '+L2('Inspección lista','Inspection done')+'</span>';
     const tsk=c.tasks?(' · 🔧 '+c.tasks+' '+t('jobsN')):'';
     const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' '+L2('labor','labor')+'</span>'):'';
-    return '<div onclick="opWorkDealer(\''+c.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+esc(stage)+' <span style="color:var(--muted);">›</span></span></div>'
+    const col = c.waitingParts?'#ff9800':(c.inspDone?'#35c46a':((c.reconStage==='mecanico'&&c.inspStarted)?'#e8b64a':'#67708f'));
+    return '<div onclick="opWorkDealer(\''+c.id+'\')" style="padding:9px 2px 9px 10px;border-left:3px solid '+col+';border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="font-size:11px;font-weight:700;color:var(--gold);white-space:nowrap;">'+esc(stage)+' <span style="color:var(--muted);">›</span></span></div>'
       +'<div class="faint" style="font-size:12px;margin-top:2px;">'+(dvi||'&nbsp;')+tsk+lab+'</div>'+dealPipelineHtml(c.reconStage)+'</div>';
   }).join('');
 }
@@ -2161,7 +2162,8 @@ function _opSvcHtml(full){
     const stage = o.activeRole ? ('🚩 '+svcRoleLabel(o.activeRole)) : (doneSt ? ('🏁 '+L2('Terminado','Done')) : ('🚩 '+_opStatusLabel(o.status)));
     const s=(o.services||[]).find(x=>x.role===o.activeRole && x.assignName); const who=s?(' · 👤 '+esc(s.assignName)):'';
     const folio=o.orderNum?('<span style="color:var(--gold);font-weight:800;font-variant-numeric:tabular-nums;">#'+o.orderNum+'</span> · '):'';
-    return '<div onclick="svcEmpOpen(\''+o.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
+    const col=(window.LMG&&LMG.svcStatusRich)?LMG.svcStatusRich(o,L==='en').col:'#8a8fa8';
+    return '<div onclick="svcEmpOpen(\''+o.id+'\')" style="padding:10px 2px 10px 10px;border-left:3px solid '+col+';border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+folio+esc(o.clientName||'Cliente')+'</span><span style="display:flex;align-items:center;gap:6px;flex:none;">'+_opBadge(o.status)+'<span style="color:var(--muted);">›</span></span></div>'
       +'<div class="faint" style="font-size:12px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚗 '+car+(o.reason?(' · '+esc(o.reason)):'')+(stage?(' · '+stage):'')+who+'</div></div>';
   }).join('');
@@ -2215,7 +2217,8 @@ function _opDisHtml(){
       : ('<span style="color:var(--muted);">'+L2('Aún sin partes capturadas','No parts captured yet')+'</span>');
     const allSold = c.partsTotal>0 && c.partsLeft===0;
     const lab=c.laborCents?(' · <span style="color:#8ab4ff;">💪 $'+(c.laborCents/100).toFixed(0)+' labor</span>'):'';
-    return '<div onclick="openCarAccounts(\''+c.id+'\')" style="padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="white-space:nowrap;">'+(allSold?'<span style="font-size:11px;color:#35c46a;font-weight:700;">✓ </span>':'')+'<span style="font-size:11px;font-weight:700;color:var(--gold);">💰 '+L2('cuentas','accounts')+' <span style="color:var(--muted);">›</span></span></span></div>'
+    const col = (c.partsTotal>0 && c.partsLeft===0)?'#35c46a':(c.partsTotal>0?'#e8b64a':'#67708f');
+    return '<div onclick="openCarAccounts(\''+c.id+'\')" style="padding:9px 2px 9px 10px;border-left:3px solid '+col+';border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+(c.inventoryNum?('<span class="faint">#'+esc(c.inventoryNum)+'</span> '):'')+esc(c.label)+'</span><span style="white-space:nowrap;">'+(allSold?'<span style="font-size:11px;color:#35c46a;font-weight:700;">✓ </span>':'')+'<span style="font-size:11px;font-weight:700;color:var(--gold);">💰 '+L2('cuentas','accounts')+' <span style="color:var(--muted);">›</span></span></span></div>'
       +'<div class="faint" style="font-size:12px;margin-top:2px;">'+parts+lab+'</div></div>';
   }).join('');
 }
@@ -2228,7 +2231,8 @@ function _opTasksHtml(){
     const who=x.assignName?('👤 '+esc(x.assignName)):t('unassigned');
     const car=x.carLabel?(' · 🚗 '+esc(x.carLabel)):'';
     const prioB = x.priority==='now' ? '<span style="color:#e0683a;font-weight:800;font-size:10px;border:1px solid #e0683a;border-radius:999px;padding:1px 6px;white-space:nowrap;">🔴</span> ' : x.priority==='next' ? '<span style="color:#e8b64a;font-weight:800;font-size:10px;border:1px solid #e8b64a;border-radius:999px;padding:1px 6px;white-space:nowrap;">🟡</span> ' : '';
-    return '<div onclick="opWorkTask(\''+x.id+'\')" style="padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+prioB+esc(x.title)+' '+lineBadge(x.line)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+taskChip(x)+'<span onclick="event.stopPropagation();jobEditOpen(\''+x.id+'\')" title="Editar" style="cursor:pointer;font-size:14px;padding:3px 5px;border-radius:7px;background:var(--surface2);">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+_opStatusLabel(x.status)+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
+    const col = x.priority==='now'?'#e0683a':x.priority==='next'?'#e8b64a':(x.status==='pausada'?'#ff9800':(x.status==='en_proceso'?'#4c9bff':'#67708f'));
+    return '<div onclick="opWorkTask(\''+x.id+'\')" style="padding:10px 2px 10px 10px;border-left:3px solid '+col+';border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-weight:700;font-size:14px;min-width:0;">'+prioB+esc(x.title)+' '+lineBadge(x.line)+'</span><span style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">'+taskChip(x)+'<span onclick="event.stopPropagation();jobEditOpen(\''+x.id+'\')" title="Editar" style="cursor:pointer;font-size:14px;padding:3px 5px;border-radius:7px;background:var(--surface2);">✏️</span></span></div><div class="faint" style="font-size:12px;margin-top:3px;">'+who+car+' · '+_opStatusLabel(x.status)+pr+(x.needsHelp?' · <span style="color:#ff9800;">⚠️</span>':'')+'</div></div>';
   }).join('');
 }
 function renderOwnerPanel(){

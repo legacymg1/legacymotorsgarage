@@ -82,10 +82,10 @@
     var when = (o.scheduledAt || o.createdAt) ? new Date(o.scheduledAt || o.createdAt).toLocaleDateString(en ? 'en-US' : 'es-MX', { day: '2-digit', month: 'short' }) : '';
     var openFn = opts.openFn || 'svcOpenOrder', receiptFn = opts.receiptFn || openFn;
     var fn = (LMG.svcBucketOf(o) === 'completadas' && o.paid) ? (receiptFn + '(\'' + o.id + '\')') : (openFn + '(\'' + o.id + '\')');
-    return '<div onclick="' + fn + '" style="display:flex;gap:10px;align-items:center;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
+    return '<div onclick="' + fn + '" style="display:flex;gap:10px;align-items:center;padding:11px 12px 11px 11px;border-left:3px solid ' + col + ';border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
       + '<div style="width:48px;font-weight:800;color:var(--gold);font-size:13px;font-variant-numeric:tabular-nums;">' + (o.orderNum ? ('#' + o.orderNum) : '—') + '</div>'
       + '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(o.clientName || (en ? 'Customer' : 'Cliente')) + '</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚗 ' + car + (when ? (' · ' + when) : '') + '</div></div>'
-      + '<div style="flex:0 0 auto;max-width:104px;text-align:center;"><span style="font-size:10px;font-weight:800;color:' + col + ';background:' + col + '1f;border:1px solid ' + col + ';padding:3px 7px;border-radius:12px;white-space:normal;line-height:1.2;display:inline-block;">' + badge + '</span></div>'
+      + '<div style="flex:0 0 auto;max-width:104px;text-align:center;"><span style="font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:' + col + ';background:' + col + '1f;border:1px solid ' + col + ';padding:3px 7px;border-radius:12px;white-space:normal;line-height:1.2;display:inline-block;">' + badge + '</span></div>'
       + '<div style="flex:0 0 auto;width:68px;text-align:right;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;">' + tot + '</div></div>';
   };
   // Lista tipo TABLA (encabezado opcional). opts igual que svcOrderRow.
@@ -95,5 +95,5 @@
     return '<div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">' + head + (list || []).map(function (o) { return LMG.svcOrderRow(o, opts); }).join('') + '</div>';
   };
 
-  LMG.version = '2';
+  LMG.version = '3';
 })();
