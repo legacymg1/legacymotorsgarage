@@ -39,10 +39,10 @@
     var bar = document.createElement('div');
     bar.id = 'lmg-ver-bar';
     bar.style.cssText =
-      'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:99990;' +
+      'position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:2147483100;' +
       'background:linear-gradient(135deg,#d9b85a,#c9a84c);color:#0b0e14;border-radius:13px;' +
       'padding:12px 14px;display:flex;align-items:center;gap:10px;font-weight:800;font-size:13.5px;' +
-      'box-shadow:0 10px 30px rgba(0,0,0,.45);font-family:inherit;animation:lmgVerIn .35s ease;';
+      'box-shadow:0 12px 34px rgba(0,0,0,.5);font-family:inherit;animation:lmgVerIn .35s ease;max-width:520px;margin:0 auto;';
     bar.innerHTML =
       '<span style="flex:1;line-height:1.3;">✨ ' +
       (en ? 'New version available' : 'Nueva versión disponible') + '</span>' +
@@ -54,7 +54,7 @@
     (document.body || document.documentElement).appendChild(bar);
 
     var st = document.createElement('style');
-    st.textContent = '@keyframes lmgVerIn{from{transform:translateY(16px);opacity:0;}to{transform:translateY(0);opacity:1;}}';
+    st.textContent = '@keyframes lmgVerIn{from{transform:translateY(-16px);opacity:0;}to{transform:translateY(0);opacity:1;}}';
     (document.head || document.documentElement).appendChild(st);
 
     document.getElementById('lmg-ver-go').onclick = function () {
