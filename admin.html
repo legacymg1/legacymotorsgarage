@@ -1000,6 +1000,7 @@
 </script>
 
 <script src="legacy-svc.js"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2375,7 +2376,28 @@ window.renderClient360=function(id){
         ? '<span onclick="showPhoto(\''+c.idPhotoURL+'\',\'ID — '+esc((c.name||'').replace(/\x27/g,""))+'\')" style="display:inline-flex;align-items:center;gap:5px;color:var(--gold);cursor:pointer;font-size:12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:2px 8px;margin-top:5px;">🪪 ID'+(idTxt?' '+idTxt:'')+' 📷 <span style="font-size:10px;color:var(--muted);">interno</span></span>'
         : '<span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);font-size:12px;background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:2px 8px;margin-top:5px;">🪪 ID'+(idTxt?' '+idTxt:' ✓')+' <span style="font-size:10px;color:var(--muted);">interno · sin foto</span></span>')
     : '<span style="display:inline-block;color:var(--muted);font-size:12px;margin-top:5px;">🪪 Sin identificación</span>';
-  // Header: nombre + identificación al lado + teléfono/idioma + insignias + cerrar
+  // 🔗 FICHA UNIFICADA — usa el componente COMPARTIDO legacy-clientficha.js (misma ficha que Pit Crew/Centro).
+  // Admin arma el objeto normalizado + opts (nombres de sus funciones). Si el componente no cargó, cae al render clásico de abajo.
+  if(window.LMG && LMG.clientFichaHTML){
+    const cfM=_c360Money;
+    const cfGrp=_clientGroup(c); let cfSummary='';
+    if(cfGrp.length>1){ const cfBal=cfGrp.reduce((s,gm)=>s+(isPaidOff(gm)?0:(calcBalance(gm)||0))+(addonsBalance(gm)||0),0); const cfCars=cfGrp.filter(gm=>gm.vin||gm.total||((gm.schedule||[]).length)).length; cfSummary='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="color:var(--muted);font-size:13px;">Saldo total · '+cfCars+' carro(s)</span><b style="color:var(--gold);font-size:18px;">'+cfM(cfBal)+'</b></div><div style="color:var(--muted);font-size:12px;margin-top:4px;">Toca cada carro abajo para ver su saldo y pagos.</div>'; }
+    else if(f.buyer){ cfSummary=_c360FinSummary(c); }
+    const cfGv=_groupVehicles(c);
+    const cfVehicles=cfGv.map(e=>{ const v=e.v; let right=''; if(e.isFin){ right=isPaidOff(e.owner)?'<span style="color:#28b463;font-weight:800;font-size:12px;white-space:nowrap;">✅ Pagado</span>':'<span style="color:var(--gold);font-weight:800;font-size:12px;white-space:nowrap;">saldo '+cfM(calcBalance(e.owner))+'</span>'; } else { right='<span style="color:var(--muted);font-size:11px;white-space:nowrap;">'+(e.ownerId!==id?'✅ comprado':'🔧 servicio')+'</span>'; } right+=' <span style="color:var(--gold);">›</span>'; return {label:v.label||'Auto',plate:v.plate||'',vin:v.vin||'',right:right,ref:e.ownerId,ref2:e.idx}; });
+    const cfNorm=(o,done)=>{ const _sl=(typeof svcStatusLabel==='function')?svcStatusLabel(o):{txt:(done?'✅ Servicio realizado':'🧾 Estimado'),col:'var(--muted)'}; const _ow=svcOwedCents(o); return {id:o.id,orderNum:o.orderNum,title:o.reason||'Servicio',when:o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'',statusTxt:done?'✅ Servicio realizado':_sl.txt,statusCol:done?'#28b463':_sl.col,total:(o.grandTotalCents!=null?o.grandTotalCents/100:0),saldo:(!done&&_ow>0)?_ow/100:0}; };
+    const cfActive=sOrders.filter(o=>o.paid!==true).map(o=>cfNorm(o,false));
+    const cfDone=sOrders.filter(o=>o.paid===true).map(o=>cfNorm(o,true));
+    const cfExtra=[];
+    if(appts.length){ const apHtml=appts.map(a=>{ const when=(a.scheduledAt||a.date)?new Date(a.scheduledAt||a.date).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; const svc=Array.isArray(a.services)?a.services.join(', '):(a.service||a.reason||a.note||'Cita'); const st=a.status?(' · '+esc(a.status)):''; return '<div style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">📅 '+esc(svc)+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div>'+(st?('<div style="font-size:12px;color:var(--muted);margin-top:3px;">'+st.replace(/^ · /,'')+'</div>'):'')+'</div>'; }).join(''); cfExtra.push({title:'📅 Citas', html:apHtml, act:addBtn('➕ Cita','c360Close();openApptModal(\''+id+'\')')}); }
+    const cfQuotes=qz.map(q=>({id:q.id, car:(q.options&&q.options[0]&&q.options[0].car)||'', when:q.createdAt?new Date(q.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}));
+    body.innerHTML=LMG.clientFichaHTML(
+      { id:id, name:c.name, phone:c.phone, lang:c.lang, idHtml:idLink, badgesHtml:(c360BadgeHtml(f)||''), summaryHtml:cfSummary, vehicles:cfVehicles, serviceActive:cfActive, serviceDone:cfDone, extraSections:cfExtra, quotes:cfQuotes },
+      { lang:(c.lang==='en'?'en':'es'), close:'c360Close()', payFn:(f.buyer?'openPayModal':''), editFn:'openEditModal', viewAsFn:'viewAsClient', newServiceFn:'c360NewService', openVehicleFn:'openVehicle360', openOrderFn:'svcOpenOrder', openReceiptFn:'svcOpenReceipt', openQuoteFn:'viewCotiz' }
+    );
+    return;
+  }
+  // Header: nombre + identificación (RESPALDO clásico si legacy-clientficha.js no cargó)
   let h='<div style="padding:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="min-width:0;">'
     +'<div style="font-family:var(--font-display);font-size:22px;">'+esc(c.name||'(sin nombre)')+'</div>'
     +'<div>'+idLink+'</div>'
