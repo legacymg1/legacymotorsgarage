@@ -5537,7 +5537,8 @@ window.saveClient=async function(keepOpen){
   const _price  = Number(document.getElementById('f-total').value)||0;
   const _down   = Number(document.getElementById('f-down').value)||0;
   const _weekly = Number(document.getElementById('f-weekly').value)||0;
-  const _amountFinanced  = Math.max(0, _price + 70 + 58.25 - _down);   // +$70 doc +$58.25 smog (ambos financiados)
+  const _hasCar = _price > 0;   // sin carro NO hay venta → sin doc/smog/financiamiento (evita el saldo fantasma de $128.25)
+  const _amountFinanced  = _hasCar ? Math.max(0, _price + 70 + 58.25 - _down) : 0;   // +$70 doc +$58.25 smog (ambos financiados, SOLO si compró carro)
 
   const freq=document.getElementById('f-freq')?document.getElementById('f-freq').value:'weekly';
   const lang=document.getElementById('f-lang')?document.getElementById('f-lang').value:'es';
