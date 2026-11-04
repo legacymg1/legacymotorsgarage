@@ -2026,6 +2026,25 @@ window.opWorkDealer=function(id){ if(!id) return; _opFromCenter=true; _pendingMe
 // 🗂️ Sub-pestaña del Servicio (Activas·Completadas·Clientes) en el Centro.
 window.opSvcSub=function(s){ _opSvcSub=s; renderOwnerPanel(); };
 // 🧾 Vista READ-ONLY de una orden de servicio desde el Centro (dueño). Editar/cobrar vive en Clientes/admin.
+// 🔧 Acciones de DUEÑO en el popup del Centro: avanzar estatus (reusa svcOrderStatus, ya probado) + refresca el Centro.
+window.svcOpsAdvance=async function(orderId,status){
+  if(typeof _vaReadOnly==='function' && _vaReadOnly()) return;
+  try{ await httpsCallable(functions,'svcOrderStatus')(vaData({orderId:orderId,status:status})); whToast(t('updated')||'✅'); }
+  catch(e){ whToast((e&&e.message)||t('jCouldnt')||'Error',true); return; }
+  try{ const x=document.getElementById('svcops-ov'); if(x) x.remove(); }catch(e){}
+  try{ loadOwnerPanel(); }catch(e){}
+};
+function _svcOpsActions(o){
+  if(o.paid || o.status==='entregado') return '';
+  const B=(st,label,gold)=>'<button class="'+(gold?'btn-gold':'btn-ghost')+'" style="flex:1;" onclick="svcOpsAdvance(\''+o.id+'\',\''+st+'\')">'+label+'</button>';
+  const S=o.status||''; let a='';
+  if(S==='por_recibir'||S==='agendado'||S==='arrancado'||S===''){ a=B('recibido','📥 '+L2('Recibir carro','Receive car'),true); }
+  else if(S==='recibido'){ a=B('en_proceso','▶️ '+L2('Empezar','Start'),true); }
+  else if(S==='en_proceso'){ a=B('pausado_partes','⏸️ '+L2('Esperar partes','Wait parts'))+B('listo','✅ '+L2('Listo','Ready'),true); }
+  else if(S==='pausado_partes'){ a=B('en_proceso','▶️ '+L2('Reanudar','Resume'),true); }
+  else if(S==='listo'){ a=B('entregado','🏁 '+L2('Marcar entregado','Mark delivered'),true); }
+  return a?('<div style="display:flex;gap:8px;margin-top:14px;">'+a+'</div>'):'';
+}
 window.svcOpsView=function(id){
   const o=(SVC_ALL.orders||[]).find(x=>x.id===id)||(OP_SVC||[]).find(x=>x.id===id); if(!o){ whToast&&whToast(L2('Orden no encontrada','Order not found')); return; }
   const en=(L==='en'); const m=n=>'$'+Number(n||0).toFixed(2);
@@ -2055,7 +2074,8 @@ window.svcOpsView=function(id){
       +(paid>0?('<div style="display:flex;justify-content:space-between;color:#35c46a;font-weight:700;font-size:13px;margin-top:3px;"><span>'+L2('Pagado','Paid')+(o.payMethod?(' · '+esc(o.payMethod)):'')+'</span><span>'+m(paid)+'</span></div>'):'')
       +(bal>0.004?('<div style="display:flex;justify-content:space-between;color:#ff6b6b;font-weight:700;font-size:13px;margin-top:3px;"><span>'+L2('Saldo','Balance')+'</span><span>'+m(bal)+'</span></div>'):'')
     +'</div>'
-    +'<div class="faint" style="font-size:11px;margin-top:14px;text-align:center;line-height:1.5;">'+L2('Editar y cobrar la orden aquí mismo — próxima fase.','Edit & charge the order right here — coming soon.')+'</div>';
+    +_svcOpsActions(o)
+    +'<div class="faint" style="font-size:11px;margin-top:12px;text-align:center;line-height:1.5;">'+L2('El cobro detallado (tarjeta/Square) sigue en Clientes por ahora.','Detailed charging (card/Square) still lives in Clients for now.')+'</div>';
   ov.appendChild(box); document.body.appendChild(ov);
 };
 // 👥 Órdenes de UN cliente de servicio (read-only) desde el Centro.
