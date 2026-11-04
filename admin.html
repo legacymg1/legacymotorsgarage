@@ -34,8 +34,16 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--navy3); color: var(--text); font-family: var(--font-body); min-height: 100vh; }
 
-  /* LOGIN */
-  #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; background: radial-gradient(ellipse at center, #1a2035 0%, #0f1320 100%); }
+  /* SPLASH — se muestra mientras Firebase restaura la sesión (evita el parpadeo del login al abrir) */
+  #auth-splash { position: fixed; inset: 0; z-index: 9000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: radial-gradient(ellipse at center, #1a2035 0%, #0f1320 100%); }
+  #auth-splash .splash-logo { width: 150px; max-width: 46%; opacity: .95; animation: splashPulse 1.6s ease-in-out infinite; }
+  #auth-splash .splash-spinner { width: 30px; height: 30px; border: 3px solid rgba(201,168,76,.25); border-top-color: var(--gold, #c9a84c); border-radius: 50%; animation: splashSpin .8s linear infinite; }
+  @keyframes splashSpin { to { transform: rotate(360deg); } }
+  @keyframes splashPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { #auth-splash .splash-logo, #auth-splash .splash-spinner { animation: none; } }
+
+  /* LOGIN — oculto por defecto; el gate de auth lo muestra solo si NO hay sesión */
+  #login-screen { display: none; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; background: radial-gradient(ellipse at center, #1a2035 0%, #0f1320 100%); }
   .login-box { background: var(--navy); border: 1px solid var(--gold3); border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 380px; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.5); }
   .login-logo-img { width: 180px; margin-bottom: 24px; }
   .login-title { font-family: var(--font-display); font-size: 16px; color: var(--gold2); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 32px; }
@@ -260,6 +268,13 @@
 </div>
 
 <!-- LOGIN -->
+<div id="auth-splash">
+  <img src="logo.png" class="splash-logo" onerror="this.style.display='none'">
+  <div class="splash-spinner"></div>
+</div>
+<script>/* Salvavidas independiente del módulo: si en 8s no se abrió la app, quita el splash y muestra el login. */
+setTimeout(function(){var s=document.getElementById('auth-splash');if(s&&s.style.display!=='none'){var a=document.getElementById('app');if(!a||a.style.display!=='block'){s.style.display='none';var l=document.getElementById('login-screen');if(l)l.style.display='flex';}}},8000);</script>
+
 <div id="login-screen">
   <div class="login-box">
     <img src="logo.png" class="login-logo-img" onerror="this.style.display='none'">
@@ -1134,6 +1149,8 @@ onAuthStateChanged(auth, async (user) => {
   const loginScreen = document.getElementById('login-screen');
   const appEl = document.getElementById('app');
   const errEl = document.getElementById('login-error');
+  const splashEl = document.getElementById('auth-splash');
+  if(splashEl) splashEl.style.display='none';   // Firebase ya resolvió: fuera el splash, mostramos login o app sin parpadeo
   if(!user){ document.body.classList.remove('admin-on'); loginScreen.style.display='flex'; appEl.style.display='none'; return; }
   const email = (user.email||'').toLowerCase();
   if(!STAFF_EMAILS.includes(email)){ errEl.textContent = 'Esta cuenta no está autorizada.'; await signOut(auth); return; }
@@ -1154,6 +1171,16 @@ onAuthStateChanged(auth, async (user) => {
   try{ const _st=document.getElementById('sq-terminal-btn'); if(_st) _st.style.display = isOwner ? '' : 'none'; }catch(e){}   // 📟 Vincular Terminal Square: solo el dueño
   if(!_listeningStarted){ _listeningStarted = true; startListening(); }
 });
+
+// 🛟 Fallback: si Firebase no resolvió en 7s (red lenta/offline), quita el splash y muestra el login para no dejarlo pegado.
+setTimeout(function(){
+  const sp=document.getElementById('auth-splash');
+  if(sp && sp.style.display!=='none'){
+    sp.style.display='none';
+    const ls=document.getElementById('login-screen'), ap=document.getElementById('app');
+    if(ls && (!ap || ap.style.display!=='block')) ls.style.display='flex';
+  }
+}, 7000);
 
 // ---- HELPERS ----
 let clients = [];
