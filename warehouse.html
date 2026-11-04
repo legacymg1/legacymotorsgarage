@@ -1732,16 +1732,48 @@ window.whOwnerJornada=function(){
 // ⚙️ Ajustar GPS (geofence Dealer/Yonke) — movido del reloj al menú del logo (el dueño ya no ve el reloj).
 window.whOpenGps=function(){
   if(role!=='owner') return; try{ closeAcct(); }catch(e){}
-  let ov=document.getElementById('wh-gps');
-  if(!ov){ ov=document.createElement('div'); ov.id='wh-gps'; ov.style.cssText='position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;cursor:pointer;';
-    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-    const box=document.createElement('div'); box.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:420px;width:100%;padding:20px;box-sizing:border-box;cursor:default;';
-    box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;">⚙️ '+(L==='en'?'GPS locations':'Ubicaciones GPS')+'</div><button onclick="document.getElementById(\'wh-gps\').remove()" class="btn ghost sm" style="padding:6px 12px;">✕</button></div>'
-      +'<div class="sub" style="margin-bottom:10px;line-height:1.5;">📍 '+(L==='en'?'Stand at the spot and tap to save it (for employee check-in).':'Párate en el lugar y toca para guardarlo (para el check-in de empleados).')+'</div>'
-      +'<div class="row2"><button class="btn ghost" onclick="captureLoc(\'dealer\')">📍 '+(L==='en'?'Save Dealer (here)':'Guardar Dealer (aquí)')+'</button><button class="btn ghost" onclick="captureLoc(\'yonke\')">📍 '+(L==='en'?'Save Yard (here)':'Guardar Yonke (aquí)')+'</button></div>'
-      +'<div id="clock-loc-msg" class="sub" style="margin-top:8px;"></div>';
-    ov.appendChild(box); document.body.appendChild(ov);
-  } else ov.style.display='flex';
+  try{ const old=document.getElementById('wh-gps'); if(old) old.remove(); }catch(e){}
+  try{ window._gpsUnsub&&window._gpsUnsub(); }catch(e){}
+  const en=(L==='en');
+  const ov=document.createElement('div'); ov.id='wh-gps'; ov.style.cssText='position:fixed;inset:0;z-index:100050;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;cursor:pointer;';
+  ov.onclick=function(e){ if(e.target===ov) closeGps(); };
+  const box=document.createElement('div'); box.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:440px;width:100%;padding:20px;box-sizing:border-box;cursor:default;max-height:88vh;overflow:auto;';
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-weight:800;font-size:17px;">⚙️ '+(en?'GPS locations':'Ubicaciones GPS')+'</div><button onclick="closeGps()" class="btn ghost sm" style="padding:6px 12px;">✕</button></div>'
+    +'<div id="wh-gps-status" style="margin-bottom:12px;"><div class="faint" style="font-size:13px;">'+(en?'Loading…':'Cargando…')+'</div></div>'
+    +'<div class="sub" style="margin-bottom:10px;line-height:1.5;">📍 '+(en?'Stand at the spot and tap to save / update it (for employee check-in/out).':'Párate en el lugar y toca para guardarlo / actualizarlo (para el check-in/out de empleados).')+'</div>'
+    +'<div class="row2"><button class="btn ghost" onclick="captureLoc(\'dealer\')">📍 '+(en?'Save Dealer (here)':'Guardar Dealer (aquí)')+'</button><button class="btn ghost" onclick="captureLoc(\'yonke\')">📍 '+(en?'Save Yard (here)':'Guardar Yonke (aquí)')+'</button></div>'
+    +'<div id="clock-loc-msg" class="sub" style="margin-top:8px;"></div>'
+    +'<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;"><div class="sub" style="margin-bottom:6px;">📏 '+(en?'Allowed radius (meters)':'Radio permitido (metros)')+'</div>'
+    +'<div style="display:flex;gap:8px;"><input id="wh-gps-radius" type="number" inputmode="numeric" min="20" max="1000" placeholder="150" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:15px;"><button class="btn gold" onclick="whSaveRadius()" style="white-space:nowrap;">'+(en?'Save':'Guardar')+'</button></div>'
+    +'<div class="faint" style="font-size:11.5px;margin-top:5px;">'+(en?'How close they must be to the spot to clock in/out. Default 150 m.':'Qué tan cerca deben estar del lugar para fichar entrada/salida. Por defecto 150 m.')+'</div></div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  // 🔴 Lee el config REAL en vivo: muestra si Dealer/Yonke ya están guardados, cuándo, y el radio; se actualiza al guardar.
+  window._gpsUnsub=onSnapshot(doc(db,'config','timeclock'), s=>{
+    const ex=s&&s.exists; const has=(typeof ex==='function')?ex.call(s):ex;
+    _renderGpsStatus(has?(s.data()||{}):{});
+  }, e=>{ const el=document.getElementById('wh-gps-status'); if(el) el.innerHTML='<div style="color:#ff6b6b;font-size:13px;">⚠️ '+(en?'Could not read config.':'No se pudo leer la configuración.')+'</div>'; });
+};
+window.closeGps=function(){ try{ window._gpsUnsub&&window._gpsUnsub(); }catch(e){} window._gpsUnsub=null; try{ const el=document.getElementById('wh-gps'); if(el) el.remove(); }catch(e){} };
+function _renderGpsStatus(c){
+  const en=(L==='en'); const el=document.getElementById('wh-gps-status'); if(!el) return;
+  const row=(label,spot)=>{
+    const ok=spot&&spot.lat!=null;
+    let when=''; try{ if(ok&&spot.savedAt) when=' · '+new Date(spot.savedAt).toLocaleDateString(en?'en-US':'es-MX',{day:'numeric',month:'short',year:'numeric'}); }catch(e){}
+    return '<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);"><span style="font-size:17px;">'+(ok?'✅':'⚠️')+'</span><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;">'+label+'</div><div class="faint" style="font-size:12px;">'+(ok?((en?'Saved':'Guardado')+when):('<span style="color:#e8b64a;">'+(en?'Not set yet':'Falta guardar')+'</span>'))+'</div></div></div>';
+  };
+  const r=Number(c.radiusM)||150;
+  const both=(c.dealer&&c.dealer.lat!=null)&&(c.yonke&&c.yonke.lat!=null);
+  el.innerHTML=(both?'':'<div style="background:rgba(232,182,74,.12);border:1px solid #e8b64a;border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:12.5px;line-height:1.45;">⚠️ '+(en?'Until both are saved, GPS does NOT block anyone.':'Mientras falte alguna, el GPS NO bloquea a nadie.')+'</div>')
+    +row('Dealer',c.dealer)+row('Yonke',c.yonke)
+    +'<div style="padding:8px 0 0;font-size:12.5px;" class="faint">📏 '+(en?'Current radius':'Radio actual')+': <b style="color:var(--text);">'+r+' m</b></div>';
+  const ri=document.getElementById('wh-gps-radius'); if(ri && document.activeElement!==ri && !ri.value) ri.value=r;
+}
+window.whSaveRadius=async function(){
+  const en=(L==='en'); const ri=document.getElementById('wh-gps-radius'); const msg=document.getElementById('clock-loc-msg');
+  const v=Math.round(Number(ri&&ri.value));
+  if(!v||v<20||v>1000){ if(msg){ msg.style.color='#ff6b6b'; msg.textContent=(en?'Enter a radius between 20 and 1000 m.':'Pon un radio entre 20 y 1000 m.'); } return; }
+  try{ await httpsCallable(functions,'cfgSet')({docId:'timeclock', data:{radiusM:v}}); if(msg){ msg.style.color='#3ecf8e'; msg.textContent='✅ '+(en?'Radius saved: ':'Radio guardado: ')+v+' m'; } }
+  catch(e){ if(msg){ msg.style.color='#ff6b6b'; msg.textContent='⚠️ '+_clockErr(e); } }
 };
 // 🔧 Órdenes de servicio del trabajador, DENTRO de Mi jornada (no detrás de un mosaico).
 window.loadHomeSvc=async function(){
