@@ -3612,7 +3612,24 @@ exports.clockPunch = onCall({ timeoutSeconds: 30 }, async (request) => {
       weekKey: d.weekKey || _laMondayKey(new Date()), createdAt: nowIso,
     });
     await openRef.delete();
-    return { ok: true, action: "out", hours: Math.round(hours * 100) / 100, breakMin: Math.round(breakMs / 60000), at: nowIso };
+    // ⏸️ Al cerrar turno, PAUSA automáticamente las tareas que dejó EN PROCESO (no se quedan "trabajando" sin que esté).
+    //    Query por assignEmpId (equality simple → sin índice compuesto) y filtro el estatus en código. Best-effort: si falla, el clock-out NO se rompe.
+    let pausedTasks = 0;
+    try {
+      if (id.empId) {
+        const qs = await db.collection("tasks").where("assignEmpId", "==", id.empId).get();
+        const bw = db.batch();
+        qs.forEach((docu) => {
+          const tk = docu.data() || {};
+          if (tk.status !== "en_proceso") return;
+          const add = tk.lastResumeAt ? Math.max(0, now - new Date(tk.lastResumeAt).getTime()) : 0;
+          bw.set(docu.ref, { status: "pausada", pausedReason: "Cerró turno", pausedAt: nowIso, workedMs: (Number(tk.workedMs) || 0) + add, lastResumeAt: null, updatedAt: nowIso, autoPausedByClockout: true }, { merge: true });
+          pausedTasks++;
+        });
+        if (pausedTasks) await bw.commit();
+      }
+    } catch (e) { pausedTasks = 0; /* no romper el clock-out si falla el auto-pause */ }
+    return { ok: true, action: "out", hours: Math.round(hours * 100) / 100, breakMin: Math.round(breakMs / 60000), at: nowIso, pausedTasks: pausedTasks };
   }
 });
 // 🔧 Cierra un turno ABIERTO (timeclock_open) con una hora de SALIDA dada. Reusable: olvido de clock-out, correcciones.

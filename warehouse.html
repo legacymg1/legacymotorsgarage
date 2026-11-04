@@ -844,7 +844,7 @@ window.clockPunch = async function(action){
     const d=(r&&r.data)||{};
     if(msg){ msg.style.color='#3ecf8e'; msg.textContent = action==='in'
       ? ('✅ Entrada registrada'+(d.location&&d.location!=='(sin ubicación)'?(' ('+(d.location==='dealer'?'Dealer':'Yonke')+')'):''))
-      : ('✅ Salida registrada — '+(d.hours||0)+' h en este turno'); }
+      : ('✅ Salida registrada — '+(d.hours||0)+' h en este turno'+(d.pausedTasks?(' · '+d.pausedTasks+' '+(d.pausedTasks===1?'tarea en pausa':'tareas en pausa')):'')); }
     refreshClock();
   }catch(e){ if(msg){ msg.style.color='#ff6b6b'; msg.textContent='⚠️ '+_clockErr(e); } }
   if(inB) inB.disabled=false; if(outB) outB.disabled=false;
@@ -913,7 +913,7 @@ async function clkDoPunch(action){
       const g=await _getGPS();
       const r=await httpsCallable(functions,'clockPunch')(vaData({action, lat:g.lat, lng:g.lng}));
       const d=(r&&r.data)||{};
-      whToast(action==='in' ? '✅ Clocked in' : ('✅ Clocked out — '+(d.hours||0)+' h'));
+      whToast(action==='in' ? (L==='en'?'✅ Clocked in':'✅ Entrada registrada') : ((L==='en'?'✅ Clocked out — ':'✅ Salida — ')+(d.hours||0)+' h'+(d.pausedTasks?(' · '+d.pausedTasks+' '+(L==='en'?(d.pausedTasks===1?'task paused':'tasks paused'):(d.pausedTasks===1?'tarea en pausa':'tareas en pausa'))):'')));
     } else {
       await httpsCallable(functions,'clockPunch')(vaData({action}));
       whToast(action==='break_start'?'☕ Break started':'▶️ Back to work');
