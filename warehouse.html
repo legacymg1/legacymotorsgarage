@@ -2158,18 +2158,30 @@ window.opSetTab=function(tk){ _opTab=tk; try{ sessionStorage.setItem('lmg_op_tab
 function _opDiv(label,count){ if(window.LMG && LMG.softDivider) return LMG.softDivider(label,count); return '<div style="display:flex;align-items:center;gap:10px;margin:16px 2px 8px;"><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">'+label+'</span><span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);"></span>'+(count==null?'':'<span style="font-size:11px;color:var(--faint);">'+count+'</span>')+'</div>'; }
 // --- Builders de cada parte (regresan HTML string) ---
 function _opTeamHtml(){
+  // 👥 Presencia estilo iOS: primero QUIÉN ESTÁ AQUÍ (fichado, punto verde), luego —apagados—
+  // los que tienen trabajo abierto pero NO están en turno (p.ej. dejaron una tarea sin pausar, o dueños que no fichan).
   const doneCount={}; (OP_DONE||[]).forEach(p=>{ doneCount[(p.name||'').trim().toLowerCase()]=p.count; });
-  const team=OP_TEAM.slice().sort((a,b)=>Number(!!b.open)-Number(!!a.open)||Number(!!b.task)-Number(!!a.task)||(b.hours||0)-(a.hours||0));
-  if(!team.length) return _opErr.clock?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nobody working right now.':'Nadie trabajando ahora.')+'</div>';
-  return team.map(e=>{
-    const dot=e.open?'🟢':(e.task?'🔧':'⚪');
+  if(!OP_TEAM||!OP_TEAM.length) return _opErr.clock?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nobody clocked in right now.':'Nadie fichado ahora.')+'</div>';
+  const onList=OP_TEAM.filter(e=>e.open).sort((a,b)=>Number(!!b.task)-Number(!!a.task)||(b.hours||0)-(a.hours||0));
+  const offList=OP_TEAM.filter(e=>!e.open).sort((a,b)=>(b.hours||0)-(a.hours||0));
+  const hdr=txt=>'<div class="faint" style="font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:9px 2px 5px;opacity:.7;">'+txt+'</div>';
+  const row=(e,present)=>{
     const hrs=(e.open||e.hours)?(' <span class="faint" style="font-weight:400;font-size:12px;">· '+Number(e.hours||0).toFixed(1)+' h</span>'):'';
     const dc=doneCount[(e.name||'').trim().toLowerCase()]||0;
     const doneBadge=dc?(' <span style="font-size:11px;color:#35c46a;font-weight:700;">· ✅ '+dc+'</span>'):'';
     const nm=(typeof whEscA==='function'?whEscA(e.name||''):String(e.name||'')).replace(/\x27/g,'');
-    const sub=e.task?('<span style="color:var(--text);">'+esc(e.task.title)+'</span> '+lineBadge(e.task.line)+' · '+_opStatusLabel('en_proceso')):(e.open?(L==='en'?'Clocked in · no active task':'Fichado · sin tarea activa'):'');
-    return '<div onclick="whEmpReport(\'\',\''+nm+'\',\'\')" style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><span style="width:30px;height:30px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none;">'+whInitials(e.name)+'</span><div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:14px;">'+dot+' '+esc(e.name||'—')+hrs+doneBadge+'</div><div class="faint" style="font-size:12px;">'+sub+'</div></div><span style="color:var(--muted);">›</span></div>';
-  }).join('');
+    const sub=e.task
+      ? ('<span style="color:var(--text);">'+esc(e.task.title)+'</span> '+lineBadge(e.task.line)+' · '+_opStatusLabel('en_proceso'))
+      : (present?(L==='en'?'Clocked in · no active task':'Fichado · sin tarea activa'):(L==='en'?'Open task · not clocked in':'Tarea abierta · sin fichar'));
+    const dotColor=present?'#35c46a':'#8a93a6';
+    const av='<span style="position:relative;flex:none;"><span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--surface);font-weight:800;font-size:12px;'+(present?'':'opacity:.6;')+'">'+whInitials(e.name)+'</span><span style="position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:'+dotColor+';border:2px solid var(--surface2);"></span></span>';
+    return '<div onclick="whEmpReport(\'\',\''+nm+'\',\'\')" style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;'+(present?'':'opacity:.7;')+'">'+av+'<div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:14px;">'+esc(e.name||'—')+hrs+doneBadge+'</div><div class="faint" style="font-size:12px;">'+sub+'</div></div><span style="color:var(--muted);">›</span></div>';
+  };
+  let h='';
+  h+=hdr('🟢 '+(L==='en'?'Here now':'Aquí ahora')+' · '+onList.length);
+  h+= onList.length ? onList.map(e=>row(e,true)).join('') : '<div class="faint" style="font-size:13px;padding:4px 2px 2px;">'+(L==='en'?'Nobody clocked in.':'Nadie en turno.')+'</div>';
+  if(offList.length){ h+=hdr('⚪ '+(L==='en'?'Not clocked in':'Sin fichar')+' · '+offList.length)+offList.map(e=>row(e,false)).join(''); }
+  return h;
 }
 function _opDoneHtml(){
   if(!OP_DONE.length) return _opErr.done?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nothing completed yet today.':'Aún nada terminado hoy.')+'</div>';
