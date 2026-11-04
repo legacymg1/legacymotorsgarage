@@ -136,6 +136,7 @@
 </style>
 </head>
 <body>
+<script src="legacy-splash.js"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
 
 <!-- PRIMER INGRESO: bloquea el portal hasta que conteste -->
 <div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.94);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
@@ -569,6 +570,7 @@ window.exitPreview=function(){
   setTimeout(function(){ try{ location.href='admin.html'; }catch(e){} }, 120);
 };
 onAuthStateChanged(auth, async (user)=>{
+  try{ window.LMG && LMG.hideSplash && LMG.hideSplash(); }catch(_){}   // ⏳ sesión resuelta → fuera el splash
   // 👁️ VISTA PREVIA DE DUEÑO: portal.html?preview=<clientId> abierto desde admin por un staff (mismo origen, misma sesión).
   const _prevId=new URLSearchParams(location.search).get('preview');
   const _STAFF=['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];

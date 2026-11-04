@@ -51,6 +51,7 @@
 </style>
 </head>
 <body>
+<script src="legacy-splash.js"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
 
 <div id="login" class="login">
   <div class="logo">🔐</div>
@@ -131,6 +132,7 @@ window.doLogin=async function(){
 };
 window.logout=()=>signOut(auth);
 onAuthStateChanged(auth,(user)=>{
+  try{ window.LMG && LMG.hideSplash && LMG.hideSplash(); }catch(_){}   // ⏳ sesión resuelta → fuera el splash
   const em=((user&&user.email)||'').toLowerCase();
   if(user && em===OWNER){
     document.getElementById('login').style.display='none';

@@ -129,6 +129,7 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:62px;}</style>
 </head>
 <body>
+<script src="legacy-splash.js"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
 
 <!-- LOGIN -->
 <div id="login">
@@ -1007,6 +1008,7 @@ window.doLogin = async function(){
 window.doLogout = function(){ signOut(auth); };
 
 onAuthStateChanged(auth,(user)=>{
+  try{ window.LMG && LMG.hideSplash && LMG.hideSplash(); }catch(_){}   // ⏳ sesión resuelta → fuera el splash
   const isStaff = user && STAFF_EMAILS.includes((user.email||'').toLowerCase()) && user.emailVerified;
   document.body.classList.toggle('admin-on', !!isStaff);
   if(isStaff){
