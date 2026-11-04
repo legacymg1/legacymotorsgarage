@@ -3592,6 +3592,9 @@ exports.clockPunch = onCall({ timeoutSeconds: 30 }, async (request) => {
     return { ok: true, action: "in", location: geo.location, at: nowIso };
   } else {
     if (!openSnap.exists) throw new HttpsError("failed-precondition", "No tienes una entrada abierta. Haz Entrada primero.");
+    // 📍 SALIDA también exige estar en el sitio (igual que la entrada). Así las horas reflejan tiempo REAL en el lugar;
+    //    nadie cierra turno ya en su casa inflando horas. Si ya se fue y lo olvidó, la oficina cierra el turno (clockAdminClose).
+    if (!geo.ok) throw new HttpsError("failed-precondition", "No estás en el Dealer ni en el Yonke (estás a " + geo.distM + " m). Acércate para cerrar tu turno, o pídele a la oficina que lo cierre por ti.");
     const d = openSnap.data();
     let breakMs = Number(d.breakMs) || 0;
     const breaks = Array.isArray(d.breaks) ? d.breaks.slice() : [];
