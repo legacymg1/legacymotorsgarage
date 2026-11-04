@@ -547,6 +547,7 @@
 
 <script src="legacy-svc.js"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
 <script src="legacy-carficha.js"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2078,7 +2079,25 @@ window.svcOpsView=function(id){
     +'<div class="faint" style="font-size:11px;margin-top:12px;text-align:center;line-height:1.5;">'+L2('El cobro detallado (tarjeta/Square) sigue en Clientes por ahora.','Detailed charging (card/Square) still lives in Clients for now.')+'</div>';
   ov.appendChild(box); document.body.appendChild(ov);
 };
-// 👥 Órdenes de UN cliente de servicio (read-only) desde el Centro.
+// 👤 Ficha del cliente (Cliente 360) desde el Centro — usa el componente COMPARTIDO legacy-clientficha.js
+// con los datos de servicio que Pit Crew ya tiene (SVC_ALL). Tocar una orden abre el popup OPERABLE (svcOpsView).
+window.clientFichaOpen=function(clientId){
+  if(!(window.LMG&&LMG.openClientFicha)){ whToast&&whToast(L2('Ficha no disponible — recarga','Client card unavailable — reload'),true); return; }
+  const en=(L==='en');
+  const orders=(SVC_ALL.orders||[]).filter(o=>o.clientId===clientId);
+  const cdoc=(SVC_ALL.clients||[]).find(x=>x.id===clientId)||{};
+  const name=cdoc.name||(orders[0]&&orders[0].clientName)||'Cliente';
+  const phone=cdoc.phone||(orders[0]&&orders[0].clientPhone)||'';
+  const seen={}, vehicles=[];
+  orders.forEach(o=>{ const key=(o.vin||o.plate||o.vehicleLabel||''); if(!key||seen[key])return; seen[key]=1; vehicles.push({label:o.vehicleLabel||'Auto',plate:o.plate||'',vin:o.vin||''}); });
+  const mk=o=>{ const sl=(LMG.svcStatusRich)?LMG.svcStatusRich(o,en):{txt:_opStatusLabel(o.status),col:_opStatusColor(o.status)}; const tot=(Number(o.grandTotalCents)||0)/100; const paid=(Number(o.paidCents)||0)/100; return {id:o.id,orderNum:o.orderNum,title:o.reason||(en?'Service':'Servicio'),when:(o.scheduledAt||o.createdAt)?new Date(o.scheduledAt||o.createdAt).toLocaleDateString(en?'en-US':'es-MX',{day:'2-digit',month:'short',year:'numeric'}):'',statusTxt:sl.txt,statusCol:sl.col,total:tot,saldo:Math.max(0,tot-paid)}; };
+  const by=(a,b)=>String(b.scheduledAt||b.createdAt||'').localeCompare(String(a.scheduledAt||a.createdAt||''));
+  const active=orders.filter(o=>!o.paid&&o.status!=='entregado').sort(by).map(mk);
+  const done=orders.filter(o=>o.paid||o.status==='entregado').sort(by).map(mk);
+  const badges=[]; if(orders.length) badges.push({icon:'🔧',label:en?'Service':'Servicio'});
+  LMG.openClientFicha({id:clientId,name:name,phone:phone,lang:(en?'en':'es'),badges:badges,vehicles:vehicles,serviceActive:active,serviceDone:done},{lang:(en?'en':'es'),openOrderFn:'svcOpsView',openReceiptFn:'svcOpsView'});
+};
+// 👥 Órdenes de UN cliente de servicio (read-only) desde el Centro. [legacy — ahora el Centro abre clientFichaOpen]
 window.svcOpsClient=function(id){
   const list=(SVC_ALL.orders||[]).filter(o=>o.clientId===id);
   const c=(SVC_ALL.clients||[]).find(x=>x.id===id)||{name:(list[0]&&list[0].clientName)||'Cliente',phone:(list[0]&&list[0].clientPhone)||''};
@@ -2226,7 +2245,7 @@ function _opSvcClientsHtml(){
   return '<div class="faint" style="font-size:12px;margin-bottom:8px;">'+arr.length+' '+L2('cliente(s) de servicio','service client(s)')+'</div><div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">'+arr.map(c=>{
     const last=c.last?new Date(c.last).toLocaleDateString(L==='en'?'en-US':'es-MX',{day:'2-digit',month:'short',year:'numeric'}):'';
     const subl=(c.n>0?(c.n+' '+L2('orden(es)','order(s)')+(last?(' · '+last):'')):L2('Sin órdenes aún','No orders yet'));
-    return '<div onclick="svcOpsClient(\''+c.id+'\')" style="display:flex;gap:11px;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><span style="width:38px;height:38px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;">'+ini(c.name)+'</span><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.name)+'</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.phone||'')+' · '+subl+'</div></div><span style="color:var(--gold);font-size:18px;flex:none;">›</span></div>';
+    return '<div onclick="clientFichaOpen(\''+c.id+'\')" style="display:flex;gap:11px;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;"><span style="width:38px;height:38px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;">'+ini(c.name)+'</span><div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.name)+'</div><div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.phone||'')+' · '+subl+'</div></div><span style="color:var(--gold);font-size:18px;flex:none;">›</span></div>';
   }).join('')+'</div>';
 }
 function _opDisHtml(){
