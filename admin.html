@@ -6437,8 +6437,10 @@ function getBirthdayClients() {
   const todayStr = today();
   const mm = todayStr.slice(5,7);
   const dd = todayStr.slice(8,10);
+  const yr = Number(todayStr.slice(0,4));
   return clients.filter(c => {
     if(!c.dob) return false;
+    if(Number(c.birthdayGreetedYear) === yr) return false;   // ✅ ya felicitado este año → no mostrar
     return c.dob.slice(5,7) === mm && c.dob.slice(8,10) === dd;
   });
 }
@@ -6513,7 +6515,7 @@ window.sendServiceMsg = function(id) {
   try{ updateDoc(doc(db,'clients',id), { serviceReminderSentAt: new Date().toISOString() }); }catch(e){}
 };
 
-window.sendBirthdayMsg = function(id) {
+window.sendBirthdayMsg = async function(id) {
   const c = clients.find(x => x.id === id);
   if(!c) return;
   if(!marketingOk(c)) return;
@@ -6526,6 +6528,11 @@ window.sendBirthdayMsg = function(id) {
   }
   const phone = c.phone.replace(/\D/g,'');
   const _a2=document.createElement('a');_a2.href=`sms:${phone}?body=${encodeURIComponent(msg+portalTag(lang))}`;_a2.click();
+  // ✅ Marcar felicitado este año → desaparece de "Cumpleaños hoy" (re-render al instante + guardar).
+  const _yr = Number(today().slice(0,4));
+  c.birthdayGreetedYear = _yr;
+  try{ renderTodayBox(); }catch(e){}
+  try{ await updateDoc(doc(db,'clients',c.id), { birthdayGreetedYear: _yr }); }catch(e){ console.warn('birthdayGreeted', e); }
 };
 
 // Send individual friendly payment-day reminder to a single client
