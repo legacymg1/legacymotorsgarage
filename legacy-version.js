@@ -1,21 +1,25 @@
 /* ============================================================
-   legacy-version.js — AVISO DE NUEVA VERSIÓN (one-ecosystem)
+   legacy-version.js — AUTO-ACTUALIZACIÓN (one-ecosystem)
    Revisa version.json (que el deploy regenera en cada publish) y,
-   si cambió respecto a la que cargó esta pestaña, muestra una barra
-   discreta abajo: "Nueva versión — Actualizar". Así el equipo y los
-   clientes siempre tienen lo último sin limpiar caché a mano.
+   si cambió respecto a la que cargó esta pestaña, actualiza SOLA —
+   sin barra, estilo iOS — en un momento SEGURO:
+     • Si la app está en segundo plano / la cierras → recarga invisible.
+     • Si está abierta pero estás QUIETO (sin escribir) → HUD iOS
+       "Actualizando…" ~1s y recarga.
+     • NUNCA recarga mientras escribes en un campo (no pierdes lo tecleado).
 
-   Uso: incluir <script src="legacy-version.js"></script> tras <body>.
+   Uso: <script src="legacy-version.js"></script> tras <body>.
    No requiere nada más: el deploy ya genera version.json.
-   Si version.json no existe o falla la red, no hace nada (silencioso).
    ============================================================ */
 (function () {
   if (window.__lmgVerInit) return;
   window.__lmgVerInit = true;
 
   var CHECK_MS = 3 * 60 * 1000;   // revisar cada 3 min (y al volver a la pestaña)
+  var IDLE_MS  = 5000;            // "quieto" = 5s sin tocar/escribir
   var base = null;                // versión con la que cargó ESTA pestaña
-  var shown = false;              // ya avisamos (no molestar de nuevo)
+  var pending = false;            // hay nueva versión esperando a aplicarse
+  var lastInteract = Date.now();
 
   function isEn() {
     try {
@@ -32,51 +36,72 @@
       .catch(function () { return null; });
   }
 
-  function banner() {
-    if (shown || document.getElementById('lmg-ver-bar')) return;
-    shown = true;
-    var en = isEn();
-    var bar = document.createElement('div');
-    bar.id = 'lmg-ver-bar';
-    bar.style.cssText =
-      'position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:2147483100;' +
-      'background:linear-gradient(135deg,#d9b85a,#c9a84c);color:#0b0e14;border-radius:13px;' +
-      'padding:12px 14px;display:flex;align-items:center;gap:10px;font-weight:800;font-size:13.5px;' +
-      'box-shadow:0 12px 34px rgba(0,0,0,.5);font-family:inherit;animation:lmgVerIn .35s ease;max-width:520px;margin:0 auto;';
-    bar.innerHTML =
-      '<span style="flex:1;line-height:1.3;">✨ ' +
-      (en ? 'New version available' : 'Nueva versión disponible') + '</span>' +
-      '<button id="lmg-ver-go" style="background:#0b0e14;color:#f0c040;border:none;border-radius:9px;' +
-      'padding:8px 14px;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">' +
-      (en ? 'Update' : 'Actualizar') + '</button>' +
-      '<button id="lmg-ver-x" aria-label="cerrar" style="background:transparent;border:none;color:#0b0e14;' +
-      'font-size:20px;line-height:1;cursor:pointer;padding:0 2px;">×</button>';
-    (document.body || document.documentElement).appendChild(bar);
+  // ¿El usuario está escribiendo? → NO recargar (perdería lo tecleado).
+  function isTyping() {
+    var a = document.activeElement;
+    if (!a) return false;
+    if (a.isContentEditable) return true;
+    return /^(input|textarea|select)$/i.test(a.tagName || '');
+  }
 
-    var st = document.createElement('style');
-    st.textContent = '@keyframes lmgVerIn{from{transform:translateY(-16px);opacity:0;}to{transform:translateY(0);opacity:1;}}';
-    (document.head || document.documentElement).appendChild(st);
+  function reloadNow(silent) {
+    if (silent) { try { location.reload(); } catch (e) {} return; }
+    // HUD estilo iOS: recuadro redondeado con blur + spinner, centrado.
+    if (!document.getElementById('lmg-hud')) {
+      var css = document.createElement('style');
+      css.textContent =
+        '#lmg-hud{position:fixed;inset:0;z-index:2147483200;display:flex;align-items:center;justify-content:center;' +
+        'background:rgba(0,0,0,.18);animation:lmgHudFade .2s ease;}' +
+        '#lmg-hud .lmg-hud-box{background:rgba(28,28,32,.72);-webkit-backdrop-filter:blur(22px) saturate(180%);' +
+        'backdrop-filter:blur(22px) saturate(180%);border:.5px solid rgba(255,255,255,.12);border-radius:22px;' +
+        'padding:24px 28px;display:flex;flex-direction:column;align-items:center;gap:14px;min-width:160px;' +
+        'box-shadow:0 24px 70px rgba(0,0,0,.45);color:#fff;font-family:inherit;animation:lmgHudPop .28s cubic-bezier(.2,.9,.3,1.2);}' +
+        '#lmg-hud .lmg-hud-spin{width:30px;height:30px;border:3px solid rgba(255,255,255,.22);border-top-color:#fff;' +
+        'border-radius:50%;animation:lmgHudSpin .8s linear infinite;}' +
+        '#lmg-hud .lmg-hud-txt{font-size:14px;font-weight:600;letter-spacing:.2px;opacity:.95;}' +
+        '@keyframes lmgHudSpin{to{transform:rotate(360deg);}}' +
+        '@keyframes lmgHudFade{from{opacity:0;}to{opacity:1;}}' +
+        '@keyframes lmgHudPop{from{transform:scale(.86);opacity:0;}to{transform:scale(1);opacity:1;}}' +
+        '@media (prefers-reduced-motion:reduce){#lmg-hud .lmg-hud-spin{animation:none;}}';
+      (document.head || document.documentElement).appendChild(css);
+      var hud = document.createElement('div');
+      hud.id = 'lmg-hud';
+      hud.innerHTML = '<div class="lmg-hud-box"><div class="lmg-hud-spin"></div>' +
+        '<div class="lmg-hud-txt">' + (isEn() ? 'Updating…' : 'Actualizando…') + '</div></div>';
+      (document.body || document.documentElement).appendChild(hud);
+    }
+    setTimeout(function () { try { location.reload(); } catch (e) {} }, 950);
+  }
 
-    document.getElementById('lmg-ver-go').onclick = function () {
-      try { location.reload(); } catch (e) { location.href = location.pathname + '?v=' + Date.now(); }
-    };
-    document.getElementById('lmg-ver-x').onclick = function () {
-      var b = document.getElementById('lmg-ver-bar'); if (b) b.remove();
-    };
+  // Aplica la actualización en cuanto sea seguro.
+  function tryApply() {
+    if (!pending) return;
+    if (document.hidden) { reloadNow(true); return; }                 // no lo ve → recarga invisible
+    if (!isTyping() && (Date.now() - lastInteract) > IDLE_MS) {        // visible y quieto → HUD + recarga
+      reloadNow(false); return;
+    }
+    setTimeout(tryApply, 2000);                                        // ocupado/escribiendo → reintenta
   }
 
   function check() {
-    if (shown) return;
+    if (pending) return;
     fetchVer().then(function (v) {
       if (!v) return;
       if (base === null) { base = v; return; }   // primera lectura = versión de esta pestaña
-      if (v !== base) banner();
+      if (v !== base) { pending = true; tryApply(); }
     });
   }
 
-  // Primera lectura (fija la base) y chequeos periódicos + al volver a la pestaña.
+  // Marcar interacción (para saber cuándo está "quieto").
+  ['pointerdown', 'keydown', 'touchstart', 'wheel', 'scroll'].forEach(function (ev) {
+    window.addEventListener(ev, function () { lastInteract = Date.now(); }, { passive: true });
+  });
+
   check();
   setInterval(check, CHECK_MS);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { if (pending) reloadNow(true); }   // la cerró con update pendiente → recarga invisible
+    else check();                                            // volvió → revisa
+  });
   window.addEventListener('focus', check);
 })();
