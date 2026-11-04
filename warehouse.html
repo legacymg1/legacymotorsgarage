@@ -337,7 +337,7 @@
       <span style="font-weight:800;font-size:17px;" id="op-title">📊 Centro de Operaciones</span>
       <button class="linkbtn" onclick="loadOwnerPanel()" style="font-size:18px;" title="↻">↻</button>
     </div>
-    <div id="op-summary" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+    <div id="op-summary" style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:11px 13px;margin-bottom:12px;"></div>
     <div style="position:relative;margin-bottom:12px;"><input id="op-search" type="search" oninput="opSearch(this.value)" data-i18n-ph="opSearchPh" placeholder="🔎 Buscar carro, orden, tarea o empleado…" autocomplete="off" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 12px;color:var(--text);font-size:15px;"></div>
     <div id="op-results" style="display:none;margin-bottom:14px;"></div>
     <div id="op-normal">
@@ -2281,12 +2281,12 @@ function _opTasksHtml(){
 function renderOwnerPanel(){
   const tt=document.getElementById('op-title'); if(tt) tt.textContent=L==='en'?'📊 Operations Center':'📊 Centro de Operaciones';
   const onShift=OP_TEAM.filter(x=>x.open).length;
-  // Resumen de hoy (contadores) → cada uno CAMBIA de pestaña.
+  if(_opTab==='equipo') _opTab='todo';   // el Equipo ya vive arriba (caja fija) → quitamos su pestaña
+  // 👥 EQUIPO arriba (caja protagonista): quién está en qué trabajo + estatus. Reemplaza las cajas de conteo (los números ya van en las pestañas).
   const sum=document.getElementById('op-summary');
-  const cells=[['🚗',OP_DEALER.length,'Dealer','dealer'],['🔧',OP_SVC.length,'Service','service'],['🧩',OP_DIS.length,'Dismantling','dis'],['📋',OP_TASKS.length,(L==='en'?'Tasks':'Tareas'),'pit'],['🟢',onShift,(L==='en'?'On shift':'En turno'),'equipo']];
-  if(sum) sum.innerHTML=cells.map(x=>'<div onclick="opSetTab(\''+x[3]+'\')" style="flex:1;min-width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer;"><div style="font-size:22px;font-weight:800;">'+x[1]+'</div><div class="faint" style="font-size:10.5px;">'+x[0]+' '+x[2]+'</div></div>').join('');
+  if(sum) sum.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-weight:800;font-size:14px;">👥 '+L2('Equipo','Team')+'</span><span class="lmg-pill" style="color:#35c46a;background:rgba(53,196,106,.14);border-color:#35c46a;">🟢 '+onShift+' '+L2('en turno','on shift')+'</span></div>'+_opTeamHtml();
   // Pestañas
-  const tabsArr=[['todo','🗂️ '+L2('Todo','All'),OP_DEALER.length+OP_SVC.length+OP_DIS.length+OP_TASKS.length],['equipo','👥 '+L2('Equipo','Team'),OP_TEAM.length],['dealer','🚗 Dealer',OP_DEALER.length],['service','🔧 Service',OP_SVC.length],['dis','🧩 Dismantling',OP_DIS.length],['pit','📋 Pit',OP_TASKS.length]];
+  const tabsArr=[['todo','🗂️ '+L2('Todo','All'),OP_DEALER.length+OP_SVC.length+OP_DIS.length+OP_TASKS.length],['dealer','🚗 Dealer',OP_DEALER.length],['service','🔧 Service',OP_SVC.length],['dis','🧩 Dismantling',OP_DIS.length],['pit','📋 Pit',OP_TASKS.length]];
   const tabsBox=document.getElementById('op-tabs'); const cur=_opTab;
   if(tabsBox) tabsBox.innerHTML=tabsArr.map(a=>'<button onclick="opSetTab(\''+a[0]+'\')" style="padding:8px 13px;border-radius:999px;border:1px solid '+(cur===a[0]?'var(--gold)':'var(--border)')+';background:'+(cur===a[0]?'var(--gold)':'transparent')+';color:'+(cur===a[0]?'var(--navy3,#0b0e14)':'var(--text)')+';font-weight:800;font-size:12.5px;cursor:pointer;white-space:nowrap;flex:none;">'+a[1]+' <span style="opacity:.7;">'+a[2]+'</span></button>').join('');
   // Cuerpo de la pestaña activa
@@ -2298,8 +2298,7 @@ function renderOwnerPanel(){
   else if(cur==='dis'){ html=_opDisHtml(); }
   else if(cur==='pit'){ html='<div style="display:flex;gap:8px;margin-bottom:10px;"><button class="btn sm" onclick="jobAddOpen()" style="padding:7px 12px;font-size:12px;">➕ '+L2('Tarea','Task')+'</button><button class="btn ghost sm" onclick="openCarsProc()" style="padding:7px 12px;font-size:12px;">🚗 '+L2('Carros','Cars')+'</button></div>'+_opTasksHtml(); }
   else { // 🗂️ Todo = panorama con divisores suaves
-    html=_opDiv('👥 '+L2('Equipo','Team'),OP_TEAM.filter(x=>x.open||x.task).length)+_opTeamHtml()
-      +_opDiv('🚗 Dealer',OP_DEALER.length)+_opDealerHtml()
+    html=_opDiv('🚗 Dealer',OP_DEALER.length)+_opDealerHtml()
       +_opDiv('🔧 Service',OP_SVC.length)+_opSvcHtml()
       +_opDiv('🧩 Dismantling',OP_DIS.length)+_opDisHtml()
       +_opDiv('📋 Pit',OP_TASKS.length)+_opTasksHtml();
