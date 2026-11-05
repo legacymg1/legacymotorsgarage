@@ -105,7 +105,8 @@ function injectStyle(){
       background:none;border:none;flex:0 0 auto;transition:background .15s ease,transform .1s ease;}
     .lmg-logo:hover{background:rgba(232,182,74,0.12);}
     .lmg-logo:active{transform:scale(.96);}
-    .lmg-logo-img{height:64px;width:auto;display:block;}
+    .lmg-logo-img{height:70px;width:auto;display:block;}
+    @media(min-width:768px){ .lmg-logo-img{height:96px;} }
     .lmg-chev{display:inline-block;font-size:12px;opacity:.85;color:#c9b896;transition:transform .18s ease;}
     .lmg-logo[data-lmg-open] .lmg-chev{transform:rotate(180deg);}
     #lmg-catch{position:fixed;inset:0;z-index:2147483000;display:none;background:transparent;}
