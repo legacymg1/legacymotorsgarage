@@ -2271,6 +2271,45 @@ exports.svcDiagHelp = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60, mem
   } catch (e) { console.error("svcDiagHelp", e); throw new HttpsError("internal", String((e && e.message) || e)); }
 });
 
+// 💬 CHIEF MECHANIC — CHAT interactivo (reusa el patrón de portalHelp + visión + web search + Topdon). Sigue el HILO del diagnóstico.
+//    op 'chat' = siguiente respuesta; op 'finish' = de toda la plática saca {summary, parts[]} para la orden (supervisor/Centro).
+exports.svcMechChat = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 90, memory: "512MiB" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const d = request.data || {};
+  const op = String(d.op || "chat");
+  const vehicle = String(d.vehicle || "").slice(0, 120); const vin = String(d.vin || "").slice(0, 20);
+  const service = String(d.service || "").slice(0, 160);
+  const lang = (String(d.lang || "es") === "en") ? "en" : "es";
+  const history = Array.isArray(d.messages) ? d.messages.slice(-20) : [];
+  const AnthropicMod = require("@anthropic-ai/sdk"); const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+  const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+  const msgs = history.map((m) => ({ role: (m.role === "assistant" ? "assistant" : "user"), content: String(m.text || m.content || "").slice(0, 2500) })).filter((m) => m.content);
+  if (op === "finish") {
+    const convoText = history.map((m) => ((m.role === "assistant") ? "CHIEF: " : "MECÁNICO: ") + String(m.text || m.content || "")).join("\n");
+    const sys = "You are a master chief mechanic. From the diagnostic CONVERSATION, produce the FINAL structured result for the shop: a short professional SUMMARY (in Spanish) of the diagnosis, and the PARTS the vehicle needs (desc + OEM partNum if known). Return ONLY strict JSON {\"summary\":\"...\",\"parts\":[{\"desc\":\"...\",\"partNum\":\"...\"}]} — partNum '' if unknown. No prose, no code fences.";
+    const resp = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 1200, system: sys, messages: [{ role: "user", content: "Vehicle: " + (vehicle || "?") + (vin ? (" VIN " + vin) : "") + "\nService: " + (service || "-") + "\n\nConversation:\n" + convoText }] });
+    let txt = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim(); txt = txt.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
+    let out = {}; try { out = JSON.parse(txt); } catch (e) { const mm = txt.match(/\{[\s\S]*\}/); if (mm) { try { out = JSON.parse(mm[0]); } catch (_) {} } }
+    const parts = (Array.isArray(out.parts) ? out.parts : []).slice(0, 30).map((p) => ({ desc: String(p.desc || "").slice(0, 200), partNum: String(p.partNum || "").slice(0, 60) })).filter((p) => p.desc || p.partNum);
+    return { ok: true, summary: String(out.summary || "").slice(0, 2000), parts: parts };
+  }
+  // op chat (con fotos del ÚLTIMO mensaje del usuario)
+  const urls = Array.isArray(d.photos) ? d.photos.filter(Boolean).slice(0, 4) : [];
+  const images = [];
+  for (const u of urls) { try { const r = await fetch(u); if (!r.ok) continue; const ct = (r.headers.get("content-type") || "image/jpeg").split(";")[0]; const media = /png/.test(ct) ? "image/png" : /webp/.test(ct) ? "image/webp" : "image/jpeg"; const buf = Buffer.from(await r.arrayBuffer()); if (buf.length > 4.8 * 1024 * 1024) continue; images.push({ type: "image", source: { type: "base64", media_type: media, data: buf.toString("base64") } }); } catch (e) {} }
+  const sys = "You are a master ASE-certified CHIEF MECHANIC with 30 years hands-on experience, chatting with a shop mechanic to diagnose a vehicle. Be sharp, practical, HONEST, conversational and BRIEF (2-5 sentences per reply) — this is a back-and-forth, follow the diagnostic thread. " +
+    "Guide step by step: from what the mechanic reports, tell him the NEXT thing to check/test (specific expected values, the exact Topdon live-data PID or bidirectional/active test) and WAIT for his result before concluding. Narrow it down WITH him. " +
+    "USE WEB SEARCH for real common failures / TSBs / specs for this exact vehicle. The shop's scanner is a TOPDON Phoenix Plus 2 (bidirectional, ECU coding, live-data graphing, 40+ reset services) — reference its capabilities. If the mechanic sends a photo/screenshot (Topdon screen or the part), READ it and use it. " +
+    "Reply in " + (lang === "en" ? "ENGLISH" : "SPANISH") + ". Ask for what you need; don't dump a textbook.";
+  const ctx = "Vehicle: " + (vehicle || "(unknown)") + (vin ? (" · VIN " + vin) : "") + (service ? ("\nService/Complaint: " + service) : "");
+  const claudeMsgs = msgs.map((m) => ({ role: m.role, content: m.content }));
+  if (!claudeMsgs.length) return { ok: true, reply: "" };
+  if (images.length) { const last = claudeMsgs[claudeMsgs.length - 1]; if (last.role === "user") { last.content = [...images, { type: "text", text: last.content }]; } }
+  const resp = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 900, system: sys + "\n\n" + ctx, tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }], messages: claudeMsgs });
+  const reply = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  return { ok: true, reply: reply };
+});
+
 // 📋 RESUMEN DE DIAGNÓSTICO (el mecánico termina de diagnosticar y lo ENVÍA). La IA arma un resumen PROFESIONAL por servicio
 //    (hallazgo + partes con # OEM, sin precio), se guarda en la orden (historia), el trabajo se PAUSA hasta instrucciones, y se avisa al dueño.
 exports.svcDiagSummary = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }, async (request) => {
