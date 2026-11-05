@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105183725"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105183725"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105183940"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105183940"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261105183725"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261105183725"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261105183725"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105183940"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261105183940"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261105183940"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2887,7 +2887,10 @@ function _diagRender(){
   h+='<textarea oninput="_diag&&(_diag.notes=this.value)" placeholder="'+(en?'Describe the problem…':'Describe el problema…')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:14px;min-height:60px;resize:vertical;margin-bottom:7px;">'+esc(r.notes||'')+'</textarea>';
   h+='<label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;color:var(--muted);">'+(en?'Add photos of the problem':'Agrega fotos del problema')+(r.photos.length?(' · '+r.photos.length):'')+'</label>';
   h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'+r.photos.map(function(p,pi){ const src=p.url||p.preview; return '<span style="position:relative;display:inline-block;"><img src="'+src+'" style="width:72px;height:72px;object-fit:cover;border-radius:10px;"><button onclick="diagRmPhoto('+pi+')" style="position:absolute;top:-6px;right:-6px;background:#e05a4a;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;font-weight:800;cursor:pointer;line-height:1;">×</button></span>'; }).join('')+'</div>';
-  h+='<label style="display:inline-block;margin-bottom:14px;"><span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-size:13px;font-weight:700;cursor:pointer;">📷 '+(en?'Add photo':'Agregar foto')+'</span><input type="file" accept="image/*" onchange="diagAddPhoto(this)" style="display:none;"></label>';
+  h+='<label style="display:inline-block;margin-bottom:12px;"><span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-size:13px;font-weight:700;cursor:pointer;">📷 '+(en?'Add photo':'Agregar foto')+'</span><input type="file" accept="image/*" onchange="diagAddPhoto(this)" style="display:none;"></label>';
+  // 🧠 Chief mechanic (IA que ayuda a diagnosticar, ve las fotos del problema + busca fallas comunes/TSB)
+  h+='<button onclick="diagAiHelp()" '+(r.aiLoading?'disabled ':'')+'style="width:100%;margin-bottom:'+(r.aiHelp?'8px':'16px')+';background:linear-gradient(135deg,#6d4bff,#9b7bff);color:#fff;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:800;cursor:pointer;">'+(r.aiLoading?('⏳ '+(en?'Thinking…':'Pensando…')):('🧠 '+(en?'Chief mechanic — help me diagnose':'Chief mechanic — ayúdame a diagnosticar')))+'</button>';
+  if(r.aiHelp){ h+='<div style="background:rgba(109,75,255,.08);border:1px solid rgba(109,75,255,.4);border-radius:12px;padding:12px;margin-bottom:16px;"><div style="font-weight:800;font-size:12px;color:#9b7bff;margin-bottom:6px;">🧠 '+(en?'Chief mechanic':'Mecánico jefe')+'</div><div style="font-size:13px;line-height:1.5;white-space:pre-wrap;">'+esc(r.aiHelp)+'</div><button onclick="diagAiToNotes()" class="btn ghost" style="width:100%;margin-top:10px;">➕ '+(en?'Add to my notes':'Pegar a mis notas')+'</button></div>'; }
   h+='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">🧩 '+(en?'Parts needed':'Partes que necesitas')+'</label>';
   h+=r.parts.map(function(p,pi){ const psrc=p.photoUrl||p.photoPreview; return '<div style="border:1px solid var(--border);border-radius:10px;padding:9px;margin-bottom:8px;">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;"><span class="faint" style="font-size:11px;font-weight:700;">🧩 #'+(pi+1)+'</span><button onclick="diagRmPart('+pi+')" style="background:transparent;border:none;color:#e05a4a;font-size:12px;cursor:pointer;">🗑 '+(en?'Remove':'Quitar')+'</button></div>'
@@ -2903,6 +2906,19 @@ function _diagRender(){
   const body=document.getElementById('svc-diag-body'); if(body) body.innerHTML=h;
 }
 window.diagAddPart=function(){ if(!_diag) return; _diag.parts.push({desc:'',partNum:'',photoUrl:'',photoFile:null,photoPreview:''}); _diagRender(); };
+window.diagAiHelp=async function(){
+  if(!_diag) return; const en=(L==='en'); const r=_diag;
+  r.aiLoading=true; _diagRender();
+  try{
+    // sube las fotos del problema (sin guardar aún) para que la IA las vea
+    for(const p of (r.photos||[])){ if(p.file && !p.url){ const rf=ref(storage,'serviceOrders/'+r.orderId+'/diag/'+Date.now()+'_find_'+((p.file.name||'foto.jpg'))); await uploadBytes(rf,p.file); p.url=await getDownloadURL(rf); p.file=null; } }
+    const urls=(r.photos||[]).map(function(p){ return p.url; }).filter(Boolean);
+    const res=await httpsCallable(functions,'svcDiagHelp')(vaData({vehicle:r.vehicle||'',vin:r.vin||'',service:r.desc||'',symptom:(r.notes||''),photos:urls,lang:en?'en':'es'}));
+    r.aiHelp=((res&&res.data)||{}).text||''; if(!r.aiHelp) whToast(en?'No answer':'Sin respuesta');
+  }catch(e){ whToast('⚠️ '+((e&&e.message)||'IA'),true); }
+  if(_diag) _diag.aiLoading=false; _diagRender();
+};
+window.diagAiToNotes=function(){ if(!_diag||!_diag.aiHelp) return; _diag.notes=((_diag.notes||'').trim()+'\n\n'+_diag.aiHelp).trim(); _diag.aiHelp=''; _diagRender(); };
 window.diagLookupPart=async function(i){
   if(!_diag||!_diag.parts[i]) return; const en=(L==='en');
   const q=(_diag.parts[i].desc||'').trim();
@@ -5779,7 +5795,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261105183725"></script>
+<script type="module" src="launcher.js?v=20261105183940"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>

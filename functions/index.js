@@ -2239,6 +2239,37 @@ exports.svcPartLookup = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 },
   } catch (e) { console.error("svcPartLookup", e); throw new HttpsError("internal", String((e && e.message) || e)); }
 });
 
+// 🧠 CHIEF MECHANIC — IA que AYUDA A DIAGNOSTICAR (visión + búsqueda web). El mecánico describe el síntoma y (opcional) sube fotos;
+//    la IA responde como un mecánico jefe: causas probables + qué revisar + fallas comunes/TSB + partes probables. (Reusa visión de prepareEbay + web search.)
+exports.svcDiagHelp = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60, memory: "512MiB" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const d = request.data || {};
+  const vehicle = String(d.vehicle || "").slice(0, 120);
+  const vin = String(d.vin || "").slice(0, 20);
+  const service = String(d.service || "").slice(0, 160);
+  const symptom = String(d.symptom || "").slice(0, 2000);
+  const lang = (String(d.lang || "es") === "en") ? "en" : "es";
+  const urls = Array.isArray(d.photos) ? d.photos.filter(Boolean).slice(0, 5) : [];
+  if (!symptom && !urls.length) return { ok: false, text: "" };
+  const images = [];
+  for (const u of urls) {
+    try { const r = await fetch(u); if (!r.ok) continue; const ct = (r.headers.get("content-type") || "image/jpeg").split(";")[0]; const media = /png/.test(ct) ? "image/png" : /webp/.test(ct) ? "image/webp" : "image/jpeg"; const buf = Buffer.from(await r.arrayBuffer()); if (buf.length > 4.8 * 1024 * 1024) continue; images.push({ type: "image", source: { type: "base64", media_type: media, data: buf.toString("base64") } }); } catch (e) {}
+  }
+  const sys = "You are a master ASE-certified CHIEF MECHANIC with 30 years of hands-on experience, helping a shop mechanic diagnose a vehicle. Be sharp, practical and HONEST — never bluff. " +
+    "Given the vehicle (decode the VIN if provided), the service/complaint, the mechanic's notes, and any photos, think like a seasoned chief mechanic: give the MOST LIKELY causes (ranked), exactly WHAT TO CHECK/TEST for each (specific tests, measurements, tools, typical values), known COMMON FAILURES / TSBs for THIS exact vehicle, and the likely PARTS involved. " +
+    "USE WEB SEARCH to pull real common failures / TSBs / specs for this exact vehicle when it helps. If a diagnostic trouble code (e.g. P0420) is mentioned, give the REAL-WORLD usual causes, not just the generic definition. " +
+    "Be concrete and brief — this is for a working mechanic, not a textbook. Reply in " + (lang === "en" ? "ENGLISH" : "SPANISH") + ". " +
+    "Format as short sections with these headers (translate them to the reply language): '🔎 Causas probables' (ranked list), '🧪 Qué revisar' (specific checks), '🛠️ Fallas comunes / TSB', '🧩 Partes probables'. Keep it tight — no intro, no disclaimer.";
+  const userText = "Vehicle: " + (vehicle || "(unknown)") + (vin ? (" · VIN " + vin) : "") + "\nService/Complaint: " + (service || "-") + "\nMechanic's notes: " + (symptom || "-") + (images.length ? "\n(Photos attached — look at them carefully.)" : "");
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk"); const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 1600, system: sys, tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }], messages: [{ role: "user", content: [...images, { type: "text", text: userText }] }] });
+    const text = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    return { ok: true, text: text };
+  } catch (e) { console.error("svcDiagHelp", e); throw new HttpsError("internal", String((e && e.message) || e)); }
+});
+
 // 🗂️ SERVICE CRM completo para el CENTRO DE OPERACIONES (solo dueño): TODAS las órdenes (activas + completadas + estimados) + clientes de servicio.
 // Alimenta las pestañas Activas·Completadas·Clientes con el MISMO render compartido que Clientes/admin (un solo ecosistema).
 exports.svcOwnerAll = onCall({ timeoutSeconds: 30 }, async (request) => {
