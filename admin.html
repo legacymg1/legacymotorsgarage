@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105233631"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105233631"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105235225"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105235225"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105233631"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105233631"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105235225"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105235225"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -3111,6 +3111,13 @@ window.svcAddAllDiagParts=function(orderId){
   try{ if(window.svcToast) svcToast(n?('➕ '+n+' parte(s) al estimado · ponles precio abajo'):'Ya estaban todas en el estimado'); }catch(e){}
   svcHistoryClose();
 };
+// 🔎 Agrega un TRABAJO SUGERIDO (inspección rápida) como SERVICIO al estimado.
+window.svcAddSugService=function(si){
+  if(!window._svcDraft||!Array.isArray(window._svcDraft.services)){ try{ if(window.svcToast) svcToast('Abre la orden (ver orden ›) para agregarlo al estimado.'); }catch(e){} return; }
+  const s=(window._svcHistSug||[])[si]; if(!s) return;
+  svcCapture(); window._svcDraft.services.push({ desc:(s.note||'Trabajo sugerido').slice(0,120), price:0, minutes:60, parts:[] });
+  svcRenderModal(); try{ if(window.svcToast) svcToast('➕ Agregado como servicio · ponle precio abajo'); }catch(e){}
+};
 // 🔧 HISTORIA DEL MECÁNICO (popup): recepción → lista de partes (widget) → detalle por servicio (acordeón diagnóstico+reparación). NO vomitado en la orden.
 window.svcHistoryClose=function(){ const el=document.getElementById('svc-history'); if(el) el.remove(); };
 window.svcHistToggle=function(i){ var b=document.getElementById('svc-hist-body-'+i); var c=document.getElementById('svc-hist-chev-'+i); if(!b) return; var open=(b.style.display!=='none'); b.style.display=open?'none':'block'; if(c) c.textContent=open?'▾':'▴'; };
@@ -3135,6 +3142,14 @@ window.svcHistoryOpen=function(orderId){
       h+='<div style="margin-top:6px;font-weight:700;color:'+(ik.clientAck?'#35c46a':'#f0a030')+';">'+(ik.clientAck?('✅ Cliente autorizó'+(ik.clientAckAt?(' · '+dt(ik.clientAckAt)):'')):'⏳ Pendiente de autorización del cliente')+'</div>'; }
     h+='</div>';
   } else { h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">—</div>'; }
+  // 🔎 Trabajo SUGERIDO (inspección rápida del mecánico) — el dueño lo agrega como servicio al estimado.
+  const _sug=(ik&&Array.isArray(ik.suggested))?ik.suggested:[]; window._svcHistSug=_sug;
+  if(_sug.length){
+    h+='<div style="font-weight:800;font-size:12px;color:#f0a030;margin:6px 0 6px;">🔎 Trabajo sugerido por el mecánico</div>';
+    h+='<div style="background:rgba(240,160,48,.06);border:1px solid rgba(240,160,48,.35);border-radius:12px;padding:10px 12px;margin-bottom:12px;">'
+      +_sug.map(function(s,si){ return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'+(s.photo?img(s.photo,40):'')+'<div style="flex:1;min-width:0;font-size:12.5px;line-height:1.4;">'+svcEsc(s.note||'')+'</div><button type="button" onclick="svcAddSugService('+si+')" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:11.5px;font-weight:700;cursor:pointer;">➕ servicio</button></div>'; }).join('')
+      +'</div>';
+  }
   // 2) 🧩 Lista de partes (WIDGET) — consolidada de todos los servicios, para ordenar / agregar al estimado.
   h+='<div style="font-weight:800;font-size:12px;color:var(--gold);margin:6px 0 6px;">2 · 🧩 Partes que se necesitan</div>';
   if(allParts.length){
@@ -7816,6 +7831,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105233631"></script>
+<script type="module" src="launcher.js?v=20261105235225"></script>
 </body>
 </html>

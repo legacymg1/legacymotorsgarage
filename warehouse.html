@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105211153"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105211153"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105235225"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105235225"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261105211153"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261105211153"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261105211153"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105235225"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261105235225"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261105235225"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2755,15 +2755,15 @@ window.svcEmpOpen=function(orderId){
 let _recep=null;   // { orderId, o, none, miles, obs:[{note,file,preview}] }
 // 💾 Borrador de recepción: sobrevive la RECARGA (en Android la cámara con capture suele recargar la página).
 //    Guarda orderId + millas + observaciones con la FOTO YA SUBIDA (url) — no el File (no serializa). Así no se pierde nada.
-function _recepDraftSave(){ try{ const r=_recep; if(!r){ return; } const d={ orderId:r.orderId, miles:r.miles||'', none:!!r.none, obs:(r.obs||[]).map(function(o){ return { note:o.note||'', photo:o.photo||'' }; }), at:Date.now() }; sessionStorage.setItem('lmg_recep_draft', JSON.stringify(d)); }catch(e){} }
+function _recepDraftSave(){ try{ const r=_recep; if(!r){ return; } const d={ orderId:r.orderId, miles:r.miles||'', none:!!r.none, obs:(r.obs||[]).map(function(o){ return { note:o.note||'', photo:o.photo||'' }; }), sug:(r.sug||[]).map(function(o){ return { note:o.note||'', photo:o.photo||'' }; }), at:Date.now() }; sessionStorage.setItem('lmg_recep_draft', JSON.stringify(d)); }catch(e){} }
 function _recepDraftGet(){ try{ return JSON.parse(sessionStorage.getItem('lmg_recep_draft')||'null'); }catch(e){ return null; } }
 function _recepDraftClear(){ try{ sessionStorage.removeItem('lmg_recep_draft'); }catch(e){} }
 window.svcOpenReception=function(orderId){
   if(typeof _vaReadOnly==='function' && _vaReadOnly()) return;
   const o=(SVC_MY||[]).find(x=>x.id===orderId)||(typeof OP_SVC!=='undefined'&&(OP_SVC||[]).find(x=>x.id===orderId)); if(!o) return;
-  _recep={ orderId:orderId, o:o, none:false, miles:'', obs:[] };
+  _recep={ orderId:orderId, o:o, none:false, miles:'', obs:[], sug:[] };
   // ♻️ Si venimos de una recarga (misma orden), restaura lo que ya llevaba (notas + fotos subidas).
-  try{ const dr=_recepDraftGet(); if(dr && dr.orderId===orderId && (Date.now()-(dr.at||0))<30*60*1000){ _recep.miles=dr.miles||''; _recep.none=!!dr.none; _recep.obs=(dr.obs||[]).map(function(x){ return { note:x.note||'', file:null, photo:x.photo||'', preview:x.photo||'' }; }); } }catch(e){}
+  try{ const dr=_recepDraftGet(); if(dr && dr.orderId===orderId && (Date.now()-(dr.at||0))<30*60*1000){ _recep.miles=dr.miles||''; _recep.none=!!dr.none; _recep.obs=(dr.obs||[]).map(function(x){ return { note:x.note||'', file:null, photo:x.photo||'', preview:x.photo||'' }; }); _recep.sug=(dr.sug||[]).map(function(x){ return { note:x.note||'', file:null, photo:x.photo||'', preview:x.photo||'' }; }); } }catch(e){}
   let ov=document.getElementById('svc-recep');
   if(!ov){ ov=document.createElement('div'); ov.id='svc-recep'; ov.style.cssText='position:fixed;inset:0;z-index:2147482997;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:16px;box-sizing:border-box;'; ov.onclick=function(e){ if(e.target===ov) svcRecepClose(); }; document.body.appendChild(ov); }
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));cursor:default;"><div id="svc-recep-body"></div></div>';
@@ -2795,6 +2795,19 @@ function _recepRender(){
     });
     h+='<button onclick="recepAddObs()" class="btn ghost" style="width:100%;margin-bottom:14px;">➕ '+(en?'Add observation':'Agregar observación')+'</button>';
   }
+  // 🔎 INSPECCIÓN RÁPIDA — trabajo que el mecánico vio que podría necesitar (NO es daño pre-existente; es para que la oficina lo proponga al cliente).
+  h+='<div style="border-top:1px solid var(--border);margin:6px 0 10px;"></div>';
+  h+='<div style="font-weight:800;font-size:13px;margin:0 0 3px;">🔎 '+(en?'Suggested work (optional)':'Trabajo sugerido (opcional)')+((r.sug&&r.sug.length)?(' · '+r.sug.length):'')+'</div>';
+  h+='<div class="faint" style="font-size:11px;margin-bottom:8px;line-height:1.4;">'+(en?'Anything you noticed that needs work (brakes, leaks, suspension…). The office will propose it to the customer.':'Algo que viste que necesita trabajo (frenos, fugas, suspensión…). La oficina se lo propone al cliente.')+'</div>';
+  (r.sug||[]).forEach(function(sg,i){
+    h+='<div style="border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span class="faint" style="font-size:12px;font-weight:700;">🔧 #'+(i+1)+'</span><button onclick="recepRemoveSug('+i+')" style="background:transparent;border:none;color:#e05a4a;font-size:13px;cursor:pointer;">🗑 '+(en?'Remove':'Quitar')+'</button></div>';
+    h+='<textarea oninput="_rcSug('+i+',this.value)" placeholder="'+(en?'What needs work…':'Qué necesita trabajo…')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:14px;min-height:50px;resize:vertical;">'+esc(sg.note||'')+'</textarea>';
+    if(sg.preview){ h+='<img src="'+sg.preview+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-top:8px;">'; }
+    h+='<div style="margin-top:8px;">'+_photoPick('recepSugPhoto('+i+',this)', en)+'</div>';
+    h+='</div>';
+  });
+  h+='<button onclick="recepAddSug()" class="btn ghost" style="width:100%;margin-bottom:14px;">➕ '+(en?'Add suggested work':'Agregar trabajo sugerido')+'</button>';
   h+='<button id="recep-save" onclick="svcRecepSave()" class="btn-gold" style="width:100%;">'+(en?'Save report':'Guardar reporte')+'</button>';
   const _willAuth=!r.none && r.obs.length;
   h+='<div class="faint" style="font-size:11px;text-align:center;margin-top:7px;line-height:1.4;">'+(_willAuth?(en?'The customer must authorize this report before check-in.':'El cliente debe autorizar este reporte antes de ingresar el carro.'):(en?'No observations → the car is checked in right away.':'Sin observaciones → el carro se recibe de inmediato.'))+'</div>';
@@ -2832,8 +2845,16 @@ window.svcRecepSave=async function(){
       if(!note && !url) continue;
       obs.push({note:note,photo:url,at:new Date().toISOString()});
     }
+    // 🔎 Trabajo sugerido (no afecta la autorización — eso es solo por observaciones/daño pre-existente).
+    const sug=[];
+    for(const sg of (r.sug||[])){
+      const note=(sg.note||'').trim(); let url=sg.photo||'';
+      if(!url && sg.file){ const rf=ref(storage,'serviceOrders/'+r.orderId+'/reception/'+Date.now()+'_sug_'+((sg.file.name||'foto.jpg'))); await uploadBytes(rf,sg.file); url=await getDownloadURL(rf); }
+      if(!note && !url) continue;
+      sug.push({note:note,photo:url,at:new Date().toISOString()});
+    }
     const none = r.none || obs.length===0;
-    await httpsCallable(functions,'svcIntake')(vaData({ orderId:r.orderId, intake:{ miles:r.miles||'', none:none, observations:obs } }));
+    await httpsCallable(functions,'svcIntake')(vaData({ orderId:r.orderId, intake:{ miles:r.miles||'', none:none, observations:obs, suggested:sug } }));
     whToast('✅ '+(none?(en?'Car checked in':'Carro recibido'):(en?'Saved · pending customer authorization':'Guardado · Pendiente de autorización')));
     svcRecepClose(); if(typeof svcRefresh==='function') svcRefresh();
   }catch(e){ if(btn){ btn.disabled=false; btn.textContent=en?'Save report':'Guardar reporte'; } whToast('⚠️ '+(en?'Could not save: ':'No se pudo guardar: ')+((e&&e.message)||'error'),true); }
@@ -2852,6 +2873,23 @@ window._dgSet=function(k,v){ if(_diag) _diag[k]=v; };
 window._dgPart=function(i,k,v){ if(_diag&&_diag.parts&&_diag.parts[i]) _diag.parts[i][k]=v; };
 window._rcSet=function(k,v){ if(_recep){ _recep[k]=v; try{ _recepDraftSave(); }catch(e){} } };
 window._rcObs=function(i,k,v){ if(_recep&&_recep.obs&&_recep.obs[i]){ _recep.obs[i][k]=v; try{ _recepDraftSave(); }catch(e){} } };
+// 🔎 Trabajo sugerido (inspección rápida) — mismo patrón que observaciones (nota + foto que sube al instante + borrador).
+window.recepAddSug=function(){ if(!_recep) return; (_recep.sug=_recep.sug||[]).push({note:'',file:null,photo:'',preview:''}); _recepRender(); };
+window.recepRemoveSug=function(i){ if(_recep&&_recep.sug){ _recep.sug.splice(i,1); _recepRender(); } };
+window._rcSug=function(i,v){ if(_recep&&_recep.sug&&_recep.sug[i]){ _recep.sug[i].note=v; try{ _recepDraftSave(); }catch(e){} } };
+window.recepSugPhoto=async function(i,inp){
+  if(!_recep||!inp.files||!inp.files[0]||!(_recep.sug&&_recep.sug[i])) return;
+  const en=(L==='en'); const el=inp.closest('label'); const span=el&&el.querySelector('span'); const prev=span?span.textContent:'';
+  try{
+    if(span) span.textContent='⏳ '+(en?'Uploading…':'Subiendo…');
+    const jpg=await toJpeg(inp.files[0]);
+    const rf=ref(storage,'serviceOrders/'+_recep.orderId+'/reception/'+Date.now()+'_sug_'+((jpg.name||'foto.jpg')));
+    await uploadBytes(rf,jpg); const url=await getDownloadURL(rf);
+    if(_recep&&_recep.sug&&_recep.sug[i]){ _recep.sug[i].file=null; _recep.sug[i].photo=url; _recep.sug[i].preview=url; }
+    _recepRender(); try{ _recepDraftSave(); }catch(e){}
+  }
+  catch(e){ if(span) span.textContent=prev; whToast('⚠️ '+(en?'Photo failed: ':'Foto falló: ')+((e&&e.message)||''),true); }
+};
 // 📷 Selector de foto estilo iOS: SIEMPRE da la opción de CÁMARA (capture) y GALERÍA (carrete) por separado — en iPhone
 //    un solo input brinca directo al carrete; dos inputs (uno con capture) garantizan la cámara. onCall = el handler onchange ('this' = el input).
 function _photoPick(onCall, en, variant){
@@ -5991,7 +6029,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261105211153"></script>
+<script type="module" src="launcher.js?v=20261105235225"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>

@@ -2729,6 +2729,13 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
     photo: String(ob.photo || "").slice(0, 600),
     at: String(ob.at || new Date().toISOString()).slice(0, 40),
   })).filter((ob) => ob.note || ob.photo);
+  // 🔎 Trabajo SUGERIDO en la inspección rápida (NO es daño pre-existente; no afecta "none"/autorización). Para que la oficina lo proponga.
+  const sugRaw = Array.isArray(inRaw.suggested) ? inRaw.suggested.slice(0, 24) : [];
+  const suggested = sugRaw.map((s) => ({
+    note: String(s.note || "").slice(0, 500),
+    photo: String(s.photo || "").slice(0, 600),
+    at: String(s.at || new Date().toISOString()).slice(0, 40),
+  })).filter((s) => s.note || s.photo);
   const none = !!inRaw.none || observations.length === 0;
   const intake = {
     fuel: String(inRaw.fuel || "").slice(0, 8),
@@ -2736,6 +2743,7 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
     items,
     none: none,                 // true = "Sin observaciones"
     observations: observations, // desperfectos pre-existentes con foto
+    suggested: suggested,       // 🔎 trabajo sugerido (inspección rápida)
     notes: String(inRaw.notes || "").slice(0, 1000),
     photos: Array.isArray(inRaw.photos) ? inRaw.photos.slice(0, 12).map((u) => String(u || "").slice(0, 600)) : [],
     at: new Date().toISOString(),
