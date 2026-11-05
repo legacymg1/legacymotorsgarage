@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105202021"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105202021"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105203108"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105203108"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261105202021"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261105202021"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261105202021"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105203108"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261105203108"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261105203108"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1031,6 +1031,8 @@ onAuthStateChanged(auth, async (user)=>{
     try{ if(role==='owner'){ const nv=_whNavGet(); if(nv && nv.panel==='payroll'){ setTimeout(()=>{ try{ whOpenPayroll(); if(nv.week) _payWeek=nv.week; if(nv.day) _payDay=nv.day; try{ _payCalMonth=new Date((nv.day||nv.week||_dayStr(new Date()))+'T12:00:00'); }catch(e){} _payCalOpen=!!nv.calOpen; whPayLoad(false); }catch(e){} }, 500); } } }catch(e){}
     // 🧭 Al refrescar, regresa a la VISTA DE TRABAJO/diagnóstico si ahí estabas (dueño o empleado) — no te saca.
     try{ const nvw=_whNavGet(); if(nvw && nvw.panel==='svcwork' && nvw.orderId){ _restoreSvcWork(nvw.orderId); } }catch(e){}
+    // 🧭 Al refrescar durante la RECEPCIÓN (en Android la cámara recarga la página), reábrela con lo que ya llevabas.
+    try{ const nvr=_whNavGet(); if(nvr && nvr.panel==='svcrecep' && nvr.orderId){ _restoreSvcRecep(nvr.orderId); } }catch(e){}
   } else {
     _carView=''; document.body.classList.remove('owner-nav'); const fab=document.getElementById('fab-part'); if(fab) fab.style.display='none';
     const fc=document.getElementById('fab-chat'); if(fc) fc.style.display='none'; closeChat();
@@ -2751,16 +2753,25 @@ window.svcEmpOpen=function(orderId){
 // Al "Recibir carro": walk-around de daños PRE-EXISTENTES (nota + foto) o "Sin observaciones".
 // Reusa toJpeg (HEIC→JPG) + storage + svcIntake (backend). Nos protege de daños que el carro YA traía.
 let _recep=null;   // { orderId, o, none, miles, obs:[{note,file,preview}] }
+// 💾 Borrador de recepción: sobrevive la RECARGA (en Android la cámara con capture suele recargar la página).
+//    Guarda orderId + millas + observaciones con la FOTO YA SUBIDA (url) — no el File (no serializa). Así no se pierde nada.
+function _recepDraftSave(){ try{ const r=_recep; if(!r){ return; } const d={ orderId:r.orderId, miles:r.miles||'', none:!!r.none, obs:(r.obs||[]).map(function(o){ return { note:o.note||'', photo:o.photo||'' }; }), at:Date.now() }; sessionStorage.setItem('lmg_recep_draft', JSON.stringify(d)); }catch(e){} }
+function _recepDraftGet(){ try{ return JSON.parse(sessionStorage.getItem('lmg_recep_draft')||'null'); }catch(e){ return null; } }
+function _recepDraftClear(){ try{ sessionStorage.removeItem('lmg_recep_draft'); }catch(e){} }
 window.svcOpenReception=function(orderId){
   if(typeof _vaReadOnly==='function' && _vaReadOnly()) return;
   const o=(SVC_MY||[]).find(x=>x.id===orderId)||(typeof OP_SVC!=='undefined'&&(OP_SVC||[]).find(x=>x.id===orderId)); if(!o) return;
   _recep={ orderId:orderId, o:o, none:false, miles:'', obs:[] };
+  // ♻️ Si venimos de una recarga (misma orden), restaura lo que ya llevaba (notas + fotos subidas).
+  try{ const dr=_recepDraftGet(); if(dr && dr.orderId===orderId && (Date.now()-(dr.at||0))<30*60*1000){ _recep.miles=dr.miles||''; _recep.none=!!dr.none; _recep.obs=(dr.obs||[]).map(function(x){ return { note:x.note||'', file:null, photo:x.photo||'', preview:x.photo||'' }; }); } }catch(e){}
   let ov=document.getElementById('svc-recep');
   if(!ov){ ov=document.createElement('div'); ov.id='svc-recep'; ov.style.cssText='position:fixed;inset:0;z-index:2147482997;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:16px;box-sizing:border-box;'; ov.onclick=function(e){ if(e.target===ov) svcRecepClose(); }; document.body.appendChild(ov); }
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));cursor:default;"><div id="svc-recep-body"></div></div>';
+  try{ _whNavSave({panel:'svcrecep', orderId:orderId}); }catch(e){}   // 🧭 al recargar (cámara Android), vuelve a la recepción
+  _recepDraftSave();
   _recepRender(); try{ _whBusyRecalc(); }catch(e){}
 };
-window.svcRecepClose=function(){ const el=document.getElementById('svc-recep'); if(el) el.remove(); _recep=null; try{ _whBusyRecalc(); }catch(e){} };
+window.svcRecepClose=function(){ const el=document.getElementById('svc-recep'); if(el) el.remove(); _recep=null; try{ _recepDraftClear(); _whNavClear(); }catch(e){} try{ _whBusyRecalc(); }catch(e){} };
 function _recepRender(){
   const r=_recep; if(!r) return; const en=(L==='en'); const o=r.o;
   const car=esc(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
@@ -2788,27 +2799,44 @@ function _recepRender(){
   const _willAuth=!r.none && r.obs.length;
   h+='<div class="faint" style="font-size:11px;text-align:center;margin-top:7px;line-height:1.4;">'+(_willAuth?(en?'The customer must authorize this report before check-in.':'El cliente debe autorizar este reporte antes de ingresar el carro.'):(en?'No observations → the car is checked in right away.':'Sin observaciones → el carro se recibe de inmediato.'))+'</div>';
   const body=document.getElementById('svc-recep-body'); if(body) body.innerHTML=h;
+  try{ _recepDraftSave(); }catch(e){}
 }
 window.recepSetNone=function(v){ if(!_recep) return; _recep.none=!!v; if(_recep.none) _recep.obs=[]; _recepRender(); };
 window.recepAddObs=function(){ if(!_recep) return; _recep.none=false; _recep.obs.push({note:'',file:null,preview:''}); _recepRender(); };
 window.recepRemoveObs=function(i){ if(!_recep) return; _recep.obs.splice(i,1); _recepRender(); };
 window.recepObsPhoto=async function(i,inp){
-  if(!_recep||!inp.files||!inp.files[0]) return;
-  const el=inp.closest('label'); const span=el&&el.querySelector('span'); const prev=span?span.textContent:'';
-  try{ if(span) span.textContent='⏳ …'; const jpg=await toJpeg(inp.files[0]); _recep.obs[i].file=jpg; try{ if(_recep.obs[i].preview&&_recep.obs[i].preview.indexOf('blob:')===0) URL.revokeObjectURL(_recep.obs[i].preview); }catch(e){} _recep.obs[i].preview=URL.createObjectURL(jpg); _recepRender(); }
-  catch(e){ if(span) span.textContent=prev; whToast('⚠️ '+((e&&e.message)||'foto'),true); }
+  if(!_recep||!inp.files||!inp.files[0]||!_recep.obs[i]) return;
+  const en=(L==='en'); const el=inp.closest('label'); const span=el&&el.querySelector('span'); const prev=span?span.textContent:'';
+  try{
+    if(span) span.textContent='⏳ '+(en?'Uploading…':'Subiendo…');
+    const jpg=await toJpeg(inp.files[0]);
+    // 📤 Sube YA a Storage (no esperes a Guardar): así la foto sobrevive si Android recarga la página al volver de la cámara.
+    const rf=ref(storage,'serviceOrders/'+_recep.orderId+'/reception/'+Date.now()+'_'+((jpg.name||'foto.jpg')));
+    await uploadBytes(rf,jpg); const url=await getDownloadURL(rf);
+    if(_recep&&_recep.obs&&_recep.obs[i]){ _recep.obs[i].file=null; _recep.obs[i].photo=url; _recep.obs[i].preview=url; }
+    _recepRender(); try{ _recepDraftSave(); }catch(e){}
+  }
+  catch(e){ if(span) span.textContent=prev; whToast('⚠️ '+(en?'Photo failed: ':'Foto falló: ')+((e&&e.message)||''),true); }
 };
 window.svcRecepSave=async function(){
-  if(!_recep) return; const en=(L==='en'); const r=_recep;
+  const en=(L==='en');
+  if(!_recep){ whToast('⚠️ '+(en?'Reception was lost — open it again':'Se perdió la recepción — ábrela otra vez'),true); return; }
+  const r=_recep;
   const btn=document.getElementById('recep-save'); if(btn){ btn.disabled=true; btn.textContent=en?'Saving…':'Guardando…'; }
   try{
     const obs=[];
-    for(const ob of r.obs){ const note=(ob.note||'').trim(); if(!note && !ob.file) continue; let url=''; if(ob.file){ const rf=ref(storage,'serviceOrders/'+r.orderId+'/reception/'+Date.now()+'_'+((ob.file.name||'foto.jpg'))); await uploadBytes(rf,ob.file); url=await getDownloadURL(rf); } obs.push({note:note,photo:url,at:new Date().toISOString()}); }
+    for(const ob of r.obs){
+      const note=(ob.note||'').trim();
+      let url=ob.photo||'';   // ya subida al tomarla; sube aquí solo si quedó pendiente (File sin url)
+      if(!url && ob.file){ const rf=ref(storage,'serviceOrders/'+r.orderId+'/reception/'+Date.now()+'_'+((ob.file.name||'foto.jpg'))); await uploadBytes(rf,ob.file); url=await getDownloadURL(rf); }
+      if(!note && !url) continue;
+      obs.push({note:note,photo:url,at:new Date().toISOString()});
+    }
     const none = r.none || obs.length===0;
     await httpsCallable(functions,'svcIntake')(vaData({ orderId:r.orderId, intake:{ miles:r.miles||'', none:none, observations:obs } }));
     whToast('✅ '+(none?(en?'Car checked in':'Carro recibido'):(en?'Saved · pending customer authorization':'Guardado · Pendiente de autorización')));
     svcRecepClose(); if(typeof svcRefresh==='function') svcRefresh();
-  }catch(e){ if(btn){ btn.disabled=false; btn.textContent=en?'Save report':'Guardar reporte'; } whToast('⚠️ '+((e&&e.message)||'error'),true); }
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent=en?'Save report':'Guardar reporte'; } whToast('⚠️ '+(en?'Could not save: ':'No se pudo guardar: ')+((e&&e.message)||'error'),true); }
 };
 // ================= 🔬 TRABAJO DE SERVICIO — FOCO + DIAGNÓSTICO POR SERVICIO (Fase 1) =================
 // Al empezar, se abre la orden COMPLETA (pantalla llena, "ya estás en eso"). Servicio por servicio: diagnóstico
@@ -2822,8 +2850,8 @@ window._whBusyRecalc=function(){ try{ window.__lmgBusy=!!document.querySelector(
 //    Por eso lo tecleado no llegaba al modelo. Estos helpers SÍ los ven (closure) → lo tecleado se guarda.
 window._dgSet=function(k,v){ if(_diag) _diag[k]=v; };
 window._dgPart=function(i,k,v){ if(_diag&&_diag.parts&&_diag.parts[i]) _diag.parts[i][k]=v; };
-window._rcSet=function(k,v){ if(_recep) _recep[k]=v; };
-window._rcObs=function(i,k,v){ if(_recep&&_recep.obs&&_recep.obs[i]) _recep.obs[i][k]=v; };
+window._rcSet=function(k,v){ if(_recep){ _recep[k]=v; try{ _recepDraftSave(); }catch(e){} } };
+window._rcObs=function(i,k,v){ if(_recep&&_recep.obs&&_recep.obs[i]){ _recep.obs[i][k]=v; try{ _recepDraftSave(); }catch(e){} } };
 // 📷 Selector de foto estilo iOS: SIEMPRE da la opción de CÁMARA (capture) y GALERÍA (carrete) por separado — en iPhone
 //    un solo input brinca directo al carrete; dos inputs (uno con capture) garantizan la cámara. onCall = el handler onchange ('this' = el input).
 function _photoPick(onCall, en, variant){
@@ -2857,6 +2885,7 @@ window.svcOpenWork=function(orderId){
 window.svcWorkClose=function(){ try{ if(_workUnsub) _workUnsub(); }catch(e){} _workUnsub=null; const el=document.getElementById('svc-work'); if(el) el.remove(); try{ _whNavClear(); }catch(e){} };
 // 🧭 Restaura la vista de trabajo tras recargar: espera a que la orden cargue (SVC_MY/OP_SVC) y la reabre.
 function _restoreSvcWork(orderId){ let tries=0; const tick=function(){ tries++; const has=(SVC_MY||[]).some(x=>x.id===orderId)||(typeof OP_SVC!=='undefined'&&(OP_SVC||[]).some(x=>x.id===orderId)); if(has){ try{ svcOpenWork(orderId); }catch(e){} return; } if(tries<20) setTimeout(tick,400); }; setTimeout(tick,600); }
+function _restoreSvcRecep(orderId){ let tries=0; const tick=function(){ tries++; const has=(SVC_MY||[]).some(x=>x.id===orderId)||(typeof OP_SVC!=='undefined'&&(OP_SVC||[]).some(x=>x.id===orderId)); if(has){ try{ svcOpenReception(orderId); }catch(e){} return; } if(tries<20) setTimeout(tick,400); }; setTimeout(tick,600); }
 function _svcWorkRender(o){
   const ov=document.getElementById('svc-work'); if(!ov) return; const en=(L==='en');
   const car=esc(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
@@ -5885,7 +5914,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261105202021"></script>
+<script type="module" src="launcher.js?v=20261105203108"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
