@@ -55,7 +55,9 @@
   .tab.on{background:var(--gold);color:#0b0e14;border-color:var(--gold);}
   .part{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;}
   .thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;} .thumbs img{width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
-  .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;}
+  /* 🧭 Header igual que Finanzas: sticky, debajo de la muesca (safe-area), con blur. Así no se mueve ni "abre abajo". */
+  .head{display:flex;justify-content:space-between;align-items:center;gap:10px;position:sticky;top:0;z-index:30;margin:0 -16px 14px;padding:calc(env(safe-area-inset-top) + 8px) 16px 12px;background:rgba(11,14,20,0.8);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--border);}
+  #app{padding-top:0;}   /* el safe-area de arriba ahora lo pone el .head sticky (no el .wrap), para no duplicarlo */
   .muted{color:var(--muted);} .gold{color:var(--gold);} .green{color:var(--green);} .red{color:var(--red);}
   #quick-item-btn{display:none;} body.owner-nav #quick-item-btn, body.yard-quick #quick-item-btn{display:flex;}   /* Artículo rápido: dueños + captura (rol yard) */
   body.wh-home #quick-item-btn{display:none !important;}   /* en el HOME de Pit Crew no se muestra el FAB de artículo rápido */
