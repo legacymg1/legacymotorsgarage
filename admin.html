@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105205554"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105205554"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105211630"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105211630"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1001,8 +1001,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105205554"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105205554"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105211630"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105211630"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2782,11 +2782,7 @@ function svcRenderModal(){
       +(s.estNote?('<div style="font-size:11.5px;color:var(--gold);margin-top:5px;line-height:1.4;">'+svcEsc(s.estNote)+'</div>'):'')
       +'<div style="margin-top:8px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px;">👤 Asignar este servicio a</div><div style="display:flex;gap:6px;"><select id="svc-svc-role-'+i+'" onchange="svcOnRoleChange('+i+')" title="Rol que hace este servicio" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcRoleOptions(s.role)+'</select><select id="svc-svc-emp-'+i+'" onchange="svcCapServices()" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcEmpOptions(s.role, s.assignEmpId)+'</select></div></div>'
       +((s.diagnosis && ((s.diagnosis.parts&&s.diagnosis.parts.length)||s.diagnosis.notes))?(
-        '<div style="margin-top:8px;background:rgba(109,75,255,.06);border:1px solid rgba(109,75,255,.3);border-radius:9px;padding:8px;">'
-        +'<div style="font-size:11px;color:#9b7bff;font-weight:800;margin-bottom:4px;">🔬 Lo que encontró el mecánico</div>'
-        +(s.diagnosis.notes?('<div style="font-size:12px;margin-bottom:6px;line-height:1.4;white-space:pre-wrap;">'+svcEsc(s.diagnosis.notes)+'</div>'):'')
-        +((s.diagnosis.parts||[]).map((p,pi)=>'<div style="display:flex;gap:8px;align-items:center;margin-bottom:5px;">'+(p.photo?('<img src="'+p.photo+'" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex:0 0 auto;">'):'')+'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+svcEsc(p.desc||(p.partNum||'Parte'))+'</div>'+(p.partNum?('<div style="font-size:11px;color:var(--gold);">#'+svcEsc(p.partNum)+'</div>'):'')+'</div><button type="button" onclick="svcAddDiagPart('+i+','+pi+')" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:11.5px;font-weight:700;cursor:pointer;">➕ al estimado</button></div>').join(''))
-        +'</div>'
+        '<div style="margin-top:8px;background:rgba(109,75,255,.06);border:1px solid rgba(109,75,255,.3);border-radius:9px;padding:7px 9px;font-size:11.5px;color:#9b7bff;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;" onclick="svcHistoryOpen(\''+(d.editId||'')+'\')">🔬 El mecánico encontró '+((s.diagnosis.parts||[]).length)+' parte(s)<span style="color:var(--muted);">ver historia ›</span></div>'
       ):'')
       +'<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:7px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:2px;">🔩 Partes de este servicio</div>'+spartRows
       +'<button type="button" onclick="svcAddPart('+i+')" style="width:100%;margin-top:6px;background:transparent;border:1px dashed var(--border);border-radius:9px;padding:6px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;">➕ Agregar parte / cargo</button></div>'
@@ -2802,16 +2798,13 @@ function svcRenderModal(){
   const _svcAccepted = (_svcOrd.estimateStatus==='accepted') || (['recibido','en_proceso','pausado_partes','listo','entregado'].indexOf(d.status)>=0);
   // 🧾 Reporte de condición de INGRESO (lo que el mecánico documentó al recibir: daños pre-existentes "ya estaba así" + fotos) — protección legal.
   const _ik=_svcOrd.intake||null;
-  const intakeHtml = _ik ? (
-    '<div style="background:rgba(240,160,48,.07);border:1px solid rgba(240,160,48,.4);border-radius:12px;padding:12px;margin-bottom:10px;">'
-    +'<div style="font-weight:800;font-size:12px;color:#f0a030;margin-bottom:6px;">🧾 Reporte de condición de ingreso'+(_ik.miles?(' · '+svcEsc(String(_ik.miles))+' mi'):'')+(_ik.by?(' · '+svcEsc(_ik.by)):'')+'</div>'
-    +(_ik.none
-      ? '<div style="font-size:13px;color:#35c46a;font-weight:700;">✅ Sin observaciones — el carro se recibió sin daños previos.</div>'
-      : ('<div style="display:flex;flex-direction:column;gap:7px;">'+((_ik.observations||[]).map(function(ob){ return '<div style="display:flex;gap:8px;align-items:flex-start;">'+(ob.photo?('<img src="'+ob.photo+'" onclick="window.open(\''+ob.photo+'\',\'_blank\')" style="width:48px;height:48px;object-fit:cover;border-radius:7px;flex:0 0 auto;cursor:pointer;">'):'')+'<div style="flex:1;min-width:0;font-size:12.5px;line-height:1.4;">'+svcEsc(ob.note||'(sin nota)')+'</div></div>'; }).join(''))+'</div>'
-        +'<div style="margin-top:8px;font-size:11.5px;font-weight:700;color:'+(_ik.clientAck?'#35c46a':'#f0a030')+';">'+(_ik.clientAck?('✅ Cliente autorizó el ingreso'+(_ik.clientAckAt?(' · '+new Date(_ik.clientAckAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'})):'')):'⏳ Pendiente de autorización del cliente — lo ve y firma en su portal')+'</div>'))
-    +'</div>'
-  ) : '';
-  const svcHtml=intakeHtml+((_svcOrd.diagSummary && _svcOrd.diagSummary.text)?('<div style="background:rgba(109,75,255,.07);border:1px solid rgba(109,75,255,.4);border-radius:12px;padding:12px;margin-bottom:10px;"><div style="font-weight:800;font-size:12px;color:#9b7bff;margin-bottom:6px;">📋 Resumen del diagnóstico del mecánico</div><div style="font-size:13px;line-height:1.5;white-space:pre-wrap;">'+svcEsc(_svcOrd.diagSummary.text)+'</div><div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.4;">Abajo, cada servicio muestra las partes que encontró — tócalas (➕ al estimado) y ponles precio.</div></div>'):'')
+  // 🔧 Resumen COMPACTO → abre la HISTORIA del mecánico en un popup (no vomitar recepción/diagnóstico/reparación en la cara de la orden).
+  const _histSvs = Array.isArray(_svcOrd.services) ? _svcOrd.services : [];
+  let _hObs=(_ik&&!_ik.none)?((_ik.observations||[]).length):0, _hParts=0, _hRep=0, _hDiag=false;
+  _histSvs.forEach(function(s){ if(s.diagnosis){ _hDiag=true; _hParts+=((s.diagnosis.parts||[]).length); } if(s.repair){ _hRep++; } });
+  const _hHas = !!(_ik || _hDiag || _hRep);
+  const mechHistoryBtn = _hHas ? ('<button type="button" onclick="svcHistoryOpen(\''+(d.editId||'')+'\')" style="width:100%;margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;color:var(--text);font-family:inherit;text-align:left;"><div style="min-width:0;"><div style="font-weight:800;font-size:13px;">🔧 Historia del mecánico</div><div style="font-size:11.5px;color:var(--muted);margin-top:2px;">'+(_ik?((_ik.none?'🧾 Ingreso sin daños':('🧾 '+_hObs+' observación(es)'))+' · '):'')+(_hDiag?('🔬 '+_hParts+' parte(s)'):'Sin diagnóstico')+(_hRep?(' · 🔧 '+_hRep+' listo(s)'):'')+'</div></div><span style="color:var(--muted);font-size:18px;flex:0 0 auto;">›</span></button>') : '';
+  const svcHtml=mechHistoryBtn
     +'<div style="display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-bottom:8px;font-size:11.5px;color:var(--muted);">⚙️ Tarifa mecánico (para estimar): $<input id="svc-labor-rate" type="number" inputmode="decimal" value="'+rate+'" onchange="svcSetRate(this.value)" style="width:56px;padding:4px 6px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;text-align:right;">/hr</div>'
     +rowsHtml
     +'<button type="button" onclick="svcAddService()" style="width:100%;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:9px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">➕ Agregar servicio</button>'
@@ -3033,7 +3026,57 @@ window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.serv
 window.svcAddPart=function(si){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s){ (s.parts=s.parts||[]).push({desc:'',price:0}); } svcRenderModal(); };
 window.svcRemovePart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s&&Array.isArray(s.parts)){ s.parts.splice(pi,1); } svcRenderModal(); };
 // 🔬→🧾 Copia una parte ENCONTRADA por el mecánico (diagnóstico) al ESTIMADO del servicio (desc + # OEM); el precio lo pones tú.
-window.svcAddDiagPart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(!s) return; const dp=((s.diagnosis&&s.diagnosis.parts)||[])[pi]; if(!dp) return; const desc=((dp.desc||'')+(dp.partNum?(' [# '+dp.partNum+']'):'')).trim()||(dp.partNum||'Parte'); (s.parts=s.parts||[]).push({desc:desc, price:0}); svcRenderModal(); };
+window.svcAddDiagPart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(!s) return; const dp=((s.diagnosis&&s.diagnosis.parts)||[])[pi]; if(!dp) return; const desc=((dp.desc||'')+(dp.partNum?(' [# '+dp.partNum+']'):'')).trim()||(dp.partNum||'Parte'); (s.parts=s.parts||[]).push({desc:desc, price:0}); svcRenderModal(); try{ if(window.svcToast) svcToast('➕ Agregada al estimado: '+desc+' · ponle precio abajo'); }catch(e){} };
+// 🔧 HISTORIA DEL MECÁNICO (popup): recepción → diagnóstico por servicio (+➕ al estimado) → reparación con fotos. Todo junto, NO vomitado en la orden.
+window.svcHistoryClose=function(){ const el=document.getElementById('svc-history'); if(el) el.remove(); };
+window.svcHistoryOpen=function(orderId){
+  const o = (svcOrders.find(x=>x.id===orderId)) || (window._svcDraft && window._svcDraft.editId===orderId ? window._svcDraft : null) || {};
+  const svs = Array.isArray(o.services)?o.services:[]; const ik=o.intake||null;
+  if(!ik && !svs.some(s=>s.diagnosis||s.repair)){ if(window.svcToast) svcToast('Aún no hay historia del mecánico en esta orden.'); return; }
+  const dt=function(x){ try{ return x?new Date(x).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; }catch(e){ return ''; } };
+  const img=function(u,sz){ return '<img src="'+u+'" onclick="window.open(\''+u+'\',\'_blank\')" style="width:'+sz+'px;height:'+sz+'px;object-fit:cover;border-radius:7px;flex:0 0 auto;cursor:pointer;">'; };
+  let h='';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;">🔧 Historia del mecánico'+(o.orderNum?(' · #'+o.orderNum):'')+'</h2><button onclick="svcHistoryClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>';
+  h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">'+svcEsc(o.clientName||'')+' · 🚗 '+svcEsc(o.vehicleLabel||o.plate||'')+'</div>';
+  // 1) Recepción
+  h+='<div style="font-weight:800;font-size:12px;color:#f0a030;margin:6px 0 6px;">1 · 🧾 Recepción</div>';
+  if(ik){
+    h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:11px;margin-bottom:12px;font-size:12.5px;">';
+    h+='<div style="color:var(--muted);font-size:11px;margin-bottom:6px;">'+(ik.by?svcEsc(ik.by):'')+(ik.miles?(' · '+svcEsc(String(ik.miles))+' mi'):'')+(ik.at?(' · '+dt(ik.at)):'')+'</div>';
+    if(ik.none){ h+='<div style="color:#35c46a;font-weight:700;">✅ Sin observaciones — sin daños previos.</div>'; }
+    else { h+=(ik.observations||[]).map(function(ob){ return '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;">'+(ob.photo?img(ob.photo,54):'')+'<div style="flex:1;min-width:0;line-height:1.4;">'+svcEsc(ob.note||'(sin nota)')+'</div></div>'; }).join('');
+      h+='<div style="margin-top:6px;font-weight:700;color:'+(ik.clientAck?'#35c46a':'#f0a030')+';">'+(ik.clientAck?('✅ Cliente autorizó'+(ik.clientAckAt?(' · '+dt(ik.clientAckAt)):'')):'⏳ Pendiente de autorización del cliente')+'</div>'; }
+    h+='</div>';
+  } else { h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">—</div>'; }
+  // 2) Diagnóstico por servicio
+  h+='<div style="font-weight:800;font-size:12px;color:#9b7bff;margin:6px 0 6px;">2 · 🔬 Diagnóstico</div>';
+  let anyDiag=false;
+  svs.forEach(function(s,i){ const dg=s.diagnosis; if(!dg) return; anyDiag=true;
+    h+='<div style="background:rgba(109,75,255,.06);border:1px solid rgba(109,75,255,.3);border-radius:11px;padding:11px;margin-bottom:8px;">';
+    h+='<div style="font-weight:700;font-size:13px;margin-bottom:4px;">'+svcEsc(s.desc||('Servicio '+(i+1)))+'</div>';
+    if(dg.notes) h+='<div style="font-size:12.5px;line-height:1.4;white-space:pre-wrap;margin-bottom:6px;">'+svcEsc(dg.notes)+'</div>';
+    if((dg.photos||[]).length) h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">'+dg.photos.map(function(u){return img(u,54);}).join('')+'</div>';
+    (dg.parts||[]).forEach(function(p,pi){ h+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:5px;">'+(p.photo?img(p.photo,40):'')+'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;">'+svcEsc(p.desc||(p.partNum||'Parte'))+'</div>'+(p.partNum?('<div style="font-size:11px;color:var(--gold);">#'+svcEsc(p.partNum)+'</div>'):'')+'</div><button type="button" onclick="svcAddDiagPart('+i+','+pi+')" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:11.5px;font-weight:700;cursor:pointer;">➕ al estimado</button></div>'; });
+    h+='</div>';
+  });
+  if(!anyDiag) h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">—</div>';
+  if(o.diagSummary&&o.diagSummary.text) h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:11px;margin-bottom:12px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;"><b style="color:#9b7bff;">Resumen enviado:</b>\n'+svcEsc(o.diagSummary.text)+'</div>';
+  // 3) Reparación
+  h+='<div style="font-weight:800;font-size:12px;color:#35c46a;margin:6px 0 6px;">3 · 🔧 Reparación</div>';
+  let anyRep=false;
+  svs.forEach(function(s,i){ const rp=s.repair; if(!rp) return; anyRep=true;
+    h+='<div style="background:rgba(53,196,106,.06);border:1px solid rgba(53,196,106,.3);border-radius:11px;padding:11px;margin-bottom:8px;">';
+    h+='<div style="font-weight:700;font-size:13px;margin-bottom:3px;">'+svcEsc(s.desc||('Servicio '+(i+1)))+' <span style="color:#35c46a;font-size:11px;">✅</span></div>';
+    h+='<div style="color:var(--muted);font-size:11px;margin-bottom:4px;">'+(rp.by?svcEsc(rp.by):'')+(rp.at?(' · '+dt(rp.at)):'')+'</div>';
+    if(rp.notes) h+='<div style="font-size:12.5px;line-height:1.4;white-space:pre-wrap;margin-bottom:6px;">'+svcEsc(rp.notes)+'</div>';
+    if((rp.photos||[]).length) h+='<div style="display:flex;flex-wrap:wrap;gap:6px;">'+rp.photos.map(function(u){return img(u,54);}).join('')+'</div>';
+    h+='</div>';
+  });
+  if(!anyRep) h+='<div style="font-size:12px;color:var(--muted);">Aún sin reparación.</div>';
+  let ov=document.getElementById('svc-history');
+  if(!ov){ ov=document.createElement('div'); ov.id='svc-history'; ov.style.cssText='position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:16px;box-sizing:border-box;'; ov.onclick=function(e){ if(e.target===ov) svcHistoryClose(); }; document.body.appendChild(ov); }
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:540px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));cursor:default;">'+h+'</div>';
+};
 // 📄 GENERAR ESTIMADO bonito (tipo cotizador), bien desglosado por servicio + sus partes.
 function svcEstimateSheetHTML(d, services, opts){
   opts=opts||{}; const o=opts.order||{}; const receipt=!!opts.receipt;
@@ -7656,6 +7699,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105205554"></script>
+<script type="module" src="launcher.js?v=20261105211630"></script>
 </body>
 </html>
