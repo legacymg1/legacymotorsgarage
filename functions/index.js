@@ -2395,14 +2395,26 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
     ok: !!it.ok,
     note: String(it.note || "").slice(0, 300),
   })) : [];
+  // 🆕 Observaciones de recepción = desperfectos PRE-EXISTENTES (nota + foto c/u). "none" = sin observaciones (carro bien).
+  const obsRaw = Array.isArray(inRaw.observations) ? inRaw.observations.slice(0, 24) : [];
+  const observations = obsRaw.map((ob) => ({
+    note: String(ob.note || "").slice(0, 500),
+    photo: String(ob.photo || "").slice(0, 600),
+    at: String(ob.at || new Date().toISOString()).slice(0, 40),
+  })).filter((ob) => ob.note || ob.photo);
+  const none = !!inRaw.none || observations.length === 0;
   const intake = {
     fuel: String(inRaw.fuel || "").slice(0, 8),
     miles: String(inRaw.miles || "").slice(0, 12),
     items,
+    none: none,                 // true = "Sin observaciones"
+    observations: observations, // desperfectos pre-existentes con foto
     notes: String(inRaw.notes || "").slice(0, 1000),
     photos: Array.isArray(inRaw.photos) ? inRaw.photos.slice(0, 12).map((u) => String(u || "").slice(0, 600)) : [],
     at: new Date().toISOString(),
     by: id.email || id.name || id.empId || "",
+    // Para la aceptación del cliente (Fase C): arranca sin aceptar.
+    clientAck: false,
   };
   const patch = { intake, updatedAt: new Date().toISOString(), updatedBy: id.email || id.name || id.empId || "" };
   if (SVC_ORDER_STATUSES.indexOf(o.status || "agendado") < SVC_ORDER_STATUSES.indexOf("recibido")) patch.status = "recibido";

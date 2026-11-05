@@ -2680,14 +2680,14 @@ function _svcActionsHTML(o){
   const allPend=myHere.length && myHere.every(ms=>ms.status==='pendiente');
   const SP='event.stopPropagation();';
   if(!hasPipe){
-    if(o.status==='por_recibir'||o.status==='agendado') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'recibido\')">'+t('svcReceiveCar')+'</button>';
+    if(o.status==='por_recibir'||o.status==='agendado') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcOpenReception(\''+o.id+'\')">'+t('svcReceiveCar')+'</button>';
     if(o.status==='recibido') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcStartWork')+'</button>';
     if(o.status==='en_proceso') return '<div style="display:flex;gap:8px;"><button class="btn-ghost" style="flex:1;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'pausado_partes\')">'+t('svcWaitParts')+'</button><button class="btn-gold" style="flex:1;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'listo\')">'+t('svcReady')+'</button></div>';
     if(o.status==='pausado_partes') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcResume')+'</button>';
     return '';
   }
   if(o.waitingFor && !o.myStageActive) return '<div class="btn-ghost" style="width:100%;text-align:center;opacity:.75;cursor:default;">⏳ '+(L==='en'?'Waiting for ':'Esperando a ')+svcRoleLabel(o.waitingFor)+'</div>';
-  if(o.status==='por_recibir'||o.status==='agendado') return o.canReceive?'<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'recibido\')">'+t('svcReceiveCar')+'</button>':'';
+  if(o.status==='por_recibir'||o.status==='agendado') return o.canReceive?'<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcOpenReception(\''+o.id+'\')">'+t('svcReceiveCar')+'</button>':'';
   if(anyProg) return '<div style="display:flex;gap:8px;"><button class="btn-ghost" style="flex:1;" onclick="'+SP+'svcStage(\''+o.id+'\',\'pause\')">'+t('svcWaitParts')+'</button><button class="btn-gold" style="flex:1;" onclick="'+SP+'svcStage(\''+o.id+'\',\'finish\')">'+t('svcReady')+'</button></div>';
   if(anyPaused) return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcStage(\''+o.id+'\',\'resume\')">'+t('svcResume')+'</button>';
   if(allPend || o.status==='recibido') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcStage(\''+o.id+'\',\'start\')">'+t('svcStartWork')+'</button>';
@@ -2732,6 +2732,67 @@ window.svcEmpOpen=function(orderId){
     +(acts?('<div style="margin-bottom:10px;">'+acts+'</div>'):'<div class="faint" style="text-align:center;padding:8px 0 14px;font-size:13px;line-height:1.5;">'+L2('Nada por hacer ahora en esta orden.','Nothing to do on this order right now.')+'</div>')
     +'<a onclick="svcMsgAdmin(\''+(o.orderNum||'')+'\')" style="display:block;text-align:center;text-decoration:none;color:var(--gold);font-size:14px;padding:8px;cursor:pointer;">💬 '+L2('Avisar a la oficina','Message office')+'</a>'
   +'</div>';
+};
+// ================= 📋 REVISIÓN DE RECEPCIÓN (Service F3) =================
+// Al "Recibir carro": walk-around de daños PRE-EXISTENTES (nota + foto) o "Sin observaciones".
+// Reusa toJpeg (HEIC→JPG) + storage + svcIntake (backend). Nos protege de daños que el carro YA traía.
+let _recep=null;   // { orderId, o, none, miles, obs:[{note,file,preview}] }
+window.svcOpenReception=function(orderId){
+  if(typeof _vaReadOnly==='function' && _vaReadOnly()) return;
+  const o=(SVC_MY||[]).find(x=>x.id===orderId)||(typeof OP_SVC!=='undefined'&&(OP_SVC||[]).find(x=>x.id===orderId)); if(!o) return;
+  _recep={ orderId:orderId, o:o, none:false, miles:'', obs:[] };
+  let ov=document.getElementById('svc-recep');
+  if(!ov){ ov=document.createElement('div'); ov.id='svc-recep'; ov.style.cssText='position:fixed;inset:0;z-index:2147482997;background:rgba(0,0,0,.66);display:flex;align-items:flex-end;justify-content:center;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) svcRecepClose(); }; document.body.appendChild(ov); }
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));cursor:default;"><div id="svc-recep-body"></div></div>';
+  _recepRender();
+};
+window.svcRecepClose=function(){ const el=document.getElementById('svc-recep'); if(el) el.remove(); _recep=null; };
+function _recepRender(){
+  const r=_recep; if(!r) return; const en=(L==='en'); const o=r.o;
+  const car=esc(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
+  const folio=o.orderNum?('#'+o.orderNum+' · '):'';
+  let h='';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:19px;margin:0;">📋 '+(en?'Reception check':'Revisión de recepción')+'</h2><button onclick="svcRecepClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>';
+  h+='<div class="faint" style="font-size:13px;margin-bottom:4px;">'+folio+esc(o.clientName||'')+' · 🚗 '+car+'</div>';
+  h+='<div class="faint" style="font-size:12px;line-height:1.5;margin-bottom:14px;">'+(en?'Mark any pre-existing damage with a photo — this protects us. If the car is fine, mark No observations.':'Señala con foto cualquier desperfecto que el carro YA traía — esto nos protege. Si el carro está bien, marca Sin observaciones.')+'</div>';
+  h+='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:5px;">'+(en?'Miles (optional)':'Millas (opcional)')+'</label>';
+  h+='<input id="recep-miles" type="number" inputmode="numeric" value="'+esc(r.miles||'')+'" oninput="_recep&&(_recep.miles=this.value)" placeholder="84250" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--text);font-size:15px;margin-bottom:14px;">';
+  h+='<button onclick="recepSetNone('+(!r.none)+')" style="width:100%;padding:13px;border-radius:12px;border:2px solid '+(r.none?'#35c46a':'var(--border)')+';background:'+(r.none?'rgba(53,196,106,.14)':'transparent')+';color:var(--text);font-weight:800;font-size:15px;cursor:pointer;margin-bottom:12px;">'+(r.none?'✅ ':'')+(en?'No observations (car is fine)':'Sin observaciones (el carro está bien)')+'</button>';
+  if(!r.none){
+    h+='<div style="font-weight:800;font-size:13px;margin:4px 0 8px;">'+(en?'Observations':'Observaciones')+(r.obs.length?(' · '+r.obs.length):'')+'</div>';
+    r.obs.forEach((ob,i)=>{
+      h+='<div style="border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;">';
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span class="faint" style="font-size:12px;font-weight:700;">#'+(i+1)+'</span><button onclick="recepRemoveObs('+i+')" style="background:transparent;border:none;color:#e05a4a;font-size:13px;cursor:pointer;">🗑 '+(en?'Remove':'Quitar')+'</button></div>';
+      h+='<textarea oninput="_recep&&(_recep.obs['+i+'].note=this.value)" placeholder="'+(en?'What is damaged / how it already was…':'Qué está dañado / cómo ya venía…')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:14px;min-height:56px;resize:vertical;">'+esc(ob.note||'')+'</textarea>';
+      if(ob.preview){ h+='<img src="'+ob.preview+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-top:8px;">'; }
+      h+='<label style="display:block;margin-top:8px;"><span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-size:13px;font-weight:700;cursor:pointer;">📷 '+(ob.preview?(en?'Change photo':'Cambiar foto'):(en?'Add photo':'Agregar foto'))+'</span><input type="file" accept="image/*" capture="environment" onchange="recepObsPhoto('+i+',this)" style="display:none;"></label>';
+      h+='</div>';
+    });
+    h+='<button onclick="recepAddObs()" class="btn ghost" style="width:100%;margin-bottom:14px;">➕ '+(en?'Add observation':'Agregar observación')+'</button>';
+  }
+  h+='<button id="recep-save" onclick="svcRecepSave()" class="btn-gold" style="width:100%;">'+(en?'Save & receive':'Guardar y recibir')+'</button>';
+  const body=document.getElementById('svc-recep-body'); if(body) body.innerHTML=h;
+}
+window.recepSetNone=function(v){ if(!_recep) return; _recep.none=!!v; if(_recep.none) _recep.obs=[]; _recepRender(); };
+window.recepAddObs=function(){ if(!_recep) return; _recep.none=false; _recep.obs.push({note:'',file:null,preview:''}); _recepRender(); };
+window.recepRemoveObs=function(i){ if(!_recep) return; _recep.obs.splice(i,1); _recepRender(); };
+window.recepObsPhoto=async function(i,inp){
+  if(!_recep||!inp.files||!inp.files[0]) return;
+  const el=inp.closest('label'); const span=el&&el.querySelector('span'); const prev=span?span.textContent:'';
+  try{ if(span) span.textContent='⏳ …'; const jpg=await toJpeg(inp.files[0]); _recep.obs[i].file=jpg; try{ if(_recep.obs[i].preview&&_recep.obs[i].preview.indexOf('blob:')===0) URL.revokeObjectURL(_recep.obs[i].preview); }catch(e){} _recep.obs[i].preview=URL.createObjectURL(jpg); _recepRender(); }
+  catch(e){ if(span) span.textContent=prev; whToast('⚠️ '+((e&&e.message)||'foto'),true); }
+};
+window.svcRecepSave=async function(){
+  if(!_recep) return; const en=(L==='en'); const r=_recep;
+  const btn=document.getElementById('recep-save'); if(btn){ btn.disabled=true; btn.textContent=en?'Saving…':'Guardando…'; }
+  try{
+    const obs=[];
+    for(const ob of r.obs){ const note=(ob.note||'').trim(); if(!note && !ob.file) continue; let url=''; if(ob.file){ const rf=ref(storage,'serviceOrders/'+r.orderId+'/reception/'+Date.now()+'_'+((ob.file.name||'foto.jpg'))); await uploadBytes(rf,ob.file); url=await getDownloadURL(rf); } obs.push({note:note,photo:url,at:new Date().toISOString()}); }
+    const none = r.none || obs.length===0;
+    await httpsCallable(functions,'svcIntake')(vaData({ orderId:r.orderId, intake:{ miles:r.miles||'', none:none, observations:obs } }));
+    whToast('✅ '+(en?'Car received':'Carro recibido'));
+    svcRecepClose(); if(typeof svcRefresh==='function') svcRefresh();
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent=en?'Save & receive':'Guardar y recibir'; } whToast('⚠️ '+((e&&e.message)||'error'),true); }
 };
 // 💬 El empleado avisa a la OFICINA/dueños (NUNCA al cliente) → abre el CHAT DE OFICINA (callables, funciona por teléfono).
 window.svcMsgAdmin=function(folio){
