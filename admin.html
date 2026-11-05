@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105214826"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105214826"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105223912"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105223912"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1001,8 +1001,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105214826"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105214826"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105223912"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105223912"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2423,7 +2423,7 @@ window.renderClient360=function(id){
     const cfQuotes=qz.map(q=>({id:q.id, car:(q.options&&q.options[0]&&q.options[0].car)||'', when:q.createdAt?new Date(q.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}));
     body.innerHTML=LMG.clientFichaHTML(
       { id:id, name:c.name, phone:c.phone, lang:c.lang, idHtml:idLink, badgesHtml:(c360BadgeHtml(f)||''), summaryHtml:cfSummary, vehicles:cfVehicles, hideFlatService:true, serviceOrphan:cfOrphan, extraSections:cfExtra, quotes:cfQuotes },
-      { lang:(c.lang==='en'?'en':'es'), close:'c360Close()', payFn:(f.buyer?'openPayModal':''), editFn:'openEditModal', viewAsFn:'viewAsClient', newServiceFn:'c360NewService', openVehicleFn:'openVehicle360', openOrderFn:'svcOpenOrder', openReceiptFn:'svcOpenReceipt', openQuoteFn:'viewCotiz' }
+      { lang:(c.lang==='en'?'en':'es'), close:'c360Close()', payFn:(f.buyer?'openPayModal':''), editFn:'openEditModal', viewAsFn:'viewAsClient', contactFn:'saveContact', newServiceFn:'c360NewService', openVehicleFn:'openVehicle360', openOrderFn:'svcOpenOrder', openReceiptFn:'svcOpenReceipt', openQuoteFn:'viewCotiz' }
     );
     return;
   }
@@ -2438,6 +2438,7 @@ window.renderClient360=function(id){
   h+='<div style="display:flex;gap:7px;flex-wrap:wrap;padding:0 16px 14px;">'
     +(f.buyer?'<button onclick="c360Close();openPayModal(\''+id+'\')" style="flex:1 1 auto;background:var(--green,#16a34a);color:#042;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:800;cursor:pointer;">💵 Pago</button>':'')
     +(phone?'<a href="sms:'+phone+'" style="flex:1 1 auto;text-align:center;text-decoration:none;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px;font-size:13px;font-weight:700;">💬 SMS</a><a href="tel:'+phone+'" style="flex:0 0 auto;text-align:center;text-decoration:none;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 13px;font-size:13px;">📞</a>':'')
+    +(phone?'<button onclick="saveContact(\''+id+'\')" title="Guardar en mis contactos" style="flex:0 0 auto;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;">📇</button>':'')
     +'<button onclick="c360Close();openEditModal(\''+id+'\')" style="flex:1 1 auto;background:var(--surface3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer;">✏️ Editar</button>'
     +'<button onclick="viewAsClient(\''+id+'\')" style="flex:1 1 auto;background:#6b4ea8;color:#fff;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:800;cursor:pointer;">👁️ Ver como cliente</button>'
     +'</div>';
@@ -7741,6 +7742,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105214826"></script>
+<script type="module" src="launcher.js?v=20261105223912"></script>
 </body>
 </html>
