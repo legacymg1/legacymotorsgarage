@@ -2183,11 +2183,12 @@ exports.svcDiag = onCall({ timeoutSeconds: 20 }, async (request) => {
     sv.status = "listo"; sv.finishedAt = now; sv.finishedBy = id.name || id.email || id.empId || "";
   } else {
     const inRaw = d.diagnosis || {};
+    // 🔧 El MECÁNICO solo pone: parte + # de parte ORIGINAL + foto de la parte. El PRECIO lo pone la oficina/dueño después (Fase 3).
     const parts = Array.isArray(inRaw.parts) ? inRaw.parts.slice(0, 30).map((p) => ({
       desc: String(p.desc || "").slice(0, 200),
       partNum: String(p.partNum || "").slice(0, 60),
-      priceCents: Math.max(0, Math.round(Number(p.priceCents) || 0)),
-    })).filter((p) => p.desc || p.partNum) : [];
+      photo: String(p.photo || "").slice(0, 600),
+    })).filter((p) => p.desc || p.partNum || p.photo) : [];
     sv.diagnosis = {
       notes: String(inRaw.notes || "").slice(0, 1500),
       photos: Array.isArray(inRaw.photos) ? inRaw.photos.slice(0, 12).map((u) => String(u || "").slice(0, 600)) : [],
