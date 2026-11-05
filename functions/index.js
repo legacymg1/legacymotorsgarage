@@ -2098,13 +2098,13 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
       vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
       reason: o.reason || "", reasonEs: o.reasonEs || o.reason || "", reasonEn: o.reasonEn || o.reason || "",
       scheduledAt: o.scheduledAt || null, receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", deliveredAt: o.deliveredAt || "",
-      status: o.status || "por_recibir", paid: !!o.paid, svcPhase: o.svcPhase || "", diagSummary: o.diagSummary || null, diagSentAt: o.diagSentAt || "",
+      status: o.status || "por_recibir", paid: !!o.paid, svcPhase: o.svcPhase || "", estimateStatus: o.estimateStatus || "", diagSummary: o.diagSummary || null, diagSentAt: o.diagSentAt || "",
       assignRole: o.assignRole || "", assignName: o.assignName || "",
       // 🔧 línea / relevo
       activeRole: activeRole || "", myStageActive, waitingFor: (!myStageActive && activeRole) ? activeRole : "",
       canReceive: isStaff || (myRoles.includes(activeRole) && isFirstRole),
-      services: svs.map((s, i) => ({ index: i, role: s.role || defRole, status: s.status || "pendiente", assignName: s.assignName || "", desc: s.desc || "", descEn: s.descEn || s.desc || "", diagnosis: s.diagnosis || null })),
-      myServices: myIdx.map((i) => ({ index: i, role: svs[i].role || defRole, status: svs[i].status || "pendiente", desc: svs[i].desc || "", descEn: svs[i].descEn || svs[i].desc || "", diagnosis: svs[i].diagnosis || null })),
+      services: svs.map((s, i) => ({ index: i, role: s.role || defRole, status: s.status || "pendiente", assignName: s.assignName || "", desc: s.desc || "", descEn: s.descEn || s.desc || "", diagnosis: s.diagnosis || null, repair: s.repair || null })),
+      myServices: myIdx.map((i) => ({ index: i, role: svs[i].role || defRole, status: svs[i].status || "pendiente", desc: svs[i].desc || "", descEn: svs[i].descEn || svs[i].desc || "", diagnosis: svs[i].diagnosis || null, repair: svs[i].repair || null })),
     };
   });
   return { ok: true, orders: out, roles: id.roles || [], name: id.name || "" };
@@ -2181,6 +2181,12 @@ exports.svcDiag = onCall({ timeoutSeconds: 20 }, async (request) => {
   const now = new Date().toISOString();
   if (op === "finish") {
     sv.status = "listo"; sv.finishedAt = now; sv.finishedBy = id.name || id.email || id.empId || "";
+    // 🔧 Evidencia de REPARACIÓN (lo que hizo + fotos del trabajo terminado) — se guarda en el servicio (historial del carro).
+    const repRaw = d.repair || {};
+    const repPhotos = Array.isArray(repRaw.photos) ? repRaw.photos.slice(0, 12).map((u) => String(u || "").slice(0, 600)).filter(Boolean) : [];
+    if (repRaw.notes || repPhotos.length) {
+      sv.repair = { notes: String(repRaw.notes || "").slice(0, 1500), photos: repPhotos, at: now, by: id.name || id.email || id.empId || "" };
+    }
   } else {
     const inRaw = d.diagnosis || {};
     // 🔧 El MECÁNICO solo pone: parte + # de parte ORIGINAL + foto de la parte. El PRECIO lo pone la oficina/dueño después (Fase 3).
@@ -2201,11 +2207,58 @@ exports.svcDiag = onCall({ timeoutSeconds: 20 }, async (request) => {
   svs[idx] = sv;
   const patch = { services: svs, updatedAt: now, updatedBy: id.name || id.email || id.empId || "" };
   if (op !== "finish") patch.svcPhase = "diagnostico";   // marca de fase (para el label "En diagnóstico")
+  else patch.svcPhase = "reparacion";
   const derived = svcDeriveStatusSrv(o, svs);
   patch.status = derived;
   if (derived === "en_proceso" && !o.startedAt) patch.startedAt = now;
+  // 🏁 ¿Se terminaron TODOS los servicios? → el carro quedó LISTO: avisa al dueño y al cliente (una sola vez).
+  const allDone = svs.length > 0 && svs.every((x) => x.status === "listo");
+  if (op === "finish" && allDone && !o.readyNotifiedAt) {
+    patch.readyNotifiedAt = now; patch.readyAt = o.readyAt || now;
+    const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : ""; const _veh = o.vehicleLabel || "";
+    try { await _pushToOwners({ title: "🏁 Carro listo", body: _nm + _fol + (_veh ? (" · " + _veh) : "") + " · trabajo terminado", titleEn: "🏁 Car ready", bodyEn: _nm + _fol + " · work done", url: "/admin.html" }); } catch (e) {}
+    try { if (typeof _notifyClientServiceReady === "function") await _notifyClientServiceReady(o); } catch (e) {}
+  }
   await ref.set(patch, { merge: true });
-  return { ok: true, status: derived };
+  return { ok: true, status: derived, allDone: allDone };
+});
+
+// 🧹 MANTENIMIENTO (solo dueño): limpia diagnósticos de prueba y/o regresa servicios que quedaron "listo" por error a "en proceso".
+//    clearDiagSummary → quita el resumen/partes/fase de diagnóstico enviado. resetServices → servicios 'listo'/'pausado' → 'en_proceso' (sin borrar el diagnóstico).
+exports.svcAdminReset = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !id.isOwner) throw new HttpsError("permission-denied", "Solo dueños.");
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const now = new Date().toISOString();
+  const patch = { updatedAt: now, updatedBy: id.email || id.name || "owner-reset" };
+  const DEL = admin.firestore.FieldValue.delete();
+  let svs = Array.isArray(o.services) ? o.services.slice() : [];
+  if (d.resetServices) {
+    svs = svs.map((s) => {
+      if (s.status === "listo" || s.status === "pausado") {
+        const n = Object.assign({}, s); n.status = "en_proceso";
+        delete n.finishedAt; delete n.finishedBy; delete n.repair;
+        return n;
+      }
+      return s;
+    });
+    patch.services = svs;
+  }
+  if (d.clearDiagSummary) {
+    patch.diagSummary = DEL; patch.diagParts = DEL; patch.diagSentAt = DEL; patch.svcPhase = DEL;
+    patch.readyNotifiedAt = DEL; patch.readyAt = DEL;
+  }
+  patch.status = svcDeriveStatusSrv(o, patch.services || svs);
+  await ref.set(patch, { merge: true });
+  return { ok: true, status: patch.status };
 });
 
 // 🔎 BÚSQUEDA DE # DE PARTE con IA (usando el VEHÍCULO/VIN). El mecánico escribe la parte que necesita y la IA sugiere
