@@ -2098,13 +2098,13 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
       vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
       reason: o.reason || "", reasonEs: o.reasonEs || o.reason || "", reasonEn: o.reasonEn || o.reason || "",
       scheduledAt: o.scheduledAt || null, receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", deliveredAt: o.deliveredAt || "",
-      status: o.status || "por_recibir", paid: !!o.paid,
+      status: o.status || "por_recibir", paid: !!o.paid, svcPhase: o.svcPhase || "",
       assignRole: o.assignRole || "", assignName: o.assignName || "",
       // 🔧 línea / relevo
       activeRole: activeRole || "", myStageActive, waitingFor: (!myStageActive && activeRole) ? activeRole : "",
       canReceive: isStaff || (myRoles.includes(activeRole) && isFirstRole),
-      services: svs.map((s) => ({ role: s.role || defRole, status: s.status || "pendiente", assignName: s.assignName || "", desc: s.desc || "", descEn: s.descEn || s.desc || "" })),
-      myServices: myIdx.map((i) => ({ index: i, role: svs[i].role || defRole, status: svs[i].status || "pendiente", desc: svs[i].desc || "", descEn: svs[i].descEn || svs[i].desc || "" })),
+      services: svs.map((s, i) => ({ index: i, role: s.role || defRole, status: s.status || "pendiente", assignName: s.assignName || "", desc: s.desc || "", descEn: s.descEn || s.desc || "", diagnosis: s.diagnosis || null })),
+      myServices: myIdx.map((i) => ({ index: i, role: svs[i].role || defRole, status: svs[i].status || "pendiente", desc: svs[i].desc || "", descEn: svs[i].descEn || svs[i].desc || "", diagnosis: svs[i].diagnosis || null })),
     };
   });
   return { ok: true, orders: out, roles: id.roles || [], name: id.name || "" };
@@ -2152,6 +2152,59 @@ exports.svcServiceDone = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (newStatus === "en_proceso" && !o.startedAt) patch.startedAt = now;
   await ref.set(patch, { merge: true });
   return { ok: true, status: newStatus, activeRole: svcActiveRoleSrv(svs) };
+});
+
+// 🔬 DIAGNÓSTICO POR SERVICIO (Fase 1). El mecánico, servicio por servicio: notas + fotos de lo encontrado +
+//    lista de partes (con # de parte ORIGINAL). op 'save' guarda el diagnóstico; op 'finish' cierra ese servicio.
+//    Reusa el modelo services[] y svcDeriveStatusSrv. Permiso: staff o el trabajador asignado a ese servicio.
+exports.svcDiag = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  const idx = Number(d.idx);
+  const op = String(d.op || "save"); // save | finish
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const svs = Array.isArray(o.services) ? o.services.slice() : [];
+  if (!(idx >= 0 && idx < svs.length)) throw new HttpsError("invalid-argument", "Servicio inválido.");
+  const defRole = o.assignRole || "Mecánico";
+  const sv = Object.assign({}, svs[idx]);
+  const mineSvc = (sv.assignEmpId && sv.assignEmpId === id.empId) ||
+    (!sv.assignEmpId && (sv.role || defRole) && Array.isArray(id.roles) && id.roles.includes(sv.role || defRole));
+  if (!(id.isOwner || id.email || mineSvc)) throw new HttpsError("permission-denied", "No es tu servicio.");
+  const now = new Date().toISOString();
+  if (op === "finish") {
+    sv.status = "listo"; sv.finishedAt = now; sv.finishedBy = id.name || id.email || id.empId || "";
+  } else {
+    const inRaw = d.diagnosis || {};
+    const parts = Array.isArray(inRaw.parts) ? inRaw.parts.slice(0, 30).map((p) => ({
+      desc: String(p.desc || "").slice(0, 200),
+      partNum: String(p.partNum || "").slice(0, 60),
+      priceCents: Math.max(0, Math.round(Number(p.priceCents) || 0)),
+    })).filter((p) => p.desc || p.partNum) : [];
+    sv.diagnosis = {
+      notes: String(inRaw.notes || "").slice(0, 1500),
+      photos: Array.isArray(inRaw.photos) ? inRaw.photos.slice(0, 12).map((u) => String(u || "").slice(0, 600)) : [],
+      parts: parts,
+      at: now, by: id.name || id.email || id.empId || "",
+    };
+    if (!sv.status || sv.status === "pendiente") sv.status = "en_proceso";
+    if (!sv.startedAt) sv.startedAt = now;
+  }
+  svs[idx] = sv;
+  const patch = { services: svs, updatedAt: now, updatedBy: id.name || id.email || id.empId || "" };
+  if (op !== "finish") patch.svcPhase = "diagnostico";   // marca de fase (para el label "En diagnóstico")
+  const derived = svcDeriveStatusSrv(o, svs);
+  patch.status = derived;
+  if (derived === "en_proceso" && !o.startedAt) patch.startedAt = now;
+  await ref.set(patch, { merge: true });
+  return { ok: true, status: derived };
 });
 
 // 🗂️ SERVICE CRM completo para el CENTRO DE OPERACIONES (solo dueño): TODAS las órdenes (activas + completadas + estimados) + clientes de servicio.
