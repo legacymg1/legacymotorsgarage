@@ -1,1 +1,1 @@
-{"v": "20261105185454", "msg": "SERVICE Fase 3 (admin): al abrir la orden el dueno ve el RESUMEN del diagnostico"}
+{"v": "20261105190653", "msg": "FIX critico: lo tecleado en recepcion/diagnostico NO se guardaba (los oninput in"}

@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105184925"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105184925"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105190653"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105190653"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261105184925"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261105184925"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261105184925"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105190653"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261105190653"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261105190653"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2702,7 +2702,7 @@ function _svcActionsHTML(o){
   if(o.waitingFor && !o.myStageActive) return '<div class="btn-ghost" style="width:100%;text-align:center;opacity:.75;cursor:default;">⏳ '+(L==='en'?'Waiting for ':'Esperando a ')+svcRoleLabel(o.waitingFor)+'</div>';
   if(o.status==='por_recibir'||o.status==='agendado') return o.canReceive?'<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcOpenReception(\''+o.id+'\')">'+t('svcReceiveCar')+'</button>':'';
   if(anyProg) return '<div style="display:flex;gap:8px;"><button class="btn-ghost" style="flex:1;" onclick="'+SP+'svcStage(\''+o.id+'\',\'pause\')">'+t('svcWaitParts')+'</button><button class="btn-gold" style="flex:1;" onclick="'+SP+'svcOpenWork(\''+o.id+'\')">🔧 '+L2('Abrir trabajo','Open work')+'</button></div>';
-  if(anyPaused) return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcStage(\''+o.id+'\',\'resume\')">'+t('svcResume')+'</button>';
+  if(anyPaused) return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcStartWork(\''+o.id+'\')">'+t('svcResume')+'</button>';
   if(allPend || o.status==='recibido') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcStartWork(\''+o.id+'\')">'+t('svcStartWork')+'</button>';
   return '';
 }
@@ -2770,14 +2770,14 @@ function _recepRender(){
   h+='<div class="faint" style="font-size:13px;margin-bottom:4px;">'+folio+esc(o.clientName||'')+' · 🚗 '+car+'</div>';
   h+='<div class="faint" style="font-size:12px;line-height:1.5;margin-bottom:14px;">'+(en?'Mark any pre-existing damage with a photo — this protects us. If the car is fine, mark No observations.':'Señala con foto cualquier desperfecto que el carro YA traía — esto nos protege. Si el carro está bien, marca Sin observaciones.')+'</div>';
   h+='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:5px;">'+(en?'Miles (optional)':'Millas (opcional)')+'</label>';
-  h+='<input id="recep-miles" type="number" inputmode="numeric" value="'+esc(r.miles||'')+'" oninput="_recep&&(_recep.miles=this.value)" placeholder="84250" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--text);font-size:15px;margin-bottom:14px;">';
+  h+='<input id="recep-miles" type="number" inputmode="numeric" value="'+esc(r.miles||'')+'" oninput="_rcSet(\'miles\',this.value)" placeholder="84250" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--text);font-size:15px;margin-bottom:14px;">';
   h+='<button onclick="recepSetNone('+(!r.none)+')" style="width:100%;padding:13px;border-radius:12px;border:2px solid '+(r.none?'#35c46a':'var(--border)')+';background:'+(r.none?'rgba(53,196,106,.14)':'transparent')+';color:var(--text);font-weight:800;font-size:15px;cursor:pointer;margin-bottom:12px;">'+(r.none?'✅ ':'')+(en?'No observations (car is fine)':'Sin observaciones (el carro está bien)')+'</button>';
   if(!r.none){
     h+='<div style="font-weight:800;font-size:13px;margin:4px 0 8px;">'+(en?'Observations':'Observaciones')+(r.obs.length?(' · '+r.obs.length):'')+'</div>';
     r.obs.forEach((ob,i)=>{
       h+='<div style="border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;">';
       h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span class="faint" style="font-size:12px;font-weight:700;">#'+(i+1)+'</span><button onclick="recepRemoveObs('+i+')" style="background:transparent;border:none;color:#e05a4a;font-size:13px;cursor:pointer;">🗑 '+(en?'Remove':'Quitar')+'</button></div>';
-      h+='<textarea oninput="_recep&&(_recep.obs['+i+'].note=this.value)" placeholder="'+(en?'What is damaged / how it already was…':'Qué está dañado / cómo ya venía…')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:14px;min-height:56px;resize:vertical;">'+esc(ob.note||'')+'</textarea>';
+      h+='<textarea oninput="_rcObs('+i+',\'note\',this.value)" placeholder="'+(en?'What is damaged / how it already was…':'Qué está dañado / cómo ya venía…')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:14px;min-height:56px;resize:vertical;">'+esc(ob.note||'')+'</textarea>';
       if(ob.preview){ h+='<img src="'+ob.preview+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;margin-top:8px;">'; }
       h+='<label style="display:block;margin-top:8px;"><span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-size:13px;font-weight:700;cursor:pointer;">📷 '+(ob.preview?(en?'Change photo':'Cambiar foto'):(en?'Add photo':'Agregar foto'))+'</span><input type="file" accept="image/*" onchange="recepObsPhoto('+i+',this)" style="display:none;"></label>';
       h+='</div>';
@@ -2818,6 +2818,12 @@ let _workUnsub=null;
 // 🛑 "Ocupado" = hay algo SIN GUARDAR (hoja de diagnóstico/recepción) → el auto-update espera a que cierres para no perderlo.
 //    La vista de trabajo (#svc-work) NO cuenta: ahí sí puede recargar y te regresa al mismo lugar (_restoreSvcWork).
 window._whBusyRecalc=function(){ try{ window.__lmgBusy=!!document.querySelector('#svc-diag,#svc-recep'); }catch(e){} };
+// 🔌 Setters en window: los handlers inline (oninput) corren en scope GLOBAL y NO ven _diag/_recep (son del módulo).
+//    Por eso lo tecleado no llegaba al modelo. Estos helpers SÍ los ven (closure) → lo tecleado se guarda.
+window._dgSet=function(k,v){ if(_diag) _diag[k]=v; };
+window._dgPart=function(i,k,v){ if(_diag&&_diag.parts&&_diag.parts[i]) _diag.parts[i][k]=v; };
+window._rcSet=function(k,v){ if(_recep) _recep[k]=v; };
+window._rcObs=function(i,k,v){ if(_recep&&_recep.obs&&_recep.obs[i]) _recep.obs[i][k]=v; };
 window.svcStartWork=async function(orderId){
   try{ await httpsCallable(functions,'svcServiceDone')(vaData({orderId:orderId,action:'start'})); }
   catch(e){ whToast('⚠️ '+((e&&e.message)||'error'),true); return; }
@@ -2894,18 +2900,19 @@ function _diagRender(){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><h2 style="font-size:18px;margin:0;line-height:1.2;">🔬 '+(en?'Diagnosis':'Diagnóstico')+'</h2><button onclick="svcDiagClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;flex:none;">×</button></div>';
   h+='<div class="faint" style="font-size:13px;margin-bottom:12px;">'+esc(r.desc)+'</div>';
   h+='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:5px;">'+(en?'What you found':'Qué encontraste')+'</label>';
-  h+='<textarea oninput="_diag&&(_diag.notes=this.value)" placeholder="'+(en?'Describe the problem…':'Describe el problema…')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:14px;min-height:60px;resize:vertical;margin-bottom:7px;">'+esc(r.notes||'')+'</textarea>';
+  h+='<textarea oninput="_dgSet(\'notes\',this.value)" placeholder="'+(en?'Describe the problem…':'Describe el problema…')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:14px;min-height:60px;resize:vertical;margin-bottom:7px;">'+esc(r.notes||'')+'</textarea>';
   h+='<label style="font-size:12.5px;font-weight:600;display:block;margin-bottom:6px;color:var(--muted);">'+(en?'Add photos of the problem':'Agrega fotos del problema')+(r.photos.length?(' · '+r.photos.length):'')+'</label>';
   h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'+r.photos.map(function(p,pi){ const src=p.url||p.preview; return '<span style="position:relative;display:inline-block;"><img src="'+src+'" style="width:72px;height:72px;object-fit:cover;border-radius:10px;"><button onclick="diagRmPhoto('+pi+')" style="position:absolute;top:-6px;right:-6px;background:#e05a4a;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;font-weight:800;cursor:pointer;line-height:1;">×</button></span>'; }).join('')+'</div>';
   h+='<label style="display:inline-block;margin-bottom:12px;"><span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-size:13px;font-weight:700;cursor:pointer;">📷 '+(en?'Add photo':'Agregar foto')+'</span><input type="file" accept="image/*" onchange="diagAddPhoto(this)" style="display:none;"></label>';
   // 🧠 Chief mechanic (IA que ayuda a diagnosticar, ve las fotos del problema + busca fallas comunes/TSB)
-  h+='<button onclick="diagAiHelp()" '+(r.aiLoading?'disabled ':'')+'style="width:100%;margin-bottom:'+(r.aiHelp?'8px':'16px')+';background:linear-gradient(135deg,#6d4bff,#9b7bff);color:#fff;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:800;cursor:pointer;">'+(r.aiLoading?('⏳ '+(en?'Thinking…':'Pensando…')):('🧠 '+(en?'Chief mechanic — help me diagnose':'Chief mechanic — ayúdame a diagnosticar')))+'</button>';
-  if(r.aiHelp){ h+='<div style="background:rgba(109,75,255,.08);border:1px solid rgba(109,75,255,.4);border-radius:12px;padding:12px;margin-bottom:16px;"><div style="font-weight:800;font-size:12px;color:#9b7bff;margin-bottom:6px;">🧠 '+(en?'Chief mechanic':'Mecánico jefe')+'</div><div style="font-size:13px;line-height:1.5;white-space:pre-wrap;">'+esc(r.aiHelp)+'</div><button onclick="diagAiToNotes()" class="btn ghost" style="width:100%;margin-top:10px;">➕ '+(en?'Add to my notes':'Pegar a mis notas')+'</button></div>'; }
+  h+='<button onclick="diagAiHelp()" '+(r.aiLoading?'disabled ':'')+'style="width:100%;margin-bottom:'+((r.aiHelp||r.aiLoading)?'8px':'16px')+';background:linear-gradient(135deg,#6d4bff,#9b7bff);color:#fff;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:800;cursor:pointer;opacity:'+(r.aiLoading?'.7':'1')+';">'+(r.aiLoading?('⏳ '+(en?'Analyzing…':'Analizando…')):('🧠 '+(en?'Chief mechanic — help me diagnose':'Chief mechanic — ayúdame a diagnosticar')))+'</button>';
+  if(r.aiLoading){ h+='<div class="faint" style="font-size:12px;text-align:center;margin-bottom:16px;line-height:1.4;">🔎 '+(en?'The chief mechanic is researching this vehicle… (10-20s)':'El chief mechanic está investigando este carro… (10-20s)')+'</div>'; }
+  if(r.aiHelp){ h+='<div data-aihelp="1" style="background:rgba(109,75,255,.08);border:1px solid rgba(109,75,255,.4);border-radius:12px;padding:12px;margin-bottom:16px;"><div style="font-weight:800;font-size:12px;color:#9b7bff;margin-bottom:6px;">🧠 '+(en?'Chief mechanic':'Mecánico jefe')+'</div><div style="font-size:13px;line-height:1.5;white-space:pre-wrap;">'+esc(r.aiHelp)+'</div><button onclick="diagAiToNotes()" class="btn ghost" style="width:100%;margin-top:10px;">➕ '+(en?'Add to my notes':'Pegar a mis notas')+'</button></div>'; }
   h+='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px;">🧩 '+(en?'Parts needed':'Partes que necesitas')+'</label>';
   h+=r.parts.map(function(p,pi){ const psrc=p.photoUrl||p.photoPreview; return '<div style="border:1px solid var(--border);border-radius:10px;padding:9px;margin-bottom:8px;">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;"><span class="faint" style="font-size:11px;font-weight:700;">🧩 #'+(pi+1)+'</span><button onclick="diagRmPart('+pi+')" style="background:transparent;border:none;color:#e05a4a;font-size:12px;cursor:pointer;">🗑 '+(en?'Remove':'Quitar')+'</button></div>'
-    +'<input value="'+esc(p.desc||'')+'" oninput="_diag&&(_diag.parts['+pi+'].desc=this.value)" placeholder="'+(en?'Part (e.g. front brake pads)':'Parte (ej. balatas delanteras)')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--text);font-size:14px;margin-bottom:6px;">'
-    +'<input value="'+esc(p.partNum||'')+'" oninput="_diag&&(_diag.parts['+pi+'].partNum=this.value)" placeholder="'+(en?'Original part #':'# de parte original')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--text);font-size:13px;margin-bottom:6px;">'
+    +'<input value="'+esc(p.desc||'')+'" oninput="_dgPart('+pi+',\'desc\',this.value)" placeholder="'+(en?'Part (e.g. front brake pads)':'Parte (ej. balatas delanteras)')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--text);font-size:14px;margin-bottom:6px;">'
+    +'<input value="'+esc(p.partNum||'')+'" oninput="_dgPart('+pi+',\'partNum\',this.value)" placeholder="'+(en?'Original part #':'# de parte original')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--text);font-size:13px;margin-bottom:6px;">'
     +'<button onclick="diagLookupPart('+pi+')" '+(p.loading?'disabled ':'')+'style="width:100%;margin-bottom:6px;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:9px;padding:8px;font-size:12.5px;font-weight:700;cursor:pointer;">'+(p.loading?('⏳ '+(en?'Searching…':'Buscando…')):('🔎 '+(en?'Find part # with AI':'Buscar # con IA')))+'</button>'
     +((p.cands&&p.cands.length)?('<div style="margin-bottom:6px;">'+p.cands.map(function(c){ const pn=(c.partNum||'').replace(/\x27/g,''); return '<div onclick="diagPickPart('+pi+',\''+pn+'\')" style="border:1px solid var(--gold);border-radius:9px;padding:8px;margin-bottom:5px;cursor:pointer;background:rgba(201,168,76,.08);"><div style="font-weight:800;font-size:13px;color:var(--gold);">'+(c.partNum?esc(c.partNum):(en?'(verify in catalog)':'(verificar en catálogo)'))+'</div>'+(c.name?'<div style="font-size:12px;">'+esc(c.name)+'</div>':'')+(c.note?'<div class="faint" style="font-size:11px;margin-top:2px;line-height:1.35;">'+esc(c.note)+'</div>':'')+'</div>'; }).join('')+'<div class="faint" style="font-size:10.5px;">'+(en?'Tap the right one to fill it in — verify before saving.':'Toca el correcto para ponerlo — verifica antes de guardar.')+'</div></div>'):'')
     +(psrc?'<img src="'+psrc+'" style="width:100%;max-height:160px;object-fit:cover;border-radius:9px;margin-bottom:6px;">':'')
@@ -2927,6 +2934,7 @@ window.diagAiHelp=async function(){
     r.aiHelp=((res&&res.data)||{}).text||''; if(!r.aiHelp) whToast(en?'No answer':'Sin respuesta');
   }catch(e){ whToast('⚠️ '+((e&&e.message)||'IA'),true); }
   if(_diag) _diag.aiLoading=false; _diagRender();
+  try{ setTimeout(function(){ const b=document.querySelector('#svc-diag [data-aihelp]'); if(b) b.scrollIntoView({behavior:'smooth',block:'nearest'}); },60); }catch(e){}
 };
 window.diagAiToNotes=function(){ if(!_diag||!_diag.aiHelp) return; _diag.notes=((_diag.notes||'').trim()+'\n\n'+_diag.aiHelp).trim(); _diag.aiHelp=''; _diagRender(); };
 window.diagLookupPart=async function(i){
@@ -5805,7 +5813,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261105184925"></script>
+<script type="module" src="launcher.js?v=20261105190653"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
