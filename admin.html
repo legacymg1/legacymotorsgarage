@@ -156,7 +156,7 @@
   .form-group { margin-bottom: 16px; }
   .form-label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
   .form-input { width: 100%; background: var(--navy2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: var(--font-body); font-size: 14px; outline: none; transition: border-color 0.2s; }
-  #f-name,#f-make,#f-model,#f-trim,#f-color,#f-city{text-transform:capitalize;} #f-vin,#f-plate{text-transform:uppercase;}
+  #f-name,#f-lastname,#f-lastname2,#f-make,#f-model,#f-trim,#f-color,#f-city{text-transform:capitalize;} #f-vin,#f-plate{text-transform:uppercase;}
   .form-input:focus { border-color: var(--gold); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .form-hint { font-size: 11px; color: var(--gold); margin-top: 4px; min-height: 16px; }
@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105224825"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105224825"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105230344"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105230344"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -522,11 +522,17 @@
     <div class="addc-section">
       <div class="addc-head">2 · Datos del cliente</div>
       <div class="form-row">
-        <div class="form-group" style="position:relative;"><label class="form-label">Nombre</label><input class="form-input" id="f-name" placeholder="Juan García" autocomplete="off" oninput="newClientNameSuggest(this.value)" onfocus="newClientNameSuggest(this.value)" onblur="setTimeout(function(){var b=document.getElementById('f-name-results');if(b)b.style.display='none';},200)">
+        <div class="form-group" style="position:relative;"><label class="form-label">Nombre(s)</label><input class="form-input" id="f-name" placeholder="Juan" autocomplete="off" oninput="newClientNameSuggest(this.value)" onfocus="newClientNameSuggest(this.value)" onblur="setTimeout(function(){var b=document.getElementById('f-name-results');if(b)b.style.display='none';},200)">
           <div id="f-name-results" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--surface,#141924);border:1px solid var(--border);border-radius:10px;margin-top:4px;max-height:40vh;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.5);"></div>
           <div id="f-name-note" style="font-size:11px;color:var(--gold);margin-top:4px;"></div>
         </div>
         <div class="form-group"><label class="form-label">Teléfono</label><input class="form-input" id="f-phone" placeholder="(555) 555-5555" type="tel" inputmode="tel" oninput="formatPhone(this)"></div>
+      </div>
+      <!-- 👤 Nombre PRO separado: apellidos como en la licencia/ID → contratos y DMV cuadran. El nombre completo se arma solo al guardar. -->
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Apellido paterno</label><input class="form-input" id="f-lastname" placeholder="García" autocomplete="off"></div>
+        <div class="form-group"><label class="form-label">Apellido materno</label><input class="form-input" id="f-lastname2" placeholder="López" autocomplete="off"></div>
+        <div class="form-group" style="flex:0 0 90px;"><label class="form-label">Sufijo</label><input class="form-input" id="f-suffix" placeholder="Jr." autocomplete="off" style="text-transform:none;"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Fecha de Nacimiento</label><input class="form-input" id="f-dob" type="date"></div>
@@ -1001,8 +1007,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105224825"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105224825"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105230344"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105230344"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -5266,7 +5272,7 @@ window.smsPlain=function(id){ const c=clients.find(x=>x.id===id); if(!c) return;
 window.openAddModal=function(){
   editingId=null;
   document.getElementById('modal-title').textContent='NUEVO CLIENTE';
-  ['name','phone','make','model','color','year','total','down','weekly','notes','dob','contractdate','lastservice','vin','miles','plate','address','city','zip','id-number'].forEach(f=>{const el=document.getElementById('f-'+f);if(el)el.value='';});
+  ['name','lastname','lastname2','suffix','phone','make','model','color','year','total','down','weekly','notes','dob','contractdate','lastservice','vin','miles','plate','address','city','zip','id-number'].forEach(f=>{const el=document.getElementById('f-'+f);if(el)el.value='';});
   const _c=document.getElementById('f-sms-consent'); if(_c) _c.checked=false;
   const _pv2=document.getElementById('f-private'); if(_pv2) _pv2.checked=false;
   document.getElementById('f-startdate').value=today();
@@ -5381,7 +5387,9 @@ window.openEditModal=function(id){
   document.getElementById('modal-title').textContent='EDITAR CLIENTE';
   const _k2=document.getElementById('f-kind'); if(_k2) _k2.value=c.kind||'finance'; toggleKind();
   // Basic fields
-  document.getElementById('f-name').value=c.name||'';
+  // 👤 Si el cliente ya tiene el nombre separado, llena las partes; si no (viejo), pon el nombre completo en Nombre(s) y deja apellidos vacíos (lo separas si quieres).
+  if(c.firstName||c.lastName||c.lastName2||c.suffix){ document.getElementById('f-name').value=c.firstName||''; const _sl=(i,v)=>{const el=document.getElementById(i); if(el) el.value=v||'';}; _sl('f-lastname',c.lastName); _sl('f-lastname2',c.lastName2); _sl('f-suffix',c.suffix); }
+  else { document.getElementById('f-name').value=c.name||''; ['f-lastname','f-lastname2','f-suffix'].forEach(i=>{const el=document.getElementById(i); if(el) el.value='';}); }
   document.getElementById('f-phone').value=c.phone||''; formatPhone(document.getElementById('f-phone'));
   document.getElementById('f-make').value=c.make||'';
   if(document.getElementById('f-color')) document.getElementById('f-color').value=c.color||'';
@@ -5635,7 +5643,12 @@ async function uploadPhotoRetry(storageRef, blob, metadata, label){
 window.saveClient=async function(keepOpen){
   // keepOpen=true → "Guardar y seguir" (guardado PARCIAL): no cierra el modal y NO exige el plan de pagos.
   console.log("saveClient v3.5 running", {keepOpen:!!keepOpen});
-  const name=titleCase(document.getElementById('f-name').value.trim());
+  const _first=titleCase(document.getElementById('f-name').value.trim());
+  const _pat=titleCase(((document.getElementById('f-lastname')||{}).value||'').trim());
+  const _mat=titleCase(((document.getElementById('f-lastname2')||{}).value||'').trim());
+  const _suf=(((document.getElementById('f-suffix')||{}).value||'').trim());
+  // 👤 Si hay apellidos → nombre PRO armado de las partes; si no (cliente viejo / un solo campo) → usa lo tecleado tal cual (no rompe a los viejos).
+  const name=(_pat||_mat||_suf)?([_first,_pat,_mat].filter(Boolean).join(' ')+(_suf?(' '+_suf):'')):_first;
   if(!name){alert('Nombre requerido');return;}
   const _phD=(document.getElementById('f-phone').value||'').replace(/[^0-9]/g,'');
   if(_phD.length>0 && _phD.length!==10){
@@ -5730,6 +5743,7 @@ window.saveClient=async function(keepOpen){
 
   const data={
     name,
+    firstName:_first, lastName:_pat, lastName2:_mat, suffix:_suf,
     phone:document.getElementById('f-phone').value.trim(),
     phoneE164:toE164(document.getElementById('f-phone').value),
     dob:document.getElementById('f-dob')?.value || existing.dob || '',
@@ -7114,8 +7128,11 @@ window.saveContact = async function(id){
   const car=[c.year,c.make,c.model].filter(Boolean).join(' ');
   const esc=s=>String(s||'').replace(/([\\;,])/g,'\\$1').replace(/\n/g,'\\n');
   const noteParts=[car, c.vin?('VIN '+c.vin):'', c.contractNumber?('Contrato '+c.contractNumber):''].filter(Boolean).join(' · ');
+  // 👤 Nombre estructurado para Contactos (ordena por apellido): N:Apellidos;Nombre;;;Sufijo
+  const _ape=[c.lastName,c.lastName2].filter(Boolean).join(' ');
+  const _nLine=(c.firstName||_ape)?('N:'+esc(_ape)+';'+esc(c.firstName||'')+';;;'+esc(c.suffix||'')):('N:'+esc(name)+';;;');
   const vcf=['BEGIN:VCARD','VERSION:3.0',
-    'N:'+esc(name)+';;;','FN:'+esc(name),
+    _nLine,'FN:'+esc(name),
     'TEL;TYPE=CELL:'+phone,
     'ORG:Cliente Legacy Motors',
     noteParts?('NOTE:'+esc(noteParts)):'',
@@ -7748,6 +7765,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105224825"></script>
+<script type="module" src="launcher.js?v=20261105230344"></script>
 </body>
 </html>
