@@ -77,15 +77,38 @@
     setTimeout(function () { try { location.reload(); } catch (e) {} }, 950);
   }
 
+  // 🔄 Chip discreto "Nueva versión — tocar para actualizar": cuando hay update lista pero NO se puede
+  //    aplicar sola (estás en una tarea o escribiendo), aparece para que la apliques TÚ en un momento seguro.
+  function showChip() {
+    if (document.getElementById('lmg-upd-chip')) return;
+    var c = document.createElement('button');
+    c.id = 'lmg-upd-chip';
+    c.type = 'button';
+    c.textContent = '🔄 ' + (isEn() ? 'New version — tap to update' : 'Nueva versión — tocar para actualizar');
+    c.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:2147483210;' +
+      'background:rgba(28,28,32,.82);-webkit-backdrop-filter:blur(18px) saturate(180%);backdrop-filter:blur(18px) saturate(180%);' +
+      'color:#fff;border:.5px solid rgba(255,255,255,.16);border-radius:999px;padding:11px 18px;font:600 13.5px/1 inherit;' +
+      'box-shadow:0 12px 34px rgba(0,0,0,.42);cursor:pointer;max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:lmgChipUp .3s cubic-bezier(.2,.9,.3,1.2);';
+    if (!document.getElementById('lmg-chip-css')) {
+      var st = document.createElement('style'); st.id = 'lmg-chip-css';
+      st.textContent = '@keyframes lmgChipUp{from{transform:translate(-50%,16px);opacity:0;}to{transform:translate(-50%,0);opacity:1;}}';
+      (document.head || document.documentElement).appendChild(st);
+    }
+    c.onclick = function () { reloadNow(false); };
+    (document.body || document.documentElement).appendChild(c);
+  }
+  function hideChip() { var c = document.getElementById('lmg-upd-chip'); if (c) c.remove(); }
+
   // Aplica la actualización en cuanto sea seguro.
   function tryApply() {
     if (!pending) return;
-    if (isBusy()) { setTimeout(tryApply, 2000); return; }             // en una tarea → NO recargar (no lo saca)
+    if (isBusy()) { showChip(); setTimeout(tryApply, 2000); return; }  // en una tarea → NO la saques; ofrece el chip
     if (document.hidden) { reloadNow(true); return; }                 // no lo ve → recarga invisible
     if (!isTyping() && (Date.now() - lastInteract) > IDLE_MS) {        // visible y quieto → HUD + recarga
-      reloadNow(false); return;
+      hideChip(); reloadNow(false); return;
     }
-    setTimeout(tryApply, 2000);                                        // ocupado/escribiendo → reintenta
+    showChip();                                                       // escribiendo/ocupado → ofrece el chip
+    setTimeout(tryApply, 2000);                                        // y reintenta la recarga sola cuando esté quieto
   }
 
   function check() {
