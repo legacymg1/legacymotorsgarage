@@ -2098,7 +2098,7 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
       vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
       reason: o.reason || "", reasonEs: o.reasonEs || o.reason || "", reasonEn: o.reasonEn || o.reason || "",
       scheduledAt: o.scheduledAt || null, receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", deliveredAt: o.deliveredAt || "",
-      status: o.status || "por_recibir", paid: !!o.paid, svcPhase: o.svcPhase || "",
+      status: o.status || "por_recibir", paid: !!o.paid, svcPhase: o.svcPhase || "", diagSummary: o.diagSummary || null, diagSentAt: o.diagSentAt || "",
       assignRole: o.assignRole || "", assignName: o.assignName || "",
       // 🔧 línea / relevo
       activeRole: activeRole || "", myStageActive, waitingFor: (!myStageActive && activeRole) ? activeRole : "",
@@ -2258,6 +2258,7 @@ exports.svcDiagHelp = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60, mem
   const sys = "You are a master ASE-certified CHIEF MECHANIC with 30 years of hands-on experience, helping a shop mechanic diagnose a vehicle. Be sharp, practical and HONEST — never bluff. " +
     "Given the vehicle (decode the VIN if provided), the service/complaint, the mechanic's notes, and any photos, think like a seasoned chief mechanic: give the MOST LIKELY causes (ranked), exactly WHAT TO CHECK/TEST for each (specific tests, measurements, tools, typical values), known COMMON FAILURES / TSBs for THIS exact vehicle, and the likely PARTS involved. " +
     "USE WEB SEARCH to pull real common failures / TSBs / specs for this exact vehicle when it helps. If a diagnostic trouble code (e.g. P0420) is mentioned, give the REAL-WORLD usual causes, not just the generic definition. " +
+    "The shop's scan tool is a TOPDON Phoenix Plus 2 — a bidirectional scanner with ECU coding, active/bidirectional tests, live-data graphing and 40+ reset services. Tailor your checks to it: name the EXACT live-data PIDs to watch and their expected/normal values, and the specific bidirectional/active tests to run on the Topdon. If the mechanic uploads a photo or screenshot of the Topdon (codes or live-data), READ it and use those values in your diagnosis. " +
     "Be concrete and brief — this is for a working mechanic, not a textbook. Reply in " + (lang === "en" ? "ENGLISH" : "SPANISH") + ". " +
     "Format as short sections with these headers (translate them to the reply language): '🔎 Causas probables' (ranked list), '🧪 Qué revisar' (specific checks), '🛠️ Fallas comunes / TSB', '🧩 Partes probables'. Keep it tight — no intro, no disclaimer.";
   const userText = "Vehicle: " + (vehicle || "(unknown)") + (vin ? (" · VIN " + vin) : "") + "\nService/Complaint: " + (service || "-") + "\nMechanic's notes: " + (symptom || "-") + (images.length ? "\n(Photos attached — look at them carefully.)" : "");
@@ -2268,6 +2269,52 @@ exports.svcDiagHelp = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60, mem
     const text = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
     return { ok: true, text: text };
   } catch (e) { console.error("svcDiagHelp", e); throw new HttpsError("internal", String((e && e.message) || e)); }
+});
+
+// 📋 RESUMEN DE DIAGNÓSTICO (el mecánico termina de diagnosticar y lo ENVÍA). La IA arma un resumen PROFESIONAL por servicio
+//    (hallazgo + partes con # OEM, sin precio), se guarda en la orden (historia), el trabajo se PAUSA hasta instrucciones, y se avisa al dueño.
+exports.svcDiagSummary = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const svs = Array.isArray(o.services) ? o.services : [];
+  const veh = o.vehicleLabel || ""; const vin = o.vin || "";
+  const lines = svs.map((s, i) => {
+    const dg = s.diagnosis || {};
+    const parts = (dg.parts || []).map((p) => "    - " + (p.desc || "") + (p.partNum ? (" [# " + p.partNum + "]") : "")).join("\n");
+    return (i + 1) + ". " + (s.desc || "") + "\n   Hallazgo: " + (dg.notes || "(sin notas)") + (parts ? ("\n   Partes:\n" + parts) : "\n   Partes: (ninguna)");
+  }).join("\n\n");
+  const sys = "You are a professional service writer at an auto repair shop. Write a SHORT, PROFESSIONAL diagnosis summary IN SPANISH for the shop OWNER, based on the mechanic's per-service findings. " +
+    "For EACH service: one clear line of what was found, and the parts needed (with OEM # if given). End with one brief overall recommendation line. Be concise and professional, no fluff, no apologies. Plain text, simple structure. Do NOT include prices.";
+  const userMsg = "Vehicle: " + (veh || "(unknown)") + (vin ? (" · VIN " + vin) : "") + "\nPer-service findings:\n" + lines;
+  let text = "";
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk"); const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 1200, system: sys, messages: [{ role: "user", content: userMsg }] });
+    text = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  } catch (e) { console.error("svcDiagSummary", e); }
+  const now = new Date().toISOString();
+  const allParts = [];
+  svs.forEach((s) => { ((s.diagnosis && s.diagnosis.parts) || []).forEach((p) => { allParts.push({ desc: p.desc || "", partNum: p.partNum || "", photo: p.photo || "" }); }); });
+  // ⏸️ pausa el trabajo hasta instrucciones (el mecánico ya envió la info)
+  const nsvs = svs.map((s) => (s.status === "en_proceso") ? Object.assign({}, s, { status: "pausado" }) : s);
+  const patch = {
+    diagSummary: { text: text, at: now, by: id ? (id.name || id.email || id.empId || "") : "" },
+    diagParts: allParts, diagSentAt: now, svcPhase: "diag_enviado",
+    services: nsvs, status: svcDeriveStatusSrv(o, nsvs), updatedAt: now,
+  };
+  await ref.set(patch, { merge: true });
+  const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";
+  try { await _pushToOwners({ title: "🔬 Diagnóstico listo", body: _nm + " · diagnóstico enviado" + _fol + (veh ? (" · " + veh) : ""), titleEn: "🔬 Diagnosis ready", bodyEn: _nm + " diagnosis ready" + _fol, url: "/admin.html" }); } catch (e) {}
+  return { ok: true, text: text };
 });
 
 // 🗂️ SERVICE CRM completo para el CENTRO DE OPERACIONES (solo dueño): TODAS las órdenes (activas + completadas + estimados) + clientes de servicio.

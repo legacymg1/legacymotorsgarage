@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105183940"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105183940"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105184925"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105184925"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261105183940"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261105183940"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261105183940"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105184925"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261105184925"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261105184925"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2741,6 +2741,7 @@ window.svcEmpOpen=function(orderId){
     +'<div style="font-size:15px;margin-bottom:3px;">🚗 '+car+'</div>'
     +(idbits?'<div class="faint" style="font-size:12px;margin-bottom:8px;">'+idbits+'</div>':'')
     +_svcPipeHTML(o)+_svcMyListHTML(o)
+    +((o.diagSummary&&o.diagSummary.text)?('<div style="background:rgba(109,75,255,.07);border:1px solid rgba(109,75,255,.35);border-radius:12px;padding:12px;margin:8px 0;"><div style="font-weight:800;font-size:12px;color:#9b7bff;margin-bottom:6px;">📋 '+L2('Resumen del diagnóstico','Diagnosis summary')+'</div><div style="font-size:13px;line-height:1.5;white-space:pre-wrap;">'+esc(o.diagSummary.text)+'</div></div>'):'')
     +'<div class="faint" style="font-size:12px;margin:8px 0 14px;">'+when+'</div>'
     +(acts?('<div style="margin-bottom:10px;">'+acts+'</div>'):'<div class="faint" style="text-align:center;padding:8px 0 14px;font-size:13px;line-height:1.5;">'+L2('Nada por hacer ahora en esta orden.','Nothing to do on this order right now.')+'</div>')
     +'<a onclick="svcMsgAdmin(\''+(o.orderNum||'')+'\')" style="display:block;text-align:center;text-decoration:none;color:var(--gold);font-size:14px;padding:8px;cursor:pointer;">💬 '+L2('Avisar a la oficina','Message office')+'</a>'
@@ -2855,8 +2856,17 @@ function _svcWorkRender(o){
       +(done?'':'<div style="display:flex;gap:8px;margin-top:10px;"><button class="btn ghost" style="flex:1;" onclick="svcOpenDiag(\''+o.id+'\','+i+')">🔬 '+(dg?(en?'Edit diagnosis':'Editar diagnóstico'):(en?'Diagnose':'Diagnóstico'))+'</button><button class="btn-gold" style="flex:1;" onclick="svcServiceFinish(\''+o.id+'\','+i+')">✅ '+(en?'Done':'Terminar')+'</button></div>')
       +'</div>';
   }).join('');
+  // 📋 Resumen del diagnóstico (ya enviado) + botón para terminar y enviar al dueño
+  const anyDiag=list.some(function(s){ return s.diagnosis; });
+  if(o.diagSummary && o.diagSummary.text){ h+='<div style="background:rgba(109,75,255,.07);border:1px solid rgba(109,75,255,.35);border-radius:12px;padding:12px;margin:6px 0 12px;"><div style="font-weight:800;font-size:12px;color:#9b7bff;margin-bottom:6px;">📋 '+(en?'Diagnosis summary (sent)':'Resumen del diagnóstico (enviado)')+'</div><div style="font-size:13px;line-height:1.5;white-space:pre-wrap;">'+esc(o.diagSummary.text)+'</div></div>'; }
+  if(anyDiag){ h+='<button id="send-diag-btn" onclick="svcSendDiag(\''+o.id+'\')" class="btn-gold" style="width:100%;margin-top:4px;">📤 '+(o.diagSummary?(en?'Re-send diagnosis':'Reenviar diagnóstico'):(en?'Finish & send diagnosis':'Terminar y enviar diagnóstico'))+'</button><div class="faint" style="font-size:11px;text-align:center;margin-top:6px;line-height:1.4;">'+(en?'Sends the summary to the owner and pauses until instructions.':'Envía el resumen al dueño y pausa hasta recibir instrucciones.')+'</div>'; }
   h+='</div>'; ov.innerHTML=h;
 }
+window.svcSendDiag=async function(orderId){
+  const en=(L==='en'); const btn=document.getElementById('send-diag-btn'); if(btn){ btn.disabled=true; btn.textContent=en?'Sending…':'Enviando…'; }
+  try{ await httpsCallable(functions,'svcDiagSummary')(vaData({orderId:orderId})); whToast('✅ '+(en?'Diagnosis sent to the office':'Diagnóstico enviado a la oficina')); if(typeof svcRefresh==='function') svcRefresh(); }
+  catch(e){ if(btn){ btn.disabled=false; } whToast('⚠️ '+((e&&e.message)||'error'),true); }
+};
 window.svcServiceFinish=async function(orderId,idx){
   const en=(L==='en');
   try{ await httpsCallable(functions,'svcDiag')(vaData({orderId:orderId,idx:idx,op:'finish'})); whToast('✅ '+(en?'Service done':'Servicio terminado')); if(typeof svcRefresh==='function') svcRefresh(); }
@@ -5795,7 +5805,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261105183940"></script>
+<script type="module" src="launcher.js?v=20261105184925"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
