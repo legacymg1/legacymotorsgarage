@@ -2778,7 +2778,8 @@ function _recepRender(){
     h+='<button onclick="recepAddObs()" class="btn ghost" style="width:100%;margin-bottom:14px;">➕ '+(en?'Add observation':'Agregar observación')+'</button>';
   }
   h+='<button id="recep-save" onclick="svcRecepSave()" class="btn-gold" style="width:100%;">'+(en?'Save report':'Guardar reporte')+'</button>';
-  h+='<div class="faint" style="font-size:11px;text-align:center;margin-top:7px;line-height:1.4;">'+(en?'The customer must authorize this report before the car is checked in.':'El cliente debe autorizar este reporte antes de ingresar el carro.')+'</div>';
+  const _willAuth=!r.none && r.obs.length;
+  h+='<div class="faint" style="font-size:11px;text-align:center;margin-top:7px;line-height:1.4;">'+(_willAuth?(en?'The customer must authorize this report before check-in.':'El cliente debe autorizar este reporte antes de ingresar el carro.'):(en?'No observations → the car is checked in right away.':'Sin observaciones → el carro se recibe de inmediato.'))+'</div>';
   const body=document.getElementById('svc-recep-body'); if(body) body.innerHTML=h;
 }
 window.recepSetNone=function(v){ if(!_recep) return; _recep.none=!!v; if(_recep.none) _recep.obs=[]; _recepRender(); };
@@ -2798,7 +2799,7 @@ window.svcRecepSave=async function(){
     for(const ob of r.obs){ const note=(ob.note||'').trim(); if(!note && !ob.file) continue; let url=''; if(ob.file){ const rf=ref(storage,'serviceOrders/'+r.orderId+'/reception/'+Date.now()+'_'+((ob.file.name||'foto.jpg'))); await uploadBytes(rf,ob.file); url=await getDownloadURL(rf); } obs.push({note:note,photo:url,at:new Date().toISOString()}); }
     const none = r.none || obs.length===0;
     await httpsCallable(functions,'svcIntake')(vaData({ orderId:r.orderId, intake:{ miles:r.miles||'', none:none, observations:obs } }));
-    whToast('✅ '+(en?'Report saved · pending customer authorization':'Reporte guardado · Pendiente de autorización'));
+    whToast('✅ '+(none?(en?'Car checked in':'Carro recibido'):(en?'Saved · pending customer authorization':'Guardado · Pendiente de autorización')));
     svcRecepClose(); if(typeof svcRefresh==='function') svcRefresh();
   }catch(e){ if(btn){ btn.disabled=false; btn.textContent=en?'Save report':'Guardar reporte'; } whToast('⚠️ '+((e&&e.message)||'error'),true); }
 };

@@ -980,6 +980,7 @@ function svcTrackerHTML(o){
 function receptionBlockHTML(o){
   const es=L!=='en'; const k=o.intake; if(!k) return '';
   const acked = k.clientAck===true;
+  const hasObs = !k.none && Array.isArray(k.observations) && k.observations.length;   // solo se AUTORIZA si hay observaciones
   let obsHtml;
   if(k.none || !(k.observations && k.observations.length)){
     obsHtml=`<div style="font-size:13px;color:#49d17f;font-weight:700;">✅ ${es?'Sin observaciones — el vehículo se recibió en buen estado.':'No observations — vehicle received in good condition.'}</div>`;
@@ -990,12 +991,14 @@ function receptionBlockHTML(o){
   const legal = es
     ? 'Confirmo y autorizo el estado del vehículo registrado arriba (observaciones y fotos) al momento de su ingreso a Legacy Motors Garage para servicio.'
     : 'I confirm and authorize the vehicle condition recorded above (observations and photos) at the time it was dropped off at Legacy Motors Garage for service.';
-  if(acked){
+  // Sin observaciones (recibido sin gate) O ya autorizado → bloque INFORMATIVO, sin botón.
+  if(!hasObs || acked){
     return `<div style="margin:4px 0 12px;background:rgba(40,180,99,.10);border:1px solid rgba(40,180,99,.35);border-radius:12px;padding:12px;">
-      <div style="font-weight:800;font-size:14px;color:#49d17f;margin-bottom:8px;">🧾 ${es?'Reporte de condición de ingreso · Autorizado':'Check-in condition report · Authorized'}</div>
+      <div style="font-weight:800;font-size:14px;color:#49d17f;margin-bottom:8px;">🧾 ${es?'Reporte de condición de ingreso':'Check-in condition report'}${acked?(es?' · Autorizado':' · Authorized'):''}</div>
       ${obsHtml}${miles}
-      <div style="font-size:11px;color:#49d17f;font-weight:600;margin-top:8px;">✅ ${es?'Autorizaste el ingreso':'You authorized check-in'}${k.clientAckAt?(' · '+formatDate((k.clientAckAt||'').slice(0,10))):''}</div></div>`;
+      ${acked?`<div style="font-size:11px;color:#49d17f;font-weight:600;margin-top:8px;">✅ ${es?'Autorizaste el ingreso':'You authorized check-in'}${k.clientAckAt?(' · '+formatDate((k.clientAckAt||'').slice(0,10))):''}</div>`:''}</div>`;
   }
+  // Con observaciones y sin autorizar → se pide AUTORIZACIÓN.
   return `<div style="margin:4px 0 12px;background:rgba(240,160,48,.08);border:1px solid rgba(240,160,48,.5);border-radius:12px;padding:12px;">
     <div style="font-weight:800;font-size:14px;color:#f0a030;margin-bottom:4px;">🧾 ${es?'Reporte de condición de ingreso':'Check-in condition report'}</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.4;">${es?'Revisa cómo recibimos tu vehículo y autoriza su ingreso para empezar el servicio.':'Review how we received your vehicle and authorize check-in to start the service.'}</div>
@@ -1021,7 +1024,7 @@ window.portalAuthReception = async function(orderId){
 };
 function estimateCardHTML(o){
   const es=L!=='en'; const accepted=o.estimateStatus==='accepted';
-  const receptionPending = !!(o.intake && o.intake.clientAck!==true);   // falta que el cliente AUTORICE el ingreso
+  const receptionPending = !!(o.intake && !o.intake.none && Array.isArray(o.intake.observations) && o.intake.observations.length && o.intake.clientAck!==true);   // solo si HAY observaciones sin autorizar
   const showTrack=(o.receivedAt||o.paid||['recibido','en_proceso','pausado_partes','listo','entregado'].indexOf(o.status)>=0||accepted);
   let rows='';
   (o.services||[]).forEach(s=>{

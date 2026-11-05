@@ -2417,9 +2417,12 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
     clientAck: false,
   };
   const patch = { intake, updatedAt: new Date().toISOString(), updatedBy: id.email || id.name || id.empId || "" };
-  // 🚦 GATE: tras la Revisión de recepción el carro NO queda "recibido" todavía → "por_aprobar" (Pendiente de autorización).
-  //    Sin la autorización del cliente NO se puede recibir/empezar. Lo desbloquea svcReceptionAck (el cliente autoriza).
-  if (SVC_ORDER_STATUSES.indexOf(o.status || "agendado") < SVC_ORDER_STATUSES.indexOf("recibido")) patch.status = "por_aprobar";
+  // 🚦 GATE: SOLO si hay OBSERVACIONES (desperfectos pre-existentes) se exige autorización del cliente → "por_aprobar".
+  //    Sin observaciones no hay nada que autorizar → pasa directo a "recibido" (se puede empezar).
+  if (SVC_ORDER_STATUSES.indexOf(o.status || "agendado") < SVC_ORDER_STATUSES.indexOf("recibido")) {
+    patch.status = none ? "recibido" : "por_aprobar";
+    if (none) patch.receivedAt = o.receivedAt || new Date().toISOString();
+  }
   await ref.set(patch, { merge: true });
   return { ok: true };
 });
