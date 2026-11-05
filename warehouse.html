@@ -17,6 +17,11 @@
 <link rel="stylesheet" href="legacy-theme.css">
 <style>
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-text-size-adjust:100%;}
+  /* 🖥️ Popups estilo bottom-sheet (iOS en teléfono): en pantalla ANCHA se CENTRAN y redondean (no pegados abajo). */
+  @media (min-width:640px){
+    #job-add, #mech-intake, #mech-addtask, #svc-recep{ align-items:center !important; }
+    #job-add>div, #mech-intake>div, #mech-addtask>div, #svc-recep>div{ border-radius:20px !important; margin-bottom:0 !important; }
+  }
   .wrap{max-width:760px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 2px) 16px calc(84px + env(safe-area-inset-bottom));}
   #login{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 20px) 24px calc(20px + env(safe-area-inset-bottom));background:radial-gradient(ellipse at 50% -10%,#161d2e,var(--bg) 55%);}
   /* Barra de navegación inferior — solo dueños */
@@ -614,7 +619,7 @@ const T={
     invNumLbl:'Inventario #', recDate:'Fecha de recepción:', noJobs:'No hay trabajos en cola.', noJobsOwner:'<br>Toca <b>➕ Agregar trabajo a un carro</b>.',
     otherJob:'➕ otra tarea a este carro', whatToDo:'¿Qué se le va a hacer? (el paso)', whatToDoPh:'Ej. Reemplazar motor', addToQueue:'➕ Agregar a la cola', chooseCar:'— Elige el carro —', svcCar:'Carro',
     stCola:'🕐 En cola', stProc:'🔧 En proceso', stDone:'✅ Hecho',
-    svcAgendado:'📅 Agendado', svcPorRecibir:'🕐 Por recibir', svcRecibido:'📋 Recibido', svcEnProceso:'🔧 En proceso', svcPausado:'⏸️ Esperando partes', svcListo:'✅ Listo', svcEntregado:'🏁 Entregado',
+    svcAgendado:'📅 Agendado', svcPorRecibir:'🕐 Por recibir', svcPorAprobar:'⏳ Pendiente de autorización', svcRecibido:'📋 Recibido', svcEnProceso:'🔧 En proceso', svcPausado:'⏸️ Esperando partes', svcListo:'✅ Listo', svcEntregado:'🏁 Entregado',
     svcReceiveCar:'📋 Recibir carro', svcStartWork:'🔧 Empezar trabajo', svcWaitParts:'⏸️ Esperar partes', svcReady:'✅ Listo', svcResume:'▶️ Reanudar', svcMsg:'💬 Mensaje', svcNow:'🕐 Ahora', svcNoOrders:'No tienes órdenes de servicio ahora.<br>Cuando te asignen un carro, aquí aparece.', updated:'✅ Actualizado',
     carsProcH:'🚗 Carros en proceso', inProcNone:'No hay carros en proceso ahora.', jobsN:'trabajos', inspPending:'Inspección pendiente', stMecanico:'Mecánico', stPintura:'Pintura', stDetalle:'Detalle', stListo:'Listo',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
@@ -667,7 +672,7 @@ const T={
     invNumLbl:'Inventory #', recDate:'Received on:', noJobs:'No jobs in queue.', noJobsOwner:'<br>Tap <b>➕ Add a job to a car</b>.',
     otherJob:'➕ another job for this car', whatToDo:'What needs to be done? (the step)', whatToDoPh:'e.g. Replace engine', addToQueue:'➕ Add to queue', chooseCar:'— Choose the car —', svcCar:'Car',
     stCola:'🕐 Queued', stProc:'🔧 In progress', stDone:'✅ Done',
-    svcAgendado:'📅 Scheduled', svcPorRecibir:'🕐 To receive', svcRecibido:'📋 Received', svcEnProceso:'🔧 In progress', svcPausado:'⏸️ Waiting for parts', svcListo:'✅ Ready', svcEntregado:'🏁 Delivered',
+    svcAgendado:'📅 Scheduled', svcPorRecibir:'🕐 To receive', svcPorAprobar:'⏳ Pending authorization', svcRecibido:'📋 Received', svcEnProceso:'🔧 In progress', svcPausado:'⏸️ Waiting for parts', svcListo:'✅ Ready', svcEntregado:'🏁 Delivered',
     svcReceiveCar:'📋 Receive car', svcStartWork:'🔧 Start work', svcWaitParts:'⏸️ Wait for parts', svcReady:'✅ Ready', svcResume:'▶️ Resume', svcMsg:'💬 Message', svcNow:'🕐 Now', svcNoOrders:'No service orders right now.<br>When a car is assigned to you, it shows here.', updated:'✅ Updated',
     carsProcH:'🚗 Cars in process', inProcNone:'No cars in process right now.', jobsN:'jobs', inspPending:'Inspection pending', stMecanico:'Mechanic', stPintura:'Paint', stDetalle:'Detail', stListo:'Ready',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
@@ -2502,7 +2507,7 @@ window.loadCarsProc=async function(){
 };
 
 // ===================== 🔧 MECÁNICO: Mi taller (portado de crew) =====================
-const SVC_ST={ agendado:{k:'svcAgendado',c:'#0a84ff'}, por_recibir:{k:'svcPorRecibir',c:'#c9a84c'}, recibido:{k:'svcRecibido',c:'#c9a84c'}, en_proceso:{k:'svcEnProceso',c:'#32d74b'}, pausado_partes:{k:'svcPausado',c:'#ff9800'}, listo:{k:'svcListo',c:'#32d74b'}, entregado:{k:'svcEntregado',c:'#8a8fa8'} };
+const SVC_ST={ agendado:{k:'svcAgendado',c:'#0a84ff'}, por_recibir:{k:'svcPorRecibir',c:'#c9a84c'}, por_aprobar:{k:'svcPorAprobar',c:'#f0a030'}, recibido:{k:'svcRecibido',c:'#c9a84c'}, en_proceso:{k:'svcEnProceso',c:'#32d74b'}, pausado_partes:{k:'svcPausado',c:'#ff9800'}, listo:{k:'svcListo',c:'#32d74b'}, entregado:{k:'svcEntregado',c:'#8a8fa8'} };
 function svcStLabel(st){ const s=SVC_ST[st]; return s?t(s.k):st; }
 const MECH_TASK_ST={ cola:{k:'stCola',c:'#c9a84c'}, en_proceso:{k:'stProc',c:'#32d74b'}, hecho:{k:'stDone',c:'#8a8fa8'} };
 let SVC_MY=[], MECH_CARS=[], MECH_WAITING=[], MECH_WORKING=[], MECH_CUR=null, MECH_TASKS=[], MECH_PREP=[], MECH_ADDCAR=null;
@@ -2679,6 +2684,8 @@ function _svcActionsHTML(o){
   const anyPaused=myHere.some(ms=>ms.status==='pausado');
   const allPend=myHere.length && myHere.every(ms=>ms.status==='pendiente');
   const SP='event.stopPropagation();';
+  // 🚦 GATE: tras la Revisión de recepción el carro queda "Pendiente de autorización del cliente" → el empleado NO puede empezar hasta que el cliente autorice.
+  if(o.status==='por_aprobar') return '<div class="btn-ghost" style="width:100%;text-align:center;opacity:.85;cursor:default;line-height:1.4;">⏳ '+L2('Pendiente de autorización del cliente','Pending client authorization')+'</div>';
   if(!hasPipe){
     if(o.status==='por_recibir'||o.status==='agendado') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcOpenReception(\''+o.id+'\')">'+t('svcReceiveCar')+'</button>';
     if(o.status==='recibido') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcStartWork')+'</button>';
@@ -2752,7 +2759,7 @@ function _recepRender(){
   const car=esc(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
   const folio=o.orderNum?('#'+o.orderNum+' · '):'';
   let h='';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:19px;margin:0;">📋 '+(en?'Reception check':'Revisión de recepción')+'</h2><button onclick="svcRecepClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;line-height:1.2;">📋 '+(en?'Check-in condition report':'Reporte de condición de ingreso')+'</h2><button onclick="svcRecepClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;flex:none;">×</button></div>';
   h+='<div class="faint" style="font-size:13px;margin-bottom:4px;">'+folio+esc(o.clientName||'')+' · 🚗 '+car+'</div>';
   h+='<div class="faint" style="font-size:12px;line-height:1.5;margin-bottom:14px;">'+(en?'Mark any pre-existing damage with a photo — this protects us. If the car is fine, mark No observations.':'Señala con foto cualquier desperfecto que el carro YA traía — esto nos protege. Si el carro está bien, marca Sin observaciones.')+'</div>';
   h+='<label style="font-size:13px;font-weight:600;display:block;margin-bottom:5px;">'+(en?'Miles (optional)':'Millas (opcional)')+'</label>';
@@ -2770,7 +2777,8 @@ function _recepRender(){
     });
     h+='<button onclick="recepAddObs()" class="btn ghost" style="width:100%;margin-bottom:14px;">➕ '+(en?'Add observation':'Agregar observación')+'</button>';
   }
-  h+='<button id="recep-save" onclick="svcRecepSave()" class="btn-gold" style="width:100%;">'+(en?'Save & receive':'Guardar y recibir')+'</button>';
+  h+='<button id="recep-save" onclick="svcRecepSave()" class="btn-gold" style="width:100%;">'+(en?'Save report':'Guardar reporte')+'</button>';
+  h+='<div class="faint" style="font-size:11px;text-align:center;margin-top:7px;line-height:1.4;">'+(en?'The customer must authorize this report before the car is checked in.':'El cliente debe autorizar este reporte antes de ingresar el carro.')+'</div>';
   const body=document.getElementById('svc-recep-body'); if(body) body.innerHTML=h;
 }
 window.recepSetNone=function(v){ if(!_recep) return; _recep.none=!!v; if(_recep.none) _recep.obs=[]; _recepRender(); };
@@ -2790,9 +2798,9 @@ window.svcRecepSave=async function(){
     for(const ob of r.obs){ const note=(ob.note||'').trim(); if(!note && !ob.file) continue; let url=''; if(ob.file){ const rf=ref(storage,'serviceOrders/'+r.orderId+'/reception/'+Date.now()+'_'+((ob.file.name||'foto.jpg'))); await uploadBytes(rf,ob.file); url=await getDownloadURL(rf); } obs.push({note:note,photo:url,at:new Date().toISOString()}); }
     const none = r.none || obs.length===0;
     await httpsCallable(functions,'svcIntake')(vaData({ orderId:r.orderId, intake:{ miles:r.miles||'', none:none, observations:obs } }));
-    whToast('✅ '+(en?'Car received':'Carro recibido'));
+    whToast('✅ '+(en?'Report saved · pending customer authorization':'Reporte guardado · Pendiente de autorización'));
     svcRecepClose(); if(typeof svcRefresh==='function') svcRefresh();
-  }catch(e){ if(btn){ btn.disabled=false; btn.textContent=en?'Save & receive':'Guardar y recibir'; } whToast('⚠️ '+((e&&e.message)||'error'),true); }
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent=en?'Save report':'Guardar reporte'; } whToast('⚠️ '+((e&&e.message)||'error'),true); }
 };
 // 💬 El empleado avisa a la OFICINA/dueños (NUNCA al cliente) → abre el CHAT DE OFICINA (callables, funciona por teléfono).
 window.svcMsgAdmin=function(folio){

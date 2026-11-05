@@ -12,6 +12,7 @@
   // 🏷️ ESTATUS UNIFICADO de tareas/etapas en TODO el sistema:
   //    En cola → En proceso → En pausa → Terminado.
   LMG.svcStatusLabel = function (s, en) {
+    if (s === 'por_aprobar') return en ? 'Pending authorization' : 'Pendiente de autorización';
     if (s === 'en_proceso') return en ? 'In progress' : 'En proceso';
     if (s === 'pausada' || s === 'pausado' || s === 'pausado_partes') return en ? 'Paused' : 'En pausa';
     if (s === 'listo' || s === 'hecho' || s === 'terminado' || s === 'entregado') return en ? 'Done' : 'Terminado';
@@ -20,6 +21,7 @@
 
   // 🎨 COLOR único por estatus: cola gris · en proceso dorado · en pausa naranja · terminado verde.
   LMG.svcStatusColor = function (s) {
+    if (s === 'por_aprobar') return '#f0a030';
     if (s === 'en_proceso') return '#e8b64a';
     if (s === 'pausada' || s === 'pausado' || s === 'pausado_partes') return '#ff9800';
     if (s === 'listo' || s === 'hecho' || s === 'terminado' || s === 'entregado') return '#35c46a';
@@ -49,6 +51,7 @@
     o = o || {};
     if (o.paid) return { txt: en ? '✅ Paid' : '✅ Pagado', col: '#28b463' };
     var s = o.status;
+    if (s === 'por_aprobar') return { txt: en ? '⏳ Pending authorization' : '⏳ Pendiente de autorización', col: '#f0a030' };
     // 🗓️ Ya tiene FECHA agendada y aún no empieza el trabajo → muestra "Agendado" (gana sobre "arrancó").
     if (o.scheduledAt && ['arrancado', 'agendado', 'por_recibir', '', undefined].indexOf(s) >= 0) return { txt: en ? '🗓️ Scheduled' : '🗓️ Agendado', col: '#0a84ff' };
     if (s === 'arrancado') return { txt: en ? '🚀 Service started!' : '🚀 ¡Servicio arrancó!', col: '#7c5cff' };
@@ -66,7 +69,7 @@
   LMG.svcBucketOf = function (o) {
     o = o || {};
     if (o.paid || o.status === 'entregado') return 'completadas';   // paid "verdadero" (no sólo ===true) o entregado → completada
-    if (o.estimateStatus === 'accepted' || ['arrancado', 'recibido', 'en_proceso', 'pausado_partes', 'listo'].indexOf(o.status) >= 0) return 'activas';
+    if (o.estimateStatus === 'accepted' || ['arrancado', 'por_aprobar', 'recibido', 'en_proceso', 'pausado_partes', 'listo'].indexOf(o.status) >= 0) return 'activas';
     return 'estimados';
   };
   function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -95,5 +98,5 @@
     return '<div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">' + head + (list || []).map(function (o) { return LMG.svcOrderRow(o, opts); }).join('') + '</div>';
   };
 
-  LMG.version = '3';
+  LMG.version = '4';
 })();
