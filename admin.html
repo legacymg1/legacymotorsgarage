@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105214535"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105214535"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105214826"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105214826"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1001,8 +1001,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105214535"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105214535"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105214826"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105214826"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2388,7 +2388,10 @@ function c360JacketHtml(c, v){ const inv=_c360InvFor(c, v); let rows='';
 window.renderClient360=function(id){
   const c=clients.find(x=>x.id===id); if(!c) return; const body=document.getElementById('c360-body'); if(!body) return;
   const M=_c360Money, f=c360ClientFlags(c), phone=(c.phone||'').replace(/[^0-9+]/g,''), vehicles=clientVehicles(c);
-  const sOrders=svcOrders.filter(o=>o.clientId===id).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  // 🔗 Órdenes de TODO el grupo (mismo teléfono) — no solo el registro abierto; si no, se pierden órdenes de otro registro del cliente. [[multi-car-per-client]]
+  const _grpIds=new Set(_clientGroup(c).map(x=>x.id)); _grpIds.add(id);
+  const _grpPhone=_phoneKey(c);
+  const sOrders=svcOrders.filter(o=>_grpIds.has(o.clientId) || (_grpPhone && _phoneKey({phone:o.clientPhone})===_grpPhone)).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const qz=(_c360Quotes||[]).filter(q=>(q.phoneE164||'')===(c.phoneE164||'')).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   const appts=(Array.isArray(_c360Appts)?_c360Appts:[]).filter(a=>a.clientId===id || (c.phoneE164 && a.phoneE164===c.phoneE164)).sort((a,b)=>String(b.scheduledAt||b.date||b.createdAt||'').localeCompare(String(a.scheduledAt||a.date||a.createdAt||'')));
   const sec=(t,inner,act)=>'<div style="padding:14px 16px;border-top:1px solid var(--border);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><div style="font-weight:800;font-size:13px;color:var(--gold);letter-spacing:.3px;">'+t+'</div>'+(act||'')+'</div>'+inner+'</div>';
@@ -7738,6 +7741,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105214535"></script>
+<script type="module" src="launcher.js?v=20261105214826"></script>
 </body>
 </html>
