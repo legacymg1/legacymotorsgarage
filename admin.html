@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105213138"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105213138"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105214535"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105214535"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1001,8 +1001,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105213138"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105213138"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105214535"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105214535"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2358,16 +2358,20 @@ function c360SvcHistory(c, v){
     const tot=hasInvoice?_c360Money(o.grandTotalCents/100):'';
     const done=(o.status==='listo'||o.status==='entregado');
     const svcList=Array.isArray(o.services)?o.services.map(s=>s&&s.desc).filter(Boolean):[];
-    const photos=(Array.isArray(o.photos)&&o.photos.length)?o.photos:((Array.isArray(o.workPhotos)&&o.workPhotos.length)?o.workPhotos:[]);
+    // 🔧 Trabajo realizado (notas de reparación) + fotos del trabajo terminado (services[].repair) — se conecta con la fase nueva.
+    const repNotes=(Array.isArray(o.services)?o.services:[]).map(s=>(s&&s.repair&&s.repair.notes)||'').filter(Boolean);
+    const repPhotos=[]; (Array.isArray(o.services)?o.services:[]).forEach(s=>{ ((s&&s.repair&&s.repair.photos)||[]).forEach(u=>{ if(u) repPhotos.push(u); }); });
+    const photos=repPhotos.length?repPhotos:((Array.isArray(o.photos)&&o.photos.length)?o.photos:((Array.isArray(o.workPhotos)&&o.workPhotos.length)?o.workPhotos:[]));
+    const hasHist=!!(o.intake || (Array.isArray(o.services)&&o.services.some(s=>s&&(s.diagnosis||s.repair))));
     let row='<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">';
     const folioH=o.orderNum?('<span style="color:var(--gold);font-weight:800;">#'+o.orderNum+'</span> · '):'';
     row+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="min-width:0;"><div style="font-size:13px;font-weight:700;">'+folioH+esc(o.reason||'Servicio')+'</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">'+when+(hasInvoice?(' · '+tot):'')+'</div></div><span style="flex:0 0 auto;background:'+ss.c+'22;color:'+ss.c+';border:1px solid '+ss.c+';border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;">'+ss.lbl+'</span></div>';
-    if(done && svcList.length){ row+='<div style="font-size:12px;color:var(--text);margin-top:7px;">🛠️ Se hizo: '+svcList.map(esc).join(' · ')+'</div>'; }
+    if(done && (repNotes.length||svcList.length)){ row+='<div style="font-size:12px;color:var(--text);margin-top:7px;">🛠️ Se hizo: '+esc(repNotes.length?repNotes.join(' · '):svcList.join(' · '))+'</div>'; }
     if(photos.length){ row+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;">'+photos.slice(0,8).map((u,i)=>'<span onclick="showPhoto(\''+u+'\',\'Trabajo realizado\')" style="font-size:11px;color:var(--gold);cursor:pointer;">📷 Foto '+(i+1)+'</span>').join('')+'</div>'; }
     const isPaid=(o.paid===true);
     const docLbl = isPaid ? '🧾 recibo ›' : (done ? '🧾 invoice ›' : '📄 estimado ›');   // pagada = RECIBO; entregada = invoice; antes = estimado
     const docFn = isPaid ? ('svcOpenReceipt(\''+o.id+'\')') : ('svcOpenOrder(\''+o.id+'\')');
-    row+='<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px;"><a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">ver orden ›</a>'+(hasInvoice?('<a href="#" onclick="event.preventDefault();c360Close();'+docFn+'" style="color:var(--gold);text-decoration:none;font-size:12px;">'+docLbl+'</a>'):'')+'</div></div>';
+    row+='<div style="display:flex;justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:8px;">'+(hasHist?('<a href="#" onclick="event.preventDefault();c360Close();svcHistoryOpen(\''+o.id+'\')" style="color:#9b7bff;text-decoration:none;font-size:12px;">🔧 historia ›</a>'):'')+'<a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">ver orden ›</a>'+(hasInvoice?('<a href="#" onclick="event.preventDefault();c360Close();'+docFn+'" style="color:var(--gold);text-decoration:none;font-size:12px;">'+docLbl+'</a>'):'')+'</div></div>';
     return row;
   }).join('');
 }
@@ -2404,15 +2408,18 @@ window.renderClient360=function(id){
     if(cfGrp.length>1){ const cfBal=cfGrp.reduce((s,gm)=>s+(isPaidOff(gm)?0:(calcBalance(gm)||0))+(addonsBalance(gm)||0),0); const cfCars=cfGrp.filter(gm=>gm.vin||gm.total||((gm.schedule||[]).length)).length; cfSummary='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="color:var(--muted);font-size:13px;">Saldo total · '+cfCars+' carro(s)</span><b style="color:var(--gold);font-size:18px;">'+cfM(cfBal)+'</b></div><div style="color:var(--muted);font-size:12px;margin-top:4px;">Toca cada carro abajo para ver su saldo y pagos.</div>'; }
     else if(f.buyer){ cfSummary=_c360FinSummary(c); }
     const cfGv=_groupVehicles(c);
-    const cfVehicles=cfGv.map(e=>{ const v=e.v; let right=''; if(e.isFin){ right=isPaidOff(e.owner)?'<span style="color:#28b463;font-weight:800;font-size:12px;white-space:nowrap;">✅ Pagado</span>':'<span style="color:var(--gold);font-weight:800;font-size:12px;white-space:nowrap;">saldo '+cfM(calcBalance(e.owner))+'</span>'; } else { right='<span style="color:var(--muted);font-size:11px;white-space:nowrap;">'+(e.ownerId!==id?'✅ comprado':'🔧 servicio')+'</span>'; } right+=' <span style="color:var(--gold);">›</span>'; return {label:v.label||'Auto',plate:v.plate||'',vin:v.vin||'',right:right,ref:e.ownerId,ref2:e.idx}; });
-    const cfNorm=(o,done)=>{ const _sl=(typeof svcStatusLabel==='function')?svcStatusLabel(o):{txt:(done?'✅ Servicio realizado':'🧾 Estimado'),col:'var(--muted)'}; const _ow=svcOwedCents(o); return {id:o.id,orderNum:o.orderNum,title:o.reason||'Servicio',when:o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'',statusTxt:done?'✅ Servicio realizado':_sl.txt,statusCol:done?'#28b463':_sl.col,total:(o.grandTotalCents!=null?o.grandTotalCents/100:0),saldo:(!done&&_ow>0)?_ow/100:0}; };
-    const cfActive=sOrders.filter(o=>o.paid!==true).map(o=>cfNorm(o,false));
-    const cfDone=sOrders.filter(o=>o.paid===true).map(o=>cfNorm(o,true));
+    // 🔧 La orden de servicio vive DENTRO del carro: normaliza + reparte cada orden a su vehículo (por VIN o etiqueta).
+    const cfNorm=(o)=>{ const done=(o.paid===true)||(o.status==='listo'||o.status==='entregado'); const _sl=(typeof svcStatusLabel==='function')?svcStatusLabel(o):{txt:(done?'✅ Servicio realizado':'🧾 Estimado'),col:'var(--muted)'}; const _ow=svcOwedCents(o); return {id:o.id,orderNum:o.orderNum,title:o.reason||'Servicio',when:o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'',statusTxt:done?'✅ Servicio realizado':_sl.txt,statusCol:done?'#28b463':_sl.col,total:(o.grandTotalCents!=null?o.grandTotalCents/100:0),saldo:(!done&&_ow>0)?_ow/100:0,done:done}; };
+    const _nlz=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const _matchedSvc=new Set();
+    const _ordersFor=(vin,label)=>{ const V=(vin||'').toUpperCase(), Lk=_nlz(label); return sOrders.filter(o=>{ const ov=(o.vin||'').toUpperCase(); const m=(V&&ov)?(ov===V):(!!Lk && _nlz(o.vehicleLabel)===Lk); if(m)_matchedSvc.add(o.id); return m; }).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).map(cfNorm); };
+    const cfVehicles=cfGv.map(e=>{ const v=e.v; let right=''; if(e.isFin){ right=isPaidOff(e.owner)?'<span style="color:#28b463;font-weight:800;font-size:12px;white-space:nowrap;">✅ Pagado</span>':'<span style="color:var(--gold);font-weight:800;font-size:12px;white-space:nowrap;">saldo '+cfM(calcBalance(e.owner))+'</span>'; } else { right='<span style="color:var(--muted);font-size:11px;white-space:nowrap;">'+(e.ownerId!==id?'✅ comprado':'🔧 servicio')+'</span>'; } right+=' <span style="color:var(--gold);">›</span>'; return {label:v.label||'Auto',plate:v.plate||'',vin:v.vin||'',right:right,ref:e.ownerId,ref2:e.idx,orders:_ordersFor(v.vin,v.label)}; });
+    const cfOrphan=sOrders.filter(o=>!_matchedSvc.has(o.id)).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).map(cfNorm);
     const cfExtra=[];
     if(appts.length){ const apHtml=appts.map(a=>{ const when=(a.scheduledAt||a.date)?new Date(a.scheduledAt||a.date).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; const svc=Array.isArray(a.services)?a.services.join(', '):(a.service||a.reason||a.note||'Cita'); const st=a.status?(' · '+esc(a.status)):''; return '<div style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">📅 '+esc(svc)+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div>'+(st?('<div style="font-size:12px;color:var(--muted);margin-top:3px;">'+st.replace(/^ · /,'')+'</div>'):'')+'</div>'; }).join(''); cfExtra.push({title:'📅 Citas', html:apHtml, act:addBtn('➕ Cita','c360Close();openApptModal(\''+id+'\')')}); }
     const cfQuotes=qz.map(q=>({id:q.id, car:(q.options&&q.options[0]&&q.options[0].car)||'', when:q.createdAt?new Date(q.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''}));
     body.innerHTML=LMG.clientFichaHTML(
-      { id:id, name:c.name, phone:c.phone, lang:c.lang, idHtml:idLink, badgesHtml:(c360BadgeHtml(f)||''), summaryHtml:cfSummary, vehicles:cfVehicles, serviceActive:cfActive, serviceDone:cfDone, extraSections:cfExtra, quotes:cfQuotes },
+      { id:id, name:c.name, phone:c.phone, lang:c.lang, idHtml:idLink, badgesHtml:(c360BadgeHtml(f)||''), summaryHtml:cfSummary, vehicles:cfVehicles, hideFlatService:true, serviceOrphan:cfOrphan, extraSections:cfExtra, quotes:cfQuotes },
       { lang:(c.lang==='en'?'en':'es'), close:'c360Close()', payFn:(f.buyer?'openPayModal':''), editFn:'openEditModal', viewAsFn:'viewAsClient', newServiceFn:'c360NewService', openVehicleFn:'openVehicle360', openOrderFn:'svcOpenOrder', openReceiptFn:'svcOpenReceipt', openQuoteFn:'viewCotiz' }
     );
     return;
@@ -3026,9 +3033,10 @@ window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.serv
 window.svcAddPart=function(si){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s){ (s.parts=s.parts||[]).push({desc:'',price:0}); } svcRenderModal(); };
 window.svcRemovePart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s&&Array.isArray(s.parts)){ s.parts.splice(pi,1); } svcRenderModal(); };
 // 🔬→🧾 Copia una parte ENCONTRADA por el mecánico (diagnóstico) al ESTIMADO del servicio (desc + # OEM); el precio lo pones tú.
-window.svcAddDiagPart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(!s) return; const dp=((s.diagnosis&&s.diagnosis.parts)||[])[pi]; if(!dp) return; const desc=((dp.desc||'')+(dp.partNum?(' [# '+dp.partNum+']'):'')).trim()||(dp.partNum||'Parte'); (s.parts=s.parts||[]).push({desc:desc, price:0}); svcRenderModal(); try{ if(window.svcToast) svcToast('➕ Agregada al estimado: '+desc+' · ponle precio abajo'); }catch(e){} };
+window.svcAddDiagPart=function(si,pi){ if(!window._svcDraft||!Array.isArray(window._svcDraft.services)){ try{ if(window.svcToast) svcToast('Abre la orden (ver orden ›) para agregar al estimado.'); }catch(e){} return; } svcCapture(); const s=(window._svcDraft.services||[])[si]; if(!s) return; const dp=((s.diagnosis&&s.diagnosis.parts)||[])[pi]; if(!dp) return; const desc=((dp.desc||'')+(dp.partNum?(' [# '+dp.partNum+']'):'')).trim()||(dp.partNum||'Parte'); (s.parts=s.parts||[]).push({desc:desc, price:0}); svcRenderModal(); try{ if(window.svcToast) svcToast('➕ Agregada al estimado: '+desc+' · ponle precio abajo'); }catch(e){} };
 // ➕ Agrega TODAS las partes del diagnóstico al estimado de una (sin duplicar las que ya están).
 window.svcAddAllDiagParts=function(orderId){
+  if(!window._svcDraft||!Array.isArray(window._svcDraft.services)){ try{ if(window.svcToast) svcToast('Abre la orden (ver orden ›) para agregar al estimado.'); }catch(e){} return; }
   svcCapture(); let n=0;
   (window._svcDraft.services||[]).forEach(function(s){
     const have=(s.parts||[]).map(function(p){ return (p.desc||'').trim().toLowerCase(); });
@@ -7730,6 +7738,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105213138"></script>
+<script type="module" src="launcher.js?v=20261105214535"></script>
 </body>
 </html>

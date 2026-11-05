@@ -53,27 +53,37 @@
       h += sec('💵 '+L2('Resumen de cuenta','Account summary'), '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="color:var(--muted);font-size:13px;">'+L2('Saldo total','Total balance')+(data.finance.cars?(' · '+data.finance.cars+' '+L2('carro(s)','car(s)')):'')+'</span><b style="color:var(--gold);font-size:18px;">'+money(data.finance.balance)+'</b></div>');
     }
 
-    // 🚗 Vehículos
+    // 🔧 Fila de orden (compartida): compacta (anidada en el carro) o normal (lista suelta).
+    var svcRow = function(o, done, mini){
+      var dn = (o.done!=null) ? o.done : done;
+      var fn = dn ? (opts.openReceiptFn||opts.openOrderFn) : opts.openOrderFn;
+      var onc = fn ? (' onclick="'+(mini?'event.stopPropagation();':'')+close+';'+fn+'(\''+esc(o.id)+'\')" style="cursor:pointer;') : (' style="');
+      var fol = o.orderNum ? ('<span style="color:var(--gold);font-weight:800;">#'+esc(o.orderNum)+'</span> '+(mini?'':'· ')) : '';
+      var tot = (o.total!=null && o.total>0) ? money(o.total) : '';
+      var saldo = (!dn && o.saldo>0) ? (' · '+L2('saldo','balance')+' '+money(o.saldo)) : '';
+      var col = o.statusCol || 'var(--muted)';
+      var pad = mini ? '7px 10px' : '9px 12px', mt = mini ? 'margin-top:6px;' : 'margin-bottom:7px;', fs = mini ? '12.5px' : '13px';
+      return '<div'+onc+'border:1px solid var(--border);border-radius:'+(mini?'9px':'10px')+';padding:'+pad+';'+mt+'"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:'+fs+';min-width:0;">'+fol+esc(o.title||L2('Servicio','Service'))+'</span><span style="font-size:'+(mini?'10.5px':'11px')+';color:var(--muted);white-space:nowrap;">'+esc(o.when||'')+'</span></div><div style="font-size:'+(mini?'11.5px':'12px')+';color:'+col+';margin-top:'+(mini?'2px':'3px')+';font-weight:700;">'+esc(o.statusTxt||'')+(mini&&tot?(' · '+tot):'')+(mini?saldo:'')+(mini&&fn?(' · '+L2('ver','open')+' ›'):'')+'</div>'+((!mini&&(tot||saldo))?('<div style="font-size:11px;color:var(--muted);margin-top:1px;">'+tot+saldo+(fn?(' · '+L2('ver','open')+' ›'):'')+'</div>'):'')+'</div>';
+    };
+    var addSvc = opts.newServiceFn ? addBtn('➕ '+L2('Agendar servicio','Schedule service'), close+';'+opts.newServiceFn+'(\''+esc(data.id||'')+'\')') : '';
+
+    // 🚗 Vehículos — cada carro es la CASA de sus órdenes (la orden vive DENTRO del carro).
     var vehHtml = (data.vehicles&&data.vehicles.length) ? data.vehicles.map(function(v){
       var vargs = (v.ref!=null) ? ('\''+esc(v.ref)+'\''+(v.ref2!=null?(',\''+esc(v.ref2)+'\''):'')) : '';
-      var tap = (opts.openVehicleFn && v.ref!=null) ? (' onclick="'+close+';'+opts.openVehicleFn+'('+vargs+')" style="cursor:pointer;') : (' style="');
-      return '<div'+tap+'border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;gap:10px;"><div style="min-width:0;"><div style="font-weight:700;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN …'+esc(String(v.vin).slice(-6))):'')+'</div></div>'+(v.right?('<div style="flex:0 0 auto;">'+v.right+'</div>'):'')+'</div>';
+      var tapAttr = (opts.openVehicleFn && v.ref!=null) ? (' onclick="'+close+';'+opts.openVehicleFn+'('+vargs+')" style="cursor:pointer;') : (' style="');
+      var head = '<div'+tapAttr+'display:flex;justify-content:space-between;align-items:center;gap:10px;"><div style="min-width:0;"><div style="font-weight:700;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN …'+esc(String(v.vin).slice(-6))):'')+'</div></div>'+(v.right?('<div style="flex:0 0 auto;">'+v.right+'</div>'):'')+'</div>';
+      var ords = (v.orders&&v.orders.length) ? v.orders.map(function(o){return svcRow(o,!!o.done,true);}).join('') : '';
+      return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'+head+ords+'</div>';
     }).join('') : empty(L2('Sin vehículos registrados.','No vehicles.'));
-    h += sec('🚗 '+L2('Vehículos','Vehicles')+((data.vehicles&&data.vehicles.length>1)?(' ('+data.vehicles.length+')'):''), vehHtml);
+    h += sec('🚗 '+L2('Vehículos','Vehicles')+((data.vehicles&&data.vehicles.length>1)?(' ('+data.vehicles.length+')'):''), vehHtml, (data.hideFlatService?addSvc:''));
 
-    // 🔧 Servicio (en curso + completadas)
-    var svcRow = function(o, done){
-      var fn = done ? (opts.openReceiptFn||opts.openOrderFn) : opts.openOrderFn;
-      var onc = fn ? (' onclick="'+close+';'+fn+'(\''+esc(o.id)+'\')" style="cursor:pointer;') : (' style="');
-      var fol = o.orderNum ? ('<span style="color:var(--gold);font-weight:800;">#'+esc(o.orderNum)+'</span> · ') : '';
-      var tot = (o.total!=null && o.total>0) ? money(o.total) : '';
-      var saldo = (!done && o.saldo>0) ? (' · '+L2('saldo','balance')+' '+money(o.saldo)) : '';
-      var col = o.statusCol || 'var(--muted)';
-      return '<div'+onc+'border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+fol+esc(o.title||L2('Servicio','Service'))+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+esc(o.when||'')+'</span></div><div style="font-size:12px;color:'+col+';margin-top:3px;font-weight:700;">'+esc(o.statusTxt||'')+'</div>'+((tot||saldo)?('<div style="font-size:11px;color:var(--muted);margin-top:1px;">'+tot+saldo+(fn?(' · '+L2('ver','open')+' ›'):'')+'</div>'):'')+'</div>';
-    };
-    var act2 = opts.newServiceFn ? addBtn('➕ '+L2('Agendar servicio','Schedule service'), close+';'+opts.newServiceFn+'(\''+esc(data.id||'')+'\')') : '';
-    h += sec('🔧 '+L2('Servicio','Service'), (data.serviceActive&&data.serviceActive.length)?data.serviceActive.map(function(o){return svcRow(o,false);}).join(''):empty(L2('Sin órdenes abiertas.','No open orders.')), act2);
-    if (data.serviceDone && data.serviceDone.length) h += sec('✅ '+L2('Órdenes completadas','Completed orders')+' ('+data.serviceDone.length+')', data.serviceDone.map(function(o){return svcRow(o,true);}).join(''));
+    // 🔧 Servicio SUELTO — solo si el host NO anida las órdenes en los carros (retrocompat: Pit Crew). Con hideFlatService, solo se muestran huérfanas (sin carro).
+    if (!data.hideFlatService) {
+      h += sec('🔧 '+L2('Servicio','Service'), (data.serviceActive&&data.serviceActive.length)?data.serviceActive.map(function(o){return svcRow(o,false);}).join(''):empty(L2('Sin órdenes abiertas.','No open orders.')), addSvc);
+      if (data.serviceDone && data.serviceDone.length) h += sec('✅ '+L2('Órdenes completadas','Completed orders')+' ('+data.serviceDone.length+')', data.serviceDone.map(function(o){return svcRow(o,true);}).join(''));
+    } else if (data.serviceOrphan && data.serviceOrphan.length) {
+      h += sec('🔧 '+L2('Otros servicios','Other services'), data.serviceOrphan.map(function(o){return svcRow(o,!!o.done);}).join(''));
+    }
 
     // Secciones extra que el host inyecta como HTML (ej. admin: 📅 Citas). Van después de Servicio.
     (data.extraSections||[]).forEach(function(s){ if(s&&s.html) h += sec(s.title||'', s.html, s.act||''); });
