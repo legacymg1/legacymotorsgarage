@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105211630"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105211630"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105211917"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105211917"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1001,8 +1001,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105211630"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105211630"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105211917"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105211917"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -3027,7 +3027,22 @@ window.svcAddPart=function(si){ svcCapture(); const s=(window._svcDraft.services
 window.svcRemovePart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s&&Array.isArray(s.parts)){ s.parts.splice(pi,1); } svcRenderModal(); };
 // 🔬→🧾 Copia una parte ENCONTRADA por el mecánico (diagnóstico) al ESTIMADO del servicio (desc + # OEM); el precio lo pones tú.
 window.svcAddDiagPart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(!s) return; const dp=((s.diagnosis&&s.diagnosis.parts)||[])[pi]; if(!dp) return; const desc=((dp.desc||'')+(dp.partNum?(' [# '+dp.partNum+']'):'')).trim()||(dp.partNum||'Parte'); (s.parts=s.parts||[]).push({desc:desc, price:0}); svcRenderModal(); try{ if(window.svcToast) svcToast('➕ Agregada al estimado: '+desc+' · ponle precio abajo'); }catch(e){} };
-// 🔧 HISTORIA DEL MECÁNICO (popup): recepción → diagnóstico por servicio (+➕ al estimado) → reparación con fotos. Todo junto, NO vomitado en la orden.
+// ➕ Agrega TODAS las partes del diagnóstico al estimado de una (sin duplicar las que ya están).
+window.svcAddAllDiagParts=function(orderId){
+  svcCapture(); let n=0;
+  (window._svcDraft.services||[]).forEach(function(s){
+    const have=(s.parts||[]).map(function(p){ return (p.desc||'').trim().toLowerCase(); });
+    ((s.diagnosis&&s.diagnosis.parts)||[]).forEach(function(dp){
+      const desc=((dp.desc||'')+(dp.partNum?(' [# '+dp.partNum+']'):'')).trim()||(dp.partNum||'Parte');
+      if(have.indexOf(desc.toLowerCase())>=0) return;
+      (s.parts=s.parts||[]).push({desc:desc, price:0}); have.push(desc.toLowerCase()); n++;
+    });
+  });
+  svcRenderModal();
+  try{ if(window.svcToast) svcToast(n?('➕ '+n+' parte(s) al estimado · ponles precio abajo'):'Ya estaban todas en el estimado'); }catch(e){}
+  svcHistoryClose();
+};
+// 🔧 HISTORIA DEL MECÁNICO (popup): recepción → lista de partes (widget) → diagnóstico por servicio → reparación con fotos. Todo junto, NO vomitado en la orden.
 window.svcHistoryClose=function(){ const el=document.getElementById('svc-history'); if(el) el.remove(); };
 window.svcHistoryOpen=function(orderId){
   const o = (svcOrders.find(x=>x.id===orderId)) || (window._svcDraft && window._svcDraft.editId===orderId ? window._svcDraft : null) || {};
@@ -3035,6 +3050,8 @@ window.svcHistoryOpen=function(orderId){
   if(!ik && !svs.some(s=>s.diagnosis||s.repair)){ if(window.svcToast) svcToast('Aún no hay historia del mecánico en esta orden.'); return; }
   const dt=function(x){ try{ return x?new Date(x).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; }catch(e){ return ''; } };
   const img=function(u,sz){ return '<img src="'+u+'" onclick="window.open(\''+u+'\',\'_blank\')" style="width:'+sz+'px;height:'+sz+'px;object-fit:cover;border-radius:7px;flex:0 0 auto;cursor:pointer;">'; };
+  // 🧩 TODAS las partes que el mecánico marcó (consolidadas de todos los servicios) → widget-lista para ordenar/agregar al estimado.
+  const allParts=[]; svs.forEach(function(s,i){ ((s.diagnosis&&s.diagnosis.parts)||[]).forEach(function(p,pi){ allParts.push({ si:i, pi:pi, svc:(s.desc||('Servicio '+(i+1))), desc:p.desc||'', partNum:p.partNum||'', photo:p.photo||'' }); }); });
   let h='';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;">🔧 Historia del mecánico'+(o.orderNum?(' · #'+o.orderNum):'')+'</h2><button onclick="svcHistoryClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>';
   h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">'+svcEsc(o.clientName||'')+' · 🚗 '+svcEsc(o.vehicleLabel||o.plate||'')+'</div>';
@@ -3048,21 +3065,29 @@ window.svcHistoryOpen=function(orderId){
       h+='<div style="margin-top:6px;font-weight:700;color:'+(ik.clientAck?'#35c46a':'#f0a030')+';">'+(ik.clientAck?('✅ Cliente autorizó'+(ik.clientAckAt?(' · '+dt(ik.clientAckAt)):'')):'⏳ Pendiente de autorización del cliente')+'</div>'; }
     h+='</div>';
   } else { h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">—</div>'; }
-  // 2) Diagnóstico por servicio
-  h+='<div style="font-weight:800;font-size:12px;color:#9b7bff;margin:6px 0 6px;">2 · 🔬 Diagnóstico</div>';
+  // 2) 🧩 Lista de partes (WIDGET) — consolidada de todos los servicios, para ordenar / agregar al estimado.
+  h+='<div style="font-weight:800;font-size:12px;color:var(--gold);margin:6px 0 6px;">2 · 🧩 Partes que se necesitan</div>';
+  if(allParts.length){
+    h+='<div style="background:rgba(240,192,64,.06);border:1px solid var(--gold3);border-radius:12px;padding:12px;margin-bottom:12px;">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;font-weight:700;color:var(--muted);">'+allParts.length+' parte(s)</span><button type="button" onclick="svcAddAllDiagParts(\''+orderId+'\')" style="background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:800;cursor:pointer;">➕ Todas al estimado</button></div>';
+    h+=allParts.map(function(p){ return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.05);">'+(p.photo?img(p.photo,40):'<div style="width:40px;height:40px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">🧩</div>')+'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;">'+svcEsc(p.desc||(p.partNum||'Parte'))+'</div>'+(p.partNum?('<div style="font-size:11px;color:var(--gold);">#'+svcEsc(p.partNum)+'</div>'):'')+'<div style="font-size:10.5px;color:var(--muted);">'+svcEsc(p.svc)+'</div></div><button type="button" onclick="svcAddDiagPart('+p.si+','+p.pi+')" title="Agregar al estimado" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:12.5px;font-weight:700;cursor:pointer;">➕</button></div>'; }).join('');
+    h+='</div>';
+  } else { h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Sin partes marcadas aún.</div>'; }
+  // 3) Diagnóstico por servicio (detalle: hallazgo + fotos)
+  h+='<div style="font-weight:800;font-size:12px;color:#9b7bff;margin:6px 0 6px;">3 · 🔬 Diagnóstico</div>';
   let anyDiag=false;
   svs.forEach(function(s,i){ const dg=s.diagnosis; if(!dg) return; anyDiag=true;
     h+='<div style="background:rgba(109,75,255,.06);border:1px solid rgba(109,75,255,.3);border-radius:11px;padding:11px;margin-bottom:8px;">';
     h+='<div style="font-weight:700;font-size:13px;margin-bottom:4px;">'+svcEsc(s.desc||('Servicio '+(i+1)))+'</div>';
     if(dg.notes) h+='<div style="font-size:12.5px;line-height:1.4;white-space:pre-wrap;margin-bottom:6px;">'+svcEsc(dg.notes)+'</div>';
     if((dg.photos||[]).length) h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">'+dg.photos.map(function(u){return img(u,54);}).join('')+'</div>';
-    (dg.parts||[]).forEach(function(p,pi){ h+='<div style="display:flex;gap:8px;align-items:center;margin-bottom:5px;">'+(p.photo?img(p.photo,40):'')+'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;">'+svcEsc(p.desc||(p.partNum||'Parte'))+'</div>'+(p.partNum?('<div style="font-size:11px;color:var(--gold);">#'+svcEsc(p.partNum)+'</div>'):'')+'</div><button type="button" onclick="svcAddDiagPart('+i+','+pi+')" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:11.5px;font-weight:700;cursor:pointer;">➕ al estimado</button></div>'; });
+    if((dg.parts||[]).length) h+='<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">🧩 '+(dg.parts||[]).map(function(p){ return svcEsc(p.desc||p.partNum||'Parte')+(p.partNum?(' (#'+svcEsc(p.partNum)+')'):''); }).join(' · ')+'</div>';
     h+='</div>';
   });
   if(!anyDiag) h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">—</div>';
   if(o.diagSummary&&o.diagSummary.text) h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:11px;margin-bottom:12px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;"><b style="color:#9b7bff;">Resumen enviado:</b>\n'+svcEsc(o.diagSummary.text)+'</div>';
-  // 3) Reparación
-  h+='<div style="font-weight:800;font-size:12px;color:#35c46a;margin:6px 0 6px;">3 · 🔧 Reparación</div>';
+  // 4) Reparación
+  h+='<div style="font-weight:800;font-size:12px;color:#35c46a;margin:6px 0 6px;">4 · 🔧 Reparación</div>';
   let anyRep=false;
   svs.forEach(function(s,i){ const rp=s.repair; if(!rp) return; anyRep=true;
     h+='<div style="background:rgba(53,196,106,.06);border:1px solid rgba(53,196,106,.3);border-radius:11px;padding:11px;margin-bottom:8px;">';
@@ -7699,6 +7724,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105211630"></script>
+<script type="module" src="launcher.js?v=20261105211917"></script>
 </body>
 </html>
