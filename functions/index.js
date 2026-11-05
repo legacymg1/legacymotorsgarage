@@ -2,6 +2,7 @@
 // redeploy marker: push onMoneyIn trigger (IAM + eventarc service agent concedidos)
 const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
@@ -1502,6 +1503,59 @@ async function _pushToOrderMechs(o, payload) {
     for (const id of ids) { await _pushToEmp(id, payload); }
   } catch (e) { console.log("_pushToOrderMechs", e); }
 }
+
+// ===================== 🔔 RECORDATORIOS AUTOMÁTICOS DE SERVICIO (cada ~3 meses) =====================
+// Proceso DIARIO: revisa el último servicio de cada carro; si ya pasaron 90 días (y no se le recordó este ciclo),
+// le manda PUSH al cliente (si tiene la app) y junta un digest para avisar a los dueños. La LISTA accionable con 💬 SMS
+// se ve en el admin (se calcula de los mismos datos). Sin Twilio: el SMS lo manda el dueño con 1 toque desde la lista.
+const SVC_REMIND_DAYS = 90;
+function _svcDueInfo(client) {
+  // Junta los vehículos del cliente (primario en el doc + array vehicles[]) y regresa los que ya tocan servicio.
+  const vs = [];
+  const pl = [client.year, client.make, client.model].filter(Boolean).join(" ");
+  if (client.lastServiceDate && (pl || client.vin)) vs.push({ label: pl || ("VIN …" + String(client.vin || "").slice(-6)), lastServiceDate: client.lastServiceDate });
+  (Array.isArray(client.vehicles) ? client.vehicles : []).forEach((v) => {
+    if (v && v.lastServiceDate) vs.push({ label: v.label || [v.year, v.make, v.model].filter(Boolean).join(" ") || "Auto", lastServiceDate: v.lastServiceDate });
+  });
+  const now = new Date(); const due = [];
+  vs.forEach((v) => {
+    const d = new Date(String(v.lastServiceDate) + "T12:00:00"); if (isNaN(d)) return;
+    d.setDate(d.getDate() + SVC_REMIND_DAYS);
+    if (now >= d) due.push({ label: v.label, dueAt: d, lastServiceDate: v.lastServiceDate });
+  });
+  // ordena por el que tiene MÁS tiempo sin servicio
+  due.sort((a, b) => a.dueAt - b.dueAt);
+  return due;
+}
+exports.serviceReminderDaily = onSchedule({ schedule: "0 16 * * *", timeZone: "America/Los_Angeles", region: "us-central1", memory: "512MiB" }, async () => {
+  const db = admin.firestore();
+  const now = new Date(); const todayStr = now.toISOString().slice(0, 10);
+  let snap; try { snap = await db.collection("clients").get(); } catch (e) { console.error("serviceReminderDaily read", e); return; }
+  const ownerLines = []; let reminded = 0;
+  for (const doc of snap.docs) {
+    const c = doc.data() || {};
+    const due = _svcDueInfo(c);
+    if (!due.length) continue;
+    // ¿ya se le recordó en ESTE ciclo? (serviceReminderAt posterior a la fecha-tope más próxima = ya avisado)
+    const firstDue = due[0].dueAt;
+    if (c.serviceReminderAt) { const r = new Date(String(c.serviceReminderAt) + "T12:00:00"); if (!isNaN(r) && r >= firstDue) continue; }
+    const carLabel = due[0].label; const nm = c.name || "Cliente";
+    // 🔔 push al cliente (si tiene la app) — reusa _pushToClient
+    try { await _pushToClient(c.id, c.phone || "", {
+      title: "🔧 Tu carro toca servicio", body: "Tu " + carLabel + " ya va para su servicio (cambio de aceite / revisión). Agenda cuando quieras.",
+      titleEn: "🔧 Time for service", bodyEn: "Your " + carLabel + " is due for service (oil change / check-up). Book anytime.",
+      url: "/portal.html",
+    }); } catch (e) {}
+    ownerLines.push(nm + " · " + carLabel + (c.phone ? (" · " + c.phone) : ""));
+    try { await doc.ref.set({ serviceReminderAt: todayStr }, { merge: true }); } catch (e) {}
+    reminded++;
+  }
+  if (ownerLines.length) {
+    const body = ownerLines.slice(0, 8).join("\n") + (ownerLines.length > 8 ? ("\n+" + (ownerLines.length - 8) + " más") : "");
+    try { await _pushToOwners({ title: "🔔 " + ownerLines.length + " carro(s) tocan servicio", body: body, titleEn: "🔔 " + ownerLines.length + " car(s) due for service", bodyEn: body, url: "/admin.html?svcdue=1" }); } catch (e) {}
+  }
+  console.log("serviceReminderDaily done", { reminded });
+});
 
 // 🔧 "Atiende esto" — texto del aviso según prioridad (🔴 Ahora / 🟡 Siguiente), en el idioma del empleado.
 function _taskPushPayload(t) {

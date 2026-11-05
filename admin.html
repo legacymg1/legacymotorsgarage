@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105230344"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105230344"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105233035"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105233035"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -970,6 +970,7 @@
     <button onclick="svcNewOrder()" style="background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:11px 18px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;">➕ Nueva orden de servicio</button>
     <input id="svc-search" oninput="svcRenderOrders()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="🔍 Buscar cliente, carro, placa o VIN…" style="flex:1 1 220px;max-width:420px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;">
   </div>
+  <div id="svc-due"></div>
   <div id="svc-tabs" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;"></div>
   <div id="svc-filters" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;"></div>
   <div id="svc-orders"><div class="faint" style="padding:40px;text-align:center;">Cargando…</div></div>
@@ -1007,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105230344"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105230344"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105233035"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105233035"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1798,10 +1799,53 @@ function svcRenderCitasTab(box,q){
   }
   box.innerHTML=html;
 }
+// 🔔 Carros que ya tocan servicio (último servicio + ~90 días) — se calcula de los clientes ya cargados.
+function _svcDueFor(c){
+  const DAYS=90; const vs=[];
+  const pl=[c.year,c.make,c.model].filter(Boolean).join(' ');
+  if(c.lastServiceDate && (pl||c.vin)) vs.push({label: pl||('VIN …'+String(c.vin||'').slice(-6)), last:c.lastServiceDate});
+  (Array.isArray(c.vehicles)?c.vehicles:[]).forEach(v=>{ if(v&&v.lastServiceDate) vs.push({label:v.label||[v.year,v.make,v.model].filter(Boolean).join(' ')||'Auto', last:v.lastServiceDate}); });
+  const now=new Date(); const due=[];
+  vs.forEach(v=>{ const d=new Date(String(v.last)+'T12:00:00'); if(isNaN(d))return; d.setDate(d.getDate()+DAYS); if(now>=d) due.push({label:v.label, due:d, last:v.last}); });
+  due.sort((a,b)=>a.due-b.due);
+  if(due.length && c.serviceReminderAt){ const r=new Date(String(c.serviceReminderAt)+'T12:00:00'); if(!isNaN(r)&&r>=due[0].due) return []; }  // ya contactado este ciclo
+  return due;
+}
+window.svcRenderDue=function(){
+  const box=document.getElementById('svc-due'); if(!box) return;
+  const items=[];
+  (clients||[]).forEach(c=>{ const due=_svcDueFor(c); if(due.length) items.push({c:c, car:due[0].label, last:due[0].last}); });
+  if(!items.length){ box.innerHTML=''; return; }
+  items.sort((a,b)=>String(a.last).localeCompare(String(b.last)));
+  const rows=items.slice(0,50).map(function(it){
+    const c=it.c; const first=(c.firstName||(c.name||'').split(' ')[0]||'').trim(); const ph=(c.phone||'').replace(/[^0-9+]/g,''); const en=(c.lang==='en');
+    const msg=en?('Hi '+first+'! This is Legacy Motors Garage 🔧. Your '+it.car+' is due for its service (oil change / check-up). What day works for you? — (559) 540-5145')
+                :('Hola '+first+'! Somos de Legacy Motors Garage 🔧. Tu '+it.car+' ya va para su servicio (cambio de aceite / revisión). ¿Qué día te acomoda? — (559) 540-5145');
+    let lastD=it.last; try{ lastD=new Date(it.last+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}); }catch(e){}
+    const sms=ph?('sms:'+ph+'?&body='+encodeURIComponent(msg)):'';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);">'
+      +'<div style="flex:1;min-width:0;cursor:pointer;" onclick="openClient360(\''+c.id+'\')"><div style="font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+svcEsc(c.name||'Cliente')+'</div><div style="font-size:11.5px;color:var(--muted);">🚗 '+svcEsc(it.car)+' · últ. servicio '+lastD+'</div></div>'
+      +(sms?('<a href="'+sms+'" style="flex:0 0 auto;text-decoration:none;background:var(--gold);color:var(--navy3);border-radius:8px;padding:7px 11px;font-size:12px;font-weight:800;">💬 SMS</a>'):'')
+      +'<button onclick="svcDueContacted(\''+c.id+'\')" title="Ya lo contacté" style="flex:0 0 auto;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 9px;font-size:12px;font-weight:700;cursor:pointer;">✅</button>'
+      +'</div>';
+  }).join('');
+  box.innerHTML='<div style="background:rgba(240,160,48,.07);border:1px solid rgba(240,160,48,.4);border-radius:12px;padding:12px 14px;margin-bottom:12px;">'
+    +'<div style="font-weight:800;font-size:13px;color:#f0a030;margin-bottom:4px;">🔔 Tocan servicio ('+items.length+')</div>'
+    +'<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;">Ya pasaron ~3 meses del último servicio. 💬 les manda el recordatorio · ✅ si ya los contactaste.</div>'
+    +rows+'</div>';
+};
+window.svcDueContacted=async function(id){
+  const today=new Date().toISOString().slice(0,10);
+  try{ await updateDoc(doc(db,'clients',id), { serviceReminderAt: today }); }catch(e){}
+  try{ const c=clients.find(x=>x.id===id); if(c) c.serviceReminderAt=today; }catch(e){}
+  try{ svcRenderDue(); }catch(e){}
+  try{ if(window.svcToast) svcToast('✅ Marcado como contactado'); }catch(e){}
+};
 window.svcRenderOrders = function(){
   const box=document.getElementById('svc-orders'); if(!box) return;
   const tab=window._svcTab||'activas';
   svcRenderTabs();
+  try{ svcRenderDue(); }catch(e){}
   const fbox=document.getElementById('svc-filters'); if(fbox) fbox.style.display='none';   // las pestañas reemplazan los filtros viejos
   if(!svcRosterLoaded){ svcLoadRoster().then(()=>{ const sv=document.getElementById('service-view'); if(sv && sv.style.display!=='none') svcRenderOrders(); }); }
   const q=(document.getElementById('svc-search')?.value||'').toLowerCase().trim();
@@ -7765,6 +7809,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105230344"></script>
+<script type="module" src="launcher.js?v=20261105233035"></script>
 </body>
 </html>
