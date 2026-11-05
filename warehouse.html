@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105182522"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105182522"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105182926"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105182926"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261105182522"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261105182522"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261105182522"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105182926"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261105182926"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261105182926"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2867,6 +2867,7 @@ window.svcOpenDiag=function(orderId,idx){
   const s=list.find(x=>x.index===idx)||(o.services||[])[idx]; if(!s) return;
   const dg=s.diagnosis||{};
   _diag={ orderId:orderId, idx:idx, desc:(L==='en'?s.descEn:s.desc)||'', notes:dg.notes||'',
+    vehicle:o.vehicleLabel||'', vin:o.vin||'',
     parts:(dg.parts||[]).map(function(p){ return {desc:p.desc||'',partNum:p.partNum||'',photoUrl:p.photo||'',photoFile:null,photoPreview:''}; }),
     photos:(dg.photos||[]).map(function(u){ return {url:u}; }) };
   let ov=document.getElementById('svc-diag');
@@ -2889,6 +2890,8 @@ function _diagRender(){
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;"><span class="faint" style="font-size:11px;font-weight:700;">🧩 #'+(pi+1)+'</span><button onclick="diagRmPart('+pi+')" style="background:transparent;border:none;color:#e05a4a;font-size:12px;cursor:pointer;">🗑 '+(en?'Remove':'Quitar')+'</button></div>'
     +'<input value="'+esc(p.desc||'')+'" oninput="_diag&&(_diag.parts['+pi+'].desc=this.value)" placeholder="'+(en?'Part (e.g. front brake pads)':'Parte (ej. balatas delanteras)')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--text);font-size:14px;margin-bottom:6px;">'
     +'<input value="'+esc(p.partNum||'')+'" oninput="_diag&&(_diag.parts['+pi+'].partNum=this.value)" placeholder="'+(en?'Original part #':'# de parte original')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--text);font-size:13px;margin-bottom:6px;">'
+    +'<button onclick="diagLookupPart('+pi+')" '+(p.loading?'disabled ':'')+'style="width:100%;margin-bottom:6px;background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:9px;padding:8px;font-size:12.5px;font-weight:700;cursor:pointer;">'+(p.loading?('⏳ '+(en?'Searching…':'Buscando…')):('🔎 '+(en?'Find part # with AI':'Buscar # con IA')))+'</button>'
+    +((p.cands&&p.cands.length)?('<div style="margin-bottom:6px;">'+p.cands.map(function(c){ const pn=(c.partNum||'').replace(/\x27/g,''); return '<div onclick="diagPickPart('+pi+',\''+pn+'\')" style="border:1px solid var(--gold);border-radius:9px;padding:8px;margin-bottom:5px;cursor:pointer;background:rgba(201,168,76,.08);"><div style="font-weight:800;font-size:13px;color:var(--gold);">'+(c.partNum?esc(c.partNum):(en?'(verify in catalog)':'(verificar en catálogo)'))+'</div>'+(c.name?'<div style="font-size:12px;">'+esc(c.name)+'</div>':'')+(c.note?'<div class="faint" style="font-size:11px;margin-top:2px;line-height:1.35;">'+esc(c.note)+'</div>':'')+'</div>'; }).join('')+'<div class="faint" style="font-size:10.5px;">'+(en?'Tap the right one to fill it in — verify before saving.':'Toca el correcto para ponerlo — verifica antes de guardar.')+'</div></div>'):'')
     +(psrc?'<img src="'+psrc+'" style="width:100%;max-height:160px;object-fit:cover;border-radius:9px;margin-bottom:6px;">':'')
     +'<label style="display:block;"><span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:700;cursor:pointer;">📷 '+(psrc?(en?'Change photo':'Cambiar foto'):(en?'Photo of the part':'Foto de la parte'))+'</span><input type="file" accept="image/*" onchange="diagPartPhoto('+pi+',this)" style="display:none;"></label>'
     +'</div>'; }).join('');
@@ -2897,6 +2900,16 @@ function _diagRender(){
   const body=document.getElementById('svc-diag-body'); if(body) body.innerHTML=h;
 }
 window.diagAddPart=function(){ if(!_diag) return; _diag.parts.push({desc:'',partNum:'',photoUrl:'',photoFile:null,photoPreview:''}); _diagRender(); };
+window.diagLookupPart=async function(i){
+  if(!_diag||!_diag.parts[i]) return; const en=(L==='en');
+  const q=(_diag.parts[i].desc||'').trim();
+  if(!q){ whToast(en?'Type the part first':'Escribe la parte primero',true); return; }
+  _diag.parts[i].loading=true; _diagRender();
+  try{ const r=await httpsCallable(functions,'svcPartLookup')(vaData({vehicle:_diag.vehicle||'',vin:_diag.vin||'',query:q})); _diag.parts[i].cands=((r&&r.data)||{}).candidates||[]; if(!_diag.parts[i].cands.length) whToast(en?'No clear match — verify in catalog':'Sin match claro — verifica en catálogo'); }
+  catch(e){ whToast('⚠️ '+((e&&e.message)||'IA'),true); }
+  if(_diag&&_diag.parts[i]) _diag.parts[i].loading=false; _diagRender();
+};
+window.diagPickPart=function(i,pn){ if(!_diag||!_diag.parts[i]) return; _diag.parts[i].partNum=pn; _diag.parts[i].cands=null; _diagRender(); };
 window.diagPartPhoto=async function(i,inp){ if(!_diag||!_diag.parts[i]||!inp.files||!inp.files[0]) return; const lbl=inp.closest('label'); const span=lbl&&lbl.querySelector('span'); const prev=span?span.textContent:''; try{ if(span) span.textContent='⏳ …'; const jpg=await toJpeg(inp.files[0]); const p=_diag.parts[i]; try{ if(p.photoPreview&&p.photoPreview.indexOf('blob:')===0) URL.revokeObjectURL(p.photoPreview); }catch(e){} p.photoFile=jpg; p.photoPreview=URL.createObjectURL(jpg); p.photoUrl=''; _diagRender(); }catch(e){ if(span) span.textContent=prev; whToast('⚠️ '+((e&&e.message)||'foto'),true); } };
 window.diagRmPart=function(i){ if(!_diag) return; _diag.parts.splice(i,1); _diagRender(); };
 window.diagRmPhoto=function(i){ if(!_diag) return; try{ const p=_diag.photos[i]; if(p&&p.preview&&p.preview.indexOf('blob:')===0) URL.revokeObjectURL(p.preview); }catch(e){} _diag.photos.splice(i,1); _diagRender(); };
@@ -5763,7 +5776,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261105182522"></script>
+<script type="module" src="launcher.js?v=20261105182926"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>

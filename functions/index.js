@@ -2208,6 +2208,35 @@ exports.svcDiag = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true, status: derived };
 });
 
+// 🔎 BÚSQUEDA DE # DE PARTE con IA (usando el VEHÍCULO/VIN). El mecánico escribe la parte que necesita y la IA sugiere
+//    1-3 números de parte ORIGINAL (OEM) + cómo VERIFICAR — el mecánico coteja y confirma. (Reusa el patrón de svcEstimate.)
+exports.svcPartLookup = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const d = request.data || {};
+  const vehicle = String(d.vehicle || "").slice(0, 120);
+  const vin = String(d.vin || "").slice(0, 20);
+  const query = String(d.query || "").slice(0, 160);
+  if (!query) return { candidates: [] };
+  const sys = "You are an expert OEM auto parts specialist. Given a vehicle (year/make/model, and VIN if provided) and the part a mechanic needs, suggest the most likely ORIGINAL (OEM/factory) part number(s). " +
+    "Return 1 to 3 candidates, best first. For each: partNum (the OEM/factory part number as a string; if you are NOT confident of an exact number, leave it an empty string rather than inventing one), name (proper part name), note (a SHORT note IN SPANISH on how to VERIFY it is the right one — which engine size/trim/submodel it depends on, or 'confirma con el VIN en el catálogo del fabricante'). " +
+    "Be honest and conservative: NEVER fabricate a realistic-looking number you are unsure about — leave partNum empty and explain in the note. If it depends on engine/trim not given, say so and give the most common option. " +
+    "Return ONLY strict JSON {\"candidates\":[{\"partNum\":\"...\",\"name\":\"...\",\"note\":\"...\"}]} . No prose, no code fences.";
+  const userMsg = "Vehicle: " + (vehicle || "(unknown)") + (vin ? (" · VIN " + vin) : "") + "\nPart the mechanic needs: " + query;
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk");
+    const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 700, system: sys, messages: [{ role: "user", content: userMsg }] });
+    let txt = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    txt = txt.replace(/^```[a-z]*\n?/i, "").replace(/```$/, "").trim();
+    let out = {}; try { out = JSON.parse(txt); } catch (e) { const m = txt.match(/\{[\s\S]*\}/); if (m) { try { out = JSON.parse(m[0]); } catch (_) {} } }
+    const cands = (Array.isArray(out.candidates) ? out.candidates : []).slice(0, 3).map((c) => ({
+      partNum: String(c.partNum || "").slice(0, 60), name: String(c.name || "").slice(0, 120), note: String(c.note || "").slice(0, 200),
+    }));
+    return { candidates: cands };
+  } catch (e) { console.error("svcPartLookup", e); throw new HttpsError("internal", String((e && e.message) || e)); }
+});
+
 // 🗂️ SERVICE CRM completo para el CENTRO DE OPERACIONES (solo dueño): TODAS las órdenes (activas + completadas + estimados) + clientes de servicio.
 // Alimenta las pestañas Activas·Completadas·Clientes con el MISMO render compartido que Clientes/admin (un solo ecosistema).
 exports.svcOwnerAll = onCall({ timeoutSeconds: 30 }, async (request) => {
