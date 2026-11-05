@@ -2723,6 +2723,8 @@ function _estPayload(o, en, planPaidCents, planTotalCents) {
       none: !!o.intake.none, clientAck: !!o.intake.clientAck, clientAckAt: o.intake.clientAckAt || "", miles: o.intake.miles || "", at: o.intake.at || "",
       observations: Array.isArray(o.intake.observations) ? o.intake.observations.map((x) => ({ note: x.note || "", photo: x.photo || "", at: x.at || "" })) : [],
     } : null,
+    // 🔬 Resumen del diagnóstico del mecánico (hallazgo profesional) — para que el cliente entienda por qué estas partes/servicios.
+    diagSummary: (o.diagSummary && o.diagSummary.text) ? { text: String(o.diagSummary.text).slice(0, 2000), at: o.diagSummary.at || "" } : null,
     services,
     laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
     warranty: warranty, warrantyReason: o.warrantyReason || "", coveredCents: warranty ? totalC : 0,

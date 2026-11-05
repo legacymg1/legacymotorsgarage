@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105185454"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105185454"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105200259"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105200259"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1001,8 +1001,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105185454"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105185454"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105200259"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105200259"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1591,11 +1591,15 @@ try{ document.addEventListener('click', function(e){ const t=e.target; if(t && t
 function SVC_SEC(title,inner){ return '<div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'+title+'</div>'+inner+'</div>'; }
 
 // 🔔 Aviso visible (toast) — el admin no tenía ninguno. Salta aunque no estés en la vista de servicio.
-window.svcToast=function(msg, onClick){
+window.svcToast=function(msg, onClick, variant){
   let host=document.getElementById('svc-toast-host');
   if(!host){ host=document.createElement('div'); host.id='svc-toast-host'; host.style.cssText='position:fixed;left:0;right:0;bottom:16px;z-index:100002;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 12px;'; document.body.appendChild(host); }
   const t=document.createElement('div');
-  t.style.cssText='pointer-events:auto;max-width:460px;width:100%;background:linear-gradient(135deg,#14331f,#0f2418);border:1px solid rgba(40,180,99,.5);color:#eafff1;border-radius:14px;padding:14px 16px;font-size:14px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.45);cursor:pointer;display:flex;align-items:center;gap:10px;';
+  // 🎨 verde = éxito (default) · morado = diagnóstico (congruente con el tema de diagnóstico en todo el sistema)
+  const skin=(variant==='diag')
+    ? 'background:linear-gradient(135deg,#231a40,#18122e);border:1px solid rgba(155,123,255,.55);color:#efeaff;'
+    : 'background:linear-gradient(135deg,#14331f,#0f2418);border:1px solid rgba(40,180,99,.5);color:#eafff1;';
+  t.style.cssText='pointer-events:auto;max-width:460px;width:100%;'+skin+'border-radius:14px;padding:14px 16px;font-size:14px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.45);cursor:pointer;display:flex;align-items:center;gap:10px;';
   t.innerHTML=msg;
   t.onclick=function(){ try{ if(onClick) onClick(); }catch(e){} t.remove(); };
   host.appendChild(t);
@@ -1614,6 +1618,14 @@ function startSvcListening(){
         }
         window._svcAccSeen=nowAccepted;
       }catch(e){ console.warn('svc accept toast', e); }
+      // 🔬 Detecta cuándo el MECÁNICO acaba de ENVIAR un diagnóstico → toast morado (no en la primera carga). Keyed por diagSentAt → reenvíos también avisan.
+      try{
+        const nowDiag={}; svcOrders.forEach(o=>{ if(o.svcPhase==='diag_enviado' && o.diagSentAt) nowDiag[o.id]=o.diagSentAt; });
+        if(window._svcDiagSeen){
+          Object.keys(nowDiag).forEach(id=>{ if(window._svcDiagSeen[id]!==nowDiag[id]){ const o=svcOrders.find(x=>x.id===id)||{}; window.svcToast('🔬 Diagnóstico listo'+(o.orderNum?(' #'+o.orderNum):'')+' · '+(o.clientName||'cliente')+((o.vehicleLabel||o.plate)?(' — '+(o.vehicleLabel||o.plate)):'')+' · toca para armar el estimado', function(){ if(window.setCliView) setCliView('service'); if(window.svcOpenOrder) svcOpenOrder(id); }, 'diag'); } });
+        }
+        window._svcDiagSeen=nowDiag;
+      }catch(e){ console.warn('svc diag toast', e); }
       const sv=document.getElementById('service-view');
       if(sv && sv.style.display!=='none') svcRenderOrders();
       try{ renderTodayBox(); }catch(e){}   // 💵 refresca "Pagos de hoy" (promesas de servicio)
@@ -7633,6 +7645,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105185454"></script>
+<script type="module" src="launcher.js?v=20261105200259"></script>
 </body>
 </html>
