@@ -2029,7 +2029,7 @@ exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
 
 // 🔧 SERVICE Fase 2: las órdenes asignadas al empleado que llama (mecánico/detallador/…).
 // Los empleados entran por TELÉFONO (no son staff), así que leen sus órdenes por aquí, no directo de Firestore.
-const SVC_ORDER_STATUSES = ["agendado", "por_recibir", "recibido", "en_proceso", "pausado_partes", "listo", "entregado"];
+const SVC_ORDER_STATUSES = ["agendado", "por_recibir", "por_aprobar", "recibido", "en_proceso", "pausado_partes", "listo", "entregado"];
 // 🔧 LÍNEA DE PRODUCCIÓN (relevo por rol) — mismas reglas que admin.html. Orden fijo; configurable para reusar en inventario.
 const SVC_ROLE_PIPELINE = ["Mecánico", "Detallador"];
 function svcRoleRankSrv(r) { const i = SVC_ROLE_PIPELINE.indexOf(r); return i < 0 ? 99 : i; }
@@ -2056,7 +2056,7 @@ function svcWorkerServiceIdx(services, id, defRole) {
 function svcDeriveStatusSrv(o, svs) {
   if (!svs.length) return o.status || "por_recibir";
   const base = o.status || "por_recibir";
-  if (base === "por_recibir" || base === "agendado" || base === "entregado") return base; // aún sin recibir / ya entregado
+  if (base === "por_recibir" || base === "por_aprobar" || base === "agendado" || base === "entregado") return base; // aún sin recibir (incl. pendiente de autorización) / ya entregado
   if (!svcActiveRoleSrv(svs, o.assignRole)) return "listo";
   if (svs.some((s) => (s.status) === "en_proceso")) return "en_proceso";
   if (svs.some((s) => (s.status) === "pausado")) return "pausado_partes";
@@ -2081,7 +2081,7 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
       return bySvc || byOrder;
     });
   } else { mine = []; }
-  const rank = { por_recibir: 0, recibido: 1, en_proceso: 2, pausado_partes: 3, agendado: 4, listo: 5 };
+  const rank = { por_recibir: 0, por_aprobar: 1, recibido: 1, en_proceso: 2, pausado_partes: 3, agendado: 4, listo: 5 };
   mine.sort((a, b) => ((rank[a.status] == null ? 9 : rank[a.status]) - (rank[b.status] == null ? 9 : rank[b.status])) || ((a.scheduledAt || a.createdAt || "") < (b.scheduledAt || b.createdAt || "") ? -1 : 1));
   const out = mine.map((o) => {
     const svs = Array.isArray(o.services) ? o.services : [];
@@ -2417,8 +2417,60 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
     clientAck: false,
   };
   const patch = { intake, updatedAt: new Date().toISOString(), updatedBy: id.email || id.name || id.empId || "" };
-  if (SVC_ORDER_STATUSES.indexOf(o.status || "agendado") < SVC_ORDER_STATUSES.indexOf("recibido")) patch.status = "recibido";
+  // 🚦 GATE: tras la Revisión de recepción el carro NO queda "recibido" todavía → "por_aprobar" (Pendiente de autorización).
+  //    Sin la autorización del cliente NO se puede recibir/empezar. Lo desbloquea svcReceptionAck (el cliente autoriza).
+  if (SVC_ORDER_STATUSES.indexOf(o.status || "agendado") < SVC_ORDER_STATUSES.indexOf("recibido")) patch.status = "por_aprobar";
   await ref.set(patch, { merge: true });
+  return { ok: true };
+});
+
+// 🧾 El CLIENTE AUTORIZA el Reporte de condición de ingreso (gate de recepción). BLINDADO LEGAL:
+//    sello fecha + IP + user-agent + copia INMUTABLE de lo aceptado + texto legal versionado (subcolección append-only).
+//    Al autorizar, la orden pasa de "por_aprobar" a "recibido" (ingreso oficial) → se puede empezar el trabajo.
+exports.svcReceptionAck = onCall({ timeoutSeconds: 20 }, async (request) => {
+  const cli = await _portalClient(request);
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const mine = (o.clientId && o.clientId === cli.id) || (o.clientPhone && o.clientPhone === (cli.data.phone || ""));
+  if (!mine) throw new HttpsError("permission-denied", "No es tu orden.");
+  const intake = o.intake || null;
+  if (!intake) throw new HttpsError("failed-precondition", "Aún no hay reporte de condición de ingreso.");
+  const now = new Date().toISOString();
+  let ip = "";
+  try { const rr = request.rawRequest || {}; ip = String((rr.headers && (rr.headers["x-forwarded-for"] || "")) || rr.ip || "").split(",")[0].trim().slice(0, 60); } catch (e) {}
+  const ua = String(d.userAgent || "").slice(0, 400);
+  const LEGAL_VERSION = "recep-v1";
+  const legalEs = "Confirmo y autorizo el estado del vehículo registrado en el Reporte de condición de ingreso (observaciones y fotos) al momento de su ingreso a Legacy Motors Garage para servicio.";
+  const legalEn = "I confirm and authorize the vehicle condition recorded in the Check-in Condition Report (observations and photos) at the time it was dropped off at Legacy Motors Garage for service.";
+  const snapshot = {
+    none: !!intake.none,
+    observations: Array.isArray(intake.observations) ? intake.observations.map((x) => ({ note: x.note || "", photo: x.photo || "", at: x.at || "" })) : [],
+    miles: intake.miles || "",
+    intakeAt: intake.at || "",
+    intakeBy: intake.by || "",
+  };
+  // Registro INMUTABLE (append-only): subcolección receptionAcks (nunca se edita ni borra).
+  await ref.collection("receptionAcks").add({
+    orderId: orderId, orderNum: o.orderNum || null, clientId: cli.id, clientPhone: cli.phone || "",
+    acceptedAt: now, ip: ip, userAgent: ua, method: "tap",
+    legalVersion: LEGAL_VERSION, legalEs: legalEs, legalEn: legalEn,
+    snapshot: snapshot,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  const patch = {
+    intake: { clientAck: true, clientAckAt: now, clientAckIp: ip, legalVersion: LEGAL_VERSION },
+    receivedAt: o.receivedAt || now, updatedAt: now,
+  };
+  if (o.status === "por_aprobar" || o.status === "por_recibir" || o.status === "agendado") patch.status = "recibido";
+  await ref.set(patch, { merge: true });
+  const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";
+  try { await _pushToOwners({ title: "🧾 Ingreso autorizado", body: _nm + " autorizó el ingreso" + _fol + (o.vehicleLabel ? (" · " + o.vehicleLabel) : ""), titleEn: "🧾 Check-in authorized", bodyEn: _nm + " authorized check-in" + _fol, url: "/admin.html" }); } catch (e) {}
   return { ok: true };
 });
 
@@ -2461,6 +2513,11 @@ function _estPayload(o, en, planPaidCents, planTotalCents) {
   return {
     id: o.id, orderNum: o.orderNum || null, vehicleLabel: o.vehicleLabel || "", vin: o.vin || "", plate: o.plate || "",
     status: o.status || "", estimateStatus: o.estimateStatus || "",
+    // 🧾 Reporte de condición de ingreso (para que el cliente lo vea y AUTORICE desde el portal).
+    intake: o.intake ? {
+      none: !!o.intake.none, clientAck: !!o.intake.clientAck, clientAckAt: o.intake.clientAckAt || "", miles: o.intake.miles || "", at: o.intake.at || "",
+      observations: Array.isArray(o.intake.observations) ? o.intake.observations.map((x) => ({ note: x.note || "", photo: x.photo || "", at: x.at || "" })) : [],
+    } : null,
     services,
     laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
     warranty: warranty, warrantyReason: o.warrantyReason || "", coveredCents: warranty ? totalC : 0,
@@ -2482,7 +2539,8 @@ exports.svcPortalEstimates = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 
   let docs = [];
   try { const snap = await db.collection("serviceOrders").where("clientId", "==", cli.id).get(); docs = snap.docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) {}
   if (!docs.length) { try { const s2 = await db.collection("serviceOrders").where("clientPhone", "==", cli.data.phone || "").get(); docs = s2.docs.map((d) => ({ id: d.id, ...d.data() })); } catch (e) {} }
-  const withEst = docs.filter((o) => (o.estimateStatus === "sent" || o.estimateStatus === "accepted") || (Array.isArray(o.services) && o.services.length));
+  // Incluye también las órdenes con Reporte de condición de ingreso PENDIENTE de autorizar (aunque no tengan estimado aún).
+  const withEst = docs.filter((o) => (o.estimateStatus === "sent" || o.estimateStatus === "accepted") || (Array.isArray(o.services) && o.services.length) || (o.intake && o.intake.clientAck !== true) || o.status === "por_aprobar");
   withEst.sort((a, b) => ((b.createdAt || "") < (a.createdAt || "") ? -1 : 1));
   // 🌐 Relleno bilingüe: el cliente SIEMPRE ve su idioma. Si una línea no tiene traducción real (sin _tr),
   // se traduce (ES+EN) y se GUARDA en la orden (una sola vez por orden). Tope de 6 órdenes por carga para no tardar.

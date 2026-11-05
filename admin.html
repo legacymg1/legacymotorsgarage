@@ -1576,6 +1576,7 @@ const SVC_STATUS = {
   arrancado:     {lbl:'🚀 Servicio arrancó (refacciones)', c:'#7c5cff'},
   agendado:      {lbl:'📅 Agendado',         c:'#0a84ff'},
   por_recibir:   {lbl:'🕐 Por recibir',      c:'#c9a84c'},
+  por_aprobar:   {lbl:'⏳ Pendiente de autorización', c:'#f0a030'},
   recibido:      {lbl:'📋 Recibido',         c:'#c9a84c'},
   en_proceso:    {lbl:'🔧 En proceso',       c:'#32d74b'},
   pausado_partes:{lbl:'⏸️ Esperando partes', c:'#ff9800'},
@@ -1642,6 +1643,7 @@ async function svcLoadRoster(){
 function svcStatusLabel(o){
   if(o.paid) return {txt:'✅ Pagado', col:'#28b463'};
   const s=o.status;
+  if(s==='por_aprobar') return {txt:'⏳ Pendiente de autorización', col:'#f0a030'};
   if(o.scheduledAt && ['arrancado','agendado','por_recibir','',undefined].indexOf(s)>=0) return {txt:'🗓️ Agendado', col:'#0a84ff'};
   if(s==='arrancado') return {txt:'🚀 ¡Servicio arrancó!', col:'#7c5cff'};
   if(s==='entregado') return {txt:'🏁 Entregado', col:'#28b463'};
@@ -1657,7 +1659,7 @@ function svcStatusLabel(o){
 function svcBucket(o){
   if(window.LMG && LMG.svcBucketOf) return LMG.svcBucketOf(o);
   if(o.paid || o.status==='entregado') return 'completadas';   // fallback (paid verdadero o entregado)
-  if(o.estimateStatus==='accepted' || ['arrancado','recibido','en_proceso','pausado_partes','listo'].indexOf(o.status)>=0) return 'activas';
+  if(o.estimateStatus==='accepted' || ['arrancado','por_aprobar','recibido','en_proceso','pausado_partes','listo'].indexOf(o.status)>=0) return 'activas';
   return 'estimados';
 }
 window._svcTab=window._svcTab||'activas';

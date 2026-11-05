@@ -949,7 +949,7 @@ function svcStageHero(o){
 // 🟢 Rastreador de estatus tipo Tesla: línea de tiempo con palomita en lo hecho y la etapa actual resaltada.
 function svcTrackerHTML(o){
   const es=L!=='en';
-  const R={agendado:0,por_recibir:0,recibido:1,en_proceso:2,pausado_partes:2,listo:3,entregado:4};
+  const R={agendado:0,por_recibir:0,por_aprobar:0,recibido:1,en_proceso:2,pausado_partes:2,listo:3,entregado:4};
   let cur=(R[o.status]!=null)?R[o.status]:0; if(o.paid) cur=5;
   const waiting=(o.status==='pausado_partes');
   const steps=[
@@ -975,8 +975,53 @@ function svcTrackerHTML(o){
   return `<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:14px;margin:10px 0;">
     <div style="font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--muted);margin-bottom:10px;">${es?'ESTADO DE LA ORDEN':'ORDER STATUS'}</div>${rows}</div>`;
 }
+// 🧾 Reporte de condición de ingreso + AUTORIZACIÓN del cliente (gate de recepción).
+//    Blindado legal: casilla de confirmación + al autorizar se manda userAgent; el backend sella fecha+IP y guarda copia inmutable.
+function receptionBlockHTML(o){
+  const es=L!=='en'; const k=o.intake; if(!k) return '';
+  const acked = k.clientAck===true;
+  let obsHtml;
+  if(k.none || !(k.observations && k.observations.length)){
+    obsHtml=`<div style="font-size:13px;color:#49d17f;font-weight:700;">✅ ${es?'Sin observaciones — el vehículo se recibió en buen estado.':'No observations — vehicle received in good condition.'}</div>`;
+  } else {
+    obsHtml=k.observations.map(function(ob){ return `<div style="padding:8px 0;border-bottom:1px solid var(--border);"><div style="font-size:13px;color:var(--white);">⚠️ ${escPortal(ob.note||'')}</div>${ob.photo?`<img src="${ob.photo}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-top:6px;">`:''}</div>`; }).join('');
+  }
+  const miles = k.miles?`<div style="font-size:12px;color:var(--muted);margin-top:6px;">${es?'Millas al ingreso':'Miles at check-in'}: ${escPortal(k.miles)}</div>`:'';
+  const legal = es
+    ? 'Confirmo y autorizo el estado del vehículo registrado arriba (observaciones y fotos) al momento de su ingreso a Legacy Motors Garage para servicio.'
+    : 'I confirm and authorize the vehicle condition recorded above (observations and photos) at the time it was dropped off at Legacy Motors Garage for service.';
+  if(acked){
+    return `<div style="margin:4px 0 12px;background:rgba(40,180,99,.10);border:1px solid rgba(40,180,99,.35);border-radius:12px;padding:12px;">
+      <div style="font-weight:800;font-size:14px;color:#49d17f;margin-bottom:8px;">🧾 ${es?'Reporte de condición de ingreso · Autorizado':'Check-in condition report · Authorized'}</div>
+      ${obsHtml}${miles}
+      <div style="font-size:11px;color:#49d17f;font-weight:600;margin-top:8px;">✅ ${es?'Autorizaste el ingreso':'You authorized check-in'}${k.clientAckAt?(' · '+formatDate((k.clientAckAt||'').slice(0,10))):''}</div></div>`;
+  }
+  return `<div style="margin:4px 0 12px;background:rgba(240,160,48,.08);border:1px solid rgba(240,160,48,.5);border-radius:12px;padding:12px;">
+    <div style="font-weight:800;font-size:14px;color:#f0a030;margin-bottom:4px;">🧾 ${es?'Reporte de condición de ingreso':'Check-in condition report'}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.4;">${es?'Revisa cómo recibimos tu vehículo y autoriza su ingreso para empezar el servicio.':'Review how we received your vehicle and authorize check-in to start the service.'}</div>
+    ${obsHtml}${miles}
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:12px;color:var(--white);line-height:1.45;cursor:pointer;">
+      <input type="checkbox" id="recep-agree-${o.id}" onchange="var b=document.getElementById('recep-auth-${o.id}');b.disabled=!this.checked;b.style.opacity=this.checked?'1':'.5';" style="margin-top:2px;flex:none;width:18px;height:18px;">
+      <span>${legal}</span></label>
+    <button id="recep-auth-${o.id}" onclick="portalAuthReception('${o.id}')" disabled style="width:100%;margin-top:12px;background:linear-gradient(135deg,#d98a2b,#f0a030);color:#0b0e14;border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;opacity:.5;">🧾 ${es?'Autorizar el ingreso':'Authorize check-in'}</button>
+    <div style="font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;">${es?'Queda registrada la fecha y hora de tu autorización.':'The date and time of your authorization are recorded.'}</div>
+  </div>`;
+}
+window.portalAuthReception = async function(orderId){
+  const btn=document.getElementById('recep-auth-'+orderId);
+  if(btn){ btn.disabled=true; btn.textContent=(L==='en'?'Saving…':'Guardando…'); }
+  try{
+    await httpsCallable(functions,'svcReceptionAck')({ orderId:orderId, userAgent:String(navigator.userAgent||'').slice(0,300) });
+    await loadPortalEstimates();
+    const card=document.getElementById('est-'+orderId); if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent=(L==='en'?'🧾 Authorize check-in':'🧾 Autorizar el ingreso'); }
+    alert((L==='en'?'Could not save: ':'No se pudo guardar: ')+((e&&e.message)||e));
+  }
+};
 function estimateCardHTML(o){
   const es=L!=='en'; const accepted=o.estimateStatus==='accepted';
+  const receptionPending = !!(o.intake && o.intake.clientAck!==true);   // falta que el cliente AUTORICE el ingreso
   const showTrack=(o.receivedAt||o.paid||['recibido','en_proceso','pausado_partes','listo','entregado'].indexOf(o.status)>=0||accepted);
   let rows='';
   (o.services||[]).forEach(s=>{
@@ -989,6 +1034,7 @@ function estimateCardHTML(o){
   const paidLine = o.paid ? `<div style="font-size:12.5px;color:#49d17f;font-weight:800;margin-top:3px;">✅ ${es?'PAGADO':'PAID'} · ${formatMoney((o.paidCents||0)/100||o.total)}${o.paidAt?(' · '+formatDate((o.paidAt||'').slice(0,10))):''}</div>` : '';
   const detail = `
     <div style="font-size:13px;color:var(--muted);margin:8px 0;">🚗 ${escPortal(o.vehicleLabel||o.vin||'')}${o.plate?(' · '+escPortal(o.plate)):''}</div>
+    ${receptionBlockHTML(o)}
     ${o.warranty?`<div style="margin:8px 0;background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.45);color:#4d9bff;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:800;text-align:center;">🛡️ ${es?'EN GARANTÍA · SIN COSTO PARA USTED':'WARRANTY · NO CHARGE TO YOU'}</div>`:''}
     ${svcStageHero(o)}
     ${showTrack?svcTrackerHTML(o):''}
@@ -1017,6 +1063,8 @@ function estimateCardHTML(o){
              <button onclick="portalSignDelivery('${o.id}')" style="width:100%;background:linear-gradient(135deg,#1f6feb,#4d9bff);color:#fff;border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">🖊️ ${es?'Firmar entrega de mi vehículo':'Sign vehicle delivery'}</button>
              <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Confirma que recibiste tu vehículo. En garantía: sin costo para ti.':'Confirm you received your vehicle. Warranty: no charge to you.'}</div>`
           : `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:700;text-align:center;">✅ ${es?'Aceptaste este estimado':'You approved this estimate'}${o.acceptedAt?(' · '+formatDate((o.acceptedAt||'').slice(0,10))):''}${o.warranty?`<div style="font-size:11px;font-weight:600;color:#49d17f;margin-top:4px;">${es?'Al recoger tu vehículo firmarás la entrega (sin costo).':'You will sign delivery when you pick up (no charge).'}</div>`:''}</div>`)
+      : receptionPending
+      ? `<div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;line-height:1.4;">${es?'Primero autoriza el ingreso de tu vehículo (arriba) para continuar.':'First authorize your vehicle check-in (above) to continue.'}</div>`
       : `<div style="margin-top:12px;">
           <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
           <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${o.warranty?(es?'Autorizas el trabajo en garantía — sin costo para ti.':'You authorize the warranty work — no charge to you.'):(es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.')}</div>
