@@ -337,7 +337,12 @@
       <span style="font-weight:800;font-size:17px;" id="op-title">📊 Centro de Operaciones</span>
       <button class="linkbtn" onclick="loadOwnerPanel()" style="font-size:18px;" title="↻">↻</button>
     </div>
-    <div id="op-summary" style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:10px 12px;margin:0 0 12px auto;width:min(100%,290px);box-sizing:border-box;box-shadow:0 6px 18px rgba(0,0,0,.18);"></div>
+    <div id="op-alert"></div><!-- 🚨 Lo que necesita atención (se llena solo si hay algo urgente/trabado) -->
+    <!-- Fila de widgets iOS: IZQUIERDA 🛠️ Ahora (tareas en proceso) · DERECHA 👥 Equipo (quién está) -->
+    <div id="op-widgets" style="display:flex;gap:10px;margin-bottom:12px;align-items:stretch;">
+      <div id="op-now" style="flex:1 1 0;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:10px 12px;box-sizing:border-box;box-shadow:0 6px 18px rgba(0,0,0,.18);"></div>
+      <div id="op-summary" style="flex:1 1 0;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:10px 12px;box-sizing:border-box;box-shadow:0 6px 18px rgba(0,0,0,.18);"></div>
+    </div>
     <div style="position:relative;margin-bottom:12px;"><input id="op-search" type="search" oninput="opSearch(this.value)" data-i18n-ph="opSearchPh" placeholder="🔎 Buscar carro, orden, tarea o empleado…" autocomplete="off" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 12px;color:var(--text);font-size:15px;"></div>
     <div id="op-results" style="display:none;margin-bottom:14px;"></div>
     <div id="op-normal">
@@ -2213,6 +2218,23 @@ function _opTeamHtml(){
   }).join('');
   return rows+foot;
 }
+// 🛠️ Lo que se está haciendo AHORITA = tareas (OP_TASKS) y servicios (OP_SVC) EN PROCESO.
+//    Reusa lineBadge + _opStatusLabel (términos unificados del glosario) y los MISMOS taps que las listas
+//    (opWorkTask / svcEmpOpen) → el widget queda conectado con el resto del Centro, no es una isla.
+function _opNowHtml(){
+  const en=(L==='en');
+  const items=[];
+  (OP_TASKS||[]).forEach(t=>{ if(t.status==='en_proceso') items.push({title:t.title||'',line:t.line||'general',who:t.assignName||'',tap:'opWorkTask(\''+t.id+'\')'}); });
+  (OP_SVC||[]).forEach(o=>{ (o.services||[]).forEach(sv=>{ if(sv.status==='en_proceso') items.push({title:(en?(sv.descEn||sv.desc):sv.desc)||(en?'Service':'Servicio'),line:'service',who:sv.assignName||'',tap:'svcEmpOpen(\''+o.id+'\')'}); }); });
+  if(!items.length) return '<div class="faint" style="font-size:12px;padding:3px 1px;">'+(en?'Nothing in progress.':'Nada en proceso.')+'</div>';
+  return items.map(x=>{
+    const who=x.who?('👤 '+esc(x.who)):('<span style="color:#e8b64a;">'+(en?'Unassigned':'Sin asignar')+'</span>');
+    return '<div onclick="'+x.tap+'" style="padding:6px 1px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;">'
+      +'<div style="display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:#4c9bff;flex:none;box-shadow:0 0 0 3px rgba(76,155,255,.18);"></span>'
+      +'<span style="font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;">'+esc(x.title)+'</span></div>'
+      +'<div class="faint" style="font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+lineBadge(x.line)+' · '+who+' · '+_opStatusLabel('en_proceso')+'</div></div>';
+  }).join('');
+}
 function _opDoneHtml(){
   if(!OP_DONE.length) return _opErr.done?_opErrMsg():'<div class="faint" style="font-size:13px;padding:6px 2px;">'+(L==='en'?'Nothing completed yet today.':'Aún nada terminado hoy.')+'</div>';
   return OP_DONE.map(p=>{
@@ -2327,6 +2349,10 @@ function renderOwnerPanel(){
   // 👥 EQUIPO arriba (caja protagonista): quién está en qué trabajo + estatus. Reemplaza las cajas de conteo (los números ya van en las pestañas).
   const sum=document.getElementById('op-summary');
   if(sum) sum.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:7px;"><span style="font-weight:800;font-size:13px;">👥 '+L2('Equipo','Team')+'</span><span class="lmg-pill" style="color:#35c46a;background:rgba(53,196,106,.14);border-color:#35c46a;font-size:11px;padding:2px 8px;">🟢 '+onShift+'</span></div>'+_opTeamHtml();
+  // 🛠️ Widget IZQUIERDA: lo que se está haciendo AHORITA (tareas + servicios EN PROCESO).
+  const nowN=((OP_TASKS||[]).filter(x=>x.status==='en_proceso').length)+((OP_SVC||[]).reduce((n,o)=>n+((o.services||[]).filter(s=>s.status==='en_proceso').length),0));
+  const nw=document.getElementById('op-now');
+  if(nw) nw.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:7px;"><span style="font-weight:800;font-size:13px;">🛠️ '+L2('Ahora','Now')+'</span><span class="lmg-pill" style="color:#4c9bff;background:rgba(76,155,255,.14);border-color:#4c9bff;font-size:11px;padding:2px 8px;">'+nowN+'</span></div>'+_opNowHtml();
   // Pestañas
   const tabsArr=[['todo','🗂️ '+L2('Todo','All'),OP_DEALER.length+OP_SVC.length+OP_DIS.length+OP_TASKS.length],['dealer','🚗 Dealer',OP_DEALER.length],['service','🔧 Service',OP_SVC.length],['dis','🧩 Dismantling',OP_DIS.length],['pit','📋 Pit',OP_TASKS.length]];
   const tabsBox=document.getElementById('op-tabs'); const cur=_opTab;
