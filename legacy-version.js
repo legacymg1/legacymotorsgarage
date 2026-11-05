@@ -44,6 +44,10 @@
     return /^(input|textarea|select)$/i.test(a.tagName || '');
   }
 
+  // 🛑 ¿El usuario está en una TAREA (vista de trabajo/diagnóstico/etc.)? → NO recargar (no lo saca de donde está).
+  //    La página lo marca con window.__lmgBusy=true mientras una vista crítica está abierta.
+  function isBusy() { try { return !!window.__lmgBusy; } catch (e) { return false; } }
+
   function reloadNow(silent) {
     if (silent) { try { location.reload(); } catch (e) {} return; }
     // HUD estilo iOS: recuadro redondeado con blur + spinner, centrado.
@@ -76,6 +80,7 @@
   // Aplica la actualización en cuanto sea seguro.
   function tryApply() {
     if (!pending) return;
+    if (isBusy()) { setTimeout(tryApply, 2000); return; }             // en una tarea → NO recargar (no lo saca)
     if (document.hidden) { reloadNow(true); return; }                 // no lo ve → recarga invisible
     if (!isTyping() && (Date.now() - lastInteract) > IDLE_MS) {        // visible y quieto → HUD + recarga
       reloadNow(false); return;
@@ -100,7 +105,7 @@
   check();
   setInterval(check, CHECK_MS);
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { if (pending) reloadNow(true); }   // la cerró con update pendiente → recarga invisible
+    if (document.hidden) { if (pending && !isBusy()) reloadNow(true); }   // la cerró con update pendiente → recarga invisible (salvo si está en una tarea)
     else check();                                            // volvió → revisa
   });
   window.addEventListener('focus', check);

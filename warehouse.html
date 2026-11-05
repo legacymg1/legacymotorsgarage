@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105182926"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105182926"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105183725"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105183725"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261105182926"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261105182926"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261105182926"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105183725"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261105183725"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261105183725"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2757,9 +2757,9 @@ window.svcOpenReception=function(orderId){
   let ov=document.getElementById('svc-recep');
   if(!ov){ ov=document.createElement('div'); ov.id='svc-recep'; ov.style.cssText='position:fixed;inset:0;z-index:2147482997;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:16px;box-sizing:border-box;'; ov.onclick=function(e){ if(e.target===ov) svcRecepClose(); }; document.body.appendChild(ov); }
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));cursor:default;"><div id="svc-recep-body"></div></div>';
-  _recepRender();
+  _recepRender(); try{ _whBusyRecalc(); }catch(e){}
 };
-window.svcRecepClose=function(){ const el=document.getElementById('svc-recep'); if(el) el.remove(); _recep=null; };
+window.svcRecepClose=function(){ const el=document.getElementById('svc-recep'); if(el) el.remove(); _recep=null; try{ _whBusyRecalc(); }catch(e){} };
 function _recepRender(){
   const r=_recep; if(!r) return; const en=(L==='en'); const o=r.o;
   const car=esc(o.vehicleLabel||(o.vin?('VIN …'+(o.vin||'').slice(-6)):'Auto'));
@@ -2814,6 +2814,9 @@ window.svcRecepSave=async function(){
 // (notas + fotos de lo encontrado + partes con # ORIGINAL) y cerrar "terminado". Reusa toJpeg/storage + callable svcDiag.
 // Live con onSnapshot de la orden (tiempo real para los 3 roles).
 let _workUnsub=null;
+// 🛑 "Ocupado" = hay algo SIN GUARDAR (hoja de diagnóstico/recepción) → el auto-update espera a que cierres para no perderlo.
+//    La vista de trabajo (#svc-work) NO cuenta: ahí sí puede recargar y te regresa al mismo lugar (_restoreSvcWork).
+window._whBusyRecalc=function(){ try{ window.__lmgBusy=!!document.querySelector('#svc-diag,#svc-recep'); }catch(e){} };
 window.svcStartWork=async function(orderId){
   try{ await httpsCallable(functions,'svcServiceDone')(vaData({orderId:orderId,action:'start'})); }
   catch(e){ whToast('⚠️ '+((e&&e.message)||'error'),true); return; }
@@ -2873,9 +2876,9 @@ window.svcOpenDiag=function(orderId,idx){
   let ov=document.getElementById('svc-diag');
   if(!ov){ ov=document.createElement('div'); ov.id='svc-diag'; ov.style.cssText='position:fixed;inset:0;z-index:2147482998;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:16px;box-sizing:border-box;'; ov.onclick=function(e){ if(e.target===ov) svcDiagClose(); }; document.body.appendChild(ov); }
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));cursor:default;"><div id="svc-diag-body"></div></div>';
-  _diagRender();
+  _diagRender(); try{ _whBusyRecalc(); }catch(e){}
 };
-window.svcDiagClose=function(){ const el=document.getElementById('svc-diag'); if(el) el.remove(); _diag=null; };
+window.svcDiagClose=function(){ const el=document.getElementById('svc-diag'); if(el) el.remove(); _diag=null; try{ _whBusyRecalc(); }catch(e){} };
 function _diagRender(){
   const r=_diag; if(!r) return; const en=(L==='en'); let h='';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><h2 style="font-size:18px;margin:0;line-height:1.2;">🔬 '+(en?'Diagnosis':'Diagnóstico')+'</h2><button onclick="svcDiagClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;flex:none;">×</button></div>';
@@ -5776,7 +5779,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261105182926"></script>
+<script type="module" src="launcher.js?v=20261105183725"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
