@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105223912"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105223912"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105224825"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105224825"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1001,8 +1001,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261105223912"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261105223912"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105224825"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261105224825"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -7121,18 +7121,24 @@ window.saveContact = async function(id){
     noteParts?('NOTE:'+esc(noteParts)):'',
     'END:VCARD'].filter(Boolean).join('\r\n');
   const fname=(name.replace(/[^\w]+/g,'_')||'contacto')+'.vcf';
-  // iPhone: compartir el archivo → aparece "Agregar a Contactos" (requiere el gesto del toque, aquí sí lo hay)
+  const blob=new Blob([vcf],{type:'text/vcard;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent||'') || ((navigator.platform||'')==='MacIntel' && (navigator.maxTouchPoints||0)>1);
+  // 📇 iPhone: ABRIR el vCard directo → iOS muestra la tarjeta del contacto con "Agregar a Contactos" (NO la hoja de compartir, que en algunos iPhone no trae esa opción).
+  if(isIOS){
+    try{ window.location.href=url; setTimeout(function(){ try{URL.revokeObjectURL(url);}catch(_){ } }, 20000); return; }catch(e){}
+  }
+  // Android: compartir → va directo a la app de Contactos.
   try{
     const file=new File([vcf],fname,{type:'text/vcard'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
       await navigator.share({files:[file], title:name});
+      try{URL.revokeObjectURL(url);}catch(_){ }
       return;
     }
-  }catch(e){ if(e && e.name==='AbortError') return; /* si falla, cae al respaldo */ }
-  // Respaldo (computadora / navegadores sin compartir archivos): descarga/abre el vCard
+  }catch(e){ if(e && e.name==='AbortError'){ try{URL.revokeObjectURL(url);}catch(_){ } return; } }
+  // Escritorio / respaldo: descarga el .vcf (se abre en Contactos).
   try{
-    const blob=new Blob([vcf],{type:'text/vcard'});
-    const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download=fname; a.style.display='none';
     document.body.appendChild(a); a.click();
     setTimeout(function(){ a.remove(); URL.revokeObjectURL(url); }, 5000);
@@ -7742,6 +7748,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261105223912"></script>
+<script type="module" src="launcher.js?v=20261105224825"></script>
 </body>
 </html>
