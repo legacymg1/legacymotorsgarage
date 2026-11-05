@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105181434"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105181434"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105181731"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105181731"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261105181434"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261105181434"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261105181434"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105181731"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261105181731"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261105181731"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2753,8 +2753,8 @@ window.svcOpenReception=function(orderId){
   const o=(SVC_MY||[]).find(x=>x.id===orderId)||(typeof OP_SVC!=='undefined'&&(OP_SVC||[]).find(x=>x.id===orderId)); if(!o) return;
   _recep={ orderId:orderId, o:o, none:false, miles:'', obs:[] };
   let ov=document.getElementById('svc-recep');
-  if(!ov){ ov=document.createElement('div'); ov.id='svc-recep'; ov.style.cssText='position:fixed;inset:0;z-index:2147482997;background:rgba(0,0,0,.66);display:flex;align-items:flex-end;justify-content:center;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) svcRecepClose(); }; document.body.appendChild(ov); }
-  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));cursor:default;"><div id="svc-recep-body"></div></div>';
+  if(!ov){ ov=document.createElement('div'); ov.id='svc-recep'; ov.style.cssText='position:fixed;inset:0;z-index:2147482997;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:16px;box-sizing:border-box;'; ov.onclick=function(e){ if(e.target===ov) svcRecepClose(); }; document.body.appendChild(ov); }
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));cursor:default;"><div id="svc-recep-body"></div></div>';
   _recepRender();
 };
 window.svcRecepClose=function(){ const el=document.getElementById('svc-recep'); if(el) el.remove(); _recep=null; };
@@ -2865,8 +2865,8 @@ window.svcOpenDiag=function(orderId,idx){
     parts:(dg.parts||[]).map(function(p){ return {desc:p.desc||'',partNum:p.partNum||'',price:((p.priceCents||0)/100)||''}; }),
     photos:(dg.photos||[]).map(function(u){ return {url:u}; }) };
   let ov=document.getElementById('svc-diag');
-  if(!ov){ ov=document.createElement('div'); ov.id='svc-diag'; ov.style.cssText='position:fixed;inset:0;z-index:2147482998;background:rgba(0,0,0,.66);display:flex;align-items:flex-end;justify-content:center;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) svcDiagClose(); }; document.body.appendChild(ov); }
-  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));cursor:default;"><div id="svc-diag-body"></div></div>';
+  if(!ov){ ov=document.createElement('div'); ov.id='svc-diag'; ov.style.cssText='position:fixed;inset:0;z-index:2147482998;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:16px;box-sizing:border-box;'; ov.onclick=function(e){ if(e.target===ov) svcDiagClose(); }; document.body.appendChild(ov); }
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px calc(20px + env(safe-area-inset-bottom,0px));cursor:default;"><div id="svc-diag-body"></div></div>';
   _diagRender();
 };
 window.svcDiagClose=function(){ const el=document.getElementById('svc-diag'); if(el) el.remove(); _diag=null; };
@@ -5753,7 +5753,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261105181434"></script>
+<script type="module" src="launcher.js?v=20261105181731"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
