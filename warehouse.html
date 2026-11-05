@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261105014326"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261105014326"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261105014326"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261105014326"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261105014326"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -5656,7 +5656,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js"></script>
+<script type="module" src="launcher.js?v=20261105014326"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
