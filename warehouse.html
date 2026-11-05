@@ -17,6 +17,8 @@
 <link rel="stylesheet" href="legacy-theme.css">
 <style>
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-text-size-adjust:100%;}
+  /* 📱 iOS: frena el rebote nativo (overscroll) que, con el pull-to-refresh, dejaba el header empujado hacia abajo y atorado. */
+  html,body{overscroll-behavior-y:none;}
   /* 🖥️ Popups estilo bottom-sheet (iOS en teléfono): en pantalla ANCHA se CENTRAN y redondean (no pegados abajo). */
   @media (min-width:640px){
     #job-add, #mech-intake, #mech-addtask, #svc-recep{ align-items:center !important; }
