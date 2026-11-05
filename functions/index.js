@@ -1429,6 +1429,15 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
       p = { title: "🗓️ Tu cita quedó agendada", body: "Te esperamos" + (dt ? (" el " + dt) : "") + " para " + veh + fol + ".", titleEn: "🗓️ Your appointment is set", bodyEn: "See you" + (dtEn ? (" on " + dtEn) : "") + " for " + vehEn + fol + "." };
     }
     if (ownerP) { try { await _pushToOwners(ownerP); } catch (e) {} }   // 📦 avisa a los dueños (refacciones completas)
+    // 🔧 Avisa al MECÁNICO asignado en los momentos clave (reusa _pushToEmp → funciona dispare desde donde dispare: portal, admin, etc.).
+    try {
+      if (before.estimateStatus !== "accepted" && after.estimateStatus === "accepted") {
+        await _pushToOrderMechs(after, { title: "✅ Aprobado — atiende este carro" + fol, body: veh + " · el cliente aprobó. Es tuyo. 🔧", titleEn: "✅ Approved — take this car" + fol, bodyEn: vehEn + " · customer approved. It's yours. 🔧", url: "/warehouse.html" });
+      }
+      if (!before.partsReadyAt && after.partsReadyAt) {
+        await _pushToOrderMechs(after, { title: "📦 Partes completas — ya puedes empezar" + fol, body: "Llegaron las partes de " + veh + ". Manos a la obra. 🔧", titleEn: "📦 Parts complete — you can start" + fol, bodyEn: "Parts for " + vehEn + " arrived. Let's go. 🔧", url: "/warehouse.html" });
+      }
+    } catch (e) {}
     // 🔧 Servicio COMPLETADO (pagado o entregado) que INCLUYE CAMBIO DE ACEITE → actualiza "último servicio".
     // El recordatorio de 3 meses SOLO se resetea si el servicio trae cambio de aceite (aunque traiga más trabajos).
     try {
@@ -1483,6 +1492,15 @@ async function _pushToEmp(empId, payload) {
     }
     await Promise.all(dead.map((ref) => ref.delete().catch(() => {})));
   } catch (e) { console.log("_pushToEmp", e); }
+}
+// 🔧 Avisa a TODOS los mecánicos asignados de una orden (el de la orden + el de cada servicio), sin repetir.
+async function _pushToOrderMechs(o, payload) {
+  try {
+    const ids = new Set();
+    if (o && o.assignEmpId) ids.add(o.assignEmpId);
+    (Array.isArray(o && o.services) ? o.services : []).forEach((s) => { if (s && s.assignEmpId) ids.add(s.assignEmpId); });
+    for (const id of ids) { await _pushToEmp(id, payload); }
+  } catch (e) { console.log("_pushToOrderMechs", e); }
 }
 
 // 🔧 "Atiende esto" — texto del aviso según prioridad (🔴 Ahora / 🟡 Siguiente), en el idioma del empleado.
