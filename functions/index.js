@@ -4340,22 +4340,28 @@ exports.clockWeek = onCall({ timeoutSeconds: 30 }, async (request) => {
   try { const es = await db.collection("employees").get(); es.forEach((e) => { const dd = e.data() || {}; empRateById[e.id] = Number(dd.rate) || 0; empOwnerById[e.id] = dd.owner === true; }); }
   catch (e) {}
   const keyOf = (x) => x.actorKey || ("em_" + _emailKey((x.email || "?").toLowerCase()));
+  // 📅 HOY (zona LA) para el resumen por persona: horas de hoy + si tomó lonche + si sigue en turno.
+  const _localDay = (iso) => { try { return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }); } catch (e) { return ""; } };
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
   const byKey = {};
   const touch = (x) => {
     const k = keyOf(x);
-    if (!byKey[k]) byKey[k] = { key: k, email: (x.email || "").toLowerCase(), phone: x.phone || "", empId: x.empId || "", name: x.name || (x.email || "").split("@")[0] || "Empleado", hours: 0, open: false, shifts: 0 };
+    if (!byKey[k]) byKey[k] = { key: k, email: (x.email || "").toLowerCase(), phone: x.phone || "", empId: x.empId || "", name: x.name || (x.email || "").split("@")[0] || "Empleado", hours: 0, open: false, shifts: 0, todayHours: 0, clockedToday: false, todayOpen: false, onBreak: false, tookLunch: false };
     return byKey[k];
   };
   const snap = await db.collection("timeclock").where("weekKey", "==", wk).get();
-  snap.forEach((d) => { const x = d.data(); const r = touch(x); r.hours += Number(x.hours) || 0; r.shifts += 1; });
+  snap.forEach((d) => { const x = d.data(); const r = touch(x); r.hours += Number(x.hours) || 0; r.shifts += 1;
+    if (_localDay(x.inAt) === todayStr) { r.clockedToday = true; r.todayHours += Number(x.hours) || 0; if (Array.isArray(x.breaks) && x.breaks.length) r.tookLunch = true; } });
   // turnos abiertos (entrada sin salida)
   const openSnap = await db.collection("timeclock_open").get();
-  openSnap.forEach((d) => { const x = d.data(); if ((x.weekKey || "") !== wk) return; const r = touch(x); r.open = true; let el = Date.now() - new Date(x.inAt).getTime(); el -= (Number(x.breakMs) || 0); if (x.onBreakSince) el -= Math.max(0, Date.now() - new Date(x.onBreakSince).getTime()); r.hours += Math.max(0, el / 3600000); });
+  openSnap.forEach((d) => { const x = d.data(); if ((x.weekKey || "") !== wk) return; const r = touch(x); r.open = true; let el = Date.now() - new Date(x.inAt).getTime(); el -= (Number(x.breakMs) || 0); if (x.onBreakSince) el -= Math.max(0, Date.now() - new Date(x.onBreakSince).getTime()); r.hours += Math.max(0, el / 3600000);
+    if (_localDay(x.inAt) === todayStr) { r.clockedToday = true; r.todayOpen = true; r.todayHours += Math.max(0, el / 3600000); if (x.onBreakSince) r.onBreak = true; if ((Array.isArray(x.breaks) && x.breaks.length) || Number(x.breakMs) > 0) r.tookLunch = true; } });
   const list = Object.values(byKey).map((r) => {
     const rate = r.empId ? (empRateById[r.empId] || 0) : (Number(rates[r.email]) || 0);
     const hrs = Math.round(r.hours * 100) / 100;
     const owner = OWNER_EMAILS.includes(r.email) || (r.empId && empOwnerById[r.empId] === true);
-    return { key: r.key, email: r.email, phone: r.phone, empId: r.empId, name: r.name, hours: hrs, open: r.open, shifts: r.shifts, rate, rateSource: r.empId ? "emp" : "email", pay: Math.round(hrs * rate * 100) / 100, owner: !!owner };
+    return { key: r.key, email: r.email, phone: r.phone, empId: r.empId, name: r.name, hours: hrs, open: r.open, shifts: r.shifts, rate, rateSource: r.empId ? "emp" : "email", pay: Math.round(hrs * rate * 100) / 100, owner: !!owner,
+      todayHours: Math.round(r.todayHours * 100) / 100, clockedToday: !!r.clockedToday, todayOpen: !!r.todayOpen, onBreak: !!r.onBreak, tookLunch: !!r.tookLunch };
   }).sort((a, b) => b.hours - a.hours);
   const totalPay = list.reduce((s, r) => s + r.pay, 0);
   return { ok: true, weekKey: wk, rates, config: { dealer: cfg.dealer || null, yonke: cfg.yonke || null, radiusM: Number(cfg.radiusM) || 150 }, list, totalPay: Math.round(totalPay * 100) / 100 };

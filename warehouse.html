@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106184604"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106184604"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106220019"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106220019"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261106184604"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261106184604"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261106184604"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106220019"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261106220019"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261106220019"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2021,7 +2021,10 @@ let _opErr={};   // marca por sección si su carga FALLÓ (para distinguir "vac�
 // 👥 Equipo en vivo = quién está TRABAJANDO ahora (reloj = empleados; tarea/servicio activo = todos, incl. dueños).
 function _opRebuildTeam(){
   const live={}; const keyN=n=>(String(n||'').trim().toLowerCase());
-  ((OP_CLOCK&&OP_CLOCK.list)||[]).filter(e=>!e.owner && e.open).forEach(e=>{ const k=keyN(e.name)||e.key; if(!live[k]) live[k]={name:e.name, open:true, hours:(e.hours||0), task:null}; else { live[k].open=true; live[k].hours+=(e.hours||0); } });
+  // 👥 Incluye a los que están EN TURNO ahora Y a los que ficharon HOY aunque ya salieron (con sus horas de hoy + lonche).
+  ((OP_CLOCK&&OP_CLOCK.list)||[]).filter(e=>!e.owner && (e.open || e.clockedToday)).forEach(e=>{ const k=keyN(e.name)||e.key;
+    if(!live[k]) live[k]={name:e.name, open:!!e.open, clockedToday:!!e.clockedToday, todayHours:(e.todayHours||0), onBreak:!!e.onBreak, tookLunch:!!e.tookLunch, hours:(e.hours||0), task:null};
+    else { live[k].open=live[k].open||!!e.open; live[k].clockedToday=live[k].clockedToday||!!e.clockedToday; live[k].todayHours=Math.max(live[k].todayHours||0,(e.todayHours||0)); live[k].onBreak=live[k].onBreak||!!e.onBreak; live[k].tookLunch=live[k].tookLunch||!!e.tookLunch; live[k].hours+=(e.hours||0); } });
   (OP_TASKS||[]).filter(tk=>tk.status==='en_proceso' && tk.assignName).forEach(tk=>{ const k=keyN(tk.assignName); if(!live[k]) live[k]={name:tk.assignName, open:false, hours:0, task:null}; if(!live[k].task) live[k].task={title:tk.title, line:tk.line||'general'}; });
   (OP_SVC||[]).forEach(o=>{ (o.services||[]).forEach(sv=>{ if(sv.status==='en_proceso' && sv.assignName){ const k=keyN(sv.assignName); if(!live[k]) live[k]={name:sv.assignName, open:false, hours:0, task:null}; if(!live[k].task) live[k].task={title:sv.desc||'', line:'service'}; } }); });
   OP_TEAM=Object.values(live);
@@ -2214,28 +2217,41 @@ window.opSetTab=function(tk){ _opTab=tk; try{ sessionStorage.setItem('lmg_op_tab
 function _opDiv(label,count){ if(window.LMG && LMG.softDivider) return LMG.softDivider(label,count); return '<div style="display:flex;align-items:center;gap:10px;margin:16px 2px 8px;"><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);white-space:nowrap;">'+label+'</span><span style="flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);"></span>'+(count==null?'':'<span style="font-size:11px;color:var(--faint);">'+count+'</span>')+'</div>'; }
 // --- Builders de cada parte (regresan HTML string) ---
 function _opTeamHtml(){
-  // 👥 Widget compacto estilo iOS: SOLO quién está AQUÍ (fichado, punto verde). Los que tienen tarea abierta
-  //    pero NO ficharon NO se muestran como fila (no ocupan espacio); solo un conteo discreto abajo.
+  // 👥 Widget estilo iOS: EN TURNO ahora (punto verde) + los que FICHARON HOY aunque ya salieron (punto gris),
+  //    cada uno con sus HORAS DE HOY y si ya tomaron LONCHE. Tarea abierta sin fichar = conteo discreto abajo.
   const en=(L==='en');
   const doneCount={}; (OP_DONE||[]).forEach(p=>{ doneCount[(p.name||'').trim().toLowerCase()]=p.count; });
-  const onList=(OP_TEAM||[]).filter(e=>e.open).sort((a,b)=>Number(!!b.task)-Number(!!a.task)||(b.hours||0)-(a.hours||0));
-  const offN=(OP_TEAM||[]).filter(e=>!e.open).length;
+  const fmtH=h=>{ h=Number(h)||0; if(h<=0) return en?'0h':'0h'; const H=Math.floor(h), M=Math.round((h-H)*60); return H+'h'+(M?(' '+M+'m'):''); };
+  const lunchTag=e=> e.onBreak ? ('<span style="color:#ff9800;font-weight:700;">🍔 '+(en?'on lunch':'en lonche')+'</span>')
+    : (e.tookLunch ? ('<span style="color:#9aa3b2;">🍔 '+(en?'lunch taken':'ya comió')+'</span>')
+    : ('<span style="color:#9aa3b2;">🍴 '+(en?'no lunch':'sin lonche')+'</span>'));
+  const onList=(OP_TEAM||[]).filter(e=>e.open).sort((a,b)=>Number(!!b.task)-Number(!!a.task)||(b.todayHours||0)-(a.todayHours||0));
+  const leftList=(OP_TEAM||[]).filter(e=>!e.open && e.clockedToday).sort((a,b)=>(b.todayHours||0)-(a.todayHours||0));
+  const offN=(OP_TEAM||[]).filter(e=>!e.open && !e.clockedToday).length;   // tarea abierta pero nunca fichó
   const foot=offN?('<div class="faint" style="font-size:10.5px;margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,.06);">⚪ '+offN+' '+(en?('with '+(offN===1?'an open task':'open tasks')+', off shift'):('con '+(offN===1?'tarea abierta':'tareas abiertas')+', sin fichar'))+'</div>'):'';
-  if(!onList.length){
-    const base=_opErr.clock?_opErrMsg():'<div class="faint" style="font-size:12px;padding:3px 1px;">'+(en?'Nobody clocked in.':'Nadie en turno.')+'</div>';
+  if(!onList.length && !leftList.length){
+    const base=_opErr.clock?_opErrMsg():'<div class="faint" style="font-size:12px;padding:3px 1px;">'+(en?'Nobody clocked in today.':'Nadie fichó hoy.')+'</div>';
     return base+foot;
   }
-  const rows=onList.map(e=>{
-    const dc=doneCount[(e.name||'').trim().toLowerCase()]||0;
-    const done=dc?(' <span style="color:#35c46a;font-weight:700;">✅'+dc+'</span>'):'';
-    const nm=(typeof whEscA==='function'?whEscA(e.name||''):String(e.name||'')).replace(/\x27/g,'');
-    const sub=e.task?esc(e.task.title):(en?'No active task':'Sin tarea activa');
-    const av='<span style="position:relative;flex:none;"><span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--surface);font-weight:800;font-size:10.5px;">'+whInitials(e.name)+'</span><span style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:#35c46a;border:2px solid var(--surface2);"></span></span>';
-    return '<div onclick="whEmpReport(\'\',\''+nm+'\',\'\')" style="display:flex;align-items:center;gap:8px;padding:5px 1px;cursor:pointer;">'+av
+  const nmOf=e=>(typeof whEscA==='function'?whEscA(e.name||''):String(e.name||'')).replace(/\x27/g,'');
+  const rowOn=e=>{
+    const dc=doneCount[(e.name||'').trim().toLowerCase()]||0; const done=dc?(' <span style="color:#35c46a;font-weight:700;">✅'+dc+'</span>'):'';
+    const task=e.task?esc(e.task.title):(en?'No active task':'Sin tarea activa');
+    const av='<span style="position:relative;flex:none;"><span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--surface);font-weight:800;font-size:10.5px;">'+whInitials(e.name)+'</span><span style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:'+(e.onBreak?'#ff9800':'#35c46a')+';border:2px solid var(--surface2);"></span></span>';
+    return '<div onclick="whEmpReport(\'\',\''+nmOf(e)+'\',\'\')" style="display:flex;align-items:center;gap:8px;padding:5px 1px;cursor:pointer;">'+av
       +'<div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(e.name||'—')+done+'</div>'
-      +'<div class="faint" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+sub+'</div></div></div>';
-  }).join('');
-  return rows+foot;
+      +'<div class="faint" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+task+' · <b style="color:#35c46a;">'+fmtH(e.todayHours)+'</b> '+(en?'today':'hoy')+' · '+lunchTag(e)+'</div></div></div>';
+  };
+  const rowLeft=e=>{
+    const dc=doneCount[(e.name||'').trim().toLowerCase()]||0; const done=dc?(' <span style="color:#35c46a;font-weight:700;">✅'+dc+'</span>'):'';
+    const av='<span style="position:relative;flex:none;"><span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--surface);font-weight:800;font-size:10.5px;opacity:.7;">'+whInitials(e.name)+'</span><span style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:#8a93a6;border:2px solid var(--surface2);"></span></span>';
+    return '<div onclick="whEmpReport(\'\',\''+nmOf(e)+'\',\'\')" style="display:flex;align-items:center;gap:8px;padding:5px 1px;cursor:pointer;">'+av
+      +'<div style="min-width:0;flex:1;"><div style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c7ccd6;">'+esc(e.name||'—')+done+'</div>'
+      +'<div class="faint" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(en?'Left':'Salió')+' · <b style="color:#c7ccd6;">'+fmtH(e.todayHours)+'</b> '+(en?'today':'hoy')+' · '+lunchTag(e)+'</div></div></div>';
+  };
+  let html=onList.map(rowOn).join('');
+  if(leftList.length){ html+='<div class="faint" style="font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;margin:7px 0 2px;padding-top:6px;border-top:1px solid rgba(255,255,255,.06);">'+(en?'Worked today · left':'Trabajaron hoy · salieron')+'</div>'+leftList.map(rowLeft).join(''); }
+  return html+foot;
 }
 // 🛠️ Lo que se está haciendo AHORITA = tareas (OP_TASKS) y servicios (OP_SVC) EN PROCESO.
 //    Reusa lineBadge + _opStatusLabel (términos unificados del glosario) y los MISMOS taps que las listas
@@ -6068,7 +6084,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261106184604"></script>
+<script type="module" src="launcher.js?v=20261106220019"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
