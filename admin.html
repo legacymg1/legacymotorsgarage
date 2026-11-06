@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106184604"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106184604"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106191406"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106191406"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261106184604"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261106184604"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106191406"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261106191406"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2000,6 +2000,7 @@ window.svcChargeOpen=function(id){
           ? '<div style="text-align:center;color:#4d9bff;font-weight:800;padding:8px 0 6px;">📄 Ya tiene plan de pagos</div><div style="text-align:center;color:var(--muted);font-size:12px;padding-bottom:12px;">Pendiente del plan: <b style="color:#4d9bff;">'+formatMoney(planPend)+'</b> · el cliente lo paga en sus cuotas desde su app.</div>'
             +'<button onclick="document.getElementById(\'svc-caja\').remove();svcOpenReceipt(\''+id+'\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;">🧾 Ver recibo</button>'
           : '<div style="text-align:center;color:#28b463;font-weight:800;padding:8px 0 14px;">✅ Ya está pagada.</div>'
+            +'<button onclick="document.getElementById(\'svc-caja\').remove();svcFinalReportOpen(\''+id+'\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;margin-bottom:8px;">📄 Reporte final (dealer)</button>'
             +'<button onclick="document.getElementById(\'svc-caja\').remove();svcOpenReceipt(\''+id+'\')" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:13px;font-weight:800;font-size:14px;cursor:pointer;">🧾 Ver recibo</button>'))
   +'</div>';
   if(dueNow>0){ try{ svcAdeRender(); }catch(e){} }   // 📄 pinta las filas del plan de pagos (adendum)
@@ -2885,7 +2886,11 @@ function svcRenderModal(){
   _histSvs.forEach(function(s){ if(s.diagnosis){ _hDiag=true; _hParts+=((s.diagnosis.parts||[]).length); } if(s.repair){ _hRep++; } });
   const _hHas = !!(_ik || _hDiag || _hRep || (Array.isArray(_svcOrd.suggested) && _svcOrd.suggested.length));
   const mechHistoryBtn = _hHas ? ('<button type="button" onclick="svcHistoryOpen(\''+(d.editId||'')+'\')" style="width:100%;margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;color:var(--text);font-family:inherit;text-align:left;"><div style="min-width:0;"><div style="font-weight:800;font-size:13px;">🔧 Historial de la orden</div><div style="font-size:11.5px;color:var(--muted);margin-top:2px;">'+(_ik?((_ik.none?'🧾 Ingreso sin daños':('🧾 '+_hObs+' observación(es)'))+' · '):'')+(_hDiag?('🔬 '+_hParts+' parte(s)'):'Sin diagnóstico')+(_hRep?(' · 🔧 '+_hRep+' listo(s)'):'')+'</div></div><span style="color:var(--muted);font-size:18px;flex:0 0 auto;">›</span></button>') : '';
-  const svcHtml=mechHistoryBtn
+  // 📄 FASE 5: botón de REPORTE FINAL tipo dealer — aparece cuando ya hay reparación hecha o la orden va en reparación/listo/entregado/pagado.
+  const _canReport = (_hRep>0) || ['reparando','listo','entregado'].indexOf(_svcOrd.status)>=0 || _svcOrd.paid;
+  const _hasReport = !!(_svcOrd.finalReport && ((_svcOrd.finalReport.es||'').trim()||(_svcOrd.finalReport.en||'').trim()));
+  const finalReportBtn = _canReport ? ('<button type="button" onclick="svcFinalReportOpen(\''+(d.editId||'')+'\')" style="width:100%;margin-bottom:10px;background:linear-gradient(135deg,rgba(201,162,74,.18),rgba(201,162,74,.06));border:1px solid var(--gold3);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;color:var(--text);font-family:inherit;text-align:left;"><div style="min-width:0;"><div style="font-weight:800;font-size:13px;color:var(--gold);">📄 Reporte final (dealer)</div><div style="font-size:11.5px;color:var(--muted);margin-top:2px;">'+(_hasReport?'Listo · toca para ver / imprimir / enviar':'La IA lo redacta con toda la historia — membretado')+'</div></div><span style="color:var(--gold);font-size:18px;flex:0 0 auto;">›</span></button>') : '';
+  const svcHtml=mechHistoryBtn+finalReportBtn
     +'<div style="display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-bottom:8px;font-size:11.5px;color:var(--muted);">⚙️ Tarifa mecánico (para estimar): $<input id="svc-labor-rate" type="number" inputmode="decimal" value="'+rate+'" onchange="svcSetRate(this.value)" style="width:56px;padding:4px 6px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;text-align:right;">/hr</div>'
     +rowsHtml
     +'<button type="button" onclick="svcAddService()" style="width:100%;background:var(--surface2);border:1px dashed var(--border);border-radius:10px;padding:9px;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">➕ Agregar servicio</button>'
@@ -3207,7 +3212,7 @@ window.svcHistoryOpen=function(orderId){
 };
 // 📄 GENERAR ESTIMADO bonito (tipo cotizador), bien desglosado por servicio + sus partes.
 function svcEstimateSheetHTML(d, services, opts){
-  opts=opts||{}; const o=opts.order||{}; const receipt=!!opts.receipt;
+  opts=opts||{}; const o=opts.order||{}; const report=!!opts.report; const receipt=!!opts.receipt||report;
   const en=(d.lang==='en'); const money=formatMoney;
   const dstr=new Date().toLocaleString(en?'en-US':'es-MX',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
   let laborSub=0, partsSub=0, rows='';
@@ -3240,7 +3245,26 @@ function svcEstimateSheetHTML(d, services, opts){
         :'');
   const paidDate=o.paidAt?new Date(o.paidAt).toLocaleDateString(en?'en-US':'es-MX',{year:'numeric',month:'long',day:'numeric'}):'';
   const folio=o.orderNum?('#'+o.orderNum):'';
-  const L=en?{sub:receipt?'SERVICE RECEIPT':'SERVICE ESTIMATE',cust:'Customer',date:'Date',ord:'Order',veh:'Vehicle',labor:'Labor',parts:'Parts',subt:'Subtotal',surch:'Card processing (2%)',total:'TOTAL',dep:'Deposit',bal:'Balance',paid:'Paid',due:'Balance due',disc:receipt?'<b>Thank you for your business.</b> This is your service receipt. Keep it for your records and warranty.':'<b>Estimate only — subject to your authorization.</b> Final amounts may change after inspection; we will notify you before any additional work.'}:{sub:receipt?'RECIBO DE SERVICIO':'ESTIMADO DE SERVICIO',cust:'Cliente',date:'Fecha',ord:'Orden',veh:'Vehículo',labor:'Mano de obra',parts:'Partes',total:'TOTAL',dep:'Anticipo',bal:'Saldo',paid:'Pagado',due:'Saldo',disc:receipt?'<b>Gracias por su preferencia.</b> Este es su recibo de servicio. Consérvelo para su garantía.':'<b>Estimado informativo — sujeto a su autorización.</b> Los montos finales pueden cambiar tras la inspección; le avisamos antes de cualquier trabajo adicional.'};
+  const L=en?{sub:report?'SERVICE REPORT':(receipt?'SERVICE RECEIPT':'SERVICE ESTIMATE'),cust:'Customer',date:'Date',ord:'Order',veh:'Vehicle',labor:'Labor',parts:'Parts',subt:'Subtotal',surch:'Card processing (2%)',total:'TOTAL',dep:'Deposit',bal:'Balance',paid:'Paid',due:'Balance due',disc:receipt?'<b>Thank you for your business.</b> This is your service receipt. Keep it for your records and warranty.':'<b>Estimate only — subject to your authorization.</b> Final amounts may change after inspection; we will notify you before any additional work.'}:{sub:report?'REPORTE DE SERVICIO':(receipt?'RECIBO DE SERVICIO':'ESTIMADO DE SERVICIO'),cust:'Cliente',date:'Fecha',ord:'Orden',veh:'Vehículo',labor:'Mano de obra',parts:'Partes',total:'TOTAL',dep:'Anticipo',bal:'Saldo',paid:'Pagado',due:'Saldo',disc:receipt?'<b>Gracias por su preferencia.</b> Este es su recibo de servicio. Consérvelo para su garantía.':'<b>Estimado informativo — sujeto a su autorización.</b> Los montos finales pueden cambiar tras la inspección; le avisamos antes de cualquier trabajo adicional.'};
+  // 📄 FASE 5 — modo REPORTE: narrativa profesional (IA) + "Resumen del trabajo" con fotos. Reusa o.finalReport + o.intake + o.services[].diagnosis/repair.
+  let _narr='', _work='';
+  if(report){
+    const fr=o.finalReport||{}; const ntext=((en?(fr.en||fr.es):(fr.es||fr.en))||'').trim();
+    if(ntext) _narr='<div class="narr"><p>'+svcEsc(ntext).replace(/\n{2,}/g,'</p><p>').replace(/\n/g,'<br>')+'</p></div>';
+    const _ik=o.intake||null; const _svs=Array.isArray(o.services)?o.services:[];
+    const _pimg=u=>'<img src="'+svcEsc(u)+'" onclick="window.open(\''+u+'\',\'_blank\')" style="width:58px;height:58px;object-fit:cover;border-radius:6px;border:1px solid #ddd;cursor:pointer;">';
+    let w='';
+    if(_ik){ if(_ik.none){ w+='<div class="wrow"><b>'+(en?'Reception':'Recepción')+':</b> '+(en?'Received with no prior damage noted.':'Recibido sin daños previos.')+(_ik.miles?(' · '+svcEsc(String(_ik.miles))+' mi'):'')+'</div>'; }
+      else { const obs=(_ik.observations||[]); if(obs.length) w+='<div class="wrow"><b>'+(en?'Reception':'Recepción')+(_ik.miles?(' · '+svcEsc(String(_ik.miles))+' mi'):'')+':</b><ul>'+obs.map(ob=>'<li>'+svcEsc(ob.note||(en?'(photo)':'(foto)'))+'</li>').join('')+'</ul></div>'; } }
+    _svs.forEach((s,i)=>{ const dg=s.diagnosis, rp=s.repair; if(!dg&&!rp) return;
+      w+='<div class="wrow"><b>'+svcEsc(s.desc||((en?'Service ':'Servicio ')+(i+1)))+'</b>';
+      if(dg&&dg.notes) w+='<div class="wsub"><i>'+(en?'Diagnosis':'Diagnóstico')+':</i> '+svcEsc(dg.notes)+'</div>';
+      if(rp&&rp.notes) w+='<div class="wsub"><i>'+(en?'Work performed':'Trabajo realizado')+':</i> '+svcEsc(rp.notes)+'</div>';
+      const pics=[].concat((dg&&dg.photos)||[],(rp&&rp.photos)||[]);
+      if(pics.length) w+='<div class="wpics">'+pics.map(_pimg).join('')+'</div>';
+      w+='</div>'; });
+    if(w) _work='<div class="work"><div class="wh">'+(en?'WORK SUMMARY':'RESUMEN DEL TRABAJO')+'</div>'+w+'</div>';
+  }
   const style='.estsheet{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1a1a1a;padding:26px;max-width:620px;margin:0 auto;background:#fff;}'
     +'.estsheet .h{text-align:center;border-bottom:3px solid #c9a24a;padding-bottom:14px;margin-bottom:10px;}'
     +'.estsheet .h h1{font-size:22px;letter-spacing:1.5px;color:#0b0e14;margin:0;}'
@@ -3256,6 +3280,14 @@ function svcEstimateSheetHTML(d, services, opts){
     +'.estsheet .grand{font-size:17px;font-weight:800;color:#0b0e14;}'
     +'.estsheet .disc{font-size:10.5px;color:#888;border-top:1px solid #ddd;margin-top:16px;padding-top:10px;line-height:1.5;}'
     +'.estsheet .foot{text-align:center;font-size:12px;color:#555;margin-top:12px;line-height:1.6;}'
+    +'.estsheet .narr{font-size:13px;color:#2a2a2a;line-height:1.6;margin:10px 0 4px;}'
+    +'.estsheet .narr p{margin:0 0 9px;}'
+    +'.estsheet .work{margin-top:16px;border-top:1px solid #ddd;padding-top:10px;}'
+    +'.estsheet .work .wh{font-size:11px;font-weight:800;letter-spacing:1.5px;color:#c9a24a;margin-bottom:8px;}'
+    +'.estsheet .wrow{font-size:12.5px;color:#333;margin-bottom:9px;line-height:1.5;}'
+    +'.estsheet .wrow ul{margin:3px 0 0;padding-left:18px;}'
+    +'.estsheet .wsub{color:#555;margin:2px 0 0 2px;}.estsheet .wsub i{color:#888;font-style:normal;font-weight:700;}'
+    +'.estsheet .wpics{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}'
     +'@media print{body{padding:0;}}';
   const stamp=(o.warranty)
     ?('<div style="text-align:center;margin:10px 0 2px;"><span style="display:inline-block;border:2.5px solid #1f6feb;color:#1f6feb;font-weight:900;letter-spacing:2px;font-size:15px;padding:5px 16px;border-radius:8px;transform:rotate(-4deg);">🛡️ '+(en?'WARRANTY · NO CHARGE':'EN GARANTÍA · SIN COSTO')+'</span></div>')
@@ -3263,6 +3295,7 @@ function svcEstimateSheetHTML(d, services, opts){
   const body='<div class="estsheet"><div class="h"><h1>LEGACY MOTORS GARAGE</h1><div class="s">'+L.sub+(folio?(' · '+folio):'')+'</div></div>'
     +stamp
     +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(titleCase(d.clientName)||'—')+(d.clientPhone?(' · '+svcEsc(_fmtPhone(d.clientPhone))):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+(receipt&&paidDate?paidDate:dstr)+(folio?('<br><b>'+L.ord+':</b> '+folio):'')+'</div>'
+    +_narr
     +'<table>'+rows+'</table>'
     +'<div class="tot"><div class="line"><span style="color:#777;">'+L.labor+'</span><b>'+money(laborSub)+'</b></div><div class="line"><span style="color:#777;">'+L.parts+'</span><b>'+money(partsSub)+'</b></div>'
     +(surcharge>0
@@ -3273,6 +3306,7 @@ function svcEstimateSheetHTML(d, services, opts){
         : (receipt
             ? ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+(payMethodTxt?(' · '+payMethodTxt):'')+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):''))
             : (dep>0?('<div class="line"><span style="color:#777;">'+L.dep+'</span><b>−'+money(dep)+'</b></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.bal+'</span><span>'+money(bal)+'</span></div>'):'')))+'</div>'
+    +_work
     +'<div class="disc">'+L.disc+'</div>'
     +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California BAR Reg. No. ARD 317673 · Automotive Repair Dealer</div></div>';
   return '<style>'+style+'</style>'+body;
@@ -3403,6 +3437,34 @@ window.svcReceiptSend=function(){
   if(phone){ location.href='sms:'+phone+'?body='+encodeURIComponent(body); }
   else if(navigator.share){ navigator.share({text:body}).catch(()=>{}); }
   else { try{ navigator.clipboard.writeText(body); alert('Recibo copiado.'); }catch(e){} }
+};
+// 📄 FASE 5 — REPORTE FINAL tipo dealer (membretado): IA arma la narrativa (una vez), se muestra con factura + resumen de trabajo + fotos.
+//    Reusa svcEstimateSheetHTML({report:true}). Imprimir / Enviar (link al portal). "regen=true" fuerza regenerar.
+window.svcFinalReportOpen=async function(orderId, regen){
+  const o=svcOrders.find(x=>x.id===orderId); if(!o){ alert('Orden no encontrada.'); return; }
+  // ⏳ Si aún no hay narrativa (o se pide regenerar), la genera la IA. Overlay de "Generando…".
+  if(regen || !(o.finalReport && ((o.finalReport.es||'').trim()||(o.finalReport.en||'').trim()))){
+    let lov=document.getElementById('svc-frgen'); if(!lov){ lov=document.createElement('div'); lov.id='svc-frgen'; lov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2147483200;display:flex;align-items:center;justify-content:center;padding:24px;'; document.body.appendChild(lov); }
+    lov.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;text-align:center;color:var(--text);max-width:320px;"><div style="font-size:26px;margin-bottom:8px;">📄</div><div style="font-weight:800;margin-bottom:4px;">Generando el reporte…</div><div style="font-size:12.5px;color:var(--muted);line-height:1.5;">La IA está redactando el reporte profesional de todo el trabajo.</div></div>';
+    try{
+      const r=await httpsCallable(functions,'svcFinalReport')({ orderId:orderId }); const dd=(r&&r.data)||{};
+      o.finalReport={ es:dd.es||'', en:dd.en||'', at:new Date().toISOString() };
+    }catch(e){ const el=document.getElementById('svc-frgen'); if(el) el.remove(); alert('No se pudo generar el reporte: '+((e&&e.message)||e)); return; }
+    const el=document.getElementById('svc-frgen'); if(el) el.remove();
+  }
+  const d={ lang:o.lang||'es', clientName:o.clientName||'', clientPhone:o.clientPhone||'', vehicleLabel:o.vehicleLabel||'', vin:o.vin||'', plate:o.plate||'', deposit:(Number(o.depositCents)||0)/100 };
+  const services=(Array.isArray(o.services)&&o.services.length)?o.services.map(s=>({desc:s.desc||'',price:(s.price!=null?Number(s.price):((Number(s.laborCents!=null?s.laborCents:s.priceCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[])})):[{desc:o.reason||'Servicio',price:(Number(o.grandTotalCents)||0)/100,parts:[]}];
+  window._svcEstHtml=svcEstimateSheetHTML(d, services, {report:true, receipt:true, order:o}); window._svcRcptOrder=o.id;
+  const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2147483100;display:flex;align-items:center;justify-content:center;padding:14px;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const box=document.createElement('div'); box.style.cssText='background:#fff;color:#111;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow:auto;';
+  box.innerHTML='<div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;z-index:2;">'
+    +'<button onclick="var o=document.getElementById(\'svc-est-overlay\');if(o)o.remove();" style="background:#eee;border:none;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;">Cerrar</button>'
+    +'<button onclick="svcFinalReportOpen(\''+o.id+'\',true)" style="background:#f3edda;border:1px solid #d9c98f;color:#8a6d16;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;">🔄 Regenerar</button>'
+    +'<button onclick="svcEstPrint()" style="background:#0b0e14;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;">🖨 Imprimir</button>'
+    +'<button onclick="svcReceiptSend()" style="background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;">💬 Enviar</button>'
+    +'</div><div>'+window._svcEstHtml+'</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
 };
 // 💬 Enviar el INVOICE/ORDEN por SMS (un toque, desde la orden): manda el link al portal del cliente.
 //    Sirve para cualquier orden — incluida GARANTÍA (ahí el cliente abre y firma la entrega). Como el recordatorio de los carros.
@@ -7844,6 +7906,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261106184604"></script>
+<script type="module" src="launcher.js?v=20261106191406"></script>
 </body>
 </html>

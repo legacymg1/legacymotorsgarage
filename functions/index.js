@@ -2532,6 +2532,61 @@ exports.svcDiagSummary = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }
   return { ok: true, text: text };
 });
 
+// 📄 FASE 5 — REPORTE FINAL tipo DEALER (IA): narrativa PROFESIONAL y BILINGÜE de TODO el trabajo
+// (recepción → diagnóstico → partes → reparación). Se guarda en la orden (o.finalReport{es,en,at,by}).
+// Reusa el mismo patrón que svcDiagSummary. SIN precios (la factura/hoja membretada lleva el dinero).
+exports.svcFinalReport = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 90 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const svs = Array.isArray(o.services) ? o.services : [];
+  const veh = o.vehicleLabel || ""; const vin = o.vin || "";
+  // 🧱 Contexto COMPLETO para la IA: recepción + por-servicio (diagnóstico + reparación + partes).
+  const ik = o.intake || null;
+  let intakeTxt = "(no reception checklist)";
+  if (ik) {
+    if (ik.none) intakeTxt = "Received with NO prior damage noted." + (ik.miles ? (" Odometer at intake: " + ik.miles + " mi.") : "");
+    else intakeTxt = "Observations at intake:" + (ik.miles ? (" (odometer " + ik.miles + " mi)") : "") + "\n" + ((ik.observations || []).map((ob) => "  - " + (ob.note || "(photo only)")).join("\n") || "  (none)");
+  }
+  const lines = svs.map((s, i) => {
+    const dg = s.diagnosis || {}; const rp = s.repair || {};
+    const parts = (dg.parts || []).map((p) => "      - " + (p.desc || "") + (p.partNum ? (" [# " + p.partNum + "]") : "")).join("\n");
+    return (i + 1) + ". " + (s.desc || ("Service " + (i + 1))) +
+      "\n   Diagnosis: " + (dg.notes || "(none)") +
+      (parts ? ("\n   Parts used:\n" + parts) : "\n   Parts used: (none)") +
+      "\n   Repair performed: " + (rp.notes || (rp.at ? "(completed)" : "(no repair notes)"));
+  }).join("\n\n");
+  const sys = "You are the service writer at Legacy Motors Garage, a professional auto repair dealer. " +
+    "Write a polished, PROFESSIONAL final service report a dealership would hand the customer at pickup. " +
+    "Cover the full story in order: how the vehicle was received, what was diagnosed, the parts used, and the work performed — in clear, reassuring, customer-facing language. " +
+    "Warm but professional, confident, no fluff, no apologies, NO prices. 2 to 4 short paragraphs. " +
+    "Return the SPANISH version first, then a line with exactly =====EN===== , then the ENGLISH version. Plain text only, no markdown headings.";
+  const userMsg = "Vehicle: " + (veh || "(unknown)") + (vin ? (" · VIN " + vin) : "") +
+    "\n\nReception:\n" + intakeTxt +
+    "\n\nWork (per service):\n" + lines;
+  let es = "", enTxt = "";
+  try {
+    const AnthropicMod = require("@anthropic-ai/sdk"); const Anthropic = AnthropicMod.Anthropic || AnthropicMod.default || AnthropicMod;
+    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const msg = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 1600, system: sys, messages: [{ role: "user", content: userMsg }] });
+    const full = (msg.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+    const parts = full.split(/=====\s*EN\s*=====/i);
+    es = (parts[0] || "").trim();
+    enTxt = (parts[1] || parts[0] || "").trim();
+  } catch (e) { console.error("svcFinalReport", e); throw new HttpsError("internal", "No se pudo generar el reporte."); }
+  const now = new Date().toISOString();
+  const patch = { finalReport: { es: es, en: enTxt, at: now, by: id ? (id.name || id.email || id.empId || "") : "" }, updatedAt: now };
+  await ref.set(patch, { merge: true });
+  return { ok: true, es: es, en: enTxt };
+});
+
 // 🗂️ SERVICE CRM completo para el CENTRO DE OPERACIONES (solo dueño): TODAS las órdenes (activas + completadas + estimados) + clientes de servicio.
 // Alimenta las pestañas Activas·Completadas·Clientes con el MISMO render compartido que Clientes/admin (un solo ecosistema).
 exports.svcOwnerAll = onCall({ timeoutSeconds: 30 }, async (request) => {
