@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106032935"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106032935"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106033115"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106033115"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261106032935"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261106032935"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261106032935"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106033115"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261106033115"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261106033115"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1016,7 +1016,7 @@ onAuthStateChanged(auth, async (user)=>{
     // Correos (capture@/listing@/empaque@/Sunmi) y dueño → EXACTAMENTE como hoy.
     _homeMode = (_myRoles.length>0 || !!(_allowedTabs && _allowedTabs.length)) && role!=='owner';
     if(_homeMode){ _view=def; whGoHome(); }
-    else if(role==='owner'){ whOwnerHome(); }   // 👑 dueño aterriza en el Centro de Operaciones (limpio, sin reloj)
+    else if(role==='owner'){ let _ov=''; try{ _ov=localStorage.getItem('lmg_wh_owner_view')||''; }catch(e){} if(_ov==='jornada'){ whOwnerJornada(); } else { whOwnerHome(); } }   // 👑 dueño: regresa DONDE estaba (Centro o Mi jornada)
     else { let saved=''; try{ saved=localStorage.getItem('lmg_wh_view')||''; }catch(e){} setView(allowed.indexOf(saved)>=0?saved:def); }
     // 🕐 Reloj: muestra config de ubicaciones al dueño y refresca el estado/horas de la semana.
     const _co=document.getElementById('clock-owner'); if(_co) _co.style.display = (role==='owner')?'block':'none';
@@ -1608,6 +1608,7 @@ window.whGoHome=function(){
 // 👑 HOME del DUEÑO = Centro de Operaciones (limpio, SIN reloj). Las herramientas se abren encima.
 window.whOwnerHome=function(){
   _carView=''; _ownerJornada=false;
+  try{ localStorage.setItem('lmg_wh_owner_view','ops'); }catch(e){}   // 🧭 recuerda: al recargar, vuelve al Centro
   ['view-yard','view-lister','view-pack','view-home'].forEach(v=>{ const e=document.getElementById(v); if(e) e.style.display='none'; });
   const opc=document.getElementById('owner-op-card'); if(opc) opc.style.display='block';
   const bb=document.getElementById('wh-home-back'); if(bb) bb.style.display='none';
@@ -1737,6 +1738,7 @@ window.carAccountsSyncNet=async function(){
 let _ownerJornada=false;
 window.whOwnerJornada=function(){
   _carView=''; _ownerJornada=true;
+  try{ localStorage.setItem('lmg_wh_owner_view','jornada'); }catch(e){}   // 🧭 recuerda: al recargar, quédate en Mi jornada
   const opc=document.getElementById('owner-op-card'); if(opc) opc.style.display='none';
   const cc=document.getElementById('clock-card'); if(cc) cc.style.display='none';
   ['view-yard','view-lister','view-pack'].forEach(v=>{ const e=document.getElementById(v); if(e) e.style.display='none'; });
@@ -6062,7 +6064,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261106032935"></script>
+<script type="module" src="launcher.js?v=20261106033115"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
