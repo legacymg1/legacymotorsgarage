@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106032735"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106032735"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106032935"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106032935"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261106032735"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261106032735"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261106032735"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106032935"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261106032935"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261106032935"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -3176,8 +3176,10 @@ window.chatFinish=async function(){
     const res=await httpsCallable(functions,'svcMechChat')(vaData({op:'finish', vehicle:r.vehicle, vin:r.vin, service:r.service, lang:en?'en':'es', messages:r.msgs.map(function(m){return {role:m.role,text:m.text};})}));
     const d=(res&&res.data)||{};
     if(_diag && _diag.orderId===r.orderId && _diag.idx===r.idx){
-      if(d.summary){ _diag.notes=(((_diag.notes||'').trim())?(_diag.notes.trim()+'\n\n'):'')+d.summary; }
-      (d.parts||[]).forEach(function(p){ _diag.parts.push({desc:p.desc||'',partNum:p.partNum||'',photoUrl:'',photoFile:null,photoPreview:''}); });
+      // resumen: solo si no está ya puesto (no duplicar al Terminar otra vez)
+      if(d.summary && (_diag.notes||'').indexOf(d.summary)<0){ _diag.notes=(((_diag.notes||'').trim())?(_diag.notes.trim()+'\n\n'):'')+d.summary; }
+      // partes: agrega solo las que NO existan ya (dedupe por descripción)
+      (d.parts||[]).forEach(function(p){ const desc=(p.desc||'').trim(); if(!desc) return; const dup=_diag.parts.some(function(x){ return (x.desc||'').trim().toLowerCase()===desc.toLowerCase(); }); if(!dup) _diag.parts.push({desc:desc,partNum:p.partNum||'',photoUrl:'',photoFile:null,photoPreview:''}); });
       _diagRender();
     }
     whToast('✅ '+(en?'Diagnosis filled from the chat':'Diagnóstico llenado del chat'));
@@ -6060,7 +6062,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261106032735"></script>
+<script type="module" src="launcher.js?v=20261106032935"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
