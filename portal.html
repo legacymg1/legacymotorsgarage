@@ -136,8 +136,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106002419"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106002419"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106030239"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106030239"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <!-- PRIMER INGRESO: bloquea el portal hasta que conteste -->
 <div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.94);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
@@ -985,7 +985,7 @@ function receptionBlockHTML(o){
   if(k.none || !(k.observations && k.observations.length)){
     obsHtml=`<div style="font-size:13px;color:#49d17f;font-weight:700;">✅ ${es?'Sin observaciones — el vehículo se recibió en buen estado.':'No observations — vehicle received in good condition.'}</div>`;
   } else {
-    obsHtml=k.observations.map(function(ob){ return `<div style="padding:8px 0;border-bottom:1px solid var(--border);"><div style="font-size:13px;color:var(--white);">⚠️ ${escPortal(ob.note||'')}</div>${ob.photo?`<img src="${ob.photo}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-top:6px;">`:''}</div>`; }).join('');
+    obsHtml=k.observations.map(function(ob){ var pics=(ob.photos&&ob.photos.length?ob.photos:(ob.photo?[ob.photo]:[])); var ph=pics.map(function(u){return `<img src="${u}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-top:6px;">`;}).join(''); return `<div style="padding:8px 0;border-bottom:1px solid var(--border);"><div style="font-size:13px;color:var(--white);">⚠️ ${escPortal(ob.note||'')}</div>${ph}</div>`; }).join('');
   }
   const miles = k.miles?`<div style="font-size:12px;color:var(--muted);margin-top:6px;">${es?'Millas al ingreso':'Miles at check-in'}: ${escPortal(k.miles)}</div>`:'';
   const legal = es

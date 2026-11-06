@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106002419"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106002419"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106030239"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106030239"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261106002419"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261106002419"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106030239"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261106030239"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -3138,7 +3138,7 @@ window.svcHistoryOpen=function(orderId){
     h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:11px;margin-bottom:12px;font-size:12.5px;">';
     h+='<div style="color:var(--muted);font-size:11px;margin-bottom:6px;">'+(ik.by?svcEsc(ik.by):'')+(ik.miles?(' · '+svcEsc(String(ik.miles))+' mi'):'')+(ik.at?(' · '+dt(ik.at)):'')+'</div>';
     if(ik.none){ h+='<div style="color:#35c46a;font-weight:700;">✅ Sin observaciones — sin daños previos.</div>'; }
-    else { h+=(ik.observations||[]).map(function(ob){ return '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;">'+(ob.photo?img(ob.photo,54):'')+'<div style="flex:1;min-width:0;line-height:1.4;">'+svcEsc(ob.note||'(sin nota)')+'</div></div>'; }).join('');
+    else { h+=(ik.observations||[]).map(function(ob){ var pics=(ob.photos&&ob.photos.length?ob.photos:(ob.photo?[ob.photo]:[])); var thumbs=pics.map(function(u){return img(u,54);}).join(''); return '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">'+(thumbs?'<div style="display:flex;gap:4px;flex-wrap:wrap;flex:0 0 auto;max-width:56%;">'+thumbs+'</div>':'')+'<div style="flex:1;min-width:0;line-height:1.4;">'+svcEsc(ob.note||'(sin nota)')+'</div></div>'; }).join('');
       h+='<div style="margin-top:6px;font-weight:700;color:'+(ik.clientAck?'#35c46a':'#f0a030')+';">'+(ik.clientAck?('✅ Cliente autorizó'+(ik.clientAckAt?(' · '+dt(ik.clientAckAt)):'')):'⏳ Pendiente de autorización del cliente')+'</div>'; }
     h+='</div>';
   } else { h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">—</div>'; }
@@ -7831,6 +7831,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261106002419"></script>
+<script type="module" src="launcher.js?v=20261106030239"></script>
 </body>
 </html>
