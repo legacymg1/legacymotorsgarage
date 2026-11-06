@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106220557"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106220557"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106222955"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106222955"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261106220557"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261106220557"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106222955"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261106222955"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1591,6 +1591,15 @@ const SVC_STATUS = {
   listo:         {lbl:'✅ Listo',            c:'#32d74b'},
   entregado:     {lbl:'🏁 Entregado',        c:'#8a8fa8'},
 };
+// 🧰 TIPO de servicio por renglón (por qué viene el cliente). Maneja el comportamiento:
+//  diagnostic = cuota condicional (se cobra solo si NO repara) · oil (reinicia recordatorio 3m) / detailing = precio ESTIMADO (puede variar, se pueden agregar servicios).
+const SVC_KINDS=[
+  {k:'diagnostic', l:'🔧 Diagnóstico',    priceLbl:'Cuota de diagnóstico', note:'Se cobra solo si NO repara con nosotros.'},
+  {k:'oil',        l:'🛢️ Cambio de aceite', priceLbl:'Precio estimado',    note:'Estimado · reinicia el recordatorio de 3 meses. Para más mantenimiento hay que diagnosticar.'},
+  {k:'detailing',  l:'✨ Detallado',       priceLbl:'Precio estimado',     note:'Estimado · se pueden agregar extras (ej. desinfección).'},
+];
+function svcKind(k){ return SVC_KINDS.find(x=>x.k===k)||SVC_KINDS[1]; }
+function svcKindOptions(sel){ return SVC_KINDS.map(x=>'<option value="'+x.k+'" '+(x.k===sel?'selected':'')+'>'+x.l+'</option>').join(''); }
 const SVC_IN='width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:inherit;box-sizing:border-box;';
 function svcEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 // 🖥️ En Mac, hacer clic en un campo de fecha NO abre el calendario (solo el iconito). Esto hace que al tocar
@@ -2568,7 +2577,7 @@ window.svcOrderFromAppt=function(apptId){
   try{ svcLoadRoster().then(()=>svcRenderModal()); }catch(e){}
 };
 window.svcNewOrder=function(){
-  window._svcDraft={ clientId:'', clientName:'', clientPhone:'', lang:'es', vin:'', plate:'', vehicleLabel:'', vehPick:'', reason:'', intakeReason:'', diagFee:0, diagFeeWaive:true, when:'now', scheduledAt:'', estMin:60, assignRole:'Mecánico', assignEmpId:'', assignName:'', services:[{desc:'',minutes:60,price:0,parts:[]}], laborRate:_svcDefaultRate(), deposit:0, editId:'', status:'' };
+  window._svcDraft={ clientId:'', clientName:'', clientPhone:'', lang:'es', vin:'', plate:'', vehicleLabel:'', vehPick:'', reason:'', when:'now', scheduledAt:'', estMin:60, assignRole:'Mecánico', assignEmpId:'', assignName:'', services:[{desc:'',minutes:60,price:0,parts:[],kind:'oil'}], laborRate:_svcDefaultRate(), deposit:0, editId:'', status:'' };
   svcRenderModal();
   document.getElementById('svc-modal').style.display='flex';
   svcLoadRoster().then(()=>svcRenderModal());
@@ -2576,7 +2585,7 @@ window.svcNewOrder=function(){
 // 👁️ Abrir una orden EXISTENTE para ver/editar (mismo formulario, modo editar).
 window.svcOpenOrder=function(id){
   const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
-  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0,price:(s.price!=null?Number(s.price):((Number(s.laborCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[]),role:s.role||o.assignRole||'Mecánico',assignEmpId:s.assignEmpId||'',assignName:s.assignName||'',status:s.status||'pendiente',estNote:s.estNote||'',diagnosis:s.diagnosis||null,_collapsed:true})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60,price:(Number(o.grandTotalCents)||0)/100,parts:[],role:o.assignRole||'Mecánico',assignEmpId:o.assignEmpId||'',assignName:o.assignName||'',status:'pendiente'}];
+  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0,price:(s.price!=null?Number(s.price):((Number(s.laborCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[]),kind:(s.kind||'oil'),role:s.role||o.assignRole||'Mecánico',assignEmpId:s.assignEmpId||'',assignName:s.assignName||'',status:s.status||'pendiente',estNote:s.estNote||'',diagnosis:s.diagnosis||null,_collapsed:true})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60,price:(Number(o.grandTotalCents)||0)/100,parts:[],kind:'oil',role:o.assignRole||'Mecánico',assignEmpId:o.assignEmpId||'',assignName:o.assignName||'',status:'pendiente'}];
   // Migrar partes GLOBALES viejas (modelo anterior) al primer servicio, para no perderlas al editar.
   if(Array.isArray(o.parts)&&o.parts.length && !services.some(s=>s.parts&&s.parts.length)){ const _mig=o.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})); if(services[0]) services[0].parts=_mig; }
   window._svcDraft={ clientId:o.clientId||'', clientName:o.clientName||'', clientPhone:o.clientPhone||'', lang:o.lang||'es',
@@ -2622,9 +2631,6 @@ function svcCapture(){
   if(g('svc-received')) d.receivedAt=g('svc-received').value?new Date(g('svc-received').value).toISOString():'';
   if(g('svc-delivered')) d.deliveredAt=g('svc-delivered').value?new Date(g('svc-delivered').value).toISOString():'';
   if(g('svc-miles-out')){ const _mo=parseInt(g('svc-miles-out').value,10); d.milesOut=(isNaN(_mo)?'':_mo); }
-  if(g('svc-intake-reason')) d.intakeReason=g('svc-intake-reason').value;
-  if(g('svc-diag-fee')){ const _df=parseFloat(g('svc-diag-fee').value); d.diagFee=(isNaN(_df)?0:_df); }
-  if(g('svc-diag-waive')) d.diagFeeWaive=!!g('svc-diag-waive').checked;
 }
 function svcCapParts(){
   const d=window._svcDraft; if(!d) return;
@@ -2656,13 +2662,14 @@ function svcCapServices(){
     const desc=(document.getElementById('svc-svc-desc-'+i)||{}).value||'';
     const minutes=Number((document.getElementById('svc-svc-time-'+i)||{}).value)||0;
     const price=Number((document.getElementById('svc-svc-price-'+i)||{}).value)||0;
+    const kind=(document.getElementById('svc-svc-kind-'+i)||{}).value||(pv.kind||'oil');
     const parts=(partsBySvc[i]||[]).filter(p=>p.desc||p.price);
     const role=(document.getElementById('svc-svc-role-'+i)||{}).value||'';
     const assignEmpId=(document.getElementById('svc-svc-emp-'+i)||{}).value||'';
     const e=assignEmpId?svcRoster.find(x=>String(x.id)===String(assignEmpId)):null;
-    arr.push({desc:desc, minutes:minutes, price:price, parts:parts, role:role, assignEmpId:assignEmpId, assignName:(e?e.name:''), status:(pv.status||'pendiente'), estNote:(pv.estNote||''), diagnosis:(pv.diagnosis||null), _collapsed:false});
+    arr.push({desc:desc, minutes:minutes, price:price, kind:kind, parts:parts, role:role, assignEmpId:assignEmpId, assignName:(e?e.name:''), status:(pv.status||'pendiente'), estNote:(pv.estNote||''), diagnosis:(pv.diagnosis||null), _collapsed:false});
   });
-  d.services=arr.length?arr:[{desc:'',minutes:60,price:0,parts:[],role:'',assignEmpId:'',assignName:'',status:'pendiente'}];
+  d.services=arr.length?arr:[{desc:'',minutes:60,price:0,parts:[],kind:'oil',role:'',assignEmpId:'',assignName:'',status:'pendiente'}];
 }
 window.svcCapture=svcCapture;
 // Al cambiar el ROL de un servicio, se limpia la persona (cambia la lista) y se re-dibuja ese selector.
@@ -2842,7 +2849,7 @@ function svcRenderModal(){
   // 3 · SERVICIO (cada servicio individual, con su labor = tiempo × tarifa; feed del invoice)
   const rate=Number(d.laborRate)||_svcDefaultRate();
   const svcList=(d.services&&d.services.length)?d.services:[{desc:'',minutes:60,price:0}];
-  const rowsHtml=svcList.map((s,i)=>{ const mins=Number(s.minutes)||0; const price=Number(s.price)||0;
+  const rowsHtml=svcList.map((s,i)=>{ const mins=Number(s.minutes)||0; const price=Number(s.price)||0; const _k=svcKind(s.kind);
     const timeOpts=SVC_EST.map(o=>'<option value="'+o.m+'" '+(String(mins)===String(o.m)?'selected':'')+'>'+o.l+'</option>').join('');
     const sparts=(s.parts&&s.parts.length)?s.parts:[];
     const spartRows=sparts.map((p,pi)=>'<div data-spart-row="'+i+'-'+pi+'" style="display:flex;gap:6px;align-items:center;margin-top:6px;"><input id="svc-spart-desc-'+i+'-'+pi+'" value="'+svcEsc(p.desc||'')+'" oninput="svcDescCap(this)" placeholder="Parte / cargo" autocapitalize="sentences" autocomplete="off" autocorrect="off" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;"><div style="position:relative;flex:0 0 90px;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;">$</span><input id="svc-spart-price-'+i+'-'+pi+'" type="number" inputmode="decimal" value="'+(p.price||'')+'" oninput="svcRecalc()" placeholder="0.00" style="'+SVC_IN+';width:100%;box-sizing:border-box;padding-left:17px;text-align:right;margin:0;font-size:13px;"></div><span onclick="svcRemovePart('+i+','+pi+')" style="cursor:pointer;color:var(--faint);font-size:15px;flex:0 0 auto;">🗑️</span></div>').join('');
@@ -2853,7 +2860,7 @@ function svcRenderModal(){
       return '<div data-svc-row="'+i+'" style="background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
         +'<div onclick="svcToggleService('+i+')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;">'
         +'<div style="min-width:0;overflow:hidden;"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+svcEsc((s.desc||'').trim()||('Servicio '+(i+1)))+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+svcEsc(who)+(mins?(' · '+svcFmtMin(mins)):'')+(sumPartes?(' · 🔩 '+formatMoney(sumPartes)):'')+'</div></div>'
+        +'<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_k.l+' · '+svcEsc(who)+(mins?(' · '+svcFmtMin(mins)):'')+(sumPartes?(' · 🔩 '+formatMoney(sumPartes)):'')+'</div></div>'
         +'<div style="white-space:nowrap;font-weight:800;color:var(--gold);">'+(price?formatMoney(price):'')+' <span style="color:var(--muted);font-weight:400;font-size:13px;">▸ abrir</span></div></div>'
         +'</div>';
     }
@@ -2861,10 +2868,12 @@ function svcRenderModal(){
       +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:7px;"><input id="svc-svc-desc-'+i+'" value="'+svcEsc(s.desc||'')+'" oninput="svcDescCap(this)" onblur="svcFixDescNow(this,'+i+')" placeholder="Servicio (ej. Cambiar turbo, Detallada interior)" autocapitalize="sentences" autocomplete="off" autocorrect="off" style="'+SVC_IN+';flex:1;margin:0;">'
       +'<span onclick="svcToggleService('+i+')" title="Minimizar" style="cursor:pointer;color:var(--muted);font-size:17px;flex:0 0 auto;">▾</span>'
       +(svcList.length>1?'<span onclick="svcRemoveService('+i+')" style="cursor:pointer;color:var(--faint);font-size:18px;flex:0 0 auto;">🗑️</span>':'')+'</div>'
+      +'<div style="margin-bottom:7px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px;">🧰 Tipo de servicio (por qué vino)</div><select id="svc-svc-kind-'+i+'" onchange="svcCapServices();svcRenderModal();" style="'+SVC_IN+';width:100%;margin:0;">'+svcKindOptions(s.kind)+'</select></div>'
       +'<div style="display:flex;gap:8px;align-items:center;">'
-      +'<div style="position:relative;flex:1;"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);">$</span><input id="svc-svc-price-'+i+'" type="number" inputmode="decimal" value="'+(price||'')+'" oninput="svcRecalc()" placeholder="Labor" style="'+SVC_IN+';width:100%;box-sizing:border-box;padding-left:20px;text-align:right;margin:0;font-weight:700;"></div>'
+      +'<div style="position:relative;flex:1;"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);">$</span><input id="svc-svc-price-'+i+'" type="number" inputmode="decimal" value="'+(price||'')+'" oninput="svcRecalc()" placeholder="'+_k.priceLbl+'" style="'+SVC_IN+';width:100%;box-sizing:border-box;padding-left:20px;text-align:right;margin:0;font-weight:700;"></div>'
       +'<select id="svc-svc-time-'+i+'" onchange="svcRecalc()" title="Tiempo estimado (solo interno, no lo ve el cliente)" style="'+SVC_IN+';flex:0 0 110px;margin:0;color:var(--muted);">'+timeOpts+'</select>'
       +'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4;">'+(s.kind==='diagnostic'?'🔎 ':(s.kind==='detailing'?'✨ ':'🛢️ '))+_k.priceLbl+' — '+svcEsc(_k.note)+'</div>'
       +'<button type="button" id="svc-est-btn-'+i+'" onclick="svcEstimateOne('+i+')" style="width:100%;margin-top:7px;background:rgba(240,192,64,0.12);border:1px solid var(--gold3);border-radius:9px;padding:7px;color:var(--gold);font-size:12px;font-weight:700;cursor:pointer;">✨ Estimar tiempo y labor (IA)</button>'
       +(s.estNote?('<div style="font-size:11.5px;color:var(--gold);margin-top:5px;line-height:1.4;">'+svcEsc(s.estNote)+'</div>'):'')
       +'<div style="margin-top:8px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px;">👤 Asignar este servicio a</div><div style="display:flex;gap:6px;"><select id="svc-svc-role-'+i+'" onchange="svcOnRoleChange('+i+')" title="Rol que hace este servicio" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcRoleOptions(s.role)+'</select><select id="svc-svc-emp-'+i+'" onchange="svcCapServices()" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcEmpOptions(s.role, s.assignEmpId)+'</select></div></div>'
@@ -2965,12 +2974,6 @@ function svcRenderModal(){
       +'</div>'
       +(paidBit?'<div style="margin-bottom:14px;font-size:12.5px;color:'+paidCol+';font-weight:700;">'+paidBit+'</div>':'');
   }
-  // 🎯 MOTIVO INICIAL (por qué vino el carro) — APARTE del estimado, queda en el record. + cuota de diagnóstico condicional (se perdona si repara aquí).
-  const _IN16=SVC_IN+';font-size:16px;';
-  const motivoHtml='<div style="font-size:12px;color:var(--muted);margin-bottom:5px;">🎯 Motivo inicial — ¿por qué vino el carro? <span style="color:var(--faint);">(queda en el record, aparte del estimado)</span></div>'
-    +'<textarea id="svc-intake-reason" rows="2" placeholder="ej. revisión de frenos" style="'+_IN16+';resize:vertical;">'+svcEsc(d.intakeReason||'')+'</textarea>'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-top:8px;"><label style="font-size:13px;color:var(--muted);flex:1;">🔎 Cuota de diagnóstico $</label><input id="svc-diag-fee" type="number" inputmode="decimal" value="'+((Number(d.diagFee)||0)?Number(d.diagFee):'')+'" placeholder="0.00" style="'+_IN16+';width:120px;text-align:right;margin:0;"></div>'
-    +'<label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;color:var(--muted);cursor:pointer;"><input id="svc-diag-waive" type="checkbox" '+(d.diagFeeWaive!==false?'checked':'')+' style="width:18px;height:18px;flex:0 0 auto;"> Se perdona si repara aquí (sólo se cobra si NO repara)</label>';
   // 📋 CAJA "ESTIMADO" — al tocarla abre el popup del estimado (lo que el cliente ve).
   const _estTot=(d.services||[]).reduce((a,s)=>a+(Number(s.price)||0)+((s.parts||[]).reduce((b,p)=>b+(Number(p.price)||0),0)),0);
   const _estSt=_svcOrd&&_svcOrd.estimateStatus==='accepted'?{t:'✅ Aceptado por el cliente',c:'#28b463'}:(_svcOrd&&_svcOrd.estimateStatus==='sent'?{t:'🧾 Enviado · esperando aprobación',c:'#e8b64a'}:{t:'🖊️ Borrador',c:'var(--muted)'});
@@ -2979,7 +2982,7 @@ function svcRenderModal(){
     +'<h2 style="font-family:var(--font-display);font-size:21px;margin:0;">'+(isEdit?('Orden de servicio'+(d.orderNum?(' <span style="color:var(--gold);">#'+d.orderNum+'</span>'):'')):'Nueva orden de servicio')+'</h2>'
     +'<button onclick="svcClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>'
     +bannerHtml
-    +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',motivoHtml+svcHtml)+SVC_SEC('📋 Estimado',estimateBoxHtml)
+    +SVC_SEC('1 · Cliente',cliHtml)+SVC_SEC('2 · Auto',vehHtml)+SVC_SEC('3 · Servicio y asignación',svcHtml)+SVC_SEC('📋 Estimado',estimateBoxHtml)
     +(isEdit?SVC_SEC('4 · Estatus y fechas',datesHtml):'')
     +(((_svcAccepted||_svcOrd.status==='arrancado') && svcPartsChecklist(_svcOrd))?SVC_SEC('📦 Refacciones',svcPartsChecklist(_svcOrd)):'')
     +(docsHtml?SVC_SEC('📁 Documentos',docsHtml):'')
@@ -3123,7 +3126,7 @@ window.svcEstimateOne=async function(si){
     svcRenderModal(); try{ svcRecalc(); }catch(e){}
   }catch(e){ if(btn){ btn.disabled=false; btn.innerHTML='✨ Estimar tiempo y labor (IA)'; } alert('No se pudo estimar: '+((e&&e.message)||e)); }
 };
-window.svcAddService=function(){ svcCapture(); const arr=(window._svcDraft.services=window._svcDraft.services||[]); arr.forEach(s=>{ s._collapsed=true; }); arr.push({desc:'',minutes:60,price:0,parts:[],role:'',assignEmpId:'',assignName:'',status:'pendiente',_collapsed:false}); svcRenderModal(); };
+window.svcAddService=function(){ svcCapture(); const arr=(window._svcDraft.services=window._svcDraft.services||[]); arr.forEach(s=>{ s._collapsed=true; }); arr.push({desc:'',minutes:60,price:0,parts:[],kind:'oil',role:'',assignEmpId:'',assignName:'',status:'pendiente',_collapsed:false}); svcRenderModal(); };
 window.svcRemoveService=function(i){ svcCapture(); const a=window._svcDraft.services||[]; a.splice(i,1); if(!a.length) a.push({desc:'',minutes:60,price:0,parts:[]}); svcRenderModal(); };
 window.svcAddPart=function(si){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s){ (s.parts=s.parts||[]).push({desc:'',price:0}); } svcRenderModal(); };
 window.svcRemovePart=function(si,pi){ svcCapture(); const s=(window._svcDraft.services||[])[si]; if(s&&Array.isArray(s.parts)){ s.parts.splice(pi,1); } svcRenderModal(); };
@@ -3211,13 +3214,6 @@ window.svcHistoryOpen=function(orderId){
         +'<div style="padding-bottom:'+(last?'0':'9px')+';min-width:0;flex:1;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><span style="font-weight:700;font-size:12.5px;color:'+(done||current?'var(--text)':'var(--muted)')+';">'+s.ic+' '+s.name+'</span>'+when+'</div>'+(s.extra?('<div style="font-size:11px;color:var(--muted);margin-top:1px;">'+s.extra+'</div>'):'')+'</div></div>';
     }).join('');
     h+='</div>';
-  })();
-  // 🎯 Motivo inicial (por qué vino) + cuota de diagnóstico condicional — queda en el record.
-  (function(){ const ir=(o.intakeReason||'').trim(); const df=(Number(o.diagFeeCents)||0)/100; if(!ir && !df) return;
-    h+='<div style="font-weight:800;font-size:12px;color:#f0a030;margin:6px 0 6px;">🎯 Motivo inicial</div>';
-    h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:11px;margin-bottom:12px;font-size:12.5px;line-height:1.45;">'+(ir?svcEsc(ir):'<span style="color:var(--muted);">—</span>')
-      +(df>0?('<div style="margin-top:6px;font-size:11.5px;color:var(--muted);">🔎 Cuota de diagnóstico '+formatMoney(df)+(o.diagFeeWaiveIfRepair!==false?' · se perdona si repara aquí':'')+'</div>'):'')
-      +'</div>';
   })();
   // 1) Recepción
   h+='<div style="font-weight:800;font-size:12px;color:#f0a030;margin:6px 0 6px;">1 · 🧾 Recepción</div>';
@@ -3373,8 +3369,7 @@ function svcEstimateSheetHTML(d, services, opts){
     :((receipt && o.paid)?('<div style="text-align:center;margin:10px 0 2px;"><span style="display:inline-block;border:2.5px solid #0a7a35;color:#0a7a35;font-weight:900;letter-spacing:2px;font-size:15px;padding:5px 16px;border-radius:8px;transform:rotate(-4deg);">✓ '+(en?'PAID':'PAGADO')+(payMethodTxt?(' · '+payMethodTxt):'')+'</span></div>'):'');
   const body='<div class="estsheet"><div class="h"><h1>LEGACY MOTORS GARAGE</h1><div class="s">'+L.sub+(folio?(' · '+folio):'')+'</div></div>'
     +stamp
-    +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(titleCase(d.clientName)||'—')+(d.clientPhone?(' · '+svcEsc(_fmtPhone(d.clientPhone))):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+(receipt&&paidDate?paidDate:dstr)+(folio?('<br><b>'+L.ord+':</b> '+folio):'')
-      +((o.intakeReason||'').trim()?('<br><b>'+(en?'Reason for visit':'Motivo de la visita')+':</b> '+svcEsc(o.intakeReason)):'')+'</div>'
+    +'<div class="meta"><b>'+L.cust+':</b> '+svcEsc(titleCase(d.clientName)||'—')+(d.clientPhone?(' · '+svcEsc(_fmtPhone(d.clientPhone))):'')+'<br><b>'+L.veh+':</b> '+svcEsc(d.vehicleLabel||d.vin||'—')+(d.plate?(' · '+svcEsc(d.plate)):'')+'<br><b>'+L.date+':</b> '+(receipt&&paidDate?paidDate:dstr)+(folio?('<br><b>'+L.ord+':</b> '+folio):'')+'</div>'
     +_narr
     +'<table>'+rows+'</table>'
     +'<div class="tot"><div class="line"><span style="color:#777;">'+L.labor+'</span><b>'+money(laborSub)+'</b></div><div class="line"><span style="color:#777;">'+L.parts+'</span><b>'+money(partsSub)+'</b></div>'
@@ -3387,7 +3382,6 @@ function svcEstimateSheetHTML(d, services, opts){
             ? ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+(payMethodTxt?(' · '+payMethodTxt):'')+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):''))
             : (dep>0?('<div class="line"><span style="color:#777;">'+L.dep+'</span><b>−'+money(dep)+'</b></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.bal+'</span><span>'+money(bal)+'</span></div>'):'')))+'</div>'
     +_work
-    +(((Number(o.diagFeeCents)||0)>0 && !o.paid)?('<div class="disc" style="color:#555;"><b>'+(en?'Diagnosis fee':'Cuota de diagnóstico')+': '+money((Number(o.diagFeeCents)||0)/100)+'.</b> '+(o.diagFeeWaiveIfRepair!==false?(en?'Waived if the repair is done here; charged only if you decline the repair.':'Se perdona si la reparación se hace aquí; sólo se cobra si usted no autoriza la reparación.'):(en?'Applies to the diagnosis performed.':'Aplica por el diagnóstico realizado.'))+'</div>'):'')
     +'<div class="disc">'+L.disc+'</div>'
     +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California BAR Reg. No. ARD 317673 · Automotive Repair Dealer</div></div>';
   return '<style>'+style+'</style>'+body;
@@ -3689,7 +3683,7 @@ window.svcSaveOrder=async function(opts){
   // 3 · servicios (cada uno con su labor = tiempo × tarifa) + partes — feed del invoice
   const rate=Number(d.laborRate)||0;
   const capF=s=>{ s=(s||'').trim(); return s?s.charAt(0).toUpperCase()+s.slice(1):s; };
-  const services=(d.services||[]).map(s=>{ const e=s.assignEmpId?svcRoster.find(x=>String(x.id)===String(s.assignEmpId)):null; return { desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, parts:(Array.isArray(s.parts)?s.parts:[]), role:(s.role||''), assignEmpId:s.assignEmpId||'', assignName:(e?e.name:(s.assignName||'')), status:(s.status||'pendiente'), diagnosis:(s.diagnosis||null) }; }).filter(s=>s.desc);
+  const services=(d.services||[]).map(s=>{ const e=s.assignEmpId?svcRoster.find(x=>String(x.id)===String(s.assignEmpId)):null; return { desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, kind:(s.kind||'oil'), parts:(Array.isArray(s.parts)?s.parts:[]), role:(s.role||''), assignEmpId:s.assignEmpId||'', assignName:(e?e.name:(s.assignName||'')), status:(s.status||'pendiente'), diagnosis:(s.diagnosis||null) }; }).filter(s=>s.desc);
   if(!services.length){ alert('Agrega al menos un trabajo.'); return; }
   // 🔧 FUNCIÓN obligatoria SOLO al crear/guardar la ORDEN real (no en estimado: el estimado es cotización, aún no necesita función ni fecha ni mecánico).
   if(!opts.silent){
@@ -3747,7 +3741,7 @@ window.svcSaveOrder=async function(opts){
   let orderNum = d.editId ? ((svcOrders.find(x=>x.id===d.editId)||{}).orderNum || null) : null;
   if(!d.editId){ try{ const _n=await httpsCallable(functions,'svcNextNum')({}); orderNum=(_n&&_n.data&&_n.data.num)||null; }catch(e){ console.warn('svcNextNum', e); } }
   // guardar
-  const payload={ clientId, clientName, clientPhone, lang, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, scheduleAfterParts, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, milesOut:(d.milesOut===''||d.milesOut==null)?null:Number(d.milesOut), intakeReason:(d.intakeReason||''), diagFeeCents:Math.round((Number(d.diagFee)||0)*100), diagFeeWaiveIfRepair:(d.diagFeeWaive!==false), estMinutes, assignRole, assignEmpId, assignName, status };
+  const payload={ clientId, clientName, clientPhone, lang, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, scheduleAfterParts, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, milesOut:(d.milesOut===''||d.milesOut==null)?null:Number(d.milesOut), estMinutes, assignRole, assignEmpId, assignName, status };
   if(orderNum) payload.orderNum=orderNum;
   window._svcLastPayload=Object.assign({}, payload);   // 📸 para los snapshots de documentos (estimado inicial/final)
   const wasEdit=!!d.editId; let orderId=d.editId||'';
@@ -7987,6 +7981,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261106220557"></script>
+<script type="module" src="launcher.js?v=20261106222955"></script>
 </body>
 </html>

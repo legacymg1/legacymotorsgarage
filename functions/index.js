@@ -1471,7 +1471,8 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
     try {
       const justDone = ((!before.paid && after.paid) || (before.status !== "entregado" && after.status === "entregado"));
       const _oilRe = /aceite|oil\s*change/i;
-      const hasOil = (Array.isArray(after.services) ? after.services : []).some((s) => s && _oilRe.test(String(s.desc || "") + " " + String(s.descEn || ""))) || _oilRe.test(String(after.reason || "") + " " + String(after.reasonEn || ""));
+      // 🛢️ Reinicia el recordatorio de 3 meses si algún servicio es TIPO "cambio de aceite" (kind:'oil') o su texto lo dice.
+      const hasOil = (Array.isArray(after.services) ? after.services : []).some((s) => s && (s.kind === "oil" || _oilRe.test(String(s.desc || "") + " " + String(s.descEn || "")))) || _oilRe.test(String(after.reason || "") + " " + String(after.reasonEn || ""));
       if (justDone && hasOil && after.clientId) {
         const dstr = ((new Date().toLocaleString("en-CA", { timeZone: "America/Los_Angeles" }).split(",")[0]) || "").trim(); // YYYY-MM-DD en LA
         if (/^\d{4}-\d{2}-\d{2}$/.test(dstr)) {
