@@ -1404,6 +1404,33 @@ async function _pushToClient(clientId, phone, payload) {
   } catch (e) { console.log("_pushToClient", e); }
 }
 
+// 🔔 DIAGNÓSTICO de notificaciones (solo DUEÑO): cuenta tokens de dueños + (opcional) de un cliente, y manda un push de PRUEBA.
+//    Sirve para saber si un iPhone YA está registrado (si owners=0, ese teléfono no activó notificaciones).
+exports.pushDiag = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const email = String((request.auth.token || {}).email || "").toLowerCase();
+  if (OWNER_EMAILS.indexOf(email) < 0) throw new HttpsError("permission-denied", "Solo dueños.");
+  const db = admin.firestore();
+  const d = request.data || {};
+  const byEmail = {};
+  try {
+    const os = await db.collection("push_tokens").where("email", "in", OWNER_EMAILS).get();
+    os.forEach((x) => { const e = (x.data() || {}).email || "?"; byEmail[e] = (byEmail[e] || 0) + 1; });
+  } catch (e) { byEmail._err = String(e); }
+  let client = null;
+  const cid = String(d.clientId || ""); const phone = String(d.phone || "");
+  if (cid || phone) {
+    let c = 0;
+    try { if (cid) { const s = await db.collection("push_tokens").where("clientId", "==", cid).get(); c += s.size; } } catch (e) {}
+    try { if (phone) { const s = await db.collection("push_tokens").where("phone", "==", phone).get(); c += s.size; } } catch (e) {}
+    client = { clientId: cid, phone, tokens: c };
+  }
+  if (d.test) {
+    await _pushToOwners({ title: "🔔 Prueba Legacy", body: "Si ves esto, tus notificaciones funcionan ✅", titleEn: "🔔 Legacy test", bodyEn: "If you see this, your notifications work ✅", url: "/finanzas.html" });
+  }
+  return { ok: true, owners: byEmail, client };
+});
+
 // 🚗 Avisa al CLIENTE (en su idioma) cuando: le mandan un NUEVO ESTIMADO, o su auto queda LISTO para recoger.
 exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) => {
   try {
