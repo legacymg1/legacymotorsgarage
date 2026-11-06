@@ -2816,6 +2816,13 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
         bodyEn: _nm + _fol + _veh + " · no observations",
         url: "/admin.html",
       });
+      await _pushToClient(o.clientId || "", o.clientPhone || o.phone || "", {
+        title: "✅ Recibimos tu carro",
+        body: "Tu vehículo" + _veh + _fol + " entró sin observaciones y quedó recibido. Pronto empezamos el diagnóstico.",
+        titleEn: "✅ We received your car",
+        bodyEn: "Your vehicle" + _veh + _fol + " came in with no observations and is checked in. Diagnosis coming up.",
+        url: "/portal.html",
+      });
     }
   } catch (e) { console.log("svcIntake push", e); }
   return { ok: true };
@@ -2867,7 +2874,10 @@ exports.svcReceptionAck = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (o.status === "por_aprobar" || o.status === "por_recibir" || o.status === "agendado") patch.status = "recibido";
   await ref.set(patch, { merge: true });
   const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";
-  try { await _pushToOwners({ title: "🧾 Ingreso autorizado", body: _nm + " autorizó el ingreso" + _fol + (o.vehicleLabel ? (" · " + o.vehicleLabel) : ""), titleEn: "🧾 Check-in authorized", bodyEn: _nm + " authorized check-in" + _fol, url: "/admin.html" }); } catch (e) {}
+  const _veh = o.vehicleLabel ? (" · " + o.vehicleLabel) : "";
+  // 🔔 Al autorizar el cliente: avisa a los DUEÑOS y al MECÁNICO (ya puede empezar el diagnóstico).
+  try { await _pushToOwners({ title: "🧾 Ingreso autorizado", body: _nm + " autorizó el ingreso" + _fol + _veh, titleEn: "🧾 Check-in authorized", bodyEn: _nm + " authorized check-in" + _fol, url: "/admin.html" }); } catch (e) {}
+  try { await _pushToOrderMechs(o, { title: "✅ Cliente autorizó" + _fol, body: (o.vehicleLabel || "El carro") + " · ya puedes empezar el diagnóstico 🔧", titleEn: "✅ Customer authorized" + _fol, bodyEn: (o.vehicleLabel || "The car") + " · you can start the diagnosis 🔧", url: "/warehouse.html" }); } catch (e) {}
   return { ok: true };
 });
 
