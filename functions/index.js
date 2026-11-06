@@ -2748,11 +2748,16 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
   })) : [];
   // 🆕 Observaciones de recepción = desperfectos PRE-EXISTENTES (nota + foto c/u). "none" = sin observaciones (carro bien).
   const obsRaw = Array.isArray(inRaw.observations) ? inRaw.observations.slice(0, 24) : [];
-  const observations = obsRaw.map((ob) => ({
-    note: String(ob.note || "").slice(0, 500),
-    photo: String(ob.photo || "").slice(0, 600),
-    at: String(ob.at || new Date().toISOString()).slice(0, 40),
-  })).filter((ob) => ob.note || ob.photo);
+  const observations = obsRaw.map((ob) => {
+    const photos = (Array.isArray(ob.photos) ? ob.photos : (ob.photo ? [ob.photo] : []))
+      .slice(0, 12).map((u) => String(u || "").slice(0, 600)).filter(Boolean);
+    return {
+      note: String(ob.note || "").slice(0, 500),
+      photo: photos[0] || String(ob.photo || "").slice(0, 600), // 1ra = compat con vistas viejas
+      photos: photos,                                           // todas
+      at: String(ob.at || new Date().toISOString()).slice(0, 40),
+    };
+  }).filter((ob) => ob.note || ob.photo || (ob.photos && ob.photos.length));
   // 🔎 Trabajo SUGERIDO en la inspección rápida (NO es daño pre-existente; no afecta "none"/autorización). Para que la oficina lo proponga.
   const sugRaw = Array.isArray(inRaw.suggested) ? inRaw.suggested.slice(0, 24) : [];
   const suggested = sugRaw.map((s) => ({
@@ -2783,6 +2788,36 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
     if (none) patch.receivedAt = o.receivedAt || new Date().toISOString();
   }
   await ref.set(patch, { merge: true });
+  // 🔔 Avisa al guardar el reporte de ingreso: al CLIENTE (autoriza si hay observaciones) y al DUEÑO (entró un carro).
+  //    Requiere que ese teléfono tenga la app instalada + notificaciones permitidas (token en push_tokens).
+  const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";
+  const _veh = o.vehicleLabel ? (" · " + o.vehicleLabel) : "";
+  try {
+    if (!none) {
+      await _pushToClient(o.clientId || "", o.clientPhone || o.phone || "", {
+        title: "🧾 Autoriza el reporte de tu carro",
+        body: "Registramos la condición de ingreso" + _fol + _veh + ". Ábrelo y autorízalo.",
+        titleEn: "🧾 Authorize your check-in report",
+        bodyEn: "We logged your vehicle's condition" + _fol + _veh + ". Open and authorize it.",
+        url: "/portal.html",
+      });
+      await _pushToOwners({
+        title: "🧾 Carro ingresado · pendiente de autorización",
+        body: _nm + _fol + _veh + " · " + observations.length + " observación(es)",
+        titleEn: "🧾 Car checked in · needs authorization",
+        bodyEn: _nm + _fol + _veh + " · " + observations.length + " observation(s)",
+        url: "/admin.html",
+      });
+    } else {
+      await _pushToOwners({
+        title: "🧾 Carro recibido",
+        body: _nm + _fol + _veh + " · sin observaciones",
+        titleEn: "🧾 Car received",
+        bodyEn: _nm + _fol + _veh + " · no observations",
+        url: "/admin.html",
+      });
+    }
+  } catch (e) { console.log("svcIntake push", e); }
   return { ok: true };
 });
 
