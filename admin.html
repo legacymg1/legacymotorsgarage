@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106030239"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106030239"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106032135"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106032135"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261106030239"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261106030239"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106032135"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261106032135"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2428,7 +2428,7 @@ function c360SvcHistory(c, v){
     const isPaid=(o.paid===true);
     const docLbl = isPaid ? '🧾 recibo ›' : (done ? '🧾 invoice ›' : '📄 estimado ›');   // pagada = RECIBO; entregada = invoice; antes = estimado
     const docFn = isPaid ? ('svcOpenReceipt(\''+o.id+'\')') : ('svcOpenOrder(\''+o.id+'\')');
-    row+='<div style="display:flex;justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:8px;">'+(hasHist?('<a href="#" onclick="event.preventDefault();c360Close();svcHistoryOpen(\''+o.id+'\')" style="color:#9b7bff;text-decoration:none;font-size:12px;">🔧 historia ›</a>'):'')+'<a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">ver orden ›</a>'+(hasInvoice?('<a href="#" onclick="event.preventDefault();c360Close();'+docFn+'" style="color:var(--gold);text-decoration:none;font-size:12px;">'+docLbl+'</a>'):'')+'</div></div>';
+    row+='<div style="display:flex;justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:8px;">'+(hasHist?('<a href="#" onclick="event.preventDefault();c360Close();svcHistoryOpen(\''+o.id+'\')" style="color:#9b7bff;text-decoration:none;font-size:12px;">🔧 historial ›</a>'):'')+'<a href="#" onclick="event.preventDefault();c360Close();svcOpenOrder(\''+o.id+'\')" style="color:var(--gold);text-decoration:none;font-size:12px;">ver orden ›</a>'+(hasInvoice?('<a href="#" onclick="event.preventDefault();c360Close();'+docFn+'" style="color:var(--gold);text-decoration:none;font-size:12px;">'+docLbl+'</a>'):'')+'</div></div>';
     return row;
   }).join('');
 }
@@ -2850,7 +2850,7 @@ function svcRenderModal(){
       +(s.estNote?('<div style="font-size:11.5px;color:var(--gold);margin-top:5px;line-height:1.4;">'+svcEsc(s.estNote)+'</div>'):'')
       +'<div style="margin-top:8px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:3px;">👤 Asignar este servicio a</div><div style="display:flex;gap:6px;"><select id="svc-svc-role-'+i+'" onchange="svcOnRoleChange('+i+')" title="Rol que hace este servicio" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcRoleOptions(s.role)+'</select><select id="svc-svc-emp-'+i+'" onchange="svcCapServices()" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;">'+svcEmpOptions(s.role, s.assignEmpId)+'</select></div></div>'
       +((s.diagnosis && ((s.diagnosis.parts&&s.diagnosis.parts.length)||s.diagnosis.notes))?(
-        '<div style="margin-top:8px;background:rgba(109,75,255,.06);border:1px solid rgba(109,75,255,.3);border-radius:9px;padding:7px 9px;font-size:11.5px;color:#9b7bff;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;" onclick="svcHistoryOpen(\''+(d.editId||'')+'\')">🔬 El mecánico encontró '+((s.diagnosis.parts||[]).length)+' parte(s)<span style="color:var(--muted);">ver historia ›</span></div>'
+        '<div style="margin-top:8px;background:rgba(109,75,255,.06);border:1px solid rgba(109,75,255,.3);border-radius:9px;padding:7px 9px;font-size:11.5px;color:#9b7bff;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;" onclick="svcHistoryOpen(\''+(d.editId||'')+'\')">🔬 El mecánico encontró '+((s.diagnosis.parts||[]).length)+' parte(s)<span style="color:var(--muted);">ver historial ›</span></div>'
       ):'')
       +'<div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:7px;"><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:2px;">🔩 Partes de este servicio</div>'+spartRows
       +'<button type="button" onclick="svcAddPart('+i+')" style="width:100%;margin-top:6px;background:transparent;border:1px dashed var(--border);border-radius:9px;padding:6px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;">➕ Agregar parte / cargo</button></div>'
@@ -2871,7 +2871,7 @@ function svcRenderModal(){
   let _hObs=(_ik&&!_ik.none)?((_ik.observations||[]).length):0, _hParts=0, _hRep=0, _hDiag=false;
   _histSvs.forEach(function(s){ if(s.diagnosis){ _hDiag=true; _hParts+=((s.diagnosis.parts||[]).length); } if(s.repair){ _hRep++; } });
   const _hHas = !!(_ik || _hDiag || _hRep || (Array.isArray(_svcOrd.suggested) && _svcOrd.suggested.length));
-  const mechHistoryBtn = _hHas ? ('<button type="button" onclick="svcHistoryOpen(\''+(d.editId||'')+'\')" style="width:100%;margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;color:var(--text);font-family:inherit;text-align:left;"><div style="min-width:0;"><div style="font-weight:800;font-size:13px;">🔧 Historia del mecánico</div><div style="font-size:11.5px;color:var(--muted);margin-top:2px;">'+(_ik?((_ik.none?'🧾 Ingreso sin daños':('🧾 '+_hObs+' observación(es)'))+' · '):'')+(_hDiag?('🔬 '+_hParts+' parte(s)'):'Sin diagnóstico')+(_hRep?(' · 🔧 '+_hRep+' listo(s)'):'')+'</div></div><span style="color:var(--muted);font-size:18px;flex:0 0 auto;">›</span></button>') : '';
+  const mechHistoryBtn = _hHas ? ('<button type="button" onclick="svcHistoryOpen(\''+(d.editId||'')+'\')" style="width:100%;margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;color:var(--text);font-family:inherit;text-align:left;"><div style="min-width:0;"><div style="font-weight:800;font-size:13px;">🔧 Historial de la orden</div><div style="font-size:11.5px;color:var(--muted);margin-top:2px;">'+(_ik?((_ik.none?'🧾 Ingreso sin daños':('🧾 '+_hObs+' observación(es)'))+' · '):'')+(_hDiag?('🔬 '+_hParts+' parte(s)'):'Sin diagnóstico')+(_hRep?(' · 🔧 '+_hRep+' listo(s)'):'')+'</div></div><span style="color:var(--muted);font-size:18px;flex:0 0 auto;">›</span></button>') : '';
   const svcHtml=mechHistoryBtn
     +'<div style="display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-bottom:8px;font-size:11.5px;color:var(--muted);">⚙️ Tarifa mecánico (para estimar): $<input id="svc-labor-rate" type="number" inputmode="decimal" value="'+rate+'" onchange="svcSetRate(this.value)" style="width:56px;padding:4px 6px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;text-align:right;">/hr</div>'
     +rowsHtml
@@ -3130,7 +3130,7 @@ window.svcHistoryOpen=function(orderId){
   // 🧩 TODAS las partes que el mecánico marcó (consolidadas de todos los servicios) → widget-lista para ordenar/agregar al estimado.
   const allParts=[]; svs.forEach(function(s,i){ ((s.diagnosis&&s.diagnosis.parts)||[]).forEach(function(p,pi){ allParts.push({ si:i, pi:pi, svc:(s.desc||('Servicio '+(i+1))), desc:p.desc||'', partNum:p.partNum||'', photo:p.photo||'' }); }); });
   let h='';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;">🔧 Historia del mecánico'+(o.orderNum?(' · #'+o.orderNum):'')+'</h2><button onclick="svcHistoryClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;">🔧 Historial de la orden'+(o.orderNum?(' · #'+o.orderNum):'')+'</h2><button onclick="svcHistoryClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>';
   h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">'+svcEsc(o.clientName||'')+' · 🚗 '+svcEsc(o.vehicleLabel||o.plate||'')+'</div>';
   // 1) Recepción
   h+='<div style="font-weight:800;font-size:12px;color:#f0a030;margin:6px 0 6px;">1 · 🧾 Recepción</div>';
@@ -7831,6 +7831,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261106030239"></script>
+<script type="module" src="launcher.js?v=20261106032135"></script>
 </body>
 </html>
