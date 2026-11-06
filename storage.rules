@@ -1,15 +1,71 @@
 rules_version = '2';
 
 // Legacy Motors Garage — reglas de Firebase Storage.
-// Herramienta INTERNA: todos los que entran están autenticados (dueños/estaciones por CORREO
-// o empleados por TELÉFONO, o clientes del portal por teléfono). Permitimos leer/escribir a
-// cualquier usuario autenticado. Lo anónimo queda fuera.
-// NOTA: estas reglas se publican en la consola de Firebase (Storage → Rules → Publish),
-// o con `firebase deploy --only storage` (requiere agregar "storage" en firebase.json).
+// Fuente de verdad en la consola (Storage → Rules); este archivo las documenta.
+// Empleados por TELÉFONO (Pit Crew) suben fotos de yarda (parts/ y dismantle_vehicles/)
+// si están ACTIVOS en emp_phones. Dueños/estaciones por correo = isYard/isStaff.
 service firebase.storage {
   match /b/{bucket}/o {
+
+    function isStaff() {
+      return request.auth != null && request.auth.token.email_verified == true
+        && request.auth.token.email in ['ev@legacymotorsgarage.com', 'ivan.garcia@legacymotorsgarage.com'];
+    }
+    function isSignedIn() { return request.auth != null; }
+    function isYard() {
+      return request.auth != null
+        && request.auth.token.email in ['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com','warehouse@legacymotorsgarage.com','capture@legacymotorsgarage.com','listing@legacymotorsgarage.com','yarda@legacymotorsgarage.com','ebay@legacymotorsgarage.com','empaque@legacymotorsgarage.com'];
+    }
+    // 📱 Empleado por TELÉFONO: activo en emp_phones (Storage puede leer Firestore).
+    function isYardPhone() {
+      return request.auth != null && request.auth.token.phone_number != null
+        && firestore.exists(/databases/(default)/documents/emp_phones/$(request.auth.token.phone_number))
+        && firestore.get(/databases/(default)/documents/emp_phones/$(request.auth.token.phone_number)).data.active == true;
+    }
+
+    match /dismantle_vehicles/{allPaths=**} {
+      allow read: if true;
+      allow write: if (isYard() || isYardPhone()) && request.resource.size < 25 * 1024 * 1024;
+    }
+    match /config/{docId} {
+      allow read: if request.auth != null
+        && request.auth.token.email in ['ev@legacymotorsgarage.com','ivan.garcia@legacymotorsgarage.com'];
+      allow write: if false;
+    }
+    match /inventory/{allPaths=**} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    match /receipts/{allPaths=**} {
+      allow read:  if isStaff();
+      allow write: if isStaff() && request.resource.size < 25 * 1024 * 1024;
+    }
+    match /contracts/{allPaths=**} {
+      allow read:  if isSignedIn();
+      allow write: if isStaff() && request.resource.size < 25 * 1024 * 1024;
+    }
+    match /insurance/{allPaths=**} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn() && request.resource.size < 25 * 1024 * 1024;
+    }
+    match /ids/{allPaths=**} {
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn() && request.resource.size < 25 * 1024 * 1024;
+    }
+    match /parts/{allPaths=**} {
+      allow read: if true;
+      allow write: if (isYard() || isYardPhone()) && request.resource.size < 25 * 1024 * 1024;
+    }
+
+    // 🔧 ÓRDENES DE SERVICIO: fotos de recepción (reporte de condición), diagnóstico, reparación, chat y mantenimiento sugerido.
+    // Suben dueños/estaciones (correo) y mecánicos por TELÉFONO (activos en emp_phones). Lectura abierta (las ve el cliente en el portal; el URL ya trae token).
+    match /serviceOrders/{allPaths=**} {
+      allow read: if true;
+      allow write: if (isStaff() || isYard() || isYardPhone()) && request.resource.size < 25 * 1024 * 1024;
+    }
+
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }

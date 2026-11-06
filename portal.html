@@ -136,8 +136,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261105200259"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261105200259"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106002419"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106002419"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <!-- PRIMER INGRESO: bloquea el portal hasta que conteste -->
 <div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.94);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
@@ -1041,6 +1041,7 @@ function estimateCardHTML(o){
     ${o.warranty?`<div style="margin:8px 0;background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.45);color:#4d9bff;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:800;text-align:center;">🛡️ ${es?'EN GARANTÍA · SIN COSTO PARA USTED':'WARRANTY · NO CHARGE TO YOU'}</div>`:''}
     ${svcStageHero(o)}
     ${(!o.paid && o.diagSummary && o.diagSummary.text)?`<div style="margin:8px 0;background:rgba(109,75,255,.08);border:1px solid rgba(109,75,255,.4);border-radius:12px;padding:12px;"><div style="font-weight:800;font-size:12px;color:#9b7bff;margin-bottom:6px;">🔬 ${es?'Lo que encontramos al revisar tu vehículo':'What we found inspecting your vehicle'}</div><div style="font-size:13px;line-height:1.5;white-space:pre-wrap;color:var(--white);">${escPortal(o.diagSummary.text)}</div></div>`:''}
+    ${(!o.paid && Array.isArray(o.suggested) && o.suggested.length)?`<div style="margin:8px 0;background:rgba(240,160,48,.08);border:1px solid rgba(240,160,48,.4);border-radius:12px;padding:12px;"><div style="font-weight:800;font-size:12px;color:#f0a030;margin-bottom:8px;">🔎 ${es?'Mantenimiento que te recomendamos':'Maintenance we recommend'}</div>${o.suggested.map(s=>`<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">${s.photo?`<img src="${s.photo}" onclick="window.open('${s.photo}','_blank')" style="width:54px;height:54px;object-fit:cover;border-radius:8px;flex:0 0 auto;cursor:pointer;">`:''}<div style="flex:1;min-width:0;font-size:13px;line-height:1.4;color:var(--white);">${escPortal(s.note||'')}</div></div>`).join('')}<div style="font-size:11px;color:var(--muted);line-height:1.4;">${es?'Es una recomendación — si quieres que lo incluyamos, dinos.':'A recommendation — tell us if you want it included.'}</div></div>`:''}
     ${showTrack?svcTrackerHTML(o):''}
     ${rows}
     <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">

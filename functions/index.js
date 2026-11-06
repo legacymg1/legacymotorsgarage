@@ -2882,6 +2882,8 @@ function _estPayload(o, en, planPaidCents, planTotalCents) {
     } : null,
     // 🔬 Resumen del diagnóstico del mecánico (hallazgo profesional) — para que el cliente entienda por qué estas partes/servicios.
     diagSummary: (o.diagSummary && o.diagSummary.text) ? { text: String(o.diagSummary.text).slice(0, 2000), at: o.diagSummary.at || "" } : null,
+    // 🔎 Mantenimiento sugerido adicional (el cliente lo ve con fotos) — trabajo que el mecánico recomienda aparte.
+    suggested: Array.isArray(o.suggested) ? o.suggested.map((s) => ({ note: String(s.note || "").slice(0, 500), photo: String(s.photo || "").slice(0, 600) })).filter((s) => s.note || s.photo) : [],
     services,
     laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
     warranty: warranty, warrantyReason: o.warrantyReason || "", coveredCents: warranty ? totalC : 0,

@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106001427"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106001427"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106002419"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106002419"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261106001427"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261106001427"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261106001427"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106002419"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261106002419"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261106002419"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1833,10 +1833,10 @@ window.whOpenTool=function(k){ document.body.classList.remove('wh-home'); setVie
 // ===================== 📋 MI JORNADA (tareas guiadas, portado de crew) =====================
 function whToast(m, isErr){
   let el=document.getElementById('wh-toast');
-  if(!el){ el=document.createElement('div'); el.id='wh-toast'; el.style.cssText='position:fixed;left:14px;right:14px;bottom:calc(20px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;z-index:9900;border-radius:12px;padding:12px 15px;font-size:14px;font-weight:700;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;'; document.body.appendChild(el); }
+  if(!el){ el=document.createElement('div'); el.id='wh-toast'; el.style.cssText='position:fixed;left:14px;right:14px;bottom:calc(20px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;z-index:2147483300;border-radius:12px;padding:12px 15px;font-size:14px;font-weight:700;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none;'; document.body.appendChild(el); }
   el.style.background=isErr?'#7f1d1d':'var(--surface)'; el.style.color=isErr?'#fff':'var(--text)'; el.style.border='1px solid '+(isErr?'#ef4444':'var(--gold)');
   el.textContent=m; el.style.display='block';
-  clearTimeout(whToast._t); whToast._t=setTimeout(()=>{ if(el) el.style.display='none'; }, 2600);
+  clearTimeout(whToast._t); whToast._t=setTimeout(()=>{ if(el) el.style.display='none'; }, isErr?6000:2600);
 }
 // Términos unificados (congruentes en todas las páginas), BILINGÜES: clave interna no cambia, etiqueta por idioma.
 const JOB_LINES={ dealer:{es:'Dealer',en:'Dealer',c:'#c9a84c'}, service:{es:'Servicio',en:'Service',c:'#0a84ff'}, desmantle:{es:'Dismantling',en:'Dismantling',c:'#a855f7'}, general:{es:'General',en:'General',c:'#8a8fa8'} };
@@ -2925,7 +2925,7 @@ function _svcWorkRender(o){
   if(!repair){
     // 🔎 TRABAJO ADICIONAL que el mecánico encontró (aparte de los servicios de la orden) → la oficina lo propone al cliente.
     const _nx=((o.suggested&&o.suggested.length)||0);
-    h+='<button onclick="svcOpenExtra(\''+o.id+'\')" class="btn ghost" style="width:100%;margin:4px 0 10px;">🔎 '+(en?'Extra work I found':'Trabajo adicional que encontré')+(_nx?(' · '+_nx):'')+'</button>';
+    h+='<button onclick="svcOpenExtra(\''+o.id+'\')" class="btn ghost" style="width:100%;margin:4px 0 10px;">🔎 '+(en?'Suggested maintenance':'Mantenimiento sugerido adicional')+(_nx?(' · '+_nx):'')+'</button>';
     // 🔬 DIAGNÓSTICO: el único cierre de esta fase es ENVIAR el diagnóstico al dueño (no "terminar" la orden).
     if(anyDiag){ h+='<button id="send-diag-btn" onclick="svcSendDiag(\''+o.id+'\')" class="btn-gold" style="width:100%;margin-top:4px;">📤 '+(o.diagSummary?(en?'Re-send diagnosis':'Reenviar diagnóstico'):(en?'Finish & send diagnosis':'Terminar y enviar diagnóstico'))+'</button><div class="faint" style="font-size:11px;text-align:center;margin-top:6px;line-height:1.4;">'+(en?'Sends the summary to the owner. Do not finish the car — the office builds the estimate.':'Envía el resumen al dueño. No termines el carro — la oficina arma el estimado.')+'</div>'; }
   } else {
@@ -3019,8 +3019,8 @@ window.svcOpenExtra=function(orderId){
 window.svcExtraClose=function(){ const el=document.getElementById('svc-extra'); if(el) el.remove(); _wx=null; try{ _whBusyRecalc(); }catch(e){} };
 function _extraRender(){
   const r=_wx; if(!r) return; const en=(L==='en'); let h='';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;">🔎 '+(en?'Extra work found':'Trabajo adicional')+'</h2><button onclick="svcExtraClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>';
-  h+='<div class="faint" style="font-size:12px;line-height:1.5;margin-bottom:12px;">'+(en?'Work you found that is NOT in the order (brakes, leaks, suspension…). The office proposes it to the customer.':'Trabajo que encontraste que NO está en la orden (frenos, fugas, suspensión…). La oficina se lo propone al cliente.')+'</div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;">🔎 '+(en?'Suggested maintenance':'Mantenimiento sugerido')+'</h2><button onclick="svcExtraClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>';
+  h+='<div class="faint" style="font-size:12px;line-height:1.5;margin-bottom:12px;">'+(en?'Maintenance/work you suggest that is NOT in the order (brakes, leaks, suspension…), with photos. The office proposes it and the customer sees it.':'Mantenimiento/trabajo que sugieres que NO está en la orden (frenos, fugas, suspensión…), con fotos. La oficina lo propone y el cliente lo ve.')+'</div>';
   r.items.forEach(function(it,i){
     h+='<div style="border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:10px;">';
     h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span class="faint" style="font-size:12px;font-weight:700;">🔧 #'+(i+1)+'</span><button onclick="extraRemove('+i+')" style="background:transparent;border:none;color:#e05a4a;font-size:13px;cursor:pointer;">🗑 '+(en?'Remove':'Quitar')+'</button></div>';
@@ -6045,7 +6045,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261106001427"></script>
+<script type="module" src="launcher.js?v=20261106002419"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
