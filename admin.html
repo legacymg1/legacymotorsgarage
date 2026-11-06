@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106034526"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106034526"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106183917"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106183917"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261106034526"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261106034526"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106183917"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261106183917"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2666,10 +2666,19 @@ window.svcCliSearch=function(){
   const box=document.getElementById('svc-cli-results'); if(!box) return;
   if(!q){ box.style.display='none'; box.innerHTML=''; return; }
   const qd=q.replace(/\D/g,'');
-  const hits=clients.filter(c=>{ const pd=(c.phone||'').replace(/\D/g,'')+(c.phoneE164||'').replace(/\D/g,''); return ((c.name||'')+' '+(c.phone||'')).toLowerCase().includes(q) || (qd.length>=3 && pd.indexOf(qd)>=0); }).slice(0,8);
+  // 🔎 Busca por NOMBRE, TELÉFONO o CARRO (marca/modelo/año, VIN o placa). Guarda el carro que casó para mostrarlo.
+  const hits=[];
+  clients.forEach(c=>{
+    if(hits.length>=8) return;
+    const pd=(c.phone||'').replace(/\D/g,'')+(c.phoneE164||'').replace(/\D/g,'');
+    const byName = ((c.name||'')+' '+(c.phone||'')).toLowerCase().includes(q) || (qd.length>=3 && pd.indexOf(qd)>=0);
+    let carHit=null;
+    try{ (clientVehicles(c)||[]).forEach(v=>{ if(carHit) return; const vtxt=((v.label||'')+' '+(v.vin||'')+' '+(v.plate||'')).toLowerCase(); if(vtxt.includes(q)) carHit=v; }); }catch(e){}
+    if(byName || carHit) hits.push({c:c, car:carHit});
+  });
   if(!hits.length){ box.style.display='none'; return; }
   box.style.display='block';
-  box.innerHTML=hits.map(c=>'<div onclick="svcPickClient(\''+c.id+'\')" style="padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">'+svcEsc(c.name||'')+' <span style="color:var(--muted);">· '+svcEsc(c.phone||'')+'</span></div>').join('');
+  box.innerHTML=hits.map(h=>{ const c=h.c; const carLbl=h.car?('🚗 '+(h.car.label||'')+(h.car.plate?(' · '+h.car.plate):'')):''; return '<div onclick="svcPickClient(\''+c.id+'\')" style="padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">'+svcEsc(c.name||'')+' <span style="color:var(--muted);">· '+svcEsc(c.phone||'')+'</span>'+(carLbl?('<div style="font-size:11.5px;color:var(--gold);margin-top:2px;">'+svcEsc(carLbl)+'</div>'):'')+'</div>'; }).join('');
 };
 window.svcPickClient=function(id){ svcCapture(); window._svcDraft.clientId=id; window._svcDraft.vehPick=''; try{ const c=clients.find(x=>x.id===id); if(c&&c.lang) window._svcDraft.lang=c.lang; }catch(e){}  /* 🌐 la orden/estimado/SMS respeta el idioma del cliente (no siempre español) */ svcRenderModal(); };
 window.svcClearClient=function(){ svcCapture(); window._svcDraft.clientId=''; window._svcDraft.vehPick=''; svcRenderModal(); };
@@ -2785,7 +2794,7 @@ function svcRenderModal(){
       +'<select id="svc-new-lang" onchange="svcCapture()" title="Idioma del estimado y mensajes" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:6px 8px;font-size:12px;font-family:inherit;cursor:pointer;"><option value="es"'+(d.lang==='es'?' selected':'')+'>🇲🇽 Español</option><option value="en"'+(d.lang==='en'?' selected':'')+'>🇺🇸 English</option></select>'
       +'<button onclick="svcClearClient()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:9px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;">Cambiar</button></div></div>';
   } else {
-    cliHtml='<input id="svc-cli-search" oninput="svcCliSearch()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="🔍 Buscar cliente existente…" style="'+SVC_IN+'">'
+    cliHtml='<input id="svc-cli-search" oninput="svcCliSearch()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="🔍 Buscar por nombre, teléfono o carro…" style="'+SVC_IN+'">'
       +'<div id="svc-cli-results" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:6px;max-height:180px;overflow-y:auto;"></div>'
       +'<div style="text-align:center;color:var(--faint);font-size:12px;margin:10px 0;">— o cliente nuevo —</div>'
       +'<input id="svc-new-name" value="'+svcEsc(d.clientName||'')+'" placeholder="Nombre del cliente" autocapitalize="words" style="'+SVC_IN+';margin-bottom:8px;text-transform:capitalize;">'
@@ -7833,6 +7842,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261106034526"></script>
+<script type="module" src="launcher.js?v=20261106183917"></script>
 </body>
 </html>
