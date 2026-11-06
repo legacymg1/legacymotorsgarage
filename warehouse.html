@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106033358"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106033358"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106184604"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106184604"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261106033358"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261106033358"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261106033358"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106184604"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261106184604"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261106184604"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -623,7 +623,7 @@ const T={
     invNumLbl:'Inventario #', recDate:'Fecha de recepción:', noJobs:'No hay trabajos en cola.', noJobsOwner:'<br>Toca <b>➕ Agregar trabajo a un carro</b>.',
     otherJob:'➕ otra tarea a este carro', whatToDo:'¿Qué se le va a hacer? (el paso)', whatToDoPh:'Ej. Reemplazar motor', addToQueue:'➕ Agregar a la cola', chooseCar:'— Elige el carro —', svcCar:'Carro',
     stCola:'🕐 En cola', stProc:'🔧 En proceso', stDone:'✅ Hecho',
-    svcAgendado:'📅 Agendado', svcPorRecibir:'🕐 Por recibir', svcPorAprobar:'⏳ Pendiente de autorización', svcRecibido:'📋 Recibido', svcEnProceso:'🔧 En proceso', svcPausado:'⏸️ Esperando partes', svcListo:'✅ Listo', svcEntregado:'🏁 Entregado',
+    svcAgendado:'📅 Agendado', svcPorRecibir:'🕐 Por recibir', svcPorAprobar:'⏳ Pendiente de autorización', svcRecibido:'📋 Recibido', svcEnProceso:'🔧 En proceso', svcPausado:'⏸️ Esperando partes', svcReparando:'🔧 En reparación', svcListo:'✅ Listo', svcEntregado:'🏁 Entregado',
     svcReceiveCar:'📋 Recibir carro', svcStartWork:'🔧 Empezar trabajo', svcWaitParts:'⏸️ Esperar partes', svcReady:'✅ Listo', svcResume:'▶️ Reanudar', svcMsg:'💬 Mensaje', svcNow:'🕐 Ahora', svcNoOrders:'No tienes órdenes de servicio ahora.<br>Cuando te asignen un carro, aquí aparece.', updated:'✅ Actualizado',
     carsProcH:'🚗 Carros en proceso', inProcNone:'No hay carros en proceso ahora.', jobsN:'trabajos', inspPending:'Inspección pendiente', stMecanico:'Mecánico', stPintura:'Pintura', stDetalle:'Detalle', stListo:'Listo',
     addCar:'➕ Carro a desmantelar', decodeBtn:'🔎 Decodificar', scanVinBtn:'📠 Escanear VIN', vinScanPoint:'Apunta al código de barras del VIN (marco de la puerta o parabrisas)…', vinFicha:'Ficha del VIN', year:'Año', make:'Marca', model:'Modelo', miles:'Millas (si se sabe)', engine:'Motor (opcional)', color:'Color', colorCode:'Código de color (opc.)', saveCar:'Guardar carro', savingCar:'Guardando…', carsDismantling:'Carros en desmantelamiento', noCarsYet:'Aún no hay carros. Agrega uno arriba ↑', car:'Carro', part:'parte(s)',
@@ -676,7 +676,7 @@ const T={
     invNumLbl:'Inventory #', recDate:'Received on:', noJobs:'No jobs in queue.', noJobsOwner:'<br>Tap <b>➕ Add a job to a car</b>.',
     otherJob:'➕ another job for this car', whatToDo:'What needs to be done? (the step)', whatToDoPh:'e.g. Replace engine', addToQueue:'➕ Add to queue', chooseCar:'— Choose the car —', svcCar:'Car',
     stCola:'🕐 Queued', stProc:'🔧 In progress', stDone:'✅ Done',
-    svcAgendado:'📅 Scheduled', svcPorRecibir:'🕐 To receive', svcPorAprobar:'⏳ Pending authorization', svcRecibido:'📋 Received', svcEnProceso:'🔧 In progress', svcPausado:'⏸️ Waiting for parts', svcListo:'✅ Ready', svcEntregado:'🏁 Delivered',
+    svcAgendado:'📅 Scheduled', svcPorRecibir:'🕐 To receive', svcPorAprobar:'⏳ Pending authorization', svcRecibido:'📋 Received', svcEnProceso:'🔧 In progress', svcPausado:'⏸️ Waiting for parts', svcReparando:'🔧 In repair', svcListo:'✅ Ready', svcEntregado:'🏁 Delivered',
     svcReceiveCar:'📋 Receive car', svcStartWork:'🔧 Start work', svcWaitParts:'⏸️ Wait for parts', svcReady:'✅ Ready', svcResume:'▶️ Resume', svcMsg:'💬 Message', svcNow:'🕐 Now', svcNoOrders:'No service orders right now.<br>When a car is assigned to you, it shows here.', updated:'✅ Updated',
     carsProcH:'🚗 Cars in process', inProcNone:'No cars in process right now.', jobsN:'jobs', inspPending:'Inspection pending', stMecanico:'Mechanic', stPintura:'Paint', stDetalle:'Detail', stListo:'Ready',
     addCar:'➕ Car to dismantle', decodeBtn:'🔎 Decode', scanVinBtn:'📠 Scan VIN', vinScanPoint:'Point at the VIN barcode (door jamb or windshield)…', vinFicha:'VIN details', year:'Year', make:'Make', model:'Model', miles:'Miles (if known)', engine:'Engine (optional)', color:'Color', colorCode:'Color code (opt.)', saveCar:'Save car', savingCar:'Saving…', carsDismantling:'Cars being dismantled', noCarsYet:'No cars yet. Add one above ↑', car:'Car', part:'part(s)',
@@ -1029,6 +1029,8 @@ onAuthStateChanged(auth, async (user)=>{
     try{ const of=new URLSearchParams(location.search).get('office'); if(of){ setTimeout(()=>{ if(role==='owner' && of!=='me'){ officeOpen({ownerMode:true,empId:of}); } else { officeOpen({}); } },700); } }catch(e){}
     // 🧭 Al refrescar, regresa al dueño donde estaba (ej. Nómina en el día/semana que veía).
     try{ if(role==='owner'){ const nv=_whNavGet(); if(nv && nv.panel==='payroll'){ setTimeout(()=>{ try{ whOpenPayroll(); if(nv.week) _payWeek=nv.week; if(nv.day) _payDay=nv.day; try{ _payCalMonth=new Date((nv.day||nv.week||_dayStr(new Date()))+'T12:00:00'); }catch(e){} _payCalOpen=!!nv.calOpen; whPayLoad(false); }catch(e){} }, 500); } } }catch(e){}
+    // 🔔 Deep-link del push interactivo (ej. "📦 Partes completas"): warehouse.html?svc=<id> → abre esa orden en la vista de trabajo.
+    try{ if(!window._whSvcDeepDone){ const dsv=new URLSearchParams(location.search).get('svc'); if(dsv){ window._whSvcDeepDone=true; _restoreSvcWork(dsv); } } }catch(e){}
     // 🧭 Al refrescar, regresa a la VISTA DE TRABAJO/diagnóstico si ahí estabas (dueño o empleado) — no te saca.
     try{ const nvw=_whNavGet(); if(nvw && nvw.panel==='svcwork' && nvw.orderId){ _restoreSvcWork(nvw.orderId); } }catch(e){}
     // 🧭 Al refrescar durante la RECEPCIÓN (en Android la cámara recarga la página), reábrela con lo que ya llevabas.
@@ -2054,6 +2056,7 @@ window.loadOwnerPanel=async function(){
 // 🔗 Delegan al componente compartido legacy-svc.js (LMG); con respaldo local por si el archivo no cargó.
 function _opStatusLabel(s){
   if(window.LMG && LMG.svcStatusLabel) return LMG.svcStatusLabel(s, L==='en');
+  if(s==='reparando') return L==='en'?'In repair':'En reparación';
   if(s==='en_proceso') return L==='en'?'In progress':'En proceso';
   if(s==='pausada'||s==='pausado'||s==='pausado_partes') return L==='en'?'Paused':'En pausa';
   if(s==='listo'||s==='hecho'||s==='terminado'||s==='entregado') return L==='en'?'Done':'Terminado';
@@ -2061,6 +2064,7 @@ function _opStatusLabel(s){
 }
 function _opStatusColor(s){
   if(window.LMG && LMG.svcStatusColor) return LMG.svcStatusColor(s);
+  if(s==='reparando') return '#32d74b';
   if(s==='en_proceso') return '#e8b64a';
   if(s==='pausada'||s==='pausado'||s==='pausado_partes') return '#ff9800';
   if(s==='listo'||s==='hecho'||s==='terminado'||s==='entregado') return '#35c46a';
@@ -2097,8 +2101,8 @@ function _svcOpsActions(o){
   const S=o.status||''; let a='';
   if(S==='por_recibir'||S==='agendado'||S==='arrancado'||S===''){ a=B('recibido','📥 '+L2('Recibir carro','Receive car'),true); }
   else if(S==='recibido'){ a=B('en_proceso','▶️ '+L2('Empezar','Start'),true); }
-  else if(S==='en_proceso'){ a=B('pausado_partes','⏸️ '+L2('Esperar partes','Wait parts'))+B('listo','✅ '+L2('Listo','Ready'),true); }
-  else if(S==='pausado_partes'){ a=B('en_proceso','▶️ '+L2('Reanudar','Resume'),true); }
+  else if(S==='en_proceso'||S==='reparando'){ a=B('pausado_partes','⏸️ '+L2('Esperar partes','Wait parts'))+B('listo','✅ '+L2('Listo','Ready'),true); }
+  else if(S==='pausado_partes'){ a=B('reparando','▶️ '+L2('Reanudar','Resume'),true); }
   else if(S==='listo'){ a=B('entregado','🏁 '+L2('Marcar entregado','Mark delivered'),true); }
   return a?('<div style="display:flex;gap:8px;margin-top:14px;">'+a+'</div>'):'';
 }
@@ -2517,7 +2521,7 @@ window.loadCarsProc=async function(){
 };
 
 // ===================== 🔧 MECÁNICO: Mi taller (portado de crew) =====================
-const SVC_ST={ agendado:{k:'svcAgendado',c:'#0a84ff'}, por_recibir:{k:'svcPorRecibir',c:'#c9a84c'}, por_aprobar:{k:'svcPorAprobar',c:'#f0a030'}, recibido:{k:'svcRecibido',c:'#c9a84c'}, en_proceso:{k:'svcEnProceso',c:'#32d74b'}, pausado_partes:{k:'svcPausado',c:'#ff9800'}, listo:{k:'svcListo',c:'#32d74b'}, entregado:{k:'svcEntregado',c:'#8a8fa8'} };
+const SVC_ST={ agendado:{k:'svcAgendado',c:'#0a84ff'}, por_recibir:{k:'svcPorRecibir',c:'#c9a84c'}, por_aprobar:{k:'svcPorAprobar',c:'#f0a030'}, recibido:{k:'svcRecibido',c:'#c9a84c'}, en_proceso:{k:'svcEnProceso',c:'#32d74b'}, pausado_partes:{k:'svcPausado',c:'#ff9800'}, reparando:{k:'svcReparando',c:'#32d74b'}, listo:{k:'svcListo',c:'#32d74b'}, entregado:{k:'svcEntregado',c:'#8a8fa8'} };
 function svcStLabel(st){ const s=SVC_ST[st]; return s?t(s.k):st; }
 const MECH_TASK_ST={ cola:{k:'stCola',c:'#c9a84c'}, en_proceso:{k:'stProc',c:'#32d74b'}, hecho:{k:'stDone',c:'#8a8fa8'} };
 let SVC_MY=[], MECH_CARS=[], MECH_WAITING=[], MECH_WORKING=[], MECH_CUR=null, MECH_TASKS=[], MECH_PREP=[], MECH_ADDCAR=null;
@@ -2699,8 +2703,8 @@ function _svcActionsHTML(o){
   if(!hasPipe){
     if(o.status==='por_recibir'||o.status==='agendado') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcOpenReception(\''+o.id+'\')">'+t('svcReceiveCar')+'</button>';
     if(o.status==='recibido') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcStartWork')+'</button>';
-    if(o.status==='en_proceso') return '<div style="display:flex;gap:8px;"><button class="btn-ghost" style="flex:1;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'pausado_partes\')">'+t('svcWaitParts')+'</button><button class="btn-gold" style="flex:1;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'listo\')">'+t('svcReady')+'</button></div>';
-    if(o.status==='pausado_partes') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'en_proceso\')">'+t('svcResume')+'</button>';
+    if(o.status==='en_proceso'||o.status==='reparando') return '<div style="display:flex;gap:8px;"><button class="btn-ghost" style="flex:1;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'pausado_partes\')">'+t('svcWaitParts')+'</button><button class="btn-gold" style="flex:1;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'listo\')">'+t('svcReady')+'</button></div>';
+    if(o.status==='pausado_partes') return '<button class="btn-gold" style="width:100%;" onclick="'+SP+'svcAdvance(\''+o.id+'\',\'reparando\')">'+t('svcResume')+'</button>';
     return '';
   }
   if(o.waitingFor && !o.myStageActive) return '<div class="btn-ghost" style="width:100%;text-align:center;opacity:.75;cursor:default;">⏳ '+(L==='en'?'Waiting for ':'Esperando a ')+svcRoleLabel(o.waitingFor)+'</div>';
@@ -6064,7 +6068,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261106033358"></script>
+<script type="module" src="launcher.js?v=20261106184604"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>

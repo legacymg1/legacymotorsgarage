@@ -13,6 +13,7 @@
   //    En cola → En proceso → En pausa → Terminado.
   LMG.svcStatusLabel = function (s, en) {
     if (s === 'por_aprobar') return en ? 'Pending authorization' : 'Pendiente de autorización';
+    if (s === 'reparando') return en ? 'In repair' : 'En reparación';
     if (s === 'en_proceso') return en ? 'In progress' : 'En proceso';
     if (s === 'pausada' || s === 'pausado' || s === 'pausado_partes') return en ? 'Paused' : 'En pausa';
     if (s === 'listo' || s === 'hecho' || s === 'terminado' || s === 'entregado') return en ? 'Done' : 'Terminado';
@@ -22,6 +23,7 @@
   // 🎨 COLOR único por estatus: cola gris · en proceso dorado · en pausa naranja · terminado verde.
   LMG.svcStatusColor = function (s) {
     if (s === 'por_aprobar') return '#f0a030';
+    if (s === 'reparando') return '#35c46a';
     if (s === 'en_proceso') return '#e8b64a';
     if (s === 'pausada' || s === 'pausado' || s === 'pausado_partes') return '#ff9800';
     if (s === 'listo' || s === 'hecho' || s === 'terminado' || s === 'entregado') return '#35c46a';
@@ -57,6 +59,7 @@
     if (s === 'arrancado') return { txt: en ? '🚀 Service started!' : '🚀 ¡Servicio arrancó!', col: '#7c5cff' };
     if (s === 'entregado') return { txt: en ? '🏁 Delivered' : '🏁 Entregado', col: '#28b463' };
     if (s === 'listo') return { txt: en ? '✅ Ready for pickup' : '✅ Listo p/ entrega', col: '#28b463' };
+    if (s === 'reparando') return { txt: en ? '🔧 In repair' : '🔧 En reparación', col: '#35c46a' };
     if (s === 'en_proceso') return { txt: en ? '🔧 In progress' : '🔧 En proceso', col: '#e8b64a' };
     if (s === 'pausado_partes') return { txt: en ? '⏸️ Waiting on parts' : '⏸️ Esperando partes', col: '#ff9800' };
     if (s === 'recibido') return { txt: en ? '📥 Received' : '📥 Recibido', col: '#e8b64a' };
@@ -69,7 +72,7 @@
   LMG.svcBucketOf = function (o) {
     o = o || {};
     if (o.paid || o.status === 'entregado') return 'completadas';   // paid "verdadero" (no sólo ===true) o entregado → completada
-    if (o.estimateStatus === 'accepted' || ['arrancado', 'por_aprobar', 'recibido', 'en_proceso', 'pausado_partes', 'listo'].indexOf(o.status) >= 0) return 'activas';
+    if (o.estimateStatus === 'accepted' || ['arrancado', 'por_aprobar', 'recibido', 'en_proceso', 'pausado_partes', 'reparando', 'listo'].indexOf(o.status) >= 0) return 'activas';
     return 'estimados';
   };
   function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }

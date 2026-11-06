@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106183917"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106183917"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106184604"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106184604"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261106183917"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261106183917"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106184604"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261106184604"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1587,6 +1587,7 @@ const SVC_STATUS = {
   recibido:      {lbl:'📋 Recibido',         c:'#c9a84c'},
   en_proceso:    {lbl:'🔧 En proceso',       c:'#32d74b'},
   pausado_partes:{lbl:'⏸️ Esperando partes', c:'#ff9800'},
+  reparando:     {lbl:'🔧 En reparación',    c:'#32d74b'},
   listo:         {lbl:'✅ Listo',            c:'#32d74b'},
   entregado:     {lbl:'🏁 Entregado',        c:'#8a8fa8'},
 };
@@ -1669,6 +1670,7 @@ function svcStatusLabel(o){
   if(s==='arrancado') return {txt:'🚀 ¡Servicio arrancó!', col:'#7c5cff'};
   if(s==='entregado') return {txt:'🏁 Entregado', col:'#28b463'};
   if(s==='listo') return {txt:'✅ Listo p/ entrega', col:'#28b463'};
+  if(s==='reparando') return {txt:'🔧 En reparación', col:'#32d74b'};
   if(s==='en_proceso') return {txt:'🔧 En proceso', col:'#e8b64a'};
   if(s==='pausado_partes') return {txt:'⏸️ Esperando partes', col:'#ff9800'};
   if(s==='recibido') return {txt:'📥 Recibido', col:'#e8b64a'};
@@ -1680,7 +1682,7 @@ function svcStatusLabel(o){
 function svcBucket(o){
   if(window.LMG && LMG.svcBucketOf) return LMG.svcBucketOf(o);
   if(o.paid || o.status==='entregado') return 'completadas';   // fallback (paid verdadero o entregado)
-  if(o.estimateStatus==='accepted' || ['arrancado','por_aprobar','recibido','en_proceso','pausado_partes','listo'].indexOf(o.status)>=0) return 'activas';
+  if(o.estimateStatus==='accepted' || ['arrancado','por_aprobar','recibido','en_proceso','pausado_partes','reparando','listo'].indexOf(o.status)>=0) return 'activas';
   return 'estimados';
 }
 window._svcTab=window._svcTab||'activas';
@@ -2874,7 +2876,7 @@ function svcRenderModal(){
   const grand=svcSub+partsSub;
   // 🔑 ¿El estimado ya está APROBADO? (acepta el cliente o ya está en trabajo). Antes de eso = solo cotización.
   const _svcOrd = d.editId ? (svcOrders.find(x=>x.id===d.editId)||{}) : {};
-  const _svcAccepted = (_svcOrd.estimateStatus==='accepted') || (['recibido','en_proceso','pausado_partes','listo','entregado'].indexOf(d.status)>=0);
+  const _svcAccepted = (_svcOrd.estimateStatus==='accepted') || (['recibido','en_proceso','pausado_partes','reparando','listo','entregado'].indexOf(d.status)>=0);
   // 🧾 Reporte de condición de INGRESO (lo que el mecánico documentó al recibir: daños pre-existentes "ya estaba así" + fotos) — protección legal.
   const _ik=_svcOrd.intake||null;
   // 🔧 Resumen COMPACTO → abre la HISTORIA del mecánico en un popup (no vomitar recepción/diagnóstico/reparación en la cara de la orden).
@@ -3368,12 +3370,12 @@ window.svcTogglePart=async function(orderId, kEnc){
   const all=parts.length>0 && parts.every(p=>recv[key(p)]);
   const patch={ partsRecv:recv, updatedAt:new Date().toISOString() };
   if(all){
-    if(!o.partsReadyAt) patch.partsReadyAt=new Date().toISOString();   // 🔔 dispara aviso al cliente (onServiceStatus)
-    // ✅ Ya llegaron TODAS → sale de "Esperando partes". El trabajo puede continuar.
-    if(o.status==='pausado_partes' || o.status==='arrancado'){ patch.status='en_proceso'; if(!o.startedAt) patch.startedAt=new Date().toISOString(); }
+    if(!o.partsReadyAt) patch.partsReadyAt=new Date().toISOString();   // 🔔 dispara aviso INTERACTIVO a cliente + mecánico + dueños (onServiceStatus)
+    // ✅ Ya llegaron TODAS → sale de "Esperando partes" y entra a "En reparación".
+    if(o.status==='pausado_partes' || o.status==='arrancado' || o.status==='en_proceso'){ patch.status='reparando'; if(!o.startedAt) patch.startedAt=new Date().toISOString(); }
   } else {
-    // Si quitas una refacción (vuelve a faltar) y estaba "en proceso" por partes → regresa a "Esperando partes".
-    if(o.status==='en_proceso' && o.partsReadyAt){ patch.status='pausado_partes'; patch.partsReadyAt=null; }
+    // Si quitas una refacción (vuelve a faltar) y estaba "En reparación" por partes → regresa a "Esperando partes".
+    if((o.status==='reparando' || o.status==='en_proceso') && o.partsReadyAt){ patch.status='pausado_partes'; patch.partsReadyAt=null; }
   }
   try{ await updateDoc(doc(db,'serviceOrders',orderId), patch); const _o=svcOrders.find(x=>x.id===orderId); if(_o){ Object.assign(_o, patch); } if(window._svcDraft){ if(patch.status) window._svcDraft.status=patch.status; svcRenderModal(); } }catch(e){ alert('No se pudo actualizar: '+((e&&e.message)||e)); }
 };
@@ -3583,7 +3585,7 @@ window.svcSaveOrder=async function(opts){
   else { status='por_recibir'; if(d.when==='later'){ if(!d.scheduledAt){ alert('Elige la fecha de la cita.'); return; } scheduledAt=new Date(d.scheduledAt).toISOString(); status='agendado'; } }
   // fechas de ingreso / salida (manuales + auto por estatus)
   let receivedAt=d.receivedAt||'', deliveredAt=d.deliveredAt||'';
-  if(['recibido','en_proceso','pausado_partes','listo','entregado'].indexOf(status)>=0 && !receivedAt) receivedAt=new Date().toISOString();
+  if(['recibido','en_proceso','pausado_partes','reparando','listo','entregado'].indexOf(status)>=0 && !receivedAt) receivedAt=new Date().toISOString();
   if(status==='entregado' && !deliveredAt) deliveredAt=new Date().toISOString();
   let startedAt=d.startedAt||'';
   if(status==='en_proceso' && !startedAt) startedAt=new Date().toISOString();
@@ -7842,6 +7844,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261106183917"></script>
+<script type="module" src="launcher.js?v=20261106184604"></script>
 </body>
 </html>

@@ -1449,7 +1449,7 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
     } else if (!before.partsReadyAt && after.partsReadyAt) {
       // 🎉 llegaron TODAS las refacciones → a coordinar la cita (avisa al cliente Y a los dueños)
       p = { title: "🎉 ¡Llegaron tus refacciones!", body: "Ya tenemos todo para " + veh + fol + ". Vamos a coordinar tu cita.", titleEn: "🎉 Your parts arrived!", bodyEn: "We have everything for " + vehEn + fol + ". Let's set your appointment." };
-      ownerP = { title: "📦 Refacciones completas" + fol, body: "Ya llegaron todas las de " + (after.clientName || "cliente") + " · " + veh + ". Agenda su cita 🗓️", url: "/admin.html" };
+      ownerP = { title: "📦 Refacciones completas" + fol, body: "Ya llegaron todas las de " + (after.clientName || "cliente") + " · " + veh + ". Agenda su cita 🗓️", url: "/admin.html?svc=" + event.params.id };
     } else if (!before.scheduledAt && after.scheduledAt) {
       // 🗓️ cita agendada (se puso fecha)
       const dt = (function () { try { return new Date(after.scheduledAt).toLocaleString("es-MX", { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } })();
@@ -1460,10 +1460,10 @@ exports.onServiceStatus = onDocumentUpdated("serviceOrders/{id}", async (event) 
     // 🔧 Avisa al MECÁNICO asignado en los momentos clave (reusa _pushToEmp → funciona dispare desde donde dispare: portal, admin, etc.).
     try {
       if (before.estimateStatus !== "accepted" && after.estimateStatus === "accepted") {
-        await _pushToOrderMechs(after, { title: "✅ Aprobado — atiende este carro" + fol, body: veh + " · el cliente aprobó. Es tuyo. 🔧", titleEn: "✅ Approved — take this car" + fol, bodyEn: vehEn + " · customer approved. It's yours. 🔧", url: "/warehouse.html" });
+        await _pushToOrderMechs(after, { title: "✅ Aprobado — atiende este carro" + fol, body: veh + " · el cliente aprobó. Es tuyo. 🔧", titleEn: "✅ Approved — take this car" + fol, bodyEn: vehEn + " · customer approved. It's yours. 🔧", url: "/warehouse.html?svc=" + event.params.id });
       }
       if (!before.partsReadyAt && after.partsReadyAt) {
-        await _pushToOrderMechs(after, { title: "📦 Partes completas — ya puedes empezar" + fol, body: "Llegaron las partes de " + veh + ". Manos a la obra. 🔧", titleEn: "📦 Parts complete — you can start" + fol, bodyEn: "Parts for " + vehEn + " arrived. Let's go. 🔧", url: "/warehouse.html" });
+        await _pushToOrderMechs(after, { title: "📦 Partes completas — ya puedes empezar" + fol, body: "Llegaron las partes de " + veh + ". Manos a la obra. 🔧", titleEn: "📦 Parts complete — you can start" + fol, bodyEn: "Parts for " + vehEn + " arrived. Let's go. 🔧", url: "/warehouse.html?svc=" + event.params.id });
       }
     } catch (e) {}
     // 🔧 Servicio COMPLETADO (pagado o entregado) que INCLUYE CAMBIO DE ACEITE → actualiza "último servicio".
