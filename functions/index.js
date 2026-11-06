@@ -2170,7 +2170,7 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
       vin: o.vin || "", plate: o.plate || "", vehicleLabel: o.vehicleLabel || "",
       reason: o.reason || "", reasonEs: o.reasonEs || o.reason || "", reasonEn: o.reasonEn || o.reason || "",
       scheduledAt: o.scheduledAt || null, receivedAt: o.receivedAt || "", startedAt: o.startedAt || "", deliveredAt: o.deliveredAt || "",
-      status: o.status || "por_recibir", paid: !!o.paid, svcPhase: o.svcPhase || "", estimateStatus: o.estimateStatus || "", diagSummary: o.diagSummary || null, diagSentAt: o.diagSentAt || "",
+      status: o.status || "por_recibir", paid: !!o.paid, svcPhase: o.svcPhase || "", estimateStatus: o.estimateStatus || "", diagSummary: o.diagSummary || null, diagSentAt: o.diagSentAt || "", suggested: Array.isArray(o.suggested) ? o.suggested : [],
       assignRole: o.assignRole || "", assignName: o.assignName || "",
       // 🔧 línea / relevo
       activeRole: activeRole || "", myStageActive, waitingFor: (!myStageActive && activeRole) ? activeRole : "",
@@ -2297,6 +2297,30 @@ exports.svcDiag = onCall({ timeoutSeconds: 20 }, async (request) => {
 
 // 🧹 MANTENIMIENTO (solo dueño): limpia diagnósticos de prueba y/o regresa servicios que quedaron "listo" por error a "en proceso".
 //    clearDiagSummary → quita el resumen/partes/fase de diagnóstico enviado. resetServices → servicios 'listo'/'pausado' → 'en_proceso' (sin borrar el diagnóstico).
+// 🔎 TRABAJO ADICIONAL que el mecánico encontró en diagnóstico (aparte de los servicios de la orden). Se guarda order-level en o.suggested; el dueño lo propone.
+exports.svcSuggestWork = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id) throw new HttpsError("unauthenticated", "Sin identidad.");
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const defRole = o.assignRole || "Mecánico";
+  const mine = (o.assignEmpId && o.assignEmpId === id.empId) || (!o.assignEmpId && Array.isArray(id.roles) && id.roles.includes(defRole));
+  if (!(id.isOwner || id.email || mine)) throw new HttpsError("permission-denied", "No es tu orden.");
+  const now = new Date().toISOString();
+  const suggested = (Array.isArray(d.suggested) ? d.suggested.slice(0, 24) : []).map((s) => ({
+    note: String(s.note || "").slice(0, 500), photo: String(s.photo || "").slice(0, 600), at: now, by: id.name || id.email || id.empId || "",
+  })).filter((s) => s.note || s.photo);
+  await ref.set({ suggested: suggested, updatedAt: now }, { merge: true });
+  return { ok: true, n: suggested.length };
+});
+
 exports.svcAdminReset = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
   const id = await _actorIdentity(request);
