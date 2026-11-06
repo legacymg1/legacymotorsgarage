@@ -2528,7 +2528,7 @@ exports.svcDiagSummary = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 60 }
   };
   await ref.set(patch, { merge: true });
   const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";
-  try { await _pushToOwners({ title: "🔬 Diagnóstico listo", body: _nm + " · diagnóstico enviado" + _fol + (veh ? (" · " + veh) : ""), titleEn: "🔬 Diagnosis ready", bodyEn: _nm + " diagnosis ready" + _fol, url: "/admin.html" }); } catch (e) {}
+  try { await _pushToOwners({ title: "🔬 El mecánico terminó el diagnóstico", body: _nm + _fol + (veh ? (" · " + veh) : "") + " · revisa qué encontró y arma el estimado", titleEn: "🔬 Mechanic finished the diagnosis", bodyEn: _nm + _fol + " · review findings and build the estimate", url: "/admin.html" }); } catch (e) {}
   return { ok: true, text: text };
 });
 
