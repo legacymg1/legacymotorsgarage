@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106191406"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106191406"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261106193228"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261106193228"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261106191406"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261106191406"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261106193228"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261106193228"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2585,7 +2585,7 @@ window.svcOpenOrder=function(id){
     estMin:Number(o.estMinutes)||60, assignRole:o.assignRole||'Mecánico', assignEmpId:o.assignEmpId||'', assignName:o.assignName||'',
     services, laborRate:(Number(o.laborRateCents)||10000)/100, deposit:(Number(o.depositCents)||0)/100,
     editId:id, status:o.status||'por_recibir', orderNum:o.orderNum||null,
-    createdAt:o.createdAt||'', receivedAt:o.receivedAt||'', deliveredAt:o.deliveredAt||'', startedAt:o.startedAt||'' };
+    createdAt:o.createdAt||'', receivedAt:o.receivedAt||'', deliveredAt:o.deliveredAt||'', startedAt:o.startedAt||'', milesOut:(o.milesOut!=null?o.milesOut:'') };
   svcRenderModal();
   document.getElementById('svc-modal').style.display='flex';
   svcLoadRoster().then(()=>svcRenderModal());
@@ -2620,6 +2620,7 @@ function svcCapture(){
   if(g('svc-status')) d.status=g('svc-status').value;
   if(g('svc-received')) d.receivedAt=g('svc-received').value?new Date(g('svc-received').value).toISOString():'';
   if(g('svc-delivered')) d.deliveredAt=g('svc-delivered').value?new Date(g('svc-delivered').value).toISOString():'';
+  if(g('svc-miles-out')){ const _mo=parseInt(g('svc-miles-out').value,10); d.milesOut=(isNaN(_mo)?'':_mo); }
 }
 function svcCapParts(){
   const d=window._svcDraft; if(!d) return;
@@ -2921,7 +2922,8 @@ function svcRenderModal(){
     datesHtml='<select id="svc-status" style="'+SVC_IN+';margin-bottom:10px;">'+stOpts2+'</select>'
       +'<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">📅 Fecha de la orden: <b style="color:var(--text);">'+ordDate+'</b></div>'
       +'<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">📥 Fecha de ingreso (cuándo entró el carro)</label><input id="svc-received" type="datetime-local" value="'+_toLocal(d.receivedAt)+'" style="'+SVC_IN+';margin-bottom:8px;">'
-      +'<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">📤 Fecha de salida (cuándo se entregó)</label><input id="svc-delivered" type="datetime-local" value="'+_toLocal(d.deliveredAt)+'" style="'+SVC_IN+';">';
+      +'<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">📤 Fecha de salida (cuándo se entregó)</label><input id="svc-delivered" type="datetime-local" value="'+_toLocal(d.deliveredAt)+'" style="'+SVC_IN+';margin-bottom:8px;">'
+      +'<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">🛣️ Millas de salida (odómetro al entregar)</label><input id="svc-miles-out" type="number" inputmode="numeric" value="'+(d.milesOut||'')+'" placeholder="ej. 128450" style="'+SVC_IN+';">';
   }
   const isEdit=!!d.editId;
   // 📁 DOCUMENTOS (al editar): estimado inicial / final / invoice — cada uno desde su snapshot inmutable.
@@ -3144,20 +3146,47 @@ window.svcHistoryOpen=function(orderId){
   const svs = Array.isArray(o.services)?o.services:[]; const ik=o.intake||null;
   if(!ik && !svs.some(s=>s.diagnosis||s.repair)){ if(window.svcToast) svcToast('Aún no hay historia del mecánico en esta orden.'); return; }
   const dt=function(x){ try{ return x?new Date(x).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; }catch(e){ return ''; } };
-  const img=function(u,sz){ return '<img src="'+u+'" onclick="window.open(\''+u+'\',\'_blank\')" style="width:'+sz+'px;height:'+sz+'px;object-fit:cover;border-radius:7px;flex:0 0 auto;cursor:pointer;">'; };
+  // 📸 Tocar la foto la agranda con el visor bueno (showPhoto: overlay, maneja jpg/heic/pdf) — no window.open (iOS lo bloquea).
+  const img=function(u,sz){ return '<img src="'+u+'" onclick="showPhoto(\''+u+'\',\'📸 Foto\')" style="width:'+sz+'px;height:'+sz+'px;object-fit:cover;border-radius:8px;flex:0 0 auto;cursor:pointer;border:1px solid var(--border);">'; };
   // 🧩 TODAS las partes que el mecánico marcó (consolidadas de todos los servicios) → widget-lista para ordenar/agregar al estimado.
   const allParts=[]; svs.forEach(function(s,i){ ((s.diagnosis&&s.diagnosis.parts)||[]).forEach(function(p,pi){ allParts.push({ si:i, pi:pi, svc:(s.desc||('Servicio '+(i+1))), desc:p.desc||'', partNum:p.partNum||'', photo:p.photo||'' }); }); });
   let h='';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h2 style="font-size:18px;margin:0;">🔧 Historial de la orden'+(o.orderNum?(' · #'+o.orderNum):'')+'</h2><button onclick="svcHistoryClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>';
   h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">'+svcEsc(o.clientName||'')+' · 🚗 '+svcEsc(o.vehicleLabel||o.plate||'')+'</div>';
+  // ℹ️ INFO DE LA ORDEN (estilo iOS): quién trabaja + millas entrada/salida + fechas-hora de cada etapa.
+  (function(){
+    const workers=[...new Set([].concat(o.assignName?[o.assignName]:[], svs.map(s=>s.assignName).filter(Boolean)))];
+    const milesIn=(ik&&ik.miles)||o.milesIn||''; const milesOut=o.milesOut||'';
+    const recepAt=(ik&&ik.at)||o.receivedAt||'';
+    let diagAt=o.diagSentAt||(o.diagSummary&&o.diagSummary.at)||''; if(!diagAt){ svs.forEach(s=>{ if(s.diagnosis&&s.diagnosis.at && (!diagAt||s.diagnosis.at>diagAt)) diagAt=s.diagnosis.at; }); }
+    let repairAt=o.startedAt||''; svs.forEach(s=>{ if(s.repair&&s.repair.at && (!repairAt||s.repair.at<repairAt)) repairAt=repairAt||s.repair.at; });
+    const rows=[];
+    if(workers.length) rows.push(['👷','Trabajando', svcEsc(workers.join(', '))]);
+    rows.push(['🛣️','Millas de entrada', milesIn?(svcEsc(String(milesIn))+' mi'):'—']);
+    if(recepAt) rows.push(['📥','Recepción', dt(recepAt)]);
+    if(diagAt) rows.push(['🔬','Diagnóstico', dt(diagAt)]);
+    if(o.partsReadyAt) rows.push(['📦','Partes completas', dt(o.partsReadyAt)]);
+    if(repairAt) rows.push(['🔧','En reparación', dt(repairAt)]);
+    if(o.readyAt) rows.push(['✅','Listo', dt(o.readyAt)]);
+    if(o.deliveredAt) rows.push(['🏁','Entregado', dt(o.deliveredAt)]);
+    if(o.paidAt) rows.push(['💳','Pagado', dt(o.paidAt)]);
+    rows.push(['🛣️','Millas de salida', milesOut?(svcEsc(String(milesOut))+' mi'):'—']);
+    h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px;">'
+      +rows.map(function(r,ri){ return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;'+(ri?'border-top:1px solid var(--border);':'')+'"><span style="font-size:12.5px;color:var(--muted);">'+r[0]+' '+r[1]+'</span><span style="font-size:12.5px;font-weight:700;color:var(--text);text-align:right;">'+r[2]+'</span></div>'; }).join('')
+      +'</div>';
+  })();
   // 1) Recepción
   h+='<div style="font-weight:800;font-size:12px;color:#f0a030;margin:6px 0 6px;">1 · 🧾 Recepción</div>';
   if(ik){
     h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:11px;margin-bottom:12px;font-size:12.5px;">';
     h+='<div style="color:var(--muted);font-size:11px;margin-bottom:6px;">'+(ik.by?svcEsc(ik.by):'')+(ik.miles?(' · '+svcEsc(String(ik.miles))+' mi'):'')+(ik.at?(' · '+dt(ik.at)):'')+'</div>';
     if(ik.none){ h+='<div style="color:#35c46a;font-weight:700;">✅ Sin observaciones — sin daños previos.</div>'; }
-    else { h+=(ik.observations||[]).map(function(ob){ var pics=(ob.photos&&ob.photos.length?ob.photos:(ob.photo?[ob.photo]:[])); var thumbs=pics.map(function(u){return img(u,54);}).join(''); return '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">'+(thumbs?'<div style="display:flex;gap:4px;flex-wrap:wrap;flex:0 0 auto;max-width:56%;">'+thumbs+'</div>':'')+'<div style="flex:1;min-width:0;line-height:1.4;">'+svcEsc(ob.note||'(sin nota)')+'</div></div>'; }).join('');
-      h+='<div style="margin-top:6px;font-weight:700;color:'+(ik.clientAck?'#35c46a':'#f0a030')+';">'+(ik.clientAck?('✅ Cliente autorizó'+(ik.clientAckAt?(' · '+dt(ik.clientAckAt)):'')):'⏳ Pendiente de autorización del cliente')+'</div>'; }
+    else { h+='<div style="margin:2px -11px 0;">'+(ik.observations||[]).map(function(ob,oi){ var pics=(ob.photos&&ob.photos.length?ob.photos:(ob.photo?[ob.photo]:[])); var thumbs=pics.map(function(u){return img(u,72);}).join('');
+        return '<div style="padding:10px 11px;'+(oi?'border-top:1px solid var(--border);':'')+'">'
+          +'<div style="font-size:13px;line-height:1.45;color:var(--text);">'+svcEsc(ob.note||'(sin nota)')+'</div>'
+          +(thumbs?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'+thumbs+'</div>'):'')
+          +'</div>'; }).join('')+'</div>';
+      h+='<div style="margin:8px 0 0;font-weight:700;color:'+(ik.clientAck?'#35c46a':'#f0a030')+';">'+(ik.clientAck?('✅ Cliente autorizó'+(ik.clientAckAt?(' · '+dt(ik.clientAckAt)):'')):'⏳ Pendiente de autorización del cliente')+'</div>'; }
     h+='</div>';
   } else { h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">—</div>'; }
   // 🔎 Trabajo ADICIONAL que el mecánico encontró en diagnóstico (order-level) — el dueño lo agrega como servicio al estimado.
@@ -3173,7 +3202,13 @@ window.svcHistoryOpen=function(orderId){
   if(allParts.length){
     h+='<div style="background:rgba(240,192,64,.06);border:1px solid var(--gold3);border-radius:12px;padding:12px;margin-bottom:12px;">';
     h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;font-weight:700;color:var(--muted);">'+allParts.length+' parte(s)</span><button type="button" onclick="svcAddAllDiagParts(\''+orderId+'\')" style="background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:800;cursor:pointer;">➕ Todas al estimado</button></div>';
-    h+=allParts.map(function(p){ return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.05);">'+(p.photo?img(p.photo,40):'<div style="width:40px;height:40px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">🧩</div>')+'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;">'+svcEsc(p.desc||(p.partNum||'Parte'))+'</div>'+(p.partNum?('<div style="font-size:11px;color:var(--gold);">#'+svcEsc(p.partNum)+'</div>'):'')+'<div style="font-size:10.5px;color:var(--muted);">'+svcEsc(p.svc)+'</div></div><button type="button" onclick="svcAddDiagPart('+p.si+','+p.pi+')" title="Agregar al estimado" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:12.5px;font-weight:700;cursor:pointer;">➕</button></div>'; }).join('');
+    // 🗂️ Agrupadas POR SERVICIO para diferenciar de dónde viene cada parte (incl. mantenimiento sugerido que se volvió servicio).
+    const _grp={}; const _order=[]; allParts.forEach(function(p){ const k=p.si; if(!_grp[k]){ _grp[k]=[]; _order.push(k); } _grp[k].push(p); });
+    h+=_order.map(function(k){ const list=_grp[k]; const svcName=list[0].svc;
+      return '<div style="margin-bottom:8px;">'
+        +'<div style="font-size:11px;font-weight:800;color:var(--gold);background:rgba(240,192,64,.12);border:1px solid var(--gold3);border-radius:7px;padding:3px 8px;display:inline-block;margin-bottom:6px;">🔧 '+svcEsc(svcName)+'</div>'
+        +list.map(function(p){ return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.05);">'+(p.photo?img(p.photo,40):'<div style="width:40px;height:40px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">🧩</div>')+'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;">'+svcEsc(p.desc||(p.partNum||'Parte'))+'</div>'+(p.partNum?('<div style="font-size:11px;color:var(--gold);">#'+svcEsc(p.partNum)+'</div>'):'')+'</div><button type="button" onclick="svcAddDiagPart('+p.si+','+p.pi+')" title="Agregar al estimado" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:12.5px;font-weight:700;cursor:pointer;">➕</button></div>'; }).join('')
+        +'</div>'; }).join('');
     h+='</div>';
   } else { h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Sin partes marcadas aún.</div>'; }
   // 3) Detalle por servicio — ACORDEÓN (toca para expandir/colapsar). Cada servicio junta su diagnóstico + reparación.
@@ -3666,7 +3701,7 @@ window.svcSaveOrder=async function(opts){
   let orderNum = d.editId ? ((svcOrders.find(x=>x.id===d.editId)||{}).orderNum || null) : null;
   if(!d.editId){ try{ const _n=await httpsCallable(functions,'svcNextNum')({}); orderNum=(_n&&_n.data&&_n.data.num)||null; }catch(e){ console.warn('svcNextNum', e); } }
   // guardar
-  const payload={ clientId, clientName, clientPhone, lang, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, scheduleAfterParts, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, estMinutes, assignRole, assignEmpId, assignName, status };
+  const payload={ clientId, clientName, clientPhone, lang, vin, plate, vehicleLabel, reason, reasonEs, reasonEn, services, laborRateCents, laborTotalCents, parts, partsTotalCents, grandTotalCents, depositCents, balanceCents, scheduledAt, scheduleAfterParts, receivedAt:receivedAt||null, deliveredAt:deliveredAt||null, startedAt:startedAt||null, milesOut:(d.milesOut===''||d.milesOut==null)?null:Number(d.milesOut), estMinutes, assignRole, assignEmpId, assignName, status };
   if(orderNum) payload.orderNum=orderNum;
   window._svcLastPayload=Object.assign({}, payload);   // 📸 para los snapshots de documentos (estimado inicial/final)
   const wasEdit=!!d.editId; let orderId=d.editId||'';
@@ -7906,6 +7941,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261106191406"></script>
+<script type="module" src="launcher.js?v=20261106193228"></script>
 </body>
 </html>
