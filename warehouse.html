@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107182317"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107182317"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107183009"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107183009"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261107182317"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261107182317"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261107182317"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261107183009"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261107183009"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261107183009"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2944,13 +2944,18 @@ function _svcWorkRender(o){
   // 🧭 FASE: reparación SOLO cuando el cliente ya aceptó el estimado (o se marcó reparación). Antes de eso = diagnóstico.
   //    En diagnóstico NO se "termina" el servicio (eso completaba la orden por error) — solo se diagnostica y se envía.
   const repair=(o.estimateStatus==='accepted')||(o.svcPhase==='reparacion');
-  const phaseLbl=repair?(en?'In repair':'En reparación'):(en?'In diagnosis':'En diagnóstico');
+  // 📨 ¿Ya se envió el diagnóstico a la oficina? → el mecánico queda EN ESPERA (no atorado): la oficina arma el estimado
+  //    y, cuando el cliente autoriza, esta pantalla pasa SOLA a reparación (onSnapshot).
+  const diagSent=!repair && !!(o.diagSentAt || o.svcPhase==='diag_enviado' || (o.diagSummary && o.diagSummary.text));
+  const phaseLbl=repair?(en?'In repair':'En reparación'):(diagSent?(en?'Diagnosis sent · waiting':'Diagnóstico enviado · en espera'):(en?'In diagnosis':'En diagnóstico'));
   const list=((o.myServices&&o.myServices.length)?o.myServices:(o.services||[])).filter(function(s){ return s.clientLine!=='declined'; });
   let h='<div class="wrap" style="padding:calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));">';
   h+='<div class="topbar" style="margin-bottom:14px;"><button class="linkbtn" onclick="svcWorkClose()" style="font-size:26px;padding:0 10px 0 0;color:var(--text);">‹</button><div style="min-width:0;"><div style="font-weight:800;font-size:19px;line-height:1.15;">🔧 '+phaseLbl+'</div><div class="faint" style="font-size:12.5px;">'+folio+esc(o.clientName||'')+' · 🚗 '+car+'</div></div></div>';
   h+='<div class="faint" style="font-size:12px;line-height:1.5;margin-bottom:12px;">'+(repair
     ?(en?'The customer approved. Repair each service, take photos of the finished work, and mark it done.':'El cliente aprobó. Repara cada servicio, toma fotos del trabajo terminado y márcalo listo.')
-    :(en?'Diagnose each service: photos of what you found + the parts you need (original part #). Then send the diagnosis to the office — do NOT finish the car yet.':'Diagnostica cada servicio: fotos de lo que encontraste + las partes que necesitas (# de parte original). Luego envía el diagnóstico a la oficina — NO termines el carro todavía.'))+'</div>';
+    :(diagSent
+      ?(en?'Diagnosis sent to the office. The car is paused while the office builds the estimate — you’ll be notified when it’s authorized. Nothing to do here for now.':'Diagnóstico enviado a la oficina. El carro está en pausa mientras la oficina arma el estimado — te avisamos cuando se autorice. No hay nada que hacer aquí por ahora.')
+      :(en?'Diagnose each service: photos of what you found + the parts you need (original part #). Then send the diagnosis to the office — do NOT finish the car yet.':'Diagnostica cada servicio: fotos de lo que encontraste + las partes que necesitas (# de parte original). Luego envía el diagnóstico a la oficina — NO termines el carro todavía.')))+'</div>';
   h+=list.map(function(s){
     const i=s.index; const dg=s.diagnosis||null; const rep=s.repair||null; const done=s.status==='listo';
     const col=done?'#35c46a':(dg?'#4c9bff':'#67708f');
@@ -2977,8 +2982,15 @@ function _svcWorkRender(o){
     // 🔎 TRABAJO ADICIONAL que el mecánico encontró (aparte de los servicios de la orden) → la oficina lo propone al cliente.
     const _nx=((o.suggested&&o.suggested.length)||0);
     h+='<button onclick="svcOpenExtra(\''+o.id+'\')" class="btn ghost" style="width:100%;margin:4px 0 10px;">🔎 '+(en?'Suggested maintenance':'Mantenimiento sugerido adicional')+(_nx?(' · '+_nx):'')+'</button>';
-    // 🔬 DIAGNÓSTICO: el único cierre de esta fase es ENVIAR el diagnóstico al dueño (no "terminar" la orden).
-    if(anyDiag){ h+='<button id="send-diag-btn" onclick="svcSendDiag(\''+o.id+'\')" class="btn-gold" style="width:100%;margin-top:4px;">📤 '+(o.diagSummary?(en?'Re-send diagnosis':'Reenviar diagnóstico'):(en?'Finish & send diagnosis':'Terminar y enviar diagnóstico'))+'</button><div class="faint" style="font-size:11px;text-align:center;margin-top:6px;line-height:1.4;">'+(en?'Sends the summary to the owner. Do not finish the car — the office builds the estimate.':'Envía el resumen al dueño. No termines el carro — la oficina arma el estimado.')+'</div>'; }
+    if(diagSent){
+      // ✅ YA ENVIADO → estado de ESPERA claro (no atorado). La pantalla pasa sola a reparación cuando el cliente autorice.
+      h+='<div style="background:rgba(53,196,106,.10);border:1px solid rgba(53,196,106,.4);border-radius:12px;padding:13px;margin:6px 0 10px;text-align:center;"><div style="font-weight:800;font-size:13.5px;color:#35c46a;">✅ '+(en?'Diagnosis sent — with the office':'Diagnóstico enviado — en la oficina')+'</div><div class="faint" style="font-size:11.5px;margin-top:5px;line-height:1.45;">'+(en?'The office is building the estimate. The car stays paused until the customer authorizes it — then this screen turns to repair on its own. You can move to another car.':'La oficina está armando el estimado. El carro queda en pausa hasta que el cliente lo autorice — entonces esta pantalla pasa sola a reparación. Puedes seguir con otro carro.')+'</div></div>';
+      // Reenviar queda como opción SECUNDARIA (por si editó/agregó algo al diagnóstico).
+      h+='<button onclick="svcSendDiag(\''+o.id+'\')" class="btn ghost" style="width:100%;margin-top:2px;font-size:12.5px;color:var(--muted);">↻ '+(en?'Re-send diagnosis (if you changed something)':'Reenviar diagnóstico (si cambiaste algo)')+'</button>';
+    } else if(anyDiag){
+      // 🔬 DIAGNÓSTICO: el único cierre de esta fase es ENVIAR el diagnóstico al dueño (no "terminar" la orden).
+      h+='<button id="send-diag-btn" onclick="svcSendDiag(\''+o.id+'\')" class="btn-gold" style="width:100%;margin-top:4px;">📤 '+(en?'Finish & send diagnosis':'Terminar y enviar diagnóstico')+'</button><div class="faint" style="font-size:11px;text-align:center;margin-top:6px;line-height:1.4;">'+(en?'Sends the summary to the owner. Do not finish the car — the office builds the estimate.':'Envía el resumen al dueño. No termines el carro — la oficina arma el estimado.')+'</div>';
+    }
   } else {
     // 🔧 REPARACIÓN: la orden se completa SOLA cuando todos los servicios quedan "Terminado".
     const left=list.filter(function(s){ return s.status!=='listo'; }).length;
@@ -6140,7 +6152,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261107182317"></script>
+<script type="module" src="launcher.js?v=20261107183009"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
