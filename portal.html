@@ -136,8 +136,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107010756"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107010756"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107190434"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107190434"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <!-- PRIMER INGRESO: bloquea el portal hasta que conteste -->
 <div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.94);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
@@ -611,6 +611,7 @@ onAuthStateChanged(auth, async (user)=>{
     renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); maybeAskConsent();
     if(currentClient && currentClient.smsConsent && currentClient.smsConsent.date){ setTimeout(function(){ try{ portalMaybeNotif(); }catch(e){} }, 500); }   // 🔔 SMS ya resuelto → ofrece notificaciones
     loadPortalEstimates();   // 🧾 trae los estimados de servicio (se pintan al llegar)
+    startPortalLive();   // 🔴 mantiene el portal EN VIVO (auto-refresca órdenes/estimados)
     checkSquareReturn();   // 💳 si viene de pagar con Square, registra y refresca
     try{ await updateDoc(doc(db,'clients',currentClient.id), { lastLogin: new Date().toISOString() }); }catch(e){}
   }catch(e){ showLoginError(t('errConn')); }
@@ -877,10 +878,33 @@ function serviceCardHTML(nextServ, nextAppt, lastAppt){
 let portalEstimates = [];
 const focusOrderId = (new URLSearchParams(location.search).get('order') || '');
 function escPortal(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-async function loadPortalEstimates(){
-  try{ const _pl = (window._previewMode && currentClient) ? { previewClientId: currentClient.id } : {}; const r = await httpsCallable(functions,'svcPortalEstimates')(_pl); portalEstimates = (r&&r.data&&r.data.orders)||[]; }
-  catch(e){ portalEstimates = []; }
+async function loadPortalEstimates(opts){
+  opts=opts||{};
+  let next=null;
+  try{ const _pl = (window._previewMode && currentClient) ? { previewClientId: currentClient.id } : {}; const r = await httpsCallable(functions,'svcPortalEstimates')(_pl); next = (r&&r.data&&r.data.orders)||[]; }
+  catch(e){ if(opts.keepOnError){ return; } next = []; }   // en vivo: un error de red NO borra lo que ya se veía
+  const changed = JSON.stringify(next)!==JSON.stringify(portalEstimates||[]);
+  portalEstimates = next;
+  if(opts.silentIfSame && !changed) return;   // en vivo: sin cambios → no repinta
   try{ if(currentClient){ renderPortal(); updateInsuranceDisplay(); updateIDDisplay(); updateSmsDisplay(); } }catch(e){}
+}
+// 🔴 PORTAL EN VIVO: refresca las órdenes/estimados solo (cada ~20s y al volver a la app), SIN molestar si el cliente
+//    está firmando/aceptando (overlay abierto) y SIN repintar si no cambió nada. Reusa la callable; respeta las reglas
+//    (el cliente entra por teléfono y NO puede leer serviceOrders directo, por eso se consulta vía servidor).
+function _portalBusyOverlay(){
+  if(document.getElementById('est-review-ov')) return true;   // revisando/aceptando línea por línea
+  if(document.getElementById('sign-overlay')) return true;    // firmando entrega
+  try{ const cm=document.getElementById('consent-modal'); if(cm && getComputedStyle(cm).display!=='none') return true; }catch(e){}
+  return false;
+}
+async function portalLiveRefresh(){
+  try{ if(!currentClient || _portalBusyOverlay()) return; await loadPortalEstimates({silentIfSame:true, keepOnError:true}); }catch(e){}
+}
+function startPortalLive(){
+  if(window._portalLiveOn) return; window._portalLiveOn=true;
+  try{ setInterval(portalLiveRefresh, 20000); }catch(e){}
+  try{ document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') portalLiveRefresh(); }); }catch(e){}
+  try{ window.addEventListener('focus', portalLiveRefresh); }catch(e){}
 }
 function vehListCardHTML(c){
   const es=L!=='en'; const vehicles=clientVehicles(c);
