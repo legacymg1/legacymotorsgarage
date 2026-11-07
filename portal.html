@@ -136,8 +136,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107190434"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107190434"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107190908"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107190908"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <!-- PRIMER INGRESO: bloquea el portal hasta que conteste -->
 <div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.94);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
@@ -894,6 +894,7 @@ async function loadPortalEstimates(opts){
 function _portalBusyOverlay(){
   if(document.getElementById('est-review-ov')) return true;   // revisando/aceptando línea por línea
   if(document.getElementById('sign-overlay')) return true;    // firmando entrega
+  if(document.getElementById('final-report-ov')) return true; // leyendo el reporte final
   try{ const cm=document.getElementById('consent-modal'); if(cm && getComputedStyle(cm).display!=='none') return true; }catch(e){}
   return false;
 }
@@ -1086,6 +1087,7 @@ function estimateCardHTML(o){
       ${o.deposit>0?`<div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label">${es?'Anticipo':'Deposit'}</span><span class="ir-value">−${formatMoney(o.deposit)}</span></div><div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label" style="font-weight:700;">${es?'Saldo':'Balance'}</span><span class="ir-value" style="font-weight:700;">${formatMoney(o.balance)}</span></div>`:''}
       ${(!o.paid && (Number(o.paidCents)||0)>0)?`<div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label" style="color:#49d17f;">${es?'Abonado':'Paid so far'}</span><span class="ir-value" style="color:#49d17f;font-weight:700;">${formatMoney((o.paidCents||0)/100)}</span></div><div class="info-row" style="border:none;padding:2px 0;"><span class="ir-label" style="font-weight:800;color:var(--white);">${es?'Saldo':'Balance'}</span><span class="ir-value" style="font-weight:800;color:var(--gold);">${formatMoney(o.balance)}</span></div>`:''}
     </div>
+    ${o.finalReport?`<button onclick="portalFinalReport('${o.id}')" style="width:100%;margin-top:10px;background:rgba(109,75,255,.1);border:1px solid rgba(109,75,255,.5);color:#9b7bff;border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;">📄 ${es?'Ver reporte final del servicio':'View final service report'}</button>`:''}
     ${(!o.paid && Array.isArray(o.promises) && o.promises.length)?`
       <div style="margin-top:10px;background:rgba(240,192,64,.07);border:1px solid rgba(240,192,64,.35);border-radius:12px;padding:12px;">
         <div style="font-size:12px;font-weight:800;color:#f0c040;margin-bottom:8px;">📅 ${es?'Tus pagos acordados':'Your scheduled payments'}</div>
@@ -1126,6 +1128,22 @@ function estimateCardHTML(o){
   </div>`;
 }
 window.portalToggleRcpt=function(id){ var d=document.getElementById('est-detail-'+id); var ch=document.getElementById('est-chev-'+id); if(!d) return; var open=(d.style.display!=='none'); d.style.display=open?'none':''; if(ch) ch.textContent=open?'▸':'▾'; };
+// 📄 Reporte final tipo dealer (el cliente lo ve en su portal). Narrativa bilingüe de la orden (recepción→diagnóstico→partes→reparación).
+window.portalFinalReport=function(orderId){
+  const o=(portalEstimates||[]).find(x=>x.id===orderId); if(!o||!o.finalReport) return;
+  const es=L!=='en'; const txt=(es?(o.finalReport.es||o.finalReport.en):(o.finalReport.en||o.finalReport.es))||'';
+  let html=escPortal(txt).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');   // escapa y luego **negritas**→<b>
+  let at=''; try{ if(o.finalReport.at) at=formatDate((o.finalReport.at||'').slice(0,10)); }catch(e){}
+  const ov=document.createElement('div'); ov.id='final-report-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(6,9,15,.92);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--card);border:1px solid var(--border);border-radius:18px;max-width:600px;width:100%;max-height:90vh;overflow:auto;padding:22px 20px calc(20px + env(safe-area-inset-bottom,0px));">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;"><div style="font-weight:800;font-size:17px;color:var(--white);">📄 '+(es?'Reporte final del servicio':'Final service report')+(o.orderNum?(' · #'+o.orderNum):'')+'</div><button onclick="var x=document.getElementById(\'final-report-ov\');if(x)x.remove();" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;flex:none;">×</button></div>'
+    +'<div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">🚗 '+escPortal(o.vehicleLabel||o.vin||'')+(o.plate?(' · '+escPortal(o.plate)):'')+(at?(' · '+at):'')+'</div>'
+    +'<div style="font-size:14px;line-height:1.6;white-space:pre-wrap;color:var(--white);">'+html+'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+};
 function estimatesHTML(){
   if(!portalEstimates.length) return '';
   const list = portalEstimates.slice().sort((a,b)=> (a.id===focusOrderId?-1:(b.id===focusOrderId?1:0)) );
