@@ -2136,15 +2136,17 @@ function svcRoleRankSrv(r) { const i = SVC_ROLE_PIPELINE.indexOf(r); return i < 
 // Etapa ACTIVA = el primer rol de la línea con servicios sin terminar (null = todo listo).
 // Si un servicio no trae rol, usa defRole (el rol de la orden) — igual que el admin.
 function svcActiveRoleSrv(services, defRole) {
-  const by = {}; (services || []).forEach((s) => { const r = s.role || defRole || "Mecánico"; (by[r] = by[r] || []).push(s); });
+  // ✖️ Los servicios que el cliente RECHAZÓ (clientLine:'declined') NO cuentan como trabajo (se ignoran en el relevo).
+  const by = {}; (services || []).forEach((s) => { if (s.clientLine === "declined") return; const r = s.role || defRole || "Mecánico"; (by[r] = by[r] || []).push(s); });
   const roles = Object.keys(by).sort((a, b) => svcRoleRankSrv(a) - svcRoleRankSrv(b));
   for (const r of roles) { if (by[r].some((s) => (s.status || "pendiente") !== "listo")) return r; }
   return null;
 }
-// Índices de servicios que le tocan a este trabajador (por persona asignada, o por rol si no hay persona fija).
+// Índices de servicios que le tocan a este trabajador (por persona asignada, o por rol si no hay persona fija). Omite los rechazados por el cliente.
 function svcWorkerServiceIdx(services, id, defRole) {
   const out = [];
   (services || []).forEach((s, i) => {
+    if (s.clientLine === "declined") return;   // ✖️ rechazado por el cliente → el mecánico no lo trabaja
     const role = s.role || defRole;
     const byEmp = s.assignEmpId && id.empId && s.assignEmpId === id.empId;
     const byRole = !s.assignEmpId && role && Array.isArray(id.roles) && id.roles.includes(role);
@@ -2203,8 +2205,8 @@ exports.svcMyOrders = onCall({ timeoutSeconds: 20 }, async (request) => {
       // 🔧 línea / relevo
       activeRole: activeRole || "", myStageActive, waitingFor: (!myStageActive && activeRole) ? activeRole : "",
       canReceive: isStaff || (myRoles.includes(activeRole) && isFirstRole),
-      services: svs.map((s, i) => ({ index: i, role: s.role || defRole, status: s.status || "pendiente", assignName: s.assignName || "", desc: s.desc || "", descEn: s.descEn || s.desc || "", diagnosis: s.diagnosis || null, repair: s.repair || null })),
-      myServices: myIdx.map((i) => ({ index: i, role: svs[i].role || defRole, status: svs[i].status || "pendiente", desc: svs[i].desc || "", descEn: svs[i].descEn || svs[i].desc || "", diagnosis: svs[i].diagnosis || null, repair: svs[i].repair || null })),
+      services: svs.map((s, i) => ({ index: i, role: s.role || defRole, status: s.status || "pendiente", assignName: s.assignName || "", desc: s.desc || "", descEn: s.descEn || s.desc || "", clientLine: s.clientLine || "", diagnosis: s.diagnosis || null, repair: s.repair || null })),
+      myServices: myIdx.map((i) => ({ index: i, role: svs[i].role || defRole, status: svs[i].status || "pendiente", desc: svs[i].desc || "", descEn: svs[i].descEn || svs[i].desc || "", clientLine: svs[i].clientLine || "", diagnosis: svs[i].diagnosis || null, repair: svs[i].repair || null })),
     };
   });
   return { ok: true, orders: out, roles: id.roles || [], name: id.name || "" };

@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107003056"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107003056"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107010208"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107010208"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261107003056"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261107003056"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261107010208"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261107010208"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2585,7 +2585,7 @@ window.svcNewOrder=function(){
 // 👁️ Abrir una orden EXISTENTE para ver/editar (mismo formulario, modo editar).
 window.svcOpenOrder=function(id){
   const o=svcOrders.find(x=>x.id===id); if(!o){ alert('Orden no encontrada.'); return; }
-  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0,price:(s.price!=null?Number(s.price):((Number(s.laborCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[]),kind:(s.kind||'oil'),role:s.role||o.assignRole||'Mecánico',assignEmpId:s.assignEmpId||'',assignName:s.assignName||'',status:s.status||'pendiente',estNote:s.estNote||'',diagnosis:s.diagnosis||null,_collapsed:true})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60,price:(Number(o.grandTotalCents)||0)/100,parts:[],kind:'oil',role:o.assignRole||'Mecánico',assignEmpId:o.assignEmpId||'',assignName:o.assignName||'',status:'pendiente'}];
+  let services=Array.isArray(o.services)&&o.services.length ? o.services.map(s=>({desc:s.desc||'',minutes:Number(s.minutes)||0,price:(s.price!=null?Number(s.price):((Number(s.laborCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[]),kind:(s.kind||'oil'),clientLine:(s.clientLine||''),role:s.role||o.assignRole||'Mecánico',assignEmpId:s.assignEmpId||'',assignName:s.assignName||'',status:s.status||'pendiente',estNote:s.estNote||'',diagnosis:s.diagnosis||null,repair:s.repair||null,_collapsed:true})) : [{desc:(o.reason||''),minutes:Number(o.estMinutes)||60,price:(Number(o.grandTotalCents)||0)/100,parts:[],kind:'oil',role:o.assignRole||'Mecánico',assignEmpId:o.assignEmpId||'',assignName:o.assignName||'',status:'pendiente'}];
   // Migrar partes GLOBALES viejas (modelo anterior) al primer servicio, para no perderlas al editar.
   if(Array.isArray(o.parts)&&o.parts.length && !services.some(s=>s.parts&&s.parts.length)){ const _mig=o.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})); if(services[0]) services[0].parts=_mig; }
   window._svcDraft={ clientId:o.clientId||'', clientName:o.clientName||'', clientPhone:o.clientPhone||'', lang:o.lang||'es',
@@ -2667,7 +2667,7 @@ function svcCapServices(){
     const role=(document.getElementById('svc-svc-role-'+i)||{}).value||'';
     const assignEmpId=(document.getElementById('svc-svc-emp-'+i)||{}).value||'';
     const e=assignEmpId?svcRoster.find(x=>String(x.id)===String(assignEmpId)):null;
-    arr.push({desc:desc, minutes:minutes, price:price, kind:kind, parts:parts, role:role, assignEmpId:assignEmpId, assignName:(e?e.name:''), status:(pv.status||'pendiente'), estNote:(pv.estNote||''), diagnosis:(pv.diagnosis||null), _collapsed:false});
+    arr.push({desc:desc, minutes:minutes, price:price, kind:kind, clientLine:(pv.clientLine||''), parts:parts, role:role, assignEmpId:assignEmpId, assignName:(e?e.name:''), status:(pv.status||'pendiente'), estNote:(pv.estNote||''), diagnosis:(pv.diagnosis||null), repair:(pv.repair||null), _collapsed:false});
   });
   d.services=arr.length?arr:[{desc:'',minutes:60,price:0,parts:[],kind:'oil',role:'',assignEmpId:'',assignName:'',status:'pendiente'}];
 }
@@ -2854,12 +2854,14 @@ function svcRenderModal(){
     const sparts=(s.parts&&s.parts.length)?s.parts:[];
     const spartRows=sparts.map((p,pi)=>'<div data-spart-row="'+i+'-'+pi+'" style="display:flex;gap:6px;align-items:center;margin-top:6px;"><input id="svc-spart-desc-'+i+'-'+pi+'" value="'+svcEsc(p.desc||'')+'" oninput="svcDescCap(this)" placeholder="Parte / cargo" autocapitalize="sentences" autocomplete="off" autocorrect="off" style="'+SVC_IN+';flex:1;margin:0;font-size:13px;"><div style="position:relative;flex:0 0 90px;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;">$</span><input id="svc-spart-price-'+i+'-'+pi+'" type="number" inputmode="decimal" value="'+(p.price||'')+'" oninput="svcRecalc()" placeholder="0.00" style="'+SVC_IN+';width:100%;box-sizing:border-box;padding-left:17px;text-align:right;margin:0;font-size:13px;"></div><span onclick="svcRemovePart('+i+','+pi+')" style="cursor:pointer;color:var(--faint);font-size:15px;flex:0 0 auto;">🗑️</span></div>').join('');
     // 🗜️ PLEGABLE: colapsado = un renglón resumen (click para abrir); expandido = editor completo.
+    // ✍️ Badge de la respuesta del cliente por LÍNEA (aceptó/rechazó este servicio).
+    const _cl=s.clientLine==='accepted'?'<span style="color:#28b463;font-weight:800;font-size:10.5px;background:rgba(40,180,99,.14);border:1px solid #28b463;border-radius:6px;padding:1px 6px;margin-left:6px;white-space:nowrap;">✅ aceptado</span>':(s.clientLine==='declined'?'<span style="color:#e0683a;font-weight:800;font-size:10.5px;background:rgba(224,104,58,.14);border:1px solid #e0683a;border-radius:6px;padding:1px 6px;margin-left:6px;white-space:nowrap;">✖️ rechazado</span>':'');
     if(s._collapsed){
       const sumPartes=(s.parts||[]).reduce((x,p)=>x+(Number(p.price)||0),0);
       const who=(s.role||'Mecánico')+(s.assignName?(' · '+svcEsc(s.assignName)):'');
-      return '<div data-svc-row="'+i+'" style="background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
+      return '<div data-svc-row="'+i+'" style="background:var(--surface3);border:1px solid '+(s.clientLine==='declined'?'rgba(224,104,58,.4)':'var(--border)')+';border-radius:10px;padding:10px 12px;margin-bottom:8px;'+(s.clientLine==='declined'?'opacity:.7;':'')+'">'
         +'<div onclick="svcToggleService('+i+')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;">'
-        +'<div style="min-width:0;overflow:hidden;"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+svcEsc((s.desc||'').trim()||('Servicio '+(i+1)))+'</div>'
+        +'<div style="min-width:0;overflow:hidden;"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+svcEsc((s.desc||'').trim()||('Servicio '+(i+1)))+_cl+'</div>'
         +'<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_k.l+' · '+svcEsc(who)+(mins?(' · '+svcFmtMin(mins)):'')+(sumPartes?(' · 🔩 '+formatMoney(sumPartes)):'')+'</div></div>'
         +'<div style="white-space:nowrap;font-weight:800;color:var(--gold);">'+(price?formatMoney(price):'')+' <span style="color:var(--muted);font-weight:400;font-size:13px;">▸ abrir</span></div></div>'
         +'</div>';
@@ -3286,8 +3288,14 @@ function svcEstimateSheetHTML(d, services, opts){
   opts=opts||{}; const o=opts.order||{}; const report=!!opts.report; const receipt=!!opts.receipt||report;
   const en=(d.lang==='en'); const money=formatMoney;
   const dstr=new Date().toLocaleString(en?'en-US':'es-MX',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
-  let laborSub=0, partsSub=0, rows='';
-  services.forEach((s,i)=>{ const sp=Number(s.price)||0; laborSub+=sp;
+  let laborSub=0, partsSub=0, rows='', anyDeclined=false;
+  services.forEach((s,i)=>{ const sp=Number(s.price)||0;
+    // ✖️ Servicio RECHAZADO por el cliente: sale tachado, "No autorizado", y NO suma al total.
+    if(s.clientLine==='declined'){ anyDeclined=true;
+      rows+='<tr class="svcrow"><td style="text-decoration:line-through;color:#999;">'+svcEsc((s.desc||'').trim()||('Servicio '+(i+1)))+' <span style="color:#b00;font-weight:700;text-decoration:none;font-size:11px;">· '+(en?'DECLINED by customer':'NO autorizado por el cliente')+'</span></td><td class="r" style="text-decoration:line-through;color:#999;">'+money(sp)+'</td></tr>';
+      return;
+    }
+    laborSub+=sp;
     rows+='<tr class="svcrow"><td>'+svcEsc((s.desc||'').trim()||('Servicio '+(i+1)))+'</td><td class="r">'+money(sp)+'</td></tr>';
     (s.parts||[]).forEach(p=>{ const pp=Number(p.price)||0; partsSub+=pp; rows+='<tr class="prow"><td>• '+svcEsc((p.desc||'').trim()||(en?'Part':'Parte'))+'</td><td class="r">'+money(pp)+'</td></tr>'; });
   });
@@ -3378,6 +3386,7 @@ function svcEstimateSheetHTML(d, services, opts){
             ? ('<div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.paid+(payMethodTxt?(' · '+payMethodTxt):'')+'</span><span>'+money(paidAmt)+'</span></div>'+(dueAmt>0.004?('<div class="line" style="font-weight:800;color:#b00;"><span>'+L.due+'</span><span>'+money(dueAmt)+'</span></div>'):''))
             : (dep>0?('<div class="line"><span style="color:#777;">'+L.dep+'</span><b>−'+money(dep)+'</b></div><div class="line" style="font-weight:800;color:#0a7a35;"><span>'+L.bal+'</span><span>'+money(bal)+'</span></div>'):'')))+'</div>'
     +_work
+    +(anyDeclined?('<div class="disc" style="color:#555;border-top:1px solid #ddd;"><b>'+(en?'Declined services — release of liability.':'Servicios no autorizados — deslinde de responsabilidad.')+'</b> '+(en?'The customer was advised these services are needed and chose not to perform them, at their own risk. Legacy Motors Garage is released from any liability arising from the declined services.':'Se informó al cliente que estos servicios son necesarios y decidió no realizarlos, bajo su propio riesgo. Legacy Motors Garage queda deslindado de toda responsabilidad derivada de los servicios no autorizados.')+(o.estimateSign&&o.estimateSign.at?(' '+(en?'Authorized by signature on ':'Autorizado con firma el ')+new Date(o.estimateSign.at).toLocaleDateString(en?'en-US':'es-MX')+'.'):'')+'</div>'):'')
     +'<div class="disc">'+L.disc+'</div>'
     +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California BAR Reg. No. ARD 317673 · Automotive Repair Dealer</div></div>';
   return '<style>'+style+'</style>'+body;
@@ -3489,7 +3498,7 @@ window.svcEstPrint=function(){ const html=window._svcEstHtml||''; const w=window
 window.svcOpenReceipt=function(orderId){
   const o=svcOrders.find(x=>x.id===orderId); if(!o){ alert('Orden no encontrada.'); return; }
   const d={ lang:o.lang||'es', clientName:o.clientName||'', clientPhone:o.clientPhone||'', vehicleLabel:o.vehicleLabel||'', vin:o.vin||'', plate:o.plate||'', deposit:(Number(o.depositCents)||0)/100 };
-  const services=(Array.isArray(o.services)&&o.services.length)?o.services.map(s=>({desc:s.desc||'',price:(s.price!=null?Number(s.price):((Number(s.laborCents!=null?s.laborCents:s.priceCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[])})):[{desc:o.reason||'Servicio',price:(Number(o.grandTotalCents)||0)/100,parts:[]}];
+  const services=(Array.isArray(o.services)&&o.services.length)?o.services.map(s=>({desc:s.desc||'',price:(s.price!=null?Number(s.price):((Number(s.laborCents!=null?s.laborCents:s.priceCents)||0)/100)),clientLine:(s.clientLine||''),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[])})):[{desc:o.reason||'Servicio',price:(Number(o.grandTotalCents)||0)/100,parts:[]}];
   window._svcEstHtml=svcEstimateSheetHTML(d, services, {receipt:true, order:o}); window._svcRcptOrder=o.id;
   const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2147483100;display:flex;align-items:center;justify-content:center;padding:14px;';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
@@ -3524,7 +3533,7 @@ window.svcFinalReportOpen=async function(orderId, regen){
     const el=document.getElementById('svc-frgen'); if(el) el.remove();
   }
   const d={ lang:o.lang||'es', clientName:o.clientName||'', clientPhone:o.clientPhone||'', vehicleLabel:o.vehicleLabel||'', vin:o.vin||'', plate:o.plate||'', deposit:(Number(o.depositCents)||0)/100 };
-  const services=(Array.isArray(o.services)&&o.services.length)?o.services.map(s=>({desc:s.desc||'',price:(s.price!=null?Number(s.price):((Number(s.laborCents!=null?s.laborCents:s.priceCents)||0)/100)),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[])})):[{desc:o.reason||'Servicio',price:(Number(o.grandTotalCents)||0)/100,parts:[]}];
+  const services=(Array.isArray(o.services)&&o.services.length)?o.services.map(s=>({desc:s.desc||'',price:(s.price!=null?Number(s.price):((Number(s.laborCents!=null?s.laborCents:s.priceCents)||0)/100)),clientLine:(s.clientLine||''),parts:(Array.isArray(s.parts)?s.parts.map(p=>({desc:p.desc||'',price:(p.price!=null?Number(p.price):((Number(p.priceCents)||0)/100))})):[])})):[{desc:o.reason||'Servicio',price:(Number(o.grandTotalCents)||0)/100,parts:[]}];
   window._svcEstHtml=svcEstimateSheetHTML(d, services, {report:true, receipt:true, order:o}); window._svcRcptOrder=o.id;
   const ov=document.createElement('div'); ov.id='svc-est-overlay'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2147483100;display:flex;align-items:center;justify-content:center;padding:14px;';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
@@ -3679,7 +3688,7 @@ window.svcSaveOrder=async function(opts){
   // 3 · servicios (cada uno con su labor = tiempo × tarifa) + partes — feed del invoice
   const rate=Number(d.laborRate)||0;
   const capF=s=>{ s=(s||'').trim(); return s?s.charAt(0).toUpperCase()+s.slice(1):s; };
-  const services=(d.services||[]).map(s=>{ const e=s.assignEmpId?svcRoster.find(x=>String(x.id)===String(s.assignEmpId)):null; return { desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, kind:(s.kind||'oil'), parts:(Array.isArray(s.parts)?s.parts:[]), role:(s.role||''), assignEmpId:s.assignEmpId||'', assignName:(e?e.name:(s.assignName||'')), status:(s.status||'pendiente'), diagnosis:(s.diagnosis||null) }; }).filter(s=>s.desc);
+  const services=(d.services||[]).map(s=>{ const e=s.assignEmpId?svcRoster.find(x=>String(x.id)===String(s.assignEmpId)):null; return { desc:capF(s.desc), minutes:Number(s.minutes)||0, price:Number(s.price)||0, kind:(s.kind||'oil'), clientLine:(s.clientLine||''), parts:(Array.isArray(s.parts)?s.parts:[]), role:(s.role||''), assignEmpId:s.assignEmpId||'', assignName:(e?e.name:(s.assignName||'')), status:(s.status||'pendiente'), diagnosis:(s.diagnosis||null), repair:(s.repair||null) }; }).filter(s=>s.desc);
   if(!services.length){ alert('Agrega al menos un trabajo.'); return; }
   // 🔧 FUNCIÓN obligatoria SOLO al crear/guardar la ORDEN real (no en estimado: el estimado es cotización, aún no necesita función ni fecha ni mecánico).
   if(!opts.silent){
@@ -7977,6 +7986,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261107003056"></script>
+<script type="module" src="launcher.js?v=20261107010208"></script>
 </body>
 </html>
