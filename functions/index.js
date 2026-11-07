@@ -824,7 +824,7 @@ async function _sqRecordServiceCharge(order) {
 // 📄 Aplica un pago a las CUOTAS de un adendum (FIFO: la más próxima a vencer primero; 'contract_end' al último).
 // Reduce installments[].paidCents, guarda el pago en addon.payments[], postea el INGRESO a Finanzas (category Servicio).
 // Idempotente por entryId. sq = {payId, grossCents, feeCents, netCents, last4} para el desglose de tarjeta (opcional).
-async function _adendumApplyPayment(db, clientId, addonId, amountCents, entryId, method, who, sq, priv) {
+async function _adendumApplyPayment(db, clientId, addonId, amountCents, entryId, method, who, sq, priv, targetId) {
   const nowISO = new Date().toISOString();
   const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const cref = db.collection("clients").doc(clientId);
@@ -847,6 +847,8 @@ async function _adendumApplyPayment(db, clientId, addonId, amountCents, entryId,
       const dj = inst[j].due === "contract_end" ? "9999-12-31" : (inst[j].due || "9999-12-30");
       return di < dj ? -1 : (di > dj ? 1 : 0);
     });
+    // 🎯 Cobro de UNA cuota específica (ej. la de hoy, o la de "al final del contrato"): esa va primero. Si no, FIFO normal.
+    if (targetId) { const ti = inst.findIndex((x) => x && x.id === targetId); if (ti >= 0) { const pos = order.indexOf(ti); if (pos > 0) { order.splice(pos, 1); order.unshift(ti); } } }
     let left = Math.round(amountCents);
     for (const i of order) {
       if (left <= 0) break;
@@ -880,6 +882,25 @@ async function _adendumApplyPayment(db, clientId, addonId, amountCents, entryId,
   }
   return { ok: true, applied, settled, clientName };
 }
+// 💵 COBRO EN EFECTIVO (admin/staff) de una cuota del plan de servicio — en persona, ahorita. Reusa _adendumApplyPayment:
+//    aplica a la cuota indicada (installmentId) o FIFO si no, reduce el saldo del plan y POSTEA a Finanzas (como la tarjeta).
+exports.svcPlanPayCash = onCall({ timeoutSeconds: 20 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const id = await _actorIdentity(request);
+  if (!id || !(id.isOwner || id.email)) throw new HttpsError("permission-denied", "Solo staff.");
+  const d = request.data || {};
+  const clientId = String(d.clientId || ""); const addonId = String(d.addonId || "");
+  const amountCents = Math.round(Number(d.amountCents) || 0);
+  const targetId = String(d.installmentId || "");
+  if (!clientId || !addonId) throw new HttpsError("invalid-argument", "Faltan datos.");
+  if (!(amountCents >= 100)) throw new HttpsError("invalid-argument", "Monto inválido (mínimo $1).");
+  const db = admin.firestore();
+  const entryId = "cash_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+  const who = id.name || id.email || id.empId || "";
+  const r = await _adendumApplyPayment(db, clientId, addonId, amountCents, entryId, "cash", who, null, !!d.private, targetId);
+  if (!r) throw new HttpsError("internal", "No se pudo registrar el pago.");
+  return r;
+});
 // 📄 Registra el pago por Square de una CUOTA del adendum (idempotente por id del pago).
 async function _sqRecordAdendumCharge(order) {
   const tenders = Array.isArray(order.tenders) ? order.tenders : [];

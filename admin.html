@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107190908"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107190908"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107205833"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107205833"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261107190908"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261107190908"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261107205833"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261107205833"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1262,6 +1262,32 @@ function clientAddons(c){ return Array.isArray(c.addons)?c.addons:[]; }
 // El saldo de una orden = Total − pagado de verdad (paidCents) − pagado del plan. Nunca usamos el campo balanceCents (se quedaba viejo).
 function _svcPlanInfo(o){ let pt=0, pp=0; try{ const c=clients.find(x=>x.id===(o&&o.clientId)); if(c){ (c.addons||[]).forEach(a=>{ if(a&&a.sourceOrderId===o.id&&Array.isArray(a.installments)){ a.installments.forEach(x=>{ pt+=(Number(x.amtCents)||0); pp+=(Number(x.paidCents)||0); }); } }); } }catch(e){} return {planTotalCents:pt, planPaidCents:pp}; }
 function svcOwedCents(o){ if(o && o.warranty) return 0;   /* 🛡️ orden en garantía: el cliente no paga nada */ const t=Number(o.grandTotalCents)||0, pc=Number(o.paidCents)||0, pp=_svcPlanInfo(o).planPaidCents; return Math.max(0, t-pc-pp); }
+// 🔧 Desglose del PLAN de servicio para COBRAR en efectivo (admin): cada cuota con su fecha + botón Cobrar; la de
+//    "al final del contrato" clasificada aparte CON opción de cobrarla. El cliente lo ve pagado en su portal (en vivo).
+function _svcPlanCobrarHTML(o){
+  if(!o||!o.clientId) return '';
+  const c=clients.find(x=>x.id===o.clientId); if(!c) return '';
+  const plans=(c.addons||[]).filter(a=>a&&a.sourceOrderId===o.id&&Array.isArray(a.installments)&&a.installments.length);
+  if(!plans.length) return '';
+  return plans.map(function(a){
+    const inst=a.installments.slice().sort(function(x,y){ const dx=x.due==='contract_end'?'9999-12-31':(x.due||'9999-12-30'); const dy=y.due==='contract_end'?'9999-12-31':(y.due||'9999-12-30'); return dx<dy?-1:(dx>dy?1:0); });
+    const bal=inst.reduce((s,x)=>s+Math.max(0,(Number(x.amtCents)||0)-(Number(x.paidCents)||0)),0);
+    const rows=inst.map(function(p){
+      const amt=Number(p.amtCents)||0, pd=Number(p.paidCents)||0, rem=Math.max(0,amt-pd), done=rem<=0, partial=pd>0&&!done, end=(p.due==='contract_end');
+      const ds=end?'🏁 Al final del contrato':(function(){ try{ return '📅 '+new Date(p.due+'T12:00:00').toLocaleDateString('es-US',{year:'numeric',month:'short',day:'numeric'}); }catch(e){ return '📅 '+(p.due||''); } })();
+      const tag=done?'<span style="color:#49d17f;font-weight:700;">✅ Pagada</span>':(partial?('<span style="color:#f0c040;font-weight:700;">🔵 '+formatMoney(pd/100)+' / '+formatMoney(amt/100)+'</span>'):('<span style="font-weight:700;">'+formatMoney(amt/100)+'</span>'));
+      const endTag=end?' <span style="font-size:10px;color:#4d9bff;background:rgba(31,111,235,.14);border:1px solid rgba(31,111,235,.35);border-radius:6px;padding:1px 6px;white-space:nowrap;">se paga al final</span>':'';
+      const btn=(!done)?('<button onclick="svcPlanCobrar(\''+a.id+'\','+rem+',\''+(p.id||'')+'\',\''+o.id+'\')" style="flex:none;background:var(--gold);color:var(--navy3);border:none;border-radius:9px;padding:8px 13px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">💵 Cobrar '+formatMoney(rem/100)+'</button>'):'';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid rgba(31,111,235,.18);"><div style="min-width:0;"><div style="font-size:12.5px;color:var(--muted);">'+ds+endTag+'</div><div style="font-size:14px;margin-top:2px;">'+tag+'</div></div>'+btn+'</div>';
+    }).join('');
+    return '<div style="background:rgba(31,111,235,.06);border:1px solid rgba(31,111,235,.3);border-radius:12px;padding:12px;margin-bottom:14px;">'
+      +'<div style="font-weight:800;font-size:14px;color:#4d9bff;">🔧 Pagos de servicio · plan</div>'
+      +'<div style="font-size:11.5px;color:var(--muted);margin:2px 0;">'+svcEsc(a.concept||'')+' · saldo del plan <b style="color:#4d9bff;">'+formatMoney(bal/100)+'</b> · efectivo, cada cuota por separado</div>'
+      +rows
+      +(bal>0?('<button onclick="svcPlanCobrar(\''+a.id+'\','+bal+',\'\',\''+o.id+'\')" style="width:100%;margin-top:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;">💵 Cobrar todo el plan · '+formatMoney(bal/100)+'</button>'):'<div style="margin-top:8px;color:#49d17f;font-weight:800;font-size:13px;text-align:center;">✅ Plan pagado</div>')
+    +'</div>';
+  }).join('');
+}
 // Lo pagado de un cargo: si tiene cuotas (adendum), suma los paidCents de las cuotas; si no, los pagos viejos.
 function addonPaid(a){ if(Array.isArray(a.installments)&&a.installments.length) return a.installments.reduce((s,x)=>s+(Number(x.paidCents)||0),0)/100; return (a.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0); }
 function addonBalance(a){ if(!a||a.settled===true) return 0; return Math.max(0, ((Number(a.totalCents)||0)/100) - addonPaid(a)); }
@@ -1976,6 +2002,7 @@ window.svcChargeOpen=function(id){
       +'<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid var(--border);margin-top:4px;"><span style="font-weight:700;">Saldo por cobrar</span><b style="color:var(--gold);">'+formatMoney(due)+'</b></div>'
     +'</div>'
     +_pagosHtml
+    +_svcPlanCobrarHTML(o)
     +(dueNow>0
       ? '<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">💵 Cobrar ahora (lo que NO está en el plan · todo o un abono)</label>'
         +'<input id="svc-caja-amt" type="number" inputmode="decimal" step="0.01" value="'+dueNow.toFixed(2)+'" style="'+IN+'margin-bottom:10px;">'
@@ -2211,6 +2238,36 @@ window.svcChargeDo=async function(id, method){
   }catch(e){ if(msg) msg.textContent='Error: '+((e&&e.message)||e); else alert('Error: '+((e&&e.message)||e)); }
 };
 
+// 💵 Cobra en EFECTIVO una cuota del PLAN de servicio (o todo el plan). Aplica a la cuota indicada, postea a Finanzas,
+//    el cliente lo ve PAGADO en su portal (en vivo) y se le ofrece SMS de recibo — igual que los pagos del carro.
+window.svcPlanCobrar=async function(addonId, cents, installmentId, orderId){
+  const amt=Math.round(Number(cents)||0);
+  if(!(amt>=100)){ alert('Monto inválido.'); return; }
+  const o=svcOrders.find(x=>x.id===orderId)||{}; const c=clients.find(x=>x.id===o.clientId);
+  if(!c){ alert('Cliente no encontrado.'); return; }
+  if(!confirm('¿Registrar '+formatMoney(amt/100)+' en EFECTIVO'+(installmentId?' a esta cuota':' al plan')+' de servicio de '+(c.name||'')+'?\n\nEntra a Finanzas como ingreso de Servicio y el cliente lo verá pagado en su portal.')) return;
+  // saldo del plan ANTES (clients es live pero el snapshot puede no haber llegado tras el pago)
+  let oldRem=0; try{ (c.addons||[]).forEach(a=>{ if(a&&a.id===addonId&&Array.isArray(a.installments)) a.installments.forEach(x=>{ oldRem+=Math.max(0,(Number(x.amtCents)||0)-(Number(x.paidCents)||0)); }); }); }catch(e){}
+  try{
+    const r=await httpsCallable(functions,'svcPlanPayCash')({ clientId:c.id, addonId:addonId, amountCents:amt, installmentId:installmentId||'' });
+    const d=(r&&r.data)||{};
+    const applied=(typeof d.applied==='number' && d.applied>=0)?d.applied:amt;
+    const planBalAfter=Math.max(0, oldRem-applied);
+    const abonoTxt=formatMoney(applied/100);
+    // 💬 SMS al cliente (como el carro): pagaste X, saldo del plan Y + link a su portal.
+    const phone=(o.clientPhone||c.phoneE164||c.phone||'').replace(/[^0-9+]/g,'');
+    const fol=o.orderNum?(' #'+o.orderNum):''; const link=PORTAL_URL+'?order='+orderId;
+    if(phone && confirm('✅ '+abonoTxt+' registrado en efectivo.\n\n¿Enviar al cliente su recibo por SMS ("pagaste '+abonoTxt+', saldo del plan '+formatMoney(planBalAfter/100)+'")?')){
+      const body=(o.lang==='en')
+        ? ('Legacy Motors Garage'+fol+': you paid '+abonoTxt+' (cash). Service plan balance '+formatMoney(planBalAfter/100)+'. '+link)
+        : ('Legacy Motors Garage'+fol+': pagaste '+abonoTxt+' (efectivo). Saldo del plan de servicio '+formatMoney(planBalAfter/100)+'. '+link);
+      location.href='sms:'+phone+'?body='+encodeURIComponent(body);
+    }
+    try{ if(window.svcToast) svcToast('✅ '+abonoTxt+' cobrado · el cliente ya lo ve pagado en su portal'); }catch(e){}
+    const box=document.getElementById('svc-caja'); if(box) box.remove();
+    setTimeout(function(){ try{ svcChargeOpen(orderId); }catch(e){} }, 500);   // reabre con datos frescos (clients live)
+  }catch(e){ alert('No se pudo registrar: '+((e&&e.message)||e)); }
+};
 // 🛡️ GARANTÍA: cierra la orden SIN costo al cliente. Conserva el trabajo y los montos en el recibo (para el
 //    expediente), pone el saldo en $0 y NO registra ningún ingreso en Finanzas (no se cobró nada).
 window.svcMarkWarranty=async function(id){
@@ -7995,6 +8052,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261107190908"></script>
+<script type="module" src="launcher.js?v=20261107205833"></script>
 </body>
 </html>
