@@ -2483,8 +2483,22 @@ exports.svcMechChat = onCall({ secrets: [ANTHROPIC_KEY], timeoutSeconds: 90, mem
   const ctx = "Vehicle: " + (vehicle || "(unknown)") + (vin ? (" · VIN " + vin) : "") + (service ? ("\nService/Complaint: " + service) : "");
   const claudeMsgs = msgs.map((m) => ({ role: m.role, content: m.content }));
   if (!claudeMsgs.length) return { ok: true, reply: "" };
-  if (images.length) { const last = claudeMsgs[claudeMsgs.length - 1]; if (last.role === "user") { last.content = [...images, { type: "text", text: last.content }]; } }
-  const resp = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 900, system: sys + "\n\n" + ctx, tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }], messages: claudeMsgs });
+  // la foto va en el ÚLTIMO mensaje del usuario (texto no vacío para no mandar bloque vacío a la API)
+  if (images.length) { const last = claudeMsgs[claudeMsgs.length - 1]; if (last && last.role === "user") { const txt = String(last.content || "").trim() || (lang === "en" ? "(see photo)" : "(ver foto)"); last.content = [...images, { type: "text", text: txt }]; } }
+  let resp;
+  try {
+    resp = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 900, system: sys + "\n\n" + ctx, tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }], messages: claudeMsgs });
+  } catch (e) {
+    console.error("svcMechChat call failed:", (e && (e.status || e.name)) || "", (e && e.message) || e);
+    // 🛟 Degrada con gracia: reintenta SIN la foto (suele ser la que truena) y SIN web_search, para que el mecánico igual reciba respuesta.
+    try {
+      const noImg = claudeMsgs.map((m) => ({ role: m.role, content: (typeof m.content === "string") ? m.content : (Array.isArray(m.content) ? m.content.filter((b) => b.type === "text").map((b) => b.text).join(" ").trim() : String(m.content || "")) })).filter((m) => m.content);
+      resp = await client.messages.create({ model: "claude-sonnet-5", max_tokens: 900, system: sys + "\n\n" + ctx, messages: noImg });
+    } catch (e2) {
+      console.error("svcMechChat retry failed:", (e2 && e2.message) || e2);
+      return { ok: true, reply: (lang === "en" ? "⚠️ I couldn't process that just now — try again, or send the message without the photo." : "⚠️ No pude procesar eso en este momento — reinténtalo, o manda el mensaje sin la foto.") };
+    }
+  }
   const reply = (resp.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
   return { ok: true, reply: reply };
 });

@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107175334"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107175334"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107180231"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107180231"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261107175334"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261107175334"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261107175334"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261107180231"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261107180231"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261107180231"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -3023,8 +3023,7 @@ window.repAddPhoto=async function(inp){
   const el=inp.closest('label'); const span=el&&el.querySelector('span'); const prev=span?span.textContent:'';
   try{ if(span) span.textContent='⏳ '+(en?'Uploading…':'Subiendo…');
     const jpg=await toJpeg(inp.files[0]);
-    const rf=ref(storage,'serviceOrders/'+_rep.orderId+'/repair/'+Date.now()+'_'+((jpg.name||'foto.jpg')));
-    await uploadBytes(rf,jpg); const url=await getDownloadURL(rf);
+    const url=await _whUploadJpg('serviceOrders/'+_rep.orderId+'/repair/'+Date.now()+'_'+((jpg.name||'foto.jpg')), jpg, en);
     if(_rep&&_rep.photos){ _rep.photos.push({url:url,preview:url}); }
     _repairRender(); try{ _repDraftSave(); }catch(e){}
   }catch(e){ if(span) span.textContent=prev; whToast('⚠️ '+(en?'Photo failed: ':'Foto falló: ')+((e&&e.message)||''),true); }
@@ -3077,7 +3076,7 @@ window.extraPhoto=async function(i,inp){
   if(!_wx||!inp.files||!inp.files[0]||!_wx.items[i]) return; const en=(L==='en');
   const el=inp.closest('label'); const span=el&&el.querySelector('span'); const prev=span?span.textContent:'';
   try{ if(span) span.textContent='⏳ '+(en?'Uploading…':'Subiendo…');
-    const jpg=await toJpeg(inp.files[0]); const rf=ref(storage,'serviceOrders/'+_wx.orderId+'/diag/'+Date.now()+'_extra_'+((jpg.name||'foto.jpg'))); await uploadBytes(rf,jpg); const url=await getDownloadURL(rf);
+    const jpg=await toJpeg(inp.files[0]); const url=await _whUploadJpg('serviceOrders/'+_wx.orderId+'/diag/'+Date.now()+'_extra_'+((jpg.name||'foto.jpg')), jpg, en);
     if(_wx&&_wx.items&&_wx.items[i]){ _wx.items[i].file=null; _wx.items[i].photo=url; _wx.items[i].preview=url; }
     _extraRender();
   }catch(e){ if(span) span.textContent=prev; whToast('⚠️ '+(en?'Photo failed: ':'Foto falló: ')+((e&&e.message)||''),true); }
@@ -3597,7 +3596,7 @@ window.dviRemovePart=function(id,idx){ const d=DVI.data[id]; if(!d) return; if(!
 window.dviSet=function(id,f,val){ const d=DVI.data[id]||(DVI.data[id]={}); d[f]=val; };
 window.dviPhoto=async function(id,inp){ const f=inp&&inp.files&&inp.files[0]; if(!f) return; const lab=document.getElementById('dvi-ph-'+id);
   if(lab) lab.textContent=(L==='en'?'Uploading…':'Subiendo…');
-  try{ const jpg=await toJpeg(f); const r=ref(storage,'inventory/'+DVI.carId+'/dvi/'+Date.now()+'_'+(jpg.name||'foto.jpg')); await uploadBytes(r,jpg); const url=await getDownloadURL(r);
+  try{ const jpg=await toJpeg(f); const url=await _whUploadJpg('inventory/'+DVI.carId+'/dvi/'+Date.now()+'_'+(jpg.name||'foto.jpg'), jpg, (L==='en'));
     const d=DVI.data[id]||(DVI.data[id]={}); d.photo=url; const box=document.getElementById('dvi-items'); if(box){ const a=DVI_SOP[DVI.areaIdx]; box.innerHTML=a.items.map(it=>dviItemRow(it)).join(''); }
   }catch(e){ if(lab) lab.textContent='⚠️'; whToast((L==='en'?'Photo failed':'Falló la foto'),true); }
 };
@@ -6112,7 +6111,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261107175334"></script>
+<script type="module" src="launcher.js?v=20261107180231"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
