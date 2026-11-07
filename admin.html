@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107214156"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107214156"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107215421"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107215421"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261107214156"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261107214156"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261107215421"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261107215421"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -7011,6 +7011,19 @@ window.svcPromiseSms=function(id){
   try{ navigator.clipboard.writeText(text); }catch(e){}
   alert('Esta orden no tiene teléfono. El texto se copió 📋.');
 };
+// 🧾 Renglón UNIFICADO de "Pagos de hoy" (carro Y servicio): compacto, tappable a la tarjeta del cliente, con monto + fecha
+//    + 💵 Cobrar + 💬. UN solo formato para todos (regla de un solo ecosistema). opts: {clientId,name,folio,car,carIcon,amtTxt,whenTxt,overdue,accent,cobrar,sms}
+function _todayRow(o){
+  const ac=o.accent||'#4d9bff'; const danger=!!o.overdue; const amtCol=danger?'#ff8080':ac;
+  return '<div style="display:flex;align-items:center;gap:8px;background:'+(danger?'rgba(255,59,59,0.07)':'var(--navy2)')+';border:1px solid '+(danger?'rgba(255,59,59,0.22)':'var(--border)')+';border-radius:9px;padding:8px 11px;">'
+    +'<div '+(o.clientId?('onclick="openClient360(\''+o.clientId+'\')"'):'')+' style="flex:1;min-width:0;'+(o.clientId?'cursor:pointer;':'')+'">'
+      +'<div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(o.name||'Cliente')+(o.folio?' <span style="color:var(--gold);font-weight:800;">'+o.folio+'</span>':'')+(o.car?' <span style="color:var(--muted);font-size:12px;font-weight:400;">· '+(o.carIcon||'🚗')+' '+esc(o.car)+'</span>':'')+'</div>'
+      +'<div style="font-size:12.5px;font-weight:800;margin-top:1px;color:'+amtCol+';">'+(o.amtTxt||'')+(o.whenTxt?' <span style="font-weight:600;color:'+(danger?'#ff8080':'var(--muted)')+';">· 📅 '+o.whenTxt+'</span>':'')+'</div>'
+    +'</div>'
+    +(o.cobrar?'<button onclick="'+o.cobrar+'" title="Cobrar" style="flex:none;background:var(--gold);color:var(--navy3);border:none;border-radius:7px;padding:7px 11px;font-size:13px;font-weight:800;cursor:pointer;">💵</button>':'')
+    +(o.sms?'<button onclick="'+o.sms+'" title="Mensaje" style="flex:none;background:transparent;color:'+ac+';border:1px solid '+ac+';border-radius:7px;padding:7px 10px;font-size:13px;font-weight:700;cursor:pointer;">💬</button>':'')
+  +'</div>';
+}
 function renderTodayBox() {
   const todayStr = today();
   const todayClients = clients.filter(c => getNextPayDate(c) === todayStr);
@@ -7063,41 +7076,25 @@ function renderTodayBox() {
   let html = '';
 
   if(svcPromEntries.length){
-    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#f0c040;margin-bottom:10px;">💵 PROMESA DE PAGO · SERVICIO</div>`;
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">';
+    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#f0c040;margin-bottom:8px;">💵 PROMESA DE PAGO · SERVICIO</div>`;
+    html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">';
     svcPromEntries.forEach(e=>{ const o=e.o; const bal=((Number(o.grandTotalCents)||0)-(Number(o.paidCents)||0))/100;
       const promAmt=(e.amtCents>0)?(e.amtCents/100):bal;   // 💵 lo que prometió traer ese día (puede ser menos que el saldo)
-      const restTxt=(promAmt<bal-0.004)?(' <span style="font-size:11px;color:var(--muted);font-weight:600;">· saldo total '+formatMoney(bal)+'</span>'):'';
-      const car=o.vehicleLabel||o.plate||'Auto'; const overdue=(e.date<todayStr); const fol=o.orderNum?(' #'+o.orderNum):'';
+      const overdue=(e.date<todayStr);
       const pf=(function(){ try{ return new Date(e.date+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short'}); }catch(ex){ return e.date; } })();
       const ph=(o.clientPhone||'').replace(/\D/g,'');
-      html += `<div style="background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.4);border-radius:10px;padding:14px;">
-        <div><div style="font-weight:700;font-size:15px;">${esc(o.clientName||'Cliente')}${fol}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">🚗 ${esc(car)}</div>
-          <div style="font-size:13px;color:#f0c040;font-weight:800;margin-top:3px;">${formatMoney(promAmt)} · 📅 ${overdue?('⚠️ venció '+pf):('prometió '+pf)}${restTxt}</div></div>
-        <div style="display:flex;gap:6px;margin-top:10px;">
-          <button onclick="svcOpenOrder('${o.id}')" style="flex:1;background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;">💵 Cobrar</button>
-          ${ph?`<button onclick="svcPromiseSms('${o.id}')" style="background:transparent;color:#f0c040;border:1px solid #f0c040;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;">💬</button>`:''}
-        </div></div>`;
+      html += _todayRow({ clientId:o.clientId, name:o.clientName, folio:o.orderNum?('#'+o.orderNum):'', car:o.vehicleLabel||o.plate||'Auto', carIcon:'🔧', amtTxt:formatMoney(promAmt), whenTxt:(overdue?('venció '+pf):('prometió '+pf)), overdue:overdue, accent:'#f0c040', cobrar:"svcOpenOrder('"+o.id+"')", sms: ph?("svcPromiseSms('"+o.id+"')"):'' });
     });
     html += '</div>';
   }
 
   if(svcPlanEntries.length){
-    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4d9bff;margin-bottom:10px;">💵 CUOTA DEL PLAN · SERVICIO</div>`;
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">';
-    svcPlanEntries.forEach(e=>{ const o=e.o||{}; const car=o.vehicleLabel||o.plate||e.a.concept||'Servicio'; const fol=o.orderNum?(' #'+o.orderNum):'';
-      const overdue=(e.date<todayStr);
+    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4d9bff;margin-bottom:8px;">💵 CUOTA DEL PLAN · SERVICIO</div>`;
+    html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">';
+    svcPlanEntries.forEach(e=>{ const o=e.o||{}; const car=o.vehicleLabel||o.plate||e.a.concept||'Servicio';
+      const overdue=(e.date<todayStr); const ph=(o.clientPhone||e.c.phoneE164||e.c.phone||'');
       const pf=(function(){ try{ return new Date(e.date+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short'}); }catch(ex){ return e.date; } })();
-      html += `<div style="background:rgba(31,111,235,0.08);border:1px solid rgba(31,111,235,0.4);border-radius:10px;padding:14px;">
-        <div><div style="font-weight:700;font-size:15px;">${esc(e.c.name||o.clientName||'Cliente')}${fol}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">🔧 ${esc(car)} · 📄 plan</div>
-          <div style="font-size:13px;color:#4d9bff;font-weight:800;margin-top:3px;">${formatMoney(e.rem/100)} · 📅 ${overdue?('⚠️ venció '+pf):('cuota '+pf)}</div></div>
-        <div style="display:flex;gap:6px;margin-top:10px;">
-          <button onclick="svcPlanCobrar('${e.a.id}',${e.rem},'${e.inst.id||''}','${e.a.sourceOrderId}')" style="flex:1;background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;">💵 Cobrar</button>
-          ${((o.clientPhone||e.c.phoneE164||e.c.phone||''))?`<button onclick="svcPlanSms('${e.a.sourceOrderId}',${e.rem},'${e.date}')" style="background:transparent;color:#4d9bff;border:1px solid #4d9bff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;">💬</button>`:''}
-          ${o.id?`<button onclick="svcChargeOpen('${o.id}')" style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;">Ver</button>`:''}
-        </div></div>`;
+      html += _todayRow({ clientId:(o.clientId||e.c.id), name:(e.c.name||o.clientName), folio:o.orderNum?('#'+o.orderNum):'', car:car, carIcon:'🔧', amtTxt:formatMoney(e.rem/100), whenTxt:(overdue?('venció '+pf):('cuota '+pf)), overdue:overdue, accent:'#4d9bff', cobrar:"svcPlanCobrar('"+e.a.id+"',"+e.rem+",'"+(e.inst.id||'')+"','"+e.a.sourceOrderId+"')", sms: ph?("svcPlanSms('"+e.a.sourceOrderId+"',"+e.rem+",'"+e.date+"')"):'' });
     });
     html += '</div>';
   }
@@ -7147,12 +7144,7 @@ function renderTodayBox() {
     html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">';
     todayClients.forEach(c => {
       const _last = dueNow(c)<(Number(c.weekly)||0);
-      html += `<div style="background:var(--navy2);border-radius:9px;padding:8px 12px;display:flex;align-items:center;gap:10px;">
-        <div onclick="openClient360('${c.id}')" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;"><span style="font-weight:600;font-size:14px;">${c.name}</span> <span style="font-size:12px;color:var(--muted);">· ${c.year} ${c.make} ${c.model}</span></div>
-        ${_last?'<span style="font-size:9px;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">Último</span>':''}
-        <div style="font-family:var(--font-display);font-size:16px;color:var(--green);white-space:nowrap;">${formatMoney(dueNow(c))}</div>
-        <button onclick="sendFriendlyTodayMsg('${c.id}')" title="SMS" style="background:var(--green);color:#000;border:none;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">💬</button>
-      </div>`;
+      html += _todayRow({ clientId:c.id, name:c.name, folio:'', car:[c.year,c.make,c.model].filter(Boolean).join(' '), carIcon:'🚗', amtTxt:formatMoney(dueNow(c))+(_last?' · último':''), whenTxt:'toca hoy', overdue:false, accent:'var(--green)', cobrar:"openPayModal('"+c.id+"')", sms:"sendFriendlyTodayMsg('"+c.id+"')" });
     });
     html += '</div>';
   }
@@ -7165,12 +7157,7 @@ function renderTodayBox() {
     html += '<div style="display:flex;flex-direction:column;gap:6px;">';
     overdueClients.forEach(c => {
       const days = Math.abs(daysUntil(getNextPayDate(c)));
-      html += `<div style="background:rgba(255,59,59,0.08);border:1px solid rgba(255,59,59,0.2);border-radius:9px;padding:8px 12px;display:flex;align-items:center;gap:10px;">
-        <div onclick="openClient360('${c.id}')" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;"><span style="font-weight:600;font-size:14px;">${c.name}</span> <span style="font-size:12px;color:#ff8080;">· ${c.year} ${c.make} ${c.model} · ${days}d</span></div>
-        <div style="font-size:9px;color:#ff8080;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">debe ${formatMoney(calcBalance(c))}</div>
-        <div style="font-family:var(--font-display);font-size:16px;color:var(--red);white-space:nowrap;">${formatMoney(c.weekly)}</div>
-        <button onclick="openWhatsApp('${c.id}','overdue')" title="SMS" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">💬</button>
-      </div>`;
+      html += _todayRow({ clientId:c.id, name:c.name, folio:'', car:[c.year,c.make,c.model].filter(Boolean).join(' '), carIcon:'🚗', amtTxt:formatMoney(c.weekly)+' <span style="font-weight:600;color:#ff8080;">· debe '+formatMoney(calcBalance(c))+'</span>', whenTxt:('venció · '+days+'d'), overdue:true, accent:'var(--red)', cobrar:"openPayModal('"+c.id+"')", sms:"openWhatsApp('"+c.id+"','overdue')" });
     });
     html += '</div>';
   }
@@ -8110,6 +8097,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261107214156"></script>
+<script type="module" src="launcher.js?v=20261107215421"></script>
 </body>
 </html>
