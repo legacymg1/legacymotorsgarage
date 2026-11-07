@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107205833"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107205833"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107213654"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107213654"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261107205833"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261107205833"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261107213654"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261107213654"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2264,8 +2264,8 @@ window.svcPlanCobrar=async function(addonId, cents, installmentId, orderId){
       location.href='sms:'+phone+'?body='+encodeURIComponent(body);
     }
     try{ if(window.svcToast) svcToast('✅ '+abonoTxt+' cobrado · el cliente ya lo ve pagado en su portal'); }catch(e){}
-    const box=document.getElementById('svc-caja'); if(box) box.remove();
-    setTimeout(function(){ try{ svcChargeOpen(orderId); }catch(e){} }, 500);   // reabre con datos frescos (clients live)
+    const box=document.getElementById('svc-caja'); const wasOpen=!!box; if(box) box.remove();
+    setTimeout(function(){ try{ renderTodayBox(); }catch(e){} try{ const m=document.getElementById('c360-modal'); if(m && m.style.display!=='none') renderClient360(c.id); }catch(e){} if(wasOpen){ try{ svcChargeOpen(orderId); }catch(e){} } }, 500);   // refresca Pagos de hoy, la tarjeta del cliente y la caja (clients live)
   }catch(e){ alert('No se pudo registrar: '+((e&&e.message)||e)); }
 };
 // 🛡️ GARANTÍA: cierra la orden SIN costo al cliente. Conserva el trabajo y los montos en el recibo (para el
@@ -2588,6 +2588,9 @@ window.renderClient360=function(id){
   const _svcRow=(o,done)=>{ const when=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; const _sl=(typeof svcStatusLabel==='function')?svcStatusLabel(o):{txt:(done?'✅ Servicio realizado':'🧾 Estimado'),col:'var(--muted)'}; const stl=done?'✅ Servicio realizado':_sl.txt; const _slcol=done?'#28b463':_sl.col; const tot=o.grandTotalCents!=null?M(o.grandTotalCents/100):''; const fol=o.orderNum?('<span style="color:var(--gold);font-weight:800;">#'+o.orderNum+'</span> · '):''; const _ow=svcOwedCents(o); const saldo=(!done && _ow>0)?(' · saldo '+M(_ow/100)):''; const fn=done?('svcOpenReceipt(\''+o.id+'\')'):('svcOpenOrder(\''+o.id+'\')'); return '<div onclick="c360Close();'+fn+'" style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">'+fol+esc(o.reason||'Servicio')+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div><div style="font-size:12px;color:'+_slcol+';margin-top:3px;font-weight:700;">'+stl+'</div><div style="font-size:11px;color:var(--muted);margin-top:1px;">'+(tot||'')+saldo+(done?' · 🧾 recibo ›':' · ver ›')+'</div></div>'; };
   const _svcActive=sOrders.filter(o=>o.paid!==true), _svcDone=sOrders.filter(o=>o.paid===true);
   h+=sec('🔧 Servicio', _svcActive.length?_svcActive.map(o=>_svcRow(o,false)).join(''):empty('Sin órdenes abiertas.'), addBtn('➕ Agendar servicio','c360NewService(\''+id+'\')'));
+  // 💵 Pagos de servicio (plan) — cobrar cada cuota DESDE la tarjeta del cliente (mismo componente que la caja y Pagos de hoy).
+  const _svcPlanOrders=_svcActive.filter(o=>(c.addons||[]).some(a=>a&&a.sourceOrderId===o.id&&Array.isArray(a.installments)&&a.installments.length));
+  if(_svcPlanOrders.length){ h+=sec('💵 Pagos de servicio (plan)', _svcPlanOrders.map(o=>_svcPlanCobrarHTML(o)).join('')); }
   if(_svcDone.length) h+=sec('✅ Órdenes completadas ('+_svcDone.length+')', _svcDone.map(o=>_svcRow(o,true)).join(''));
   // 4) Citas (solo si tiene) (+ agendar)
   if(appts.length){ h+=sec('📅 Citas', appts.map(a=>{ const when=(a.scheduledAt||a.date)?new Date(a.scheduledAt||a.date).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; const svc=Array.isArray(a.services)?a.services.join(', '):(a.service||a.reason||a.note||'Cita'); const st=a.status?(' · '+esc(a.status)):''; return '<div style="border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:7px;"><div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:13px;min-width:0;">📅 '+esc(svc)+'</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">'+when+'</span></div>'+(st?('<div style="font-size:12px;color:var(--muted);margin-top:3px;">'+st.replace(/^ · /,'')+'</div>'):'')+'</div>'; }).join(''), addBtn('➕ Cita','c360Close();openApptModal(\''+id+'\')')); }
@@ -7015,7 +7018,22 @@ function renderTodayBox() {
   });
   svcPromEntries.sort((a,b)=>a.date.localeCompare(b.date));
 
-  if (!todayClients.length && !overdueClients.length && !bdayClients.length && !serviceClients.length && !svcPromEntries.length) {
+  // 💵 CUOTAS del PLAN de servicio (adendum) que vencen HOY o antes — por CADA cuota con fecha (la de 'contract_end' NO sale aquí).
+  const svcPlanEntries = [];
+  clients.forEach(c=>{
+    (c.addons||[]).forEach(a=>{
+      if(!a || !a.sourceOrderId || !Array.isArray(a.installments) || !a.installments.length) return;
+      const o=(typeof svcOrders!=='undefined'?svcOrders:[]).find(x=>x.id===a.sourceOrderId); if(!o || o.paid) return;
+      a.installments.forEach(p=>{
+        if(!p || p.due==='contract_end') return;   // la de "al final del contrato" NO sale en Pagos de hoy
+        const rem=Math.max(0,(Number(p.amtCents)||0)-(Number(p.paidCents)||0));
+        if(rem>0 && String(p.due)<=todayStr){ svcPlanEntries.push({ c, a, o, inst:p, date:String(p.due), rem }); }
+      });
+    });
+  });
+  svcPlanEntries.sort((a,b)=>a.date.localeCompare(b.date));
+
+  if (!todayClients.length && !overdueClients.length && !bdayClients.length && !serviceClients.length && !svcPromEntries.length && !svcPlanEntries.length) {
     box.style.display = 'none';
     return;
   }
@@ -7039,6 +7057,24 @@ function renderTodayBox() {
         <div style="display:flex;gap:6px;margin-top:10px;">
           <button onclick="svcOpenOrder('${o.id}')" style="flex:1;background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;">💵 Cobrar</button>
           ${ph?`<button onclick="svcPromiseSms('${o.id}')" style="background:transparent;color:#f0c040;border:1px solid #f0c040;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;">💬</button>`:''}
+        </div></div>`;
+    });
+    html += '</div>';
+  }
+
+  if(svcPlanEntries.length){
+    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4d9bff;margin-bottom:10px;">💵 CUOTA DEL PLAN · SERVICIO</div>`;
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:16px;">';
+    svcPlanEntries.forEach(e=>{ const o=e.o||{}; const car=o.vehicleLabel||o.plate||e.a.concept||'Servicio'; const fol=o.orderNum?(' #'+o.orderNum):'';
+      const overdue=(e.date<todayStr);
+      const pf=(function(){ try{ return new Date(e.date+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short'}); }catch(ex){ return e.date; } })();
+      html += `<div style="background:rgba(31,111,235,0.08);border:1px solid rgba(31,111,235,0.4);border-radius:10px;padding:14px;">
+        <div><div style="font-weight:700;font-size:15px;">${esc(e.c.name||o.clientName||'Cliente')}${fol}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">🔧 ${esc(car)} · 📄 plan</div>
+          <div style="font-size:13px;color:#4d9bff;font-weight:800;margin-top:3px;">${formatMoney(e.rem/100)} · 📅 ${overdue?('⚠️ venció '+pf):('cuota '+pf)}</div></div>
+        <div style="display:flex;gap:6px;margin-top:10px;">
+          <button onclick="svcPlanCobrar('${e.a.id}',${e.rem},'${e.inst.id||''}','${e.a.sourceOrderId}')" style="flex:1;background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;">💵 Cobrar</button>
+          ${o.id?`<button onclick="svcChargeOpen('${o.id}')" style="background:transparent;color:#4d9bff;border:1px solid #4d9bff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;">Ver</button>`:''}
         </div></div>`;
     });
     html += '</div>';
@@ -8052,6 +8088,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261107205833"></script>
+<script type="module" src="launcher.js?v=20261107213654"></script>
 </body>
 </html>
