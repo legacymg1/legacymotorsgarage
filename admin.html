@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107215421"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107215421"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107220317"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107220317"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261107215421"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261107215421"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261107220317"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261107220317"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2240,23 +2240,39 @@ window.svcChargeDo=async function(id, method){
 
 // 💵 Cobra en EFECTIVO una cuota del PLAN de servicio (o todo el plan). Aplica a la cuota indicada, postea a Finanzas,
 //    el cliente lo ve PAGADO en su portal (en vivo) y se le ofrece SMS de recibo — igual que los pagos del carro.
-window.svcPlanCobrar=async function(addonId, cents, installmentId, orderId){
-  const amt=Math.round(Number(cents)||0);
-  if(!(amt>=100)){ alert('Monto inválido.'); return; }
+// 💵 Abre "Registrar pago" EDITABLE para una cuota del plan de servicio (monto editable, NO fijo) — igual que el carro.
+//    Se usa en la caja, Pagos de hoy y la tarjeta del cliente (mismo componente). El registro real lo hace _svcPlanPayDo.
+window.svcPlanCobrar=function(addonId, cents, installmentId, orderId){
   const o=svcOrders.find(x=>x.id===orderId)||{}; const c=clients.find(x=>x.id===o.clientId);
   if(!c){ alert('Cliente no encontrado.'); return; }
-  if(!confirm('¿Registrar '+formatMoney(amt/100)+' en EFECTIVO'+(installmentId?' a esta cuota':' al plan')+' de servicio de '+(c.name||'')+'?\n\nEntra a Finanzas como ingreso de Servicio y el cliente lo verá pagado en su portal.')) return;
-  // saldo del plan ANTES (clients es live pero el snapshot puede no haber llegado tras el pago)
+  let planBal=0; try{ (c.addons||[]).forEach(a=>{ if(a&&a.id===addonId&&Array.isArray(a.installments)) a.installments.forEach(x=>{ planBal+=Math.max(0,(Number(x.amtCents)||0)-(Number(x.paidCents)||0)); }); }); }catch(e){}
+  const def=Math.max(0, Math.min(Number(cents)||0, planBal))/100;
+  const IN='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:16px;';
+  let ov=document.getElementById('svc-plan-pay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='svc-plan-pay'; ov.style.cssText='position:fixed;inset:0;z-index:2147483250;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px;cursor:pointer;'; ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:380px;width:100%;padding:20px;cursor:default;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-weight:800;font-size:17px;">💵 Registrar pago</div><button onclick="document.getElementById(\'svc-plan-pay\').remove()" style="background:transparent;border:none;color:var(--muted);font-size:24px;cursor:pointer;">×</button></div>'
+    +'<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">'+svcEsc(c.name||'')+(o.orderNum?(' · orden #'+o.orderNum):'')+' · 📄 plan de servicio</div>'
+    +'<label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px;">Monto a registrar (puedes editarlo)</label>'
+    +'<input id="svc-plan-pay-amt" type="number" inputmode="decimal" step="0.01" value="'+def.toFixed(2)+'" style="'+IN+'margin-bottom:6px;">'
+    +'<div style="font-size:11px;color:var(--faint);margin-bottom:14px;line-height:1.4;">Saldo del plan: '+formatMoney(planBal/100)+' · se aplica a esta cuota (si pagas de más, al resto por vencer).</div>'
+    +'<button onclick="_svcPlanPayDo(\''+addonId+'\',\''+(installmentId||'')+'\',\''+orderId+'\')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:15px;cursor:pointer;">💵 Registrar efectivo</button>'
+    +'<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.4;">El cliente también puede pagar con tarjeta desde su portal.</div>'
+  +'</div>';
+  document.body.appendChild(ov);
+  setTimeout(function(){ const el=document.getElementById('svc-plan-pay-amt'); if(el){ try{ el.focus(); el.select(); }catch(e){} } }, 60);
+};
+// Registro REAL del pago en efectivo de la cuota (lee el monto editado del sheet).
+window._svcPlanPayDo=async function(addonId, installmentId, orderId){
+  const el=document.getElementById('svc-plan-pay-amt'); const amt=Math.round((parseFloat(String(el?el.value:'').replace(/[^0-9.]/g,''))||0)*100);
+  if(!(amt>=100)){ alert('Monto inválido (mínimo $1).'); return; }
+  const o=svcOrders.find(x=>x.id===orderId)||{}; const c=clients.find(x=>x.id===o.clientId); if(!c){ alert('Cliente no encontrado.'); return; }
   let oldRem=0; try{ (c.addons||[]).forEach(a=>{ if(a&&a.id===addonId&&Array.isArray(a.installments)) a.installments.forEach(x=>{ oldRem+=Math.max(0,(Number(x.amtCents)||0)-(Number(x.paidCents)||0)); }); }); }catch(e){}
   try{
     const r=await httpsCallable(functions,'svcPlanPayCash')({ clientId:c.id, addonId:addonId, amountCents:amt, installmentId:installmentId||'' });
-    const d=(r&&r.data)||{};
-    const applied=(typeof d.applied==='number' && d.applied>=0)?d.applied:amt;
-    const planBalAfter=Math.max(0, oldRem-applied);
-    const abonoTxt=formatMoney(applied/100);
-    // 💬 SMS al cliente (como el carro): pagaste X, saldo del plan Y + link a su portal.
-    const phone=(o.clientPhone||c.phoneE164||c.phone||'').replace(/[^0-9+]/g,'');
-    const fol=o.orderNum?(' #'+o.orderNum):''; const link=PORTAL_URL+'?order='+orderId;
+    const d=(r&&r.data)||{}; const applied=(typeof d.applied==='number'&&d.applied>=0)?d.applied:amt; const planBalAfter=Math.max(0,oldRem-applied); const abonoTxt=formatMoney(applied/100);
+    const sheet=document.getElementById('svc-plan-pay'); if(sheet) sheet.remove();
+    const phone=(o.clientPhone||c.phoneE164||c.phone||'').replace(/[^0-9+]/g,''); const fol=o.orderNum?(' #'+o.orderNum):''; const link=PORTAL_URL+'?order='+orderId;
     if(phone && confirm('✅ '+abonoTxt+' registrado en efectivo.\n\n¿Enviar al cliente su recibo por SMS ("pagaste '+abonoTxt+', saldo del plan '+formatMoney(planBalAfter/100)+'")?')){
       const body=(o.lang==='en')
         ? ('Legacy Motors Garage'+fol+': you paid '+abonoTxt+' (cash). Service plan balance '+formatMoney(planBalAfter/100)+'. '+link)
@@ -2265,7 +2281,7 @@ window.svcPlanCobrar=async function(addonId, cents, installmentId, orderId){
     }
     try{ if(window.svcToast) svcToast('✅ '+abonoTxt+' cobrado · el cliente ya lo ve pagado en su portal'); }catch(e){}
     const box=document.getElementById('svc-caja'); const wasOpen=!!box; if(box) box.remove();
-    setTimeout(function(){ try{ renderTodayBox(); }catch(e){} try{ const m=document.getElementById('c360-modal'); if(m && m.style.display!=='none') renderClient360(c.id); }catch(e){} if(wasOpen){ try{ svcChargeOpen(orderId); }catch(e){} } }, 500);   // refresca Pagos de hoy, la tarjeta del cliente y la caja (clients live)
+    setTimeout(function(){ try{ renderTodayBox(); }catch(e){} try{ const m=document.getElementById('c360-modal'); if(m && m.style.display!=='none') renderClient360(c.id); }catch(e){} if(wasOpen){ try{ svcChargeOpen(orderId); }catch(e){} } }, 500);
   }catch(e){ alert('No se pudo registrar: '+((e&&e.message)||e)); }
 };
 // 🛡️ GARANTÍA: cierra la orden SIN costo al cliente. Conserva el trabajo y los montos en el recibo (para el
@@ -7083,7 +7099,7 @@ function renderTodayBox() {
       const overdue=(e.date<todayStr);
       const pf=(function(){ try{ return new Date(e.date+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short'}); }catch(ex){ return e.date; } })();
       const ph=(o.clientPhone||'').replace(/\D/g,'');
-      html += _todayRow({ clientId:o.clientId, name:o.clientName, folio:o.orderNum?('#'+o.orderNum):'', car:o.vehicleLabel||o.plate||'Auto', carIcon:'🔧', amtTxt:formatMoney(promAmt), whenTxt:(overdue?('venció '+pf):('prometió '+pf)), overdue:overdue, accent:'#f0c040', cobrar:"svcOpenOrder('"+o.id+"')", sms: ph?("svcPromiseSms('"+o.id+"')"):'' });
+      html += _todayRow({ clientId:o.clientId, name:o.clientName, folio:o.orderNum?('#'+o.orderNum):'', car:o.vehicleLabel||o.plate||'Auto', carIcon:'🔧', amtTxt:formatMoney(promAmt), whenTxt:(overdue?('venció '+pf):('prometió '+pf)), overdue:overdue, accent:'#f0c040', cobrar:"svcChargeOpen('"+o.id+"')", sms: ph?("svcPromiseSms('"+o.id+"')"):'' });
     });
     html += '</div>';
   }
@@ -8097,6 +8113,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261107215421"></script>
+<script type="module" src="launcher.js?v=20261107220317"></script>
 </body>
 </html>
