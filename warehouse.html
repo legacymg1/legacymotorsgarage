@@ -115,8 +115,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107174036"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107174036"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107174837"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107174837"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <div id="install-bar" style="display:none;position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;background:var(--gold);color:#0b0e14;border-radius:12px;padding:13px 44px 13px 13px;text-align:center;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.45);">
   <span onclick="installApp()" style="cursor:pointer;" data-i18n="installApp">📲 Instalar Pit Crew como app</span>
@@ -561,9 +561,9 @@
   <a href="warehouse.html" class="on"><div class="ic">🏭</div>Warehouse</a>
 </nav>
 
-<script src="legacy-svc.js?v=20261107174036"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
-<script src="legacy-carficha.js?v=20261107174036"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
-<script src="legacy-clientficha.js?v=20261107174036"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261107174837"></script><!-- 🔗 componente compartido del ecosistema (badges/estatus/divisor) -->
+<script src="legacy-carficha.js?v=20261107174837"></script><!-- 🗂️ ficha del carro compartida (etapa/tiempo/reporte/Etapa 2) -->
+<script src="legacy-clientficha.js?v=20261107174837"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -2780,39 +2780,9 @@ let _recep=null;   // { orderId, o, none, miles, obs:[{note,file,preview}] }
 function _recepDraftSave(){ try{ const r=_recep; if(!r){ return; } const d={ orderId:r.orderId, miles:r.miles||'', none:!!r.none, obs:(r.obs||[]).map(function(o){ return { note:o.note||'', photos:(o.photos||(o.photo?[o.photo]:[])) }; }), at:Date.now() }; sessionStorage.setItem('lmg_recep_draft', JSON.stringify(d)); }catch(e){} }
 function _recepDraftGet(){ try{ return JSON.parse(sessionStorage.getItem('lmg_recep_draft')||'null'); }catch(e){ return null; } }
 function _recepDraftClear(){ try{ sessionStorage.removeItem('lmg_recep_draft'); }catch(e){} }
-// 🗃️ Cola de fotos de recepción en IndexedDB — sobrevive la RECARGA de Android al volver de la cámara.
-//    Guardamos el Blob CRUDO al instante (ms), antes de la subida lenta. Si Android recarga a media subida,
-//    al reabrir la recepción _recepResumePhotos la termina sola. IDB guarda Blobs nativos (sin base64, sin límite de 5MB).
-// ⏱️ _recepIDB con tope de tiempo: en algunos Android/PWA el open se cuelga; si no abre rápido, rechaza y seguimos sin IDB
-//    (el respaldo es una red de seguridad — NUNCA debe frenar la subida real de la foto).
-function _recepIDB(){ return new Promise(function(res,rej){ try{ if(!window.indexedDB){ return rej(new Error('no idb')); } const rq=indexedDB.open('lmgRecep',1); const to=setTimeout(function(){ rej(new Error('idb timeout')); },1200); rq.onupgradeneeded=function(){ try{ rq.result.createObjectStore('pending',{keyPath:'key'}); }catch(e){} }; rq.onsuccess=function(){ clearTimeout(to); res(rq.result); }; rq.onerror=function(){ clearTimeout(to); rej(rq.error||new Error('idb error')); }; rq.onblocked=function(){ clearTimeout(to); rej(new Error('idb blocked')); }; }catch(e){ rej(e); } }); }
-async function _recepPhotoQueue(orderId,obsIdx,file){ try{ const db=await _recepIDB(); return await new Promise(function(res,rej){ const tx=db.transaction('pending','readwrite'); const key=orderId+'|'+obsIdx+'|'+Date.now()+'|'+Math.random().toString(36).slice(2); tx.objectStore('pending').put({key:key,orderId:orderId,obsIdx:obsIdx,blob:file,at:Date.now()}); tx.oncomplete=function(){ res(key); }; tx.onerror=function(){ rej(tx.error); }; }); }catch(e){ return null; } }
-async function _recepPhotoDequeue(key){ try{ const db=await _recepIDB(); await new Promise(function(res){ const tx=db.transaction('pending','readwrite'); tx.objectStore('pending').delete(key); tx.oncomplete=res; tx.onerror=res; }); }catch(e){} }
-async function _recepPhotoAll(){ try{ const db=await _recepIDB(); return await new Promise(function(res){ const out=[]; const tx=db.transaction('pending','readonly'); const cur=tx.objectStore('pending').openCursor(); cur.onsuccess=function(e){ const c=e.target.result; if(c){ out.push(c.value); c.continue(); } else res(out); }; tx.onerror=function(){ res(out); }; }); }catch(e){ return []; } }
-async function _recepResumePhotos(orderId){
-  try{
-    const all=await _recepPhotoAll();
-    for(const p of all){ if((Date.now()-(p.at||0))>=30*60*1000){ _recepPhotoDequeue(p.key); } }   // tira viejas
-    const fresh=all.filter(function(p){ return p.orderId===orderId && (Date.now()-(p.at||0))<30*60*1000; });
-    if(!fresh.length) return;
-    const en=(L==='en'); whToast('⏳ '+(en?'Finishing photo upload…':'Terminando de subir la foto…'));
-    for(const p of fresh){
-      try{
-        const jpg=await toJpeg(p.blob);
-        const rf=ref(storage,'serviceOrders/'+orderId+'/reception/'+(p.at||Date.now())+'_r'+Math.round(Math.random()*9999)+'_'+((jpg.name||'foto.jpg')));
-        await uploadBytes(rf,jpg); const url=await getDownloadURL(rf);
-        if(_recep && _recep.orderId===orderId){
-          if(!Array.isArray(_recep.obs)) _recep.obs=[];
-          let idx=p.obsIdx; if(!_recep.obs[idx]){ _recep.obs.push({note:'',photos:[]}); idx=_recep.obs.length-1; }
-          if(!Array.isArray(_recep.obs[idx].photos)) _recep.obs[idx].photos=[];
-          _recep.obs[idx].photos.push(url); _recep.none=false;
-        }
-        await _recepPhotoDequeue(p.key);
-      }catch(e){ /* la dejamos pendiente para el próximo intento */ }
-    }
-    if(_recep && _recep.orderId===orderId){ _recepRender(); try{ _recepDraftSave(); }catch(e){} }
-  }catch(e){}
-}
+// 🧹 NO guardamos fotos en el teléfono del empleado. Borra cualquier respaldo que una versión previa haya dejado
+//    en IndexedDB (las fotos solo viven en la nube; en memoria mientras suben).
+try{ if(window.indexedDB && indexedDB.deleteDatabase){ indexedDB.deleteDatabase('lmgRecep'); } }catch(e){}
 window.svcOpenReception=function(orderId){
   if(typeof _vaReadOnly==='function' && _vaReadOnly()) return;
   const o=(SVC_MY||[]).find(x=>x.id===orderId)||(typeof OP_SVC!=='undefined'&&(OP_SVC||[]).find(x=>x.id===orderId)); if(!o) return;
@@ -2825,7 +2795,6 @@ window.svcOpenReception=function(orderId){
   try{ _whNavSave({panel:'svcrecep', orderId:orderId}); }catch(e){}   // 🧭 al recargar (cámara Android), vuelve a la recepción
   _recepDraftSave();
   _recepRender(); try{ _whBusyRecalc(); }catch(e){}
-  try{ _recepResumePhotos(orderId); }catch(e){}   // ♻️ termina cualquier foto que Android dejó a medias por la recarga
 };
 window.svcRecepClose=function(){ const el=document.getElementById('svc-recep'); if(el) el.remove(); _recep=null; try{ _recepDraftClear(); _whNavClear(); }catch(e){} try{ _whBusyRecalc(); }catch(e){} };
 function _recepRender(){
@@ -2869,11 +2838,8 @@ window.recepObsPhoto=async function(i,inp){
     for(const f of files){
       n++;
       if(span) span.textContent='⏳ '+(en?'Uploading':'Subiendo')+(files.length>1?(' '+n+'/'+files.length):'')+'…';
-      // 🗃️ Encola el Blob CRUDO al instante: si Android recarga al volver de la cámara, al reabrir se reanuda y no se pierde.
-      //    Corre contra un reloj de 1.5s — si IDB tarda o se cuelga, seguimos con la subida igual (red de seguridad, no freno).
-      let _pk=null; try{ _pk=await Promise.race([ _recepPhotoQueue(_recep.orderId,i,f), new Promise(function(r){ setTimeout(function(){ r(null); },1500); }) ]); }catch(e){}
       const jpg=await toJpeg(f);
-      // 📤 Sube YA a Storage (no esperes a Guardar): así la foto sobrevive si Android recarga la página al volver de la cámara.
+      // 📤 Sube DIRECTO a la nube — la foto NO se guarda en el teléfono del empleado. Solo vive en memoria mientras sube.
       //    Con reloj de 60s: si la red del taller se atora, NO se queda "Subiendo…" para siempre — avisa y deja reintentar.
       const rf=ref(storage,'serviceOrders/'+_recep.orderId+'/reception/'+Date.now()+'_'+n+'_'+((jpg.name||'foto.jpg')));
       const url=await Promise.race([
@@ -2881,7 +2847,6 @@ window.recepObsPhoto=async function(i,inp){
         new Promise(function(_,rej){ setTimeout(function(){ rej(new Error(en?'Slow connection — try again or use Gallery':'Conexión lenta — reinténtalo o usa Galería')); },60000); })
       ]);
       if(_recep&&_recep.obs&&_recep.obs[i]){ if(!Array.isArray(_recep.obs[i].photos)) _recep.obs[i].photos=[]; _recep.obs[i].photos.push(url); }
-      if(_pk){ try{ await _recepPhotoDequeue(_pk); }catch(e){} }   // subida completa → quita el respaldo crudo (si falló, se queda para reanudar)
     }
     _recepRender(); try{ _recepDraftSave(); }catch(e){}
   }
@@ -6126,7 +6091,7 @@ setLang(L);
 </script>
 <script type="module" src="chat-widget.js?v=8"></script>
 <script type="module" src="help-bot.js?v=8"></script>
-<script type="module" src="launcher.js?v=20261107174036"></script>
+<script type="module" src="launcher.js?v=20261107174837"></script>
 <link rel="prefetch" href="index.html"><link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html">
 </body>
 </html>
