@@ -136,8 +136,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261106184604"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261106184604"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107003700"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107003700"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <!-- PRIMER INGRESO: bloquea el portal hasta que conteste -->
 <div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.94);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
@@ -1071,10 +1071,15 @@ function estimateCardHTML(o){
           : `<div style="margin-top:12px;background:rgba(40,180,99,.12);border:1px solid rgba(40,180,99,.4);color:#49d17f;border-radius:12px;padding:12px;font-size:14px;font-weight:700;text-align:center;">✅ ${es?'Aceptaste este estimado':'You approved this estimate'}${o.acceptedAt?(' · '+formatDate((o.acceptedAt||'').slice(0,10))):''}${o.warranty?`<div style="font-size:11px;font-weight:600;color:#49d17f;margin-top:4px;">${es?'Al recoger tu vehículo firmarás la entrega (sin costo).':'You will sign delivery when you pick up (no charge).'}</div>`:''}</div>`)
       : receptionPending
       ? `<div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;line-height:1.4;">${es?'Primero autoriza el ingreso de tu vehículo (arriba) para continuar.':'First authorize your vehicle check-in (above) to continue.'}</div>`
-      : `<div style="margin-top:12px;">
+      : (o.warranty
+        ? `<div style="margin-top:12px;">
           <button onclick="portalAcceptEstimate('${o.id}')" id="est-accept-${o.id}" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✅ ${es?'Aceptar estimado':'Approve estimate'}</button>
-          <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${o.warranty?(es?'Autorizas el trabajo en garantía — sin costo para ti.':'You authorize the warranty work — no charge to you.'):(es?'Es un estimado — puede cambiar tras la inspección. Te avisamos antes de cualquier trabajo extra.':'This is an estimate — it may change after inspection. We will notify you before any extra work.')}</div>
-        </div>`}
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Autorizas el trabajo en garantía — sin costo para ti.':'You authorize the warranty work — no charge to you.'}</div>
+        </div>`
+        : `<div style="margin-top:12px;">
+          <button onclick="portalReviewEstimate('${o.id}')" style="width:100%;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;letter-spacing:.3px;cursor:pointer;">✍️ ${es?'Revisar y autorizar servicios':'Review & authorize services'}</button>
+          <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">${es?'Aceptas o rechazas cada servicio y firmas. Es un estimado — puede cambiar tras la inspección.':'Accept or decline each service and sign. This is an estimate — it may change after inspection.'}</div>
+        </div>`)}
     ${(!o.paid && Number(o.balance)>0 && !(Number(o.planTotalCents)>0))?
       `<button onclick="portalPayService('${o.id}')" style="width:100%;margin-top:10px;${accepted?'background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;':'background:transparent;border:1.5px solid var(--gold);color:var(--gold);'}border-radius:12px;padding:14px;font-family:var(--font-display);font-size:16px;cursor:pointer;">💳 ${es?'Pagar saldo':'Pay balance'} · ${formatMoney(o.balance)}</button><div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">${es?'Pago seguro por Square · puedes pagar todo o una parte · pagar también aprueba':'Secure payment by Square · full or partial · paying also approves'}</div>`
     :((!o.paid && Number(o.planTotalCents)>0)?adendumPlanHTML(currentClient, o.id):'')}`;
@@ -1154,6 +1159,65 @@ window._signSubmit=async function(orderId){
     const card=document.getElementById('est-'+orderId); if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
   }catch(e){
     if(btn){ btn.disabled=false; btn.textContent=(es?'✅ Firmar y aceptar entrega':'✅ Sign & accept delivery'); }
+    alert((es?'No se pudo guardar: ':'Could not save: ')+((e&&e.message)||e));
+  }
+};
+// ✍️ ESTIMADO POR LÍNEA: el cliente acepta/rechaza CADA servicio, firma una vez; al rechazar acepta el deslinde.
+let _estReviewOrder=null, _estChoices={};
+window.portalReviewEstimate=function(orderId){
+  const o=(portalEstimates||[]).find(x=>x.id===orderId); if(!o){ return; }
+  _estReviewOrder=o; _estChoices={};
+  (o.services||[]).forEach((s,i)=>{ _estChoices[i]='accepted'; });   // por defecto todo aceptado
+  const es=L!=='en';
+  const ov=document.createElement('div'); ov.id='est-review-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:2147483600;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:16px;cursor:pointer;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--navy,#0f1320);border:1px solid var(--border,#2a3350);border-radius:18px;max-width:460px;width:100%;padding:20px;color:var(--text,#fff);max-height:92vh;overflow:auto;cursor:default;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><div style="font-weight:800;font-size:17px;">✍️ '+(es?'Autoriza tus servicios':'Authorize your services')+'</div><button onclick="document.getElementById(\'est-review-ov\').remove()" style="background:transparent;border:none;color:var(--muted,#9aa);font-size:24px;cursor:pointer;line-height:1;">×</button></div>'
+    +'<div style="font-size:12.5px;color:var(--muted,#9aa);margin-bottom:12px;line-height:1.4;">'+(es?'Acepta o rechaza cada servicio. Al final, firma una vez.':'Accept or decline each service. Then sign once.')+'</div>'
+    +'<div id="est-review-body"></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  _estReviewRender();
+};
+function _estReviewRender(){
+  const o=_estReviewOrder; if(!o) return; const es=L!=='en';
+  const box=document.getElementById('est-review-body'); if(!box) return;
+  let anyDeclined=false;
+  const rows=(o.services||[]).map((s,i)=>{
+    const ch=_estChoices[i]||'accepted'; if(ch==='declined') anyDeclined=true;
+    const acc=ch==='accepted';
+    return '<div style="border:1px solid var(--border,#2a3350);border-radius:12px;padding:11px 12px;margin-bottom:9px;">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px;"><span style="font-weight:700;font-size:14px;color:var(--white,#fff);min-width:0;">'+escPortal(s.desc||'')+'</span><span style="font-weight:700;color:var(--gold,#e8b64a);white-space:nowrap;">'+formatMoney(s.price)+'</span></div>'
+      +'<div style="display:flex;gap:8px;">'
+      +'<button onclick="_estSet('+i+',\'accepted\')" style="flex:1;border-radius:9px;padding:9px;font-weight:800;font-size:13px;cursor:pointer;border:1.5px solid '+(acc?'#28b463':'var(--border,#2a3350)')+';background:'+(acc?'rgba(40,180,99,.18)':'transparent')+';color:'+(acc?'#49d17f':'var(--muted,#9aa)')+';">✅ '+(es?'Aceptar':'Accept')+'</button>'
+      +'<button onclick="_estSet('+i+',\'declined\')" style="flex:1;border-radius:9px;padding:9px;font-weight:800;font-size:13px;cursor:pointer;border:1.5px solid '+(!acc?'#e0683a':'var(--border,#2a3350)')+';background:'+(!acc?'rgba(224,104,58,.18)':'transparent')+';color:'+(!acc?'#ff8a5c':'var(--muted,#9aa)')+';">✖️ '+(es?'No, gracias':'No, thanks')+'</button>'
+      +'</div></div>';
+  }).join('');
+  const disclaimer=anyDeclined?('<div style="background:rgba(224,104,58,.08);border:1px solid rgba(224,104,58,.4);border-radius:12px;padding:12px;margin:4px 0 12px;"><label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:12.5px;line-height:1.45;"><input type="checkbox" id="est-decline-ack" style="width:20px;height:20px;flex:none;margin-top:1px;"><span>'+(es?'Entiendo que rechazo esos servicios por mi propia decisión y <b>bajo mi propio riesgo</b>. <b>Legacy Motors Garage</b> me informó que los necesito y queda <b>deslindado de cualquier responsabilidad</b> por no realizarlos.':'I understand I decline those services by my own choice and <b>at my own risk</b>. <b>Legacy Motors Garage</b> advised me that I need them and is <b>released from any liability</b> for not performing them.')+'</span></label></div>'):'';
+  const nAcc=(o.services||[]).filter((s,i)=>_estChoices[i]!=='declined').length;
+  const who=escPortal((currentClient&&currentClient.name)||'');
+  box.innerHTML=rows+disclaimer
+    +'<div style="background:var(--surface2,#141a2b);border:1px solid var(--border,#2a3350);border-radius:12px;padding:12px;margin-top:4px;">'
+      +'<div style="font-size:12.5px;color:var(--muted,#9aa);line-height:1.45;">'+(es?'Al tocar <b style="color:var(--white,#fff);">Autorizar y firmar</b>, firmas electrónicamente'+(who?(' como <b style="color:var(--white,#fff);">'+who+'</b>'):'')+'. Queda registrada la fecha y hora.':'By tapping <b style="color:var(--white,#fff);">Authorize &amp; sign</b>, you sign electronically'+(who?(' as <b style="color:var(--white,#fff);">'+who+'</b>'):'')+'. The date and time are recorded.')+'</div>'
+    +'</div>'
+    +'<button id="est-review-submit" onclick="_estSubmit(\''+o.id+'\')" style="width:100%;margin-top:14px;background:linear-gradient(135deg,var(--gold3,#c8960c),var(--gold,#e8b64a));color:var(--navy3,#0b0e14);border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;">✍️ '+(es?'Autorizar y firmar':'Authorize &amp; sign')+(nAcc>0?('  ·  '+formatMoney((o.services||[]).reduce((a,s,i)=>a+(_estChoices[i]==='declined'?0:(Number(s.price)||0)+((s.parts||[]).reduce((b,p)=>b+(Number(p.price)||0),0))),0))):'')+'</button>';
+}
+window._estSet=function(i,v){ _estChoices[i]=v; _estReviewRender(); };
+window._estSubmit=async function(orderId){
+  const es=L!=='en'; const o=_estReviewOrder; if(!o) return;
+  const anyDeclined=Object.keys(_estChoices).some(k=>_estChoices[k]==='declined');
+  if(anyDeclined){ const ack=document.getElementById('est-decline-ack'); if(!ack||!ack.checked){ alert(es?'Marca la casilla para confirmar que rechazas esos servicios bajo tu propio riesgo.':'Check the box to confirm you decline those services at your own risk.'); return; } }
+  const btn=document.getElementById('est-review-submit'); if(btn){ btn.disabled=true; btn.textContent=es?'Guardando…':'Saving…'; }
+  const choices=(o.services||[]).map((s,i)=>(_estChoices[i]==='declined')?false:true);
+  try{
+    // 🖊️ Firma = TOQUE (e-signature por intención): el backend sella fecha/hora + guarda user-agent.
+    await httpsCallable(functions,'svcClientAcceptLines')({ orderId:orderId, choices:choices, tapSigned:true, declineAck:anyDeclined, userAgent:(navigator.userAgent||'') });
+    const ov=document.getElementById('est-review-ov'); if(ov) ov.remove();
+    await loadPortalEstimates();
+    const card=document.getElementById('est-'+orderId); if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent=(es?'✍️ Firmar y autorizar':'✍️ Sign & authorize'); }
     alert((es?'No se pudo guardar: ':'Could not save: ')+((e&&e.message)||e));
   }
 };

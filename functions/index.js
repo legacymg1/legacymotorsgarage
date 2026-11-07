@@ -3087,6 +3087,43 @@ exports.svcClientAccept = onCall({ timeoutSeconds: 20 }, async (request) => {
   return { ok: true };
 });
 
+// ✍️ ESTIMADO POR LÍNEA: el cliente acepta/rechaza CADA servicio y firma con un TOQUE (e-signature por intención).
+//    Guarda clientLine por servicio + la firma (fecha/hora + user-agent). El mecánico verá SOLO los aceptados.
+exports.svcClientAcceptLines = onCall({ timeoutSeconds: 20 }, async (request) => {
+  const cli = await _portalClient(request);
+  const d = request.data || {};
+  const orderId = String(d.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Falta la orden.");
+  const choices = Array.isArray(d.choices) ? d.choices : [];
+  const ua = String(d.userAgent || "").slice(0, 400);
+  const db = admin.firestore();
+  const ref = db.collection("serviceOrders").doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "La orden no existe.");
+  const o = snap.data() || {};
+  const mine = (o.clientId && o.clientId === cli.id) || (o.clientPhone && o.clientPhone === (cli.data.phone || ""));
+  if (!mine) throw new HttpsError("permission-denied", "No es tu orden.");
+  const now = new Date().toISOString();
+  const svs = Array.isArray(o.services) ? o.services : [];
+  let nAcc = 0, nDec = 0;
+  const nsvs = svs.map((s, i) => {
+    const accepted = (choices[i] === undefined) ? true : (choices[i] !== false);   // por defecto aceptado
+    if (accepted) nAcc++; else nDec++;
+    return Object.assign({}, s, { clientLine: accepted ? "accepted" : "declined" });
+  });
+  const sign = { at: now, by: cli.phone || "", method: "tap", userAgent: ua, declineAck: !!d.declineAck };
+  const patch = { services: nsvs, estimateSign: sign, estimateLinesAt: now, updatedAt: now };
+  // ≥1 aceptado → estimateStatus 'accepted' (dispara el aviso al mecánico en onServiceStatus). 0 aceptados → queda registrado el rechazo total.
+  if (nAcc > 0) { patch.estimateStatus = "accepted"; patch.estimateAcceptedAt = now; patch.estimateAcceptedBy = cli.phone; }
+  else { patch.allDeclined = true; }
+  await ref.set(patch, { merge: true });
+  const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";
+  const body = _nm + " respondió" + _fol + ": ✅ " + nAcc + " aceptado(s)" + (nDec ? (" · ✖️ " + nDec + " rechazado(s)") : "") + (o.vehicleLabel ? (" · " + o.vehicleLabel) : "");
+  const bodyEn = _nm + " responded" + _fol + ": ✅ " + nAcc + " accepted" + (nDec ? (" · ✖️ " + nDec + " declined") : "");
+  await _pushToOwners({ title: (nAcc > 0 ? "✅ Estimado autorizado" : "✖️ Cliente rechazó el estimado"), body: body, titleEn: (nAcc > 0 ? "✅ Estimate authorized" : "✖️ Estimate declined"), bodyEn: bodyEn, url: "/admin.html?svc=" + orderId });
+  return { ok: true, accepted: nAcc, declined: nDec };
+});
+
 // 🖊️ El cliente FIRMA la ENTREGA del vehículo desde su portal: acepta que lo recibió; en garantía, que no tuvo costo.
 //    Marca la orden ENTREGADA y, en garantía, COMPLETADA ($0). Guarda la firma como registro en la orden (su invoice).
 //    No toca Finanzas (en garantía no hay ingreso). Espejo de svcClientAccept.
