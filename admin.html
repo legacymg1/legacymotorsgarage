@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107214010"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107214010"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261107214156"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261107214156"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261107214010"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261107214010"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261107214156"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261107214156"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -6978,14 +6978,22 @@ window.sendFriendlyTodayMsg = function(id) {
 };
 
 // 💬 Recordatorio por SMS del SALDO prometido de una orden de servicio.
-// 💬 Recordatorio de una CUOTA del plan de servicio (menciona el monto de la cuota) — mismo estilo que svcPromiseSms.
-window.svcPlanSms=function(orderId, cents){
+// 💬 Recordatorio de una CUOTA del plan de servicio (monto + si venció/toca hoy) — mismo estilo que svcPromiseSms.
+window.svcPlanSms=function(orderId, cents, dueDate){
   const o=svcOrders.find(x=>x.id===orderId); if(!o){ alert('Orden no encontrada.'); return; }
   const en=(o.lang==='en'); const nm=((titleCase(o.clientName||'')||'').split(' ')[0])||'';
   const amt=formatMoney((Number(cents)||0)/100);
   const fol=o.orderNum?(' #'+o.orderNum):''; const link=(typeof PORTAL_URL!=='undefined'?PORTAL_URL:'https://legacymotorsgarage.com/portal.html')+'?order='+orderId;
-  const text=en?('Hi '+nm+'! Reminder: your service payment of '+amt+' is due'+fol+'. Pay here: '+link+'\n— Legacy Motors Garage · (559) 540-5145')
-    :('Hola '+nm+'! Recordatorio: tu pago de servicio de '+amt+' toca hoy'+fol+'. Paga aquí: '+link+'\n— Legacy Motors Garage · (559) 540-5145');
+  // 📅 Redacta según la fecha real de la cuota: vencida / hoy / futura.
+  const todayStr=(typeof today==='function')?today():''; const dstr=String(dueDate||'');
+  let pretty=dstr; try{ if(dstr) pretty=new Date(dstr+'T12:00:00').toLocaleDateString(en?'en-US':'es-MX',{day:'2-digit',month:'short'}); }catch(e){}
+  let whenEs, whenEn;
+  if(dstr && todayStr && dstr<todayStr){ whenEs='venció el '+pretty; whenEn='was due '+pretty; }
+  else if(dstr && todayStr && dstr===todayStr){ whenEs='toca hoy'; whenEn='is due today'; }
+  else if(dstr){ whenEs='toca el '+pretty; whenEn='is due '+pretty; }
+  else { whenEs='está pendiente'; whenEn='is pending'; }
+  const text=en?('Hi '+nm+'! Reminder: your service payment of '+amt+' '+whenEn+fol+'. Pay here: '+link+'\n— Legacy Motors Garage · (559) 540-5145')
+    :('Hola '+nm+'! Recordatorio: tu pago de servicio de '+amt+' '+whenEs+fol+'. Paga aquí: '+link+'\n— Legacy Motors Garage · (559) 540-5145');
   const raw=o.clientPhone||''; let num=''; if(/^\+/.test(String(raw))) num=String(raw).replace(/[^\d+]/g,''); else { const dd=String(raw).replace(/\D/g,''); if(dd.length===10) num='+1'+dd; else if(dd.length>=11) num='+'+dd; }
   if(num){ const a=document.createElement('a'); a.href='sms:'+num+'?&body='+encodeURIComponent(text); a.click(); return; }
   try{ navigator.clipboard.writeText(text); }catch(e){}
@@ -7087,7 +7095,7 @@ function renderTodayBox() {
           <div style="font-size:13px;color:#4d9bff;font-weight:800;margin-top:3px;">${formatMoney(e.rem/100)} · 📅 ${overdue?('⚠️ venció '+pf):('cuota '+pf)}</div></div>
         <div style="display:flex;gap:6px;margin-top:10px;">
           <button onclick="svcPlanCobrar('${e.a.id}',${e.rem},'${e.inst.id||''}','${e.a.sourceOrderId}')" style="flex:1;background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:800;cursor:pointer;">💵 Cobrar</button>
-          ${((o.clientPhone||e.c.phoneE164||e.c.phone||''))?`<button onclick="svcPlanSms('${e.a.sourceOrderId}',${e.rem})" style="background:transparent;color:#4d9bff;border:1px solid #4d9bff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;">💬</button>`:''}
+          ${((o.clientPhone||e.c.phoneE164||e.c.phone||''))?`<button onclick="svcPlanSms('${e.a.sourceOrderId}',${e.rem},'${e.date}')" style="background:transparent;color:#4d9bff;border:1px solid #4d9bff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;">💬</button>`:''}
           ${o.id?`<button onclick="svcChargeOpen('${o.id}')" style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-weight:700;cursor:pointer;">Ver</button>`:''}
         </div></div>`;
     });
@@ -8102,6 +8110,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261107214010"></script>
+<script type="module" src="launcher.js?v=20261107214156"></script>
 </body>
 </html>
