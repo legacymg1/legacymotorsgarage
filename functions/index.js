@@ -2991,13 +2991,26 @@ async function _portalClient(request) {
 // Convierte una orden de servicio a un estimado limpio para el portal del cliente (montos en dólares, idioma del cliente).
 function _estPayload(o, en, planPaidCents, planTotalCents) {
   const c = (x) => Math.round(Number(x) || 0) / 100;
+  const _pc = (s) => (s.priceCents != null ? Number(s.priceCents) : Math.round((Number(s.price) || 0) * 100));
   const services = (Array.isArray(o.services) ? o.services : []).map((s) => ({
     desc: (en && s.descEn) ? s.descEn : (s.desc || ""),
-    price: c(s.priceCents != null ? s.priceCents : Math.round((Number(s.price) || 0) * 100)),
+    price: c(_pc(s)), kind: s.kind || "", clientLine: s.clientLine || "",
     parts: (Array.isArray(s.parts) ? s.parts : []).map((p) => ({ desc: p.desc || "", price: c(p.priceCents != null ? p.priceCents : Math.round((Number(p.price) || 0) * 100)) })),
   }));
+  // 🧮 Totales recalculados de los SERVICIOS, con las reglas del estimado por línea:
+  //   · rechazados por el cliente (clientLine:'declined') NO suman · cuota de diagnóstico se PERDONA si se aceptó alguna reparación.
+  const _svs = Array.isArray(o.services) ? o.services : [];
+  const _repairAccepted = _svs.some((x) => x.kind !== "diagnostic" && x.clientLine !== "declined" && (_pc(x) > 0 || (Array.isArray(x.parts) && x.parts.some((p) => (p.priceCents != null ? Number(p.priceCents) : Math.round((Number(p.price) || 0) * 100)) > 0))));
+  let _laborC = 0, _partsC = 0;
+  _svs.forEach((s) => {
+    if (s.clientLine === "declined") return;
+    if (s.kind === "diagnostic") { _laborC += (_repairAccepted ? 0 : _pc(s)); return; }
+    _laborC += _pc(s);
+    (Array.isArray(s.parts) ? s.parts : []).forEach((p) => { _partsC += (p.priceCents != null ? Number(p.priceCents) : Math.round((Number(p.price) || 0) * 100)); });
+  });
+  const _grandC = _svs.length ? (_laborC + _partsC) : (Number(o.grandTotalCents) || 0);
   // 🧮 Saldo EN VIVO = Total − pagado de verdad − pagado del plan. Nunca el campo balanceCents (se quedaba viejo).
-  const totalC = Number(o.grandTotalCents) || 0, paidC = Number(o.paidCents) || 0, planPaidC = Number(planPaidCents) || 0;
+  const totalC = _grandC, paidC = Number(o.paidCents) || 0, planPaidC = Number(planPaidCents) || 0;
   // 🛡️ EN GARANTÍA: el cliente ve el VALOR del trabajo (cubierto) pero paga $0.
   const warranty = o.warranty === true;
   const deliverySigned = !!(o.delivery && o.delivery.signedAt);   // 🖊️ ¿ya firmó la entrega el cliente?
@@ -3015,7 +3028,7 @@ function _estPayload(o, en, planPaidCents, planTotalCents) {
     // 🔎 Mantenimiento sugerido adicional (el cliente lo ve con fotos) — trabajo que el mecánico recomienda aparte.
     suggested: Array.isArray(o.suggested) ? o.suggested.map((s) => ({ note: String(s.note || "").slice(0, 500), photo: String(s.photo || "").slice(0, 600) })).filter((s) => s.note || s.photo) : [],
     services,
-    laborTotal: c(o.laborTotalCents), partsTotal: c(o.partsTotalCents), total: c(o.grandTotalCents),
+    laborTotal: c(_laborC), partsTotal: c(_partsC), total: c(_grandC),
     warranty: warranty, warrantyReason: o.warrantyReason || "", coveredCents: warranty ? totalC : 0,
     deposit: c(o.depositCents), balance: owedC / 100,
     // 🛡️ En garantía el cliente NO paga, pero SÍ autoriza: queda "completado" cuando FIRMA la entrega.
