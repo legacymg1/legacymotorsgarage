@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107220317"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107220317"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261108003054"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261108003054"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261107220317"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261107220317"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261108003054"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261108003054"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1261,7 +1261,7 @@ function clientAddons(c){ return Array.isArray(c.addons)?c.addons:[]; }
 // 📄 Info del plan de pagos (adendum) LIGADO a una orden: cuánto está en el plan y cuánto ya se pagó del plan.
 // El saldo de una orden = Total − pagado de verdad (paidCents) − pagado del plan. Nunca usamos el campo balanceCents (se quedaba viejo).
 function _svcPlanInfo(o){ let pt=0, pp=0; try{ const c=clients.find(x=>x.id===(o&&o.clientId)); if(c){ (c.addons||[]).forEach(a=>{ if(a&&a.sourceOrderId===o.id&&Array.isArray(a.installments)){ a.installments.forEach(x=>{ pt+=(Number(x.amtCents)||0); pp+=(Number(x.paidCents)||0); }); } }); } }catch(e){} return {planTotalCents:pt, planPaidCents:pp}; }
-function svcOwedCents(o){ if(o && o.warranty) return 0;   /* 🛡️ orden en garantía: el cliente no paga nada */ const t=Number(o.grandTotalCents)||0, pc=Number(o.paidCents)||0, pp=_svcPlanInfo(o).planPaidCents; return Math.max(0, t-pc-pp); }
+function svcOwedCents(o){ const pp=_svcPlanInfo(o).planPaidCents; /* 🛡️ garantía=0 · saldo real (incluye lo abonado al plan) — fórmula ÚNICA en legacy-svc.js */ if(window.LMG&&LMG.svcOwed) return LMG.svcOwed(o, pp); if(o&&o.warranty) return 0; const t=Number(o.grandTotalCents)||0, pc=Number(o.paidCents)||0; return Math.max(0, t-pc-pp); }
 // 🔧 Desglose del PLAN de servicio para COBRAR en efectivo (admin): cada cuota con su fecha + botón Cobrar; la de
 //    "al final del contrato" clasificada aparte CON opción de cobrarla. El cliente lo ve pagado en su portal (en vivo).
 function _svcPlanCobrarHTML(o){
@@ -7083,13 +7083,35 @@ function renderTodayBox() {
   });
   svcPlanEntries.sort((a,b)=>a.date.localeCompare(b.date));
 
-  if (!todayClients.length && !overdueClients.length && !bdayClients.length && !serviceClients.length && !svcPromEntries.length && !svcPlanEntries.length) {
+  // 🔴 PENDIENTE DE PAGO: órdenes ENTREGADAS sin pagar (saldo real > 0), que NO están en garantía y NO tienen fecha
+  //    (promesa/plan) — si no, no se asomaban en ningún lado. Para distinguir a quién le falta pagar.
+  const svcUnpaidEntries = (typeof svcOrders!=='undefined'?svcOrders:[]).filter(o=>{
+    if(!o || o.paid || o.warranty) return false;
+    if(o.status!=='entregado') return false;
+    if(svcOwedCents(o)<=1) return false;
+    const hasProm=(Array.isArray(o.promises)&&o.promises.length)||o.promisedAt;
+    const hasPlan=(function(){ const c=clients.find(x=>x.id===o.clientId); return !!(c&&(c.addons||[]).some(a=>a&&a.sourceOrderId===o.id&&Array.isArray(a.installments)&&a.installments.length)); })();
+    return !hasProm && !hasPlan;   // las que tienen fecha ya salen en Promesa/Cuota
+  });
+
+  if (!todayClients.length && !overdueClients.length && !bdayClients.length && !serviceClients.length && !svcPromEntries.length && !svcPlanEntries.length && !svcUnpaidEntries.length) {
     box.style.display = 'none';
     return;
   }
 
   box.style.display = 'block';
   let html = '';
+
+  if(svcUnpaidEntries.length){
+    html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#ff6b6b;margin-bottom:8px;">🔴 PENDIENTE DE PAGO · ENTREGADO SIN PAGAR</div>`;
+    html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">';
+    svcUnpaidEntries.forEach(o=>{ const owed=svcOwedCents(o)/100; const c=clients.find(x=>x.id===o.clientId);
+      const dd=(function(){ try{ return o.deliveredAt?new Date(o.deliveredAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short'}):''; }catch(ex){ return ''; } })();
+      const ph=((o.clientPhone||(c&&(c.phoneE164||c.phone))||''));
+      html += _todayRow({ clientId:o.clientId, name:o.clientName, folio:o.orderNum?('#'+o.orderNum):'', car:o.vehicleLabel||o.plate||'Servicio', carIcon:'🔧', amtTxt:formatMoney(owed), whenTxt:(dd?('entregado '+dd+' · sin pagar'):'entregado · sin pagar'), overdue:true, accent:'#ff6b6b', cobrar:"svcChargeOpen('"+o.id+"')", sms: ph?("svcPromiseSms('"+o.id+"')"):'' });
+    });
+    html += '</div>';
+  }
 
   if(svcPromEntries.length){
     html += `<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#f0c040;margin-bottom:8px;">💵 PROMESA DE PAGO · SERVICIO</div>`;
@@ -8113,6 +8135,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261107220317"></script>
+<script type="module" src="launcher.js?v=20261108003054"></script>
 </body>
 </html>

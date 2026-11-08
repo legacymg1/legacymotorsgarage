@@ -75,6 +75,14 @@
     if (o.estimateStatus === 'accepted' || ['arrancado', 'por_aprobar', 'recibido', 'en_proceso', 'pausado_partes', 'reparando', 'listo'].indexOf(o.status) >= 0) return 'activas';
     return 'estimados';
   };
+  // 💵 Saldo REAL por cobrar (en CENTAVOS), compartido admin ↔ Pit Crew ↔ portal. GARANTÍA = 0 (el cliente no paga nada).
+  //    planPaidCents (opcional) = lo ya abonado en el plan de pagos (vive en el cliente; admin lo pasa, Pit Crew no lo tiene).
+  LMG.svcOwed = function (o, planPaidCents) {
+    o = o || {};
+    if (o.warranty === true) return 0;
+    var tot = Number(o.grandTotalCents) || 0, paid = Number(o.paidCents) || 0, plan = Number(planPaidCents) || 0;
+    return Math.max(0, tot - paid - plan);
+  };
   function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function _money(n) { try { return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } catch (e) { return '$' + (n || 0); } }
   // UNA fila de orden (folio · cliente/carro · estado · total). Misma que Clientes/admin.
@@ -101,5 +109,5 @@
     return '<div style="border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);">' + head + (list || []).map(function (o) { return LMG.svcOrderRow(o, opts); }).join('') + '</div>';
   };
 
-  LMG.version = '4';
+  LMG.version = '5';
 })();
