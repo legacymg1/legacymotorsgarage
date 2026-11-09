@@ -136,8 +136,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261107190908"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261107190908"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261109181200"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261109181200"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <!-- PRIMER INGRESO: bloquea el portal hasta que conteste -->
 <div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.94);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
@@ -1050,6 +1050,8 @@ window.portalAuthReception = async function(orderId){
 };
 function estimateCardHTML(o){
   const es=L!=='en'; const accepted=o.estimateStatus==='accepted';
+  // 📅 Cita agendada de ESTA orden (el dueño la puso desde la orden → scheduledAt). Se muestra hasta que el carro se recibe.
+  const apptTxt=(o.scheduledAt && !o.receivedAt && !o.paid)?(function(){ try{ const d=new Date(o.scheduledAt); const day=d.toLocaleDateString(es?'es-MX':'en-US',{weekday:'long',day:'numeric',month:'long'}); const hr=d.toLocaleTimeString(es?'es-MX':'en-US',{hour:'numeric',minute:'2-digit'}); const t0=new Date(); t0.setHours(0,0,0,0); const d0=new Date(d); d0.setHours(0,0,0,0); const diff=Math.round((d0-t0)/86400000); const pre=(diff===0?(es?'Hoy':'Today'):(diff===1?(es?'Mañana':'Tomorrow'):day)); return (diff<=1?pre:day)+' · '+hr; }catch(e){ return ''; } })():'';
   const receptionPending = !!(o.intake && !o.intake.none && Array.isArray(o.intake.observations) && o.intake.observations.length && o.intake.clientAck!==true);   // solo si HAY observaciones sin autorizar
   const showTrack=(o.receivedAt||o.paid||['recibido','en_proceso','pausado_partes','reparando','listo','entregado'].indexOf(o.status)>=0||accepted);
   let rows='';
@@ -1072,6 +1074,7 @@ function estimateCardHTML(o){
   const paidLine = o.paid ? `<div style="font-size:12.5px;color:#49d17f;font-weight:800;margin-top:3px;">✅ ${es?'PAGADO':'PAID'} · ${formatMoney((o.paidCents||0)/100||o.total)}${o.paidAt?(' · '+formatDate((o.paidAt||'').slice(0,10))):''}</div>` : '';
   const detail = `
     <div style="font-size:13px;color:var(--muted);margin:8px 0;">🚗 ${escPortal(o.vehicleLabel||o.vin||'')}${o.plate?(' · '+escPortal(o.plate)):''}</div>
+    ${apptTxt?`<div style="margin:8px 0;background:rgba(200,162,74,.1);border:1px solid var(--gold3,#c8960c);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:10px;"><span style="font-size:20px;">📅</span><div style="min-width:0;"><div style="font-size:11.5px;color:var(--muted);">${es?'Tu cita':'Your appointment'}</div><div style="font-weight:800;font-size:14.5px;color:var(--gold);text-transform:capitalize;">${apptTxt}</div></div></div>`:''}
     ${receptionBlockHTML(o)}
     ${o.warranty?`<div style="margin:8px 0;background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.45);color:#4d9bff;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:800;text-align:center;">🛡️ ${es?'EN GARANTÍA · SIN COSTO PARA USTED':'WARRANTY · NO CHARGE TO YOU'}</div>`:''}
     ${svcStageHero(o)}
