@@ -1494,25 +1494,31 @@ exports.onServiceStatus = onDocumentUpdated({ document: "serviceOrders/{id}", se
         await _pushToOrderMechs(after, { title: "📦 Partes completas — ya puedes empezar" + fol, body: "Llegaron las partes de " + veh + ". Manos a la obra. 🔧", titleEn: "📦 Parts complete — you can start" + fol, bodyEn: "Parts for " + vehEn + " arrived. Let's go. 🔧", url: "/warehouse.html?svc=" + event.params.id });
       }
     } catch (e) {}
-    // 🔧 Servicio COMPLETADO (pagado o entregado) que INCLUYE CAMBIO DE ACEITE → actualiza "último servicio".
-    // El recordatorio de 3 meses SOLO se resetea si el servicio trae cambio de aceite (aunque traiga más trabajos).
+    // 🔧 Servicio COMPLETADO (pagado o entregado) → OPCIÓN C (Enrique 2026-11-09):
+    //    · "Última visita" (expediente/garantía) = SIEMPRE que se completa un servicio.
+    //    · Recordatorio de 3 meses (lastServiceDate) = SOLO si el servicio trae CAMBIO DE ACEITE (ese es el ciclo).
     try {
       const justDone = ((!before.paid && after.paid) || (before.status !== "entregado" && after.status === "entregado"));
       const _oilRe = /aceite|oil\s*change/i;
-      // 🛢️ Reinicia el recordatorio de 3 meses si algún servicio es TIPO "cambio de aceite" (kind:'oil') o su texto lo dice.
       const hasOil = (Array.isArray(after.services) ? after.services : []).some((s) => s && (s.kind === "oil" || _oilRe.test(String(s.desc || "") + " " + String(s.descEn || "")))) || _oilRe.test(String(after.reason || "") + " " + String(after.reasonEn || ""));
-      if (justDone && hasOil && after.clientId) {
+      if (justDone && after.clientId) {
         const dstr = ((new Date().toLocaleString("en-CA", { timeZone: "America/Los_Angeles" }).split(",")[0]) || "").trim(); // YYYY-MM-DD en LA
         if (/^\d{4}-\d{2}-\d{2}$/.test(dstr)) {
           const cref = admin.firestore().collection("clients").doc(after.clientId);
           const csnap = await cref.get();
           if (csnap.exists) {
             const cd = csnap.data() || {};
-            const patch = { lastServiceDate: dstr };
+            const reason = String(after.reason || "").slice(0, 120);
+            const patch = { lastVisitDate: dstr, lastVisitReason: reason };   // 📒 expediente: siempre
+            if (hasOil) patch.lastServiceDate = dstr;                          // ⏰ recordatorio 3m: solo aceite
             if (Array.isArray(cd.vehicles) && cd.vehicles.length) {
               const vin = String(after.vin || "").toUpperCase();
               patch.vehicles = cd.vehicles.map((v) => {
-                if (v && ((vin && String(v.vin || "").toUpperCase() === vin) || (!vin && String(v.label || "") === String(after.vehicleLabel || "")))) { return Object.assign({}, v, { lastServiceDate: dstr }); }
+                if (v && ((vin && String(v.vin || "").toUpperCase() === vin) || (!vin && String(v.label || "") === String(after.vehicleLabel || "")))) {
+                  const nv = Object.assign({}, v, { lastVisitDate: dstr, lastVisitReason: reason });
+                  if (hasOil) nv.lastServiceDate = dstr;
+                  return nv;
+                }
                 return v;
               });
             }
@@ -1520,7 +1526,7 @@ exports.onServiceStatus = onDocumentUpdated({ document: "serviceOrders/{id}", se
           }
         }
       }
-    } catch (e) { console.log("lastService update", e); }
+    } catch (e) { console.log("lastVisit/lastService update", e); }
     if (!p) return;
     p.url = "/portal.html?order=" + event.params.id;
     await _pushToClient(after.clientId || "", after.clientPhone || "", p);
