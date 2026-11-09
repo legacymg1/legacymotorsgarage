@@ -2919,6 +2919,29 @@ exports.svcIntake = onCall({ timeoutSeconds: 20 }, async (request) => {
     if (none) patch.receivedAt = o.receivedAt || new Date().toISOString();
   }
   await ref.set(patch, { merge: true });
+  // 🚗 Guarda las MILLAS de recepción en el CARRO del cliente (últimas millas conocidas + fecha) — expediente/garantía.
+  //    Así en la ficha del auto se sabe con cuántas millas vino la última vez.
+  try {
+    const milesNum = parseInt(String(inRaw.miles || "").replace(/[^0-9]/g, ""), 10);
+    if (o.clientId && milesNum > 0) {
+      const cref = admin.firestore().collection("clients").doc(o.clientId);
+      const csnap = await cref.get();
+      if (csnap.exists) {
+        const cd = csnap.data() || {}; const nowISO = new Date().toISOString();
+        const cpatch = { lastServiceMiles: milesNum, lastServiceMilesAt: nowISO };
+        if (Array.isArray(cd.vehicles) && cd.vehicles.length) {
+          const vin = String(o.vin || "").toUpperCase();
+          cpatch.vehicles = cd.vehicles.map((v) => {
+            if (v && ((vin && String(v.vin || "").toUpperCase() === vin) || (!vin && String(v.label || "") === String(o.vehicleLabel || "")))) {
+              return Object.assign({}, v, { miles: String(milesNum), lastServiceMiles: milesNum, lastServiceMilesAt: nowISO });
+            }
+            return v;
+          });
+        }
+        await cref.set(cpatch, { merge: true });
+      }
+    }
+  } catch (e) { console.log("svcIntake miles->vehicle", e); }
   // 🔔 Avisa al guardar el reporte de ingreso: al CLIENTE (autoriza si hay observaciones) y al DUEÑO (entró un carro).
   //    Requiere que ese teléfono tenga la app instalada + notificaciones permitidas (token en push_tokens).
   const _nm = o.clientName || "Cliente"; const _fol = o.orderNum ? (" #" + o.orderNum) : "";

@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261108003054"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261108003054"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261109205717"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261109205717"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261108003054"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261108003054"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261109205717"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261109205717"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1728,7 +1728,7 @@ function svcRenderTabs(){
   svcOrders.forEach(o=>{ cnt[svcBucket(o)]++; if(o.clientId) cli.add(o.clientId); });
   // La vista de Clientes también incluye los clientes marcados kind:'service' sin orden → cuéntalos igual.
   try{ (clients||[]).forEach(c=>{ if(c && c.id && c.kind==='service') cli.add(c.id); }); }catch(e){}
-  let citasN=0; try{ citasN=(appointments||[]).filter(a=>a.status==='scheduled' && a.line!=='dealer').length + svcOrders.filter(o=>o.scheduledAt && !o.paid && o.status!=='entregado').length; }catch(e){}
+  let citasN=0; try{ const _aoid=new Set(); (appointments||[]).forEach(a=>{ if(a&&a.serviceOrderId)_aoid.add(a.serviceOrderId); if(a&&a.id&&/^svc_/.test(a.id))_aoid.add(a.id.replace(/^svc_/,'')); }); citasN=(appointments||[]).filter(a=>a.status==='scheduled' && a.line!=='dealer').length + svcOrders.filter(o=>o.scheduledAt && !o.paid && o.status!=='entregado' && !_aoid.has(o.id)).length; }catch(e){}
   const cur=window._svcTab||'activas';
   const tabs=[['todas','🗂️ Todas',svcOrders.length],['activas','🔧 Activas',cnt.activas],['citas','📅 Citas',citasN],['estimados','🧾 Estimados',cnt.estimados],['completadas','✅ Completadas',cnt.completadas],['clientes','👥 Clientes',cli.size]];
   box.innerHTML=tabs.map(t=>'<button onclick="svcSetTab(\''+t[0]+'\')" style="padding:9px 14px;border-radius:999px;border:1px solid '+(cur===t[0]?'var(--gold)':'var(--border)')+';background:'+(cur===t[0]?'var(--gold)':'transparent')+';color:'+(cur===t[0]?'var(--navy3)':'var(--text)')+';font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;">'+t[1]+' <span style="opacity:.7;">'+t[2]+'</span></button>').join('');
@@ -1788,9 +1788,11 @@ function svcRenderClientsTab(box,q){
 // 📅 Pestaña CITAS dentro de Servicio: las citas que agenda el cliente (o tú), con "Recibir / Crear orden".
 function svcRenderCitasTab(box,q){
   const lz=n=>String(n).padStart(2,'0');
-  // 1) Citas del portal (appointments) + 2) Órdenes de servicio CON FECHA agendada (no terminadas).
+  // 1) Citas del portal (appointments) + 2) Órdenes de servicio CON FECHA agendada (no terminadas) que NO tengan ya su cita.
   let up=(appointments||[]).filter(a=>a.status==='scheduled' && a.line!=='dealer').map(a=>Object.assign({kind:'appt'},a));
-  (svcOrders||[]).forEach(o=>{ if(!o.scheduledAt || o.paid || o.status==='entregado') return; try{ const dt=new Date(o.scheduledAt); if(isNaN(dt)) return; up.push({ kind:'order', id:o.id, orderNum:o.orderNum, date:dt.getFullYear()+'-'+lz(dt.getMonth()+1)+'-'+lz(dt.getDate()), time:lz(dt.getHours())+':'+lz(dt.getMinutes()), clientName:o.clientName||'Cliente', phone:o.clientPhone||'', carLabel:o.vehicleLabel||o.plate||'', lang:o.lang||'es', reason:o.reason||'', status:o.status }); }catch(e){} });
+  // 🧩 Órdenes que YA tienen su cita (svc_<id> o serviceOrderId) → no las dupliques desde la orden.
+  const _apptOrderIds=new Set(); (appointments||[]).forEach(a=>{ if(a&&a.serviceOrderId) _apptOrderIds.add(a.serviceOrderId); if(a&&a.id&&/^svc_/.test(a.id)) _apptOrderIds.add(a.id.replace(/^svc_/,'')); });
+  (svcOrders||[]).forEach(o=>{ if(!o.scheduledAt || o.paid || o.status==='entregado') return; if(_apptOrderIds.has(o.id)) return; try{ const dt=new Date(o.scheduledAt); if(isNaN(dt)) return; up.push({ kind:'order', id:o.id, orderNum:o.orderNum, date:dt.getFullYear()+'-'+lz(dt.getMonth()+1)+'-'+lz(dt.getDate()), time:lz(dt.getHours())+':'+lz(dt.getMinutes()), clientName:o.clientName||'Cliente', phone:o.clientPhone||'', carLabel:o.vehicleLabel||o.plate||'', lang:o.lang||'es', reason:o.reason||'', status:o.status }); }catch(e){} });
   if(q) up=up.filter(a=>((a.clientName||'')+' '+(a.phone||'')+' '+(a.carLabel||'')+' '+(a.type||'')+' '+(a.reason||'')+' '+(a.note||'')+' '+(a.orderNum?('#'+a.orderNum):'')).toLowerCase().includes(q));
   up.sort((a,b)=>((a.date||'')+(a.time||'')).localeCompare((b.date||'')+(b.time||'')));
   if(!up.length){ box.innerHTML='<div class="faint" style="padding:36px 20px;text-align:center;line-height:1.6;">Sin citas agendadas. 📅<br>Los clientes pueden agendar desde su portal, o usa <b>＋ Nueva cita</b>.</div>'; return; }
@@ -3589,6 +3591,7 @@ window.svcOpenReceipt=function(orderId){
   const box=document.createElement('div'); box.style.cssText='background:#fff;color:#111;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow:auto;';
   box.innerHTML='<div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #eee;padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;z-index:2;">'
     +'<button onclick="var o=document.getElementById(\'svc-est-overlay\');if(o)o.remove();" style="background:#eee;border:none;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;">Cerrar</button>'
+    +'<button onclick="var x=document.getElementById(\'svc-est-overlay\');if(x)x.remove();svcOpenOrder(\''+o.id+'\')" style="background:#0b5cd6;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;">📋 Ver orden</button>'
     +'<button onclick="var o=document.getElementById(\'svc-est-overlay\');if(o)o.remove();svcFinalReportOpen(\''+o.id+'\')" style="background:#6d4bff;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;">📄 Reporte final</button>'
     +'<button onclick="svcEstPrint()" style="background:#0b0e14;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;">🖨 Imprimir</button>'
     +'<button onclick="svcReceiptSend()" style="background:linear-gradient(135deg,#f0c040,#c8960c);color:#0b0e14;border:none;border-radius:8px;padding:8px 14px;font-weight:800;cursor:pointer;">💬 Enviar</button>'
@@ -3840,6 +3843,15 @@ window.svcSaveOrder=async function(opts){
     else { const oref=doc(collection(db,'serviceOrders')); orderId=oref.id; await setDoc(oref, Object.assign(payload,{ createdAt:new Date().toISOString(), createdBy:(auth.currentUser&&auth.currentUser.email)||'' })); }
   }catch(e){ alert('No se pudo guardar la orden: '+(e.message||e)); return; }
   d.editId=orderId;   // ya quedó guardada: futuras acciones (p.ej. Enviar estimado) apuntan al mismo doc
+  // 📅 Agendar en la orden = crear/actualizar la CITA en el calendario (UNA sola fuente: orden + portal + calendario + ficha).
+  //    id FIJO por orden (svc_<id>) → no duplica; al reagendar actualiza; sin fecha o ya entregada → la cancela.
+  try{
+    const _apptId='svc_'+orderId; const _sched=payload.scheduledAt||'';
+    if(_sched && status!=='entregado'){
+      const _dt=new Date(_sched); const _lz=n=>String(n).padStart(2,'0');
+      await setDoc(doc(db,'appointments',_apptId), { clientId:(payload.clientId||''), phoneE164:(payload.clientPhone||''), clientName:(payload.clientName||''), date:_dt.getFullYear()+'-'+_lz(_dt.getMonth()+1)+'-'+_lz(_dt.getDate()), time:_lz(_dt.getHours())+':'+_lz(_dt.getMinutes()), scheduledAt:_sched, carLabel:(payload.vehicleLabel||payload.plate||''), vin:(payload.vin||''), service:(payload.reason||''), lang:(payload.lang||'es'), serviceOrderId:orderId, orderNum:(orderNum||null), status:'scheduled', line:'service', source:'order', updatedAt:new Date().toISOString() }, {merge:true});
+    } else { try{ await updateDoc(doc(db,'appointments',_apptId),{ status:'cancelled', updatedAt:new Date().toISOString() }); }catch(e){} }
+  }catch(e){ console.warn('svc appt upsert', e); }
   // 🔗 Si la orden vino de una CITA agendada → marca la cita como atendida y la liga (sale de "Citas").
   if(d._fromAppt){ try{ await updateDoc(doc(db,'appointments',d._fromAppt),{ status:'done', came:true, serviceOrderId:orderId, closedAt:new Date().toISOString() }); }catch(e){} d._fromAppt=''; }
   if(opts.silent) return orderId;
@@ -8135,6 +8147,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261108003054"></script>
+<script type="module" src="launcher.js?v=20261109205717"></script>
 </body>
 </html>
