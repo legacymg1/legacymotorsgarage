@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261109212652"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261109212652"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261109231352"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261109231352"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261109212652"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261109212652"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261109231352"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261109231352"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -3233,14 +3233,15 @@ window.svcAddSugService=function(si){
   svcRenderModal(); try{ if(window.svcToast) svcToast('➕ Agregado como servicio · ponle precio abajo'); }catch(e){}
 };
 // 🔧 HISTORIA DEL MECÁNICO (popup): recepción → lista de partes (widget) → detalle por servicio (acordeón diagnóstico+reparación). NO vomitado en la orden.
-window.svcHistoryClose=function(){ const el=document.getElementById('svc-history'); if(el) el.remove(); };
+window.svcHistoryClose=function(){ const el=document.getElementById('svc-history'); if(el) el.remove(); try{ _svcHistEst=null; }catch(e){} };
 window.svcHistToggle=function(i){ var b=document.getElementById('svc-hist-body-'+i); var c=document.getElementById('svc-hist-chev-'+i); if(!b) return; var open=(b.style.display!=='none'); b.style.display=open?'none':'block'; if(c) c.textContent=open?'▾':'▴'; };
+let _svcHistEst=null;   // 📋 draft del ESTIMADO editable dentro de la historia (una fuente por orden)
 window.svcHistoryOpen=function(orderId){
   // 🚦 animación del punto del semáforo (una sola vez)
   if(!document.getElementById('lmg-pulse-kf')){ var _st=document.createElement('style'); _st.id='lmg-pulse-kf'; _st.textContent='@keyframes lmgPulse{0%{box-shadow:0 0 0 0 currentColor;opacity:1;}70%{box-shadow:0 0 0 6px transparent;opacity:.75;}100%{box-shadow:0 0 0 0 transparent;opacity:1;}}'; document.head.appendChild(_st); }
   const o = (svcOrders.find(x=>x.id===orderId)) || (window._svcDraft && window._svcDraft.editId===orderId ? window._svcDraft : null) || {};
   const svs = Array.isArray(o.services)?o.services:[]; const ik=o.intake||null;
-  if(!ik && !svs.some(s=>s.diagnosis||s.repair)){ if(window.svcToast) svcToast('Aún no hay historia del mecánico en esta orden.'); return; }
+  if(!ik && !svs.some(s=>s.diagnosis||s.repair) && !svs.length){ if(window.svcToast) svcToast('Aún no hay historia del mecánico en esta orden.'); return; }
   const dt=function(x){ try{ return x?new Date(x).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; }catch(e){ return ''; } };
   // 📸 Tocar la foto la agranda con el visor bueno (showPhoto: overlay, maneja jpg/heic/pdf) — no window.open (iOS lo bloquea).
   const img=function(u,sz){ return '<img src="'+u+'" onclick="showPhoto(\''+u+'\',\'📸 Foto\')" style="width:'+sz+'px;height:'+sz+'px;object-fit:cover;border-radius:8px;flex:0 0 auto;cursor:pointer;border:1px solid var(--border);">'; };
@@ -3325,7 +3326,7 @@ window.svcHistoryOpen=function(orderId){
   if(_sug.length){
     h+='<div style="font-weight:800;font-size:12px;color:#f0a030;margin:6px 0 6px;">🔎 Mantenimiento sugerido adicional</div>';
     h+='<div style="background:rgba(240,160,48,.06);border:1px solid rgba(240,160,48,.35);border-radius:12px;padding:10px 12px;margin-bottom:12px;">'
-      +_sug.map(function(s,si){ return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'+(s.photo?img(s.photo,40):'')+'<div style="flex:1;min-width:0;font-size:12.5px;line-height:1.4;">'+svcEsc(s.note||'')+'</div><button type="button" onclick="svcAddSugService('+si+')" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:11.5px;font-weight:700;cursor:pointer;">➕ servicio</button></div>'; }).join('')
+      +_sug.map(function(s,si){ return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'+(s.photo?img(s.photo,40):'')+'<div style="flex:1;min-width:0;font-size:12.5px;line-height:1.4;">'+svcEsc(s.note||'')+'</div><button type="button" onclick="svcHEAddSug('+si+')" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:11.5px;font-weight:700;cursor:pointer;">➕ servicio</button></div>'; }).join('')
       +'</div>';
   }
   // 2) 🔬 DIAGNÓSTICO Y PARTES — lo que el mecánico encontró (hallazgo) + la lista de partes para agregar al estimado.
@@ -3336,13 +3337,13 @@ window.svcHistoryOpen=function(orderId){
   else if(_diagNotes){ h+='<div style="background:rgba(76,155,255,.06);border:1px solid rgba(76,155,255,.3);border-radius:12px;padding:11px 12px;margin-bottom:10px;">'+_diagNotes+'</div>'; }
   if(allParts.length){
     h+='<div style="background:rgba(240,192,64,.06);border:1px solid var(--gold3);border-radius:12px;padding:12px;margin-bottom:12px;">';
-    h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;font-weight:700;color:var(--muted);">'+allParts.length+' parte(s)</span><button type="button" onclick="svcAddAllDiagParts(\''+orderId+'\')" style="background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:800;cursor:pointer;">➕ Todas al estimado</button></div>';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;font-weight:700;color:var(--muted);">'+allParts.length+' parte(s)</span><button type="button" onclick="svcHEAddAllDiag()" style="background:var(--gold);color:var(--navy3);border:none;border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:800;cursor:pointer;">➕ Todas al estimado</button></div>';
     // 🗂️ Agrupadas POR SERVICIO para diferenciar de dónde viene cada parte (incl. mantenimiento sugerido que se volvió servicio).
     const _grp={}; const _order=[]; allParts.forEach(function(p){ const k=p.si; if(!_grp[k]){ _grp[k]=[]; _order.push(k); } _grp[k].push(p); });
     h+=_order.map(function(k){ const list=_grp[k]; const svcName=list[0].svc;
       return '<div style="margin-bottom:8px;">'
         +'<div style="font-size:11px;font-weight:800;color:var(--gold);background:rgba(240,192,64,.12);border:1px solid var(--gold3);border-radius:7px;padding:3px 8px;display:inline-block;margin-bottom:6px;">🔧 '+svcEsc(svcName)+'</div>'
-        +list.map(function(p){ return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.05);">'+(p.photo?img(p.photo,40):'<div style="width:40px;height:40px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">🧩</div>')+'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;">'+svcEsc(p.desc||(p.partNum||'Parte'))+'</div>'+(p.partNum?('<div style="font-size:11px;color:var(--gold);">#'+svcEsc(p.partNum)+'</div>'):'')+'</div><button type="button" onclick="svcAddDiagPart('+p.si+','+p.pi+')" title="Agregar al estimado" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:12.5px;font-weight:700;cursor:pointer;">➕</button></div>'; }).join('')
+        +list.map(function(p){ return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.05);">'+(p.photo?img(p.photo,40):'<div style="width:40px;height:40px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;">🧩</div>')+'<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;">'+svcEsc(p.desc||(p.partNum||'Parte'))+'</div>'+(p.partNum?('<div style="font-size:11px;color:var(--gold);">#'+svcEsc(p.partNum)+'</div>'):'')+'</div><button type="button" onclick="svcHEAddDiagPart('+p.si+','+p.pi+')" title="Agregar al estimado" style="flex:0 0 auto;background:rgba(240,192,64,.14);border:1px solid var(--gold3);color:var(--gold);border-radius:8px;padding:6px 9px;font-size:12.5px;font-weight:700;cursor:pointer;">➕</button></div>'; }).join('')
         +'</div>'; }).join('');
     h+='</div>';
   } else { h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Sin partes marcadas aún.</div>'; }
@@ -3376,9 +3377,58 @@ window.svcHistoryOpen=function(orderId){
   });
   if(!anyDetail) h+='<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Aún sin diagnóstico ni reparación.</div>';
   if(o.diagSummary&&o.diagSummary.text) h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:11px;margin:8px 0 4px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;"><b style="color:#9b7bff;">Resumen enviado al dueño:</b>\n'+svcEsc(o.diagSummary.text)+'</div>';
+  // 📋 ESTIMADO EDITABLE (dentro de la historia): arranca con el motivo/renglones; agregas diagnóstico/partes y editas precio AQUÍ. El motivo de ingreso NO cambia.
+  if(!o.paid){ (function(){
+    if(!_svcHistEst || _svcHistEst.orderId!==orderId){ _svcHistEst={ orderId:orderId, services: JSON.parse(JSON.stringify(svs||[])) }; }
+    const E=_svcHistEst; const IN='width:92px;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:16px;text-align:right;'; const INt='width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:16px;';
+    let laborC=0, partsC=0;
+    h+='<div style="font-weight:800;font-size:12px;color:var(--gold);margin:16px 0 6px;">📋 Estimado <span style="font-weight:500;color:var(--muted);">· edítalo y envíalo (el motivo no cambia)</span></div>';
+    h+='<div style="background:rgba(240,192,64,.05);border:1px solid var(--gold3);border-radius:12px;padding:12px;margin-bottom:12px;">';
+    (E.services||[]).forEach(function(s,i){ const sp=Number(s.price)||0; laborC+=Math.round(sp*100); const declined=s.clientLine==='declined'; const kic=(s.kind==='diagnostic'?'🔧 ':(s.kind==='detailing'?'✨ ':(s.kind==='oil'?'🛢️ ':'')));
+      h+='<div style="border-bottom:1px solid rgba(255,255,255,.06);padding:8px 0;'+(declined?'opacity:.55;':'')+'">'
+        +'<div style="display:flex;gap:8px;align-items:center;"><div style="flex:1;min-width:0;font-weight:700;font-size:13px;">'+kic+svcEsc((s.desc||'').trim()||('Servicio '+(i+1)))+(declined?' <span style="color:#e0683a;font-size:10px;">✖️ rechazado</span>':'')+'</div>'
+        +'<div style="position:relative;flex:0 0 auto;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);">$</span><input type="number" inputmode="decimal" value="'+(sp||'')+'" oninput="svcHE('+i+',\'price\',this.value)" style="'+IN+';padding-left:17px;"></div>'
+        +(E.services.length>1?'<span onclick="svcHERmService('+i+')" style="cursor:pointer;color:var(--faint);font-size:16px;flex:0 0 auto;">🗑️</span>':'')+'</div>';
+      (s.parts||[]).forEach(function(p,pi){ const pp=Number(p.price)||0; partsC+=Math.round(pp*100);
+        h+='<div style="display:flex;gap:6px;align-items:center;margin-top:5px;padding-left:12px;"><input value="'+svcEsc(p.desc||'')+'" oninput="svcHEPart('+i+','+pi+',\'desc\',this.value)" placeholder="Parte / cargo" style="'+INt+';flex:1;font-size:13px;"><div style="position:relative;flex:0 0 auto;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;">$</span><input type="number" inputmode="decimal" value="'+(pp||'')+'" oninput="svcHEPart('+i+','+pi+',\'price\',this.value)" style="'+IN+';padding-left:17px;font-size:13px;"></div><span onclick="svcHERmPart('+i+','+pi+')" style="cursor:pointer;color:var(--faint);font-size:14px;flex:0 0 auto;">🗑️</span></div>';
+      });
+      h+='<button type="button" onclick="svcHEAddPart('+i+')" style="margin-top:6px;margin-left:12px;background:transparent;border:1px dashed var(--border);border-radius:8px;padding:5px 9px;color:var(--muted);font-size:11.5px;font-weight:600;cursor:pointer;">➕ parte / cargo</button></div>';
+    });
+    h+='<button type="button" onclick="svcHEAddService()" style="width:100%;margin-top:8px;background:var(--surface2);border:1px dashed var(--border);border-radius:9px;padding:8px;color:var(--text);font-size:12.5px;font-weight:700;cursor:pointer;">➕ Agregar servicio</button>';
+    const grandC=laborC+partsC;
+    h+='<div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px;font-size:12.5px;"><div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Mano de obra</span><b>'+formatMoney(laborC/100)+'</b></div><div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);">Partes</span><b>'+formatMoney(partsC/100)+'</b></div><div style="display:flex;justify-content:space-between;margin-top:3px;"><span style="font-weight:800;">Total</span><b style="color:var(--gold);">'+formatMoney(grandC/100)+'</b></div></div>';
+    h+='<div style="display:flex;gap:8px;margin-top:12px;"><button type="button" onclick="svcHESave(false)" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;">💾 Guardar</button><button type="button" onclick="svcHESave(true)" style="flex:1;background:linear-gradient(135deg,var(--gold3),var(--gold));color:var(--navy3);border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;cursor:pointer;">💬 Enviar al cliente</button></div>';
+    h+='<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.4;">El cliente acepta/rechaza cada renglón y firma. Es un estimado; el motivo de ingreso no cambia.</div>';
+    h+='</div>';
+  })(); }
   let ov=document.getElementById('svc-history');
   if(!ov){ ov=document.createElement('div'); ov.id='svc-history'; ov.style.cssText='position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:16px;box-sizing:border-box;'; ov.onclick=function(e){ if(e.target===ov) svcHistoryClose(); }; document.body.appendChild(ov); }
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:540px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));cursor:default;">'+h+'</div>';
+};
+// 📋 Editor de ESTIMADO dentro de la historia — setters + agregar + guardar/enviar. Trabaja sobre _svcHistEst (una fuente por orden).
+function _svcHERerender(){ try{ if(_svcHistEst) svcHistoryOpen(_svcHistEst.orderId); }catch(e){} }
+window.svcHE=function(i,k,v){ const s=_svcHistEst&&_svcHistEst.services[i]; if(s){ s[k]=(k==='price')?(parseFloat(String(v).replace(/[^0-9.]/g,''))||0):v; } };
+window.svcHEPart=function(i,pi,k,v){ const s=_svcHistEst&&_svcHistEst.services[i]; if(s&&s.parts&&s.parts[pi]){ s.parts[pi][k]=(k==='price')?(parseFloat(String(v).replace(/[^0-9.]/g,''))||0):v; } };
+window.svcHEAddPart=function(i){ const s=_svcHistEst&&_svcHistEst.services[i]; if(s){ (s.parts=s.parts||[]).push({desc:'',price:0}); _svcHERerender(); } };
+window.svcHERmPart=function(i,pi){ const s=_svcHistEst&&_svcHistEst.services[i]; if(s&&s.parts){ s.parts.splice(pi,1); _svcHERerender(); } };
+window.svcHERmService=function(i){ if(_svcHistEst&&_svcHistEst.services.length>1){ _svcHistEst.services.splice(i,1); _svcHERerender(); } };
+window.svcHEAddService=function(){ if(_svcHistEst){ _svcHistEst.services.push({desc:'',kind:'oil',price:0,parts:[],minutes:60}); _svcHERerender(); } };
+// 🔬→📋 Pasa partes del DIAGNÓSTICO al estimado (al servicio que corresponde). El mecánico las marcó; el dueño les pone precio.
+window.svcHEAddDiagPart=function(si,pi){ if(!_svcHistEst) return; const o=svcOrders.find(x=>x.id===_svcHistEst.orderId)||{}; const p=((((o.services||[])[si]||{}).diagnosis||{}).parts||[])[pi]; if(!p) return; const desc=((p.desc||'')+(p.partNum?(' [# '+p.partNum+']'):'')).trim()||'Parte'; const tgt=_svcHistEst.services[si]||_svcHistEst.services[0]; if(tgt){ (tgt.parts=tgt.parts||[]).push({desc:desc,price:0}); _svcHERerender(); } };
+window.svcHEAddAllDiag=function(){ if(!_svcHistEst) return; const o=svcOrders.find(x=>x.id===_svcHistEst.orderId)||{}; let n=0; (o.services||[]).forEach(function(s,si){ const tgt=_svcHistEst.services[si]; if(!tgt) return; const have=(tgt.parts||[]).map(function(p){return (p.desc||'').trim().toLowerCase();}); ((s.diagnosis&&s.diagnosis.parts)||[]).forEach(function(p){ const desc=((p.desc||'')+(p.partNum?(' [# '+p.partNum+']'):'')).trim()||'Parte'; if(have.indexOf(desc.toLowerCase())>=0) return; (tgt.parts=tgt.parts||[]).push({desc:desc,price:0}); have.push(desc.toLowerCase()); n++; }); }); if(n) _svcHERerender(); try{ if(window.svcToast) svcToast(n?('➕ '+n+' parte(s) al estimado · ponles precio'):'Ya estaban todas en el estimado'); }catch(e){} };
+window.svcHEAddSug=function(si){ if(!_svcHistEst) return; const s=(window._svcHistSug||[])[si]; if(!s) return; _svcHistEst.services.push({desc:(s.note||'Trabajo sugerido').slice(0,120),kind:'oil',price:0,parts:[],minutes:60}); _svcHERerender(); };
+window.svcHESave=async function(send){
+  if(!_svcHistEst) return; const id=_svcHistEst.orderId;
+  const svcsClean=_svcHistEst.services.map(function(s){ return Object.assign({}, s, { price:Number(s.price)||0, minutes:Number(s.minutes)||60, parts:(s.parts||[]).map(function(p){ return {desc:(p.desc||'').trim(), price:Number(p.price)||0}; }).filter(function(p){ return p.desc||p.price; }) }); }).filter(function(s){ return (s.desc||'').trim()||(s.parts||[]).length; });
+  let laborC=0, partsC=0; svcsClean.forEach(function(s){ laborC+=Math.round((Number(s.price)||0)*100); (s.parts||[]).forEach(function(p){ partsC+=Math.round((Number(p.price)||0)*100); }); });
+  const grandC=laborC+partsC; const paidC=Number((svcOrders.find(x=>x.id===id)||{}).paidCents)||0;
+  try{
+    await updateDoc(doc(db,'serviceOrders',id), { services:svcsClean, laborTotalCents:laborC, partsTotalCents:partsC, grandTotalCents:grandC, balanceCents:Math.max(0,grandC-paidC), updatedAt:new Date().toISOString() });
+    const _o=svcOrders.find(x=>x.id===id); if(_o){ _o.services=svcsClean; _o.laborTotalCents=laborC; _o.partsTotalCents=partsC; _o.grandTotalCents=grandC; _o.balanceCents=Math.max(0,grandC-paidC); }
+    if(send){ try{ await svcResend(id); }catch(e){} }
+    else { try{ if(window.svcToast) svcToast('💾 Estimado guardado'); }catch(e){} }
+    _svcHERerender();
+  }catch(e){ alert('No se pudo guardar el estimado: '+((e&&e.message)||e)); }
 };
 // 📄 GENERAR ESTIMADO bonito (tipo cotizador), bien desglosado por servicio + sus partes.
 function svcEstimateSheetHTML(d, services, opts){
@@ -8168,6 +8218,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261109212652"></script>
+<script type="module" src="launcher.js?v=20261109231352"></script>
 </body>
 </html>
