@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261109231352"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261109231352"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261110003026"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261110003026"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261109231352"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261109231352"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261110003026"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261110003026"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -3058,7 +3058,7 @@ function svcRenderModal(){
   const _estTot=_estLabor+_estParts; const _estDep=Number(d.deposit)||0; const _estBal=Math.max(0,_estTot-_estDep);
   const _estSt=_svcOrd&&_svcOrd.estimateStatus==='accepted'?{t:'✅ Aceptado por el cliente',c:'#28b463'}:(_svcOrd&&_svcOrd.estimateStatus==='sent'?{t:'🧾 Enviado · esperando aprobación',c:'#e8b64a'}:{t:'🖊️ Borrador',c:'var(--muted)'});
   // 📋 Caja Estimado COMPACTA (solo botón + total). El desglose y el anticipo viven DENTRO del popup al abrirla.
-  const estimateBoxHtml='<div onclick="svcGenEstimate()" style="border:1px solid var(--gold3);background:linear-gradient(135deg,rgba(240,192,64,.12),rgba(240,192,64,.04));border-radius:12px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;"><div style="min-width:0;"><div style="font-weight:800;font-size:14px;color:var(--gold);">📋 Estimado · ver y enviar</div><div style="font-size:11.5px;color:'+_estSt.c+';margin-top:2px;font-weight:700;">'+_estSt.t+(_estTot>0?(' · '+formatMoney(_estTot)):'')+'</div></div><span style="color:var(--gold);font-size:18px;flex:0 0 auto;">›</span></div>';
+  const estimateBoxHtml='<div onclick="svcOpenEstimateEditor()" style="border:1px solid var(--gold3);background:linear-gradient(135deg,rgba(240,192,64,.12),rgba(240,192,64,.04));border-radius:12px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;"><div style="min-width:0;"><div style="font-weight:800;font-size:14px;color:var(--gold);">📋 Estimado · editar y enviar</div><div style="font-size:11.5px;color:'+_estSt.c+';margin-top:2px;font-weight:700;">'+_estSt.t+(_estTot>0?(' · '+formatMoney(_estTot)):'')+'</div></div><span style="color:var(--gold);font-size:18px;flex:0 0 auto;">›</span></div>';
   body.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
     +'<h2 style="font-family:var(--font-display);font-size:21px;margin:0;">'+(isEdit?('Orden de servicio'+(d.orderNum?(' <span style="color:var(--gold);">#'+d.orderNum+'</span>'):'')):'Nueva orden de servicio')+'</h2>'
     +'<button onclick="svcClose()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;line-height:1;">×</button></div>'
@@ -3545,6 +3545,13 @@ function svcEstimateSheetHTML(d, services, opts){
     +'<div class="foot"><b>Legacy Motors Garage LLC</b><br>21122 Ave 152, Porterville, CA 93257 · (559) 540-5145<br>California BAR Reg. No. ARD 317673 · Automotive Repair Dealer</div></div>';
   return '<style>'+style+'</style>'+body;
 }
+// 📋 Abre el ESTIMADO EDITABLE (vive en la historia de la orden). Guarda la orden primero si es nueva.
+window.svcOpenEstimateEditor=async function(){
+  let id=(window._svcDraft&&window._svcDraft.editId)||'';
+  if(!id){ try{ id=await svcSaveOrder({silent:true}); }catch(e){} }
+  if(!id){ alert('Agrega al menos un servicio y guarda la orden primero.'); return; }
+  try{ svcHistoryOpen(id); }catch(e){ alert('No se pudo abrir el estimado.'); }
+};
 window.svcGenEstimate=async function(btn){
   svcCapture(); const d=window._svcDraft;
   const services=(d.services||[]).filter(s=>(s.desc||'').trim()||(s.parts||[]).length);
@@ -8218,6 +8225,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261109231352"></script>
+<script type="module" src="launcher.js?v=20261110003026"></script>
 </body>
 </html>
