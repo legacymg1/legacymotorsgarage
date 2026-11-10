@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261110231933"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261110231933"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261110232327"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261110232327"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261110231933"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261110231933"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261110232327"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261110232327"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -3386,7 +3386,7 @@ window.svcHistoryOpen=function(orderId){
     h+='<div style="background:rgba(240,192,64,.05);border:1px solid var(--gold3);border-radius:12px;padding:12px;margin-bottom:12px;">';
     (E.services||[]).forEach(function(s,i){ const sp=Number(s.price)||0; laborC+=Math.round(sp*100); const declined=s.clientLine==='declined'; const kic=(s.kind==='diagnostic'?'🔧 ':(s.kind==='detailing'?'✨ ':(s.kind==='oil'?'🛢️ ':'')));
       h+='<div style="border-bottom:1px solid rgba(255,255,255,.06);padding:8px 0;'+(declined?'opacity:.55;':'')+'">'
-        +'<div style="display:flex;gap:8px;align-items:center;"><div style="flex:1;min-width:0;font-weight:700;font-size:13px;">'+kic+svcEsc((s.desc||'').trim()||('Servicio '+(i+1)))+(declined?' <span style="color:#e0683a;font-size:10px;">✖️ rechazado</span>':'')+'</div>'
+        +'<div style="display:flex;gap:6px;align-items:center;"><input value="'+svcEsc(s.desc||'')+'" oninput="svcHE('+i+',\'desc\',this.value)" placeholder="Nombre del servicio (ej. Frenos traseros)" style="'+INt+';flex:1;font-weight:700;">'+(declined?'<span style="color:#e0683a;font-size:10px;flex:0 0 auto;">✖️</span>':'')
         +'<div style="position:relative;flex:0 0 auto;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);">$</span><input type="number" inputmode="decimal" value="'+(sp||'')+'" oninput="svcHE('+i+',\'price\',this.value)" style="'+IN+';padding-left:17px;"></div>'
         +(E.services.length>1?'<span onclick="svcHERmService('+i+')" style="cursor:pointer;color:var(--faint);font-size:16px;flex:0 0 auto;">🗑️</span>':'')+'</div>';
       (s.parts||[]).forEach(function(p,pi){ const pp=Number(p.price)||0; partsC+=Math.round(pp*100);
@@ -8231,6 +8231,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261110231933"></script>
+<script type="module" src="launcher.js?v=20261110232327"></script>
 </body>
 </html>
