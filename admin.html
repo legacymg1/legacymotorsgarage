@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261110003526"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261110003526"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261110231933"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261110231933"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261110003526"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261110003526"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261110231933"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261110231933"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -3406,7 +3406,12 @@ window.svcHistoryOpen=function(orderId){
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:100%;max-width:540px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));cursor:default;">'+h+'</div>';
 };
 // 📋 Editor de ESTIMADO dentro de la historia — setters + agregar + guardar/enviar. Trabaja sobre _svcHistEst (una fuente por orden).
-function _svcHERerender(){ try{ if(_svcHistEst) svcHistoryOpen(_svcHistEst.orderId); }catch(e){} }
+function _svcHERerender(){
+  if(!_svcHistEst) return;
+  let sc=0; try{ const el=document.querySelector('#svc-history > div'); if(el) sc=el.scrollTop; }catch(e){}   // 📌 recuerda dónde iba el scroll
+  try{ svcHistoryOpen(_svcHistEst.orderId); }catch(e){}
+  try{ const el2=document.querySelector('#svc-history > div'); if(el2){ el2.scrollTop=sc; requestAnimationFrame(function(){ try{ el2.scrollTop=sc; }catch(e){} }); } }catch(e){}   // 🔙 y lo restaura (no brinca al tope)
+}
 window.svcHE=function(i,k,v){ const s=_svcHistEst&&_svcHistEst.services[i]; if(s){ s[k]=(k==='price')?(parseFloat(String(v).replace(/[^0-9.]/g,''))||0):v; } };
 window.svcHEPart=function(i,pi,k,v){ const s=_svcHistEst&&_svcHistEst.services[i]; if(s&&s.parts&&s.parts[pi]){ s.parts[pi][k]=(k==='price')?(parseFloat(String(v).replace(/[^0-9.]/g,''))||0):v; } };
 window.svcHEAddPart=function(i){ const s=_svcHistEst&&_svcHistEst.services[i]; if(s){ (s.parts=s.parts||[]).push({desc:'',price:0}); _svcHERerender(); } };
@@ -8226,6 +8231,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261110003526"></script>
+<script type="module" src="launcher.js?v=20261110231933"></script>
 </body>
 </html>
