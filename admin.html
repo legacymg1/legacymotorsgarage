@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261113011142"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261113011142"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261113011527"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261113011527"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261113011142"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261113011142"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261113011527"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261113011527"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2625,6 +2625,22 @@ window.openVehicle360=function(id, idx){
   const sec=(t,inner)=>'<div style="padding:14px 16px;border-top:1px solid var(--border);"><div style="font-weight:800;font-size:13px;color:var(--gold);margin-bottom:8px;">'+t+'</div>'+inner+'</div>';
   let h='<div style="padding:14px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);"><button onclick="renderClient360(\''+id+'\')" style="background:transparent;border:none;color:var(--text);font-size:24px;cursor:pointer;line-height:1;">‹</button><div style="flex:1;min-width:0;"><div style="font-family:var(--font-display);font-size:19px;">🚗 '+esc(v.label||'Auto')+'</div><div style="color:var(--muted);font-size:12px;">'+(v.plate?('🪪 '+esc(v.plate)+' · '):'')+(v.vin?('VIN '+esc(v.vin)):'')+'</div></div><button onclick="c360Close()" style="background:transparent;border:none;color:var(--muted);font-size:26px;cursor:pointer;">×</button></div>'
     +'<div style="padding:12px 16px;border-bottom:1px solid var(--border);"><span style="display:inline-block;background:'+stColor+'22;color:'+stColor+';border:1px solid '+stColor+';border-radius:999px;padding:4px 13px;font-weight:800;font-size:13px;">'+stLbl+'</span>'+(isFin&&!isPaidOff(c)?('<span style="margin-left:8px;color:var(--muted);font-size:13px;">saldo '+M(calcBalance(c))+'</span>'):'')+'</div>';
+  // 📏 Odómetro / millas — al comprar (primer registro) + último servicio + recorrido. Si aún no hay servicio, la base son las millas de compra.
+  (function(){
+    const _pm=x=>{ if(x==null||x==='') return null; const n=parseInt(String(x).replace(/[^0-9]/g,''),10); return isNaN(n)?null:n; };
+    const fmt=n=>Number(n).toLocaleString('en-US')+' mi';
+    const buyM = isFin ? (_pm(c.milesCurrent)!=null?_pm(c.milesCurrent):_pm(c.miles)) : (_pm(v.miles)!=null?_pm(v.miles):_pm(c.miles));
+    const vo=svcOrders.filter(o=>o.clientId===c.id && (!v || (o.vin||'').toUpperCase()===(v.vin||'').toUpperCase())).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    let lastM=null, lastAt='';
+    for(const o of vo){ const ik=o.intake||{}; const mo=_pm(o.milesOut); const mi=_pm(ik.miles!=null?ik.miles:o.milesIn); const m=(mo!=null?mo:mi); if(m!=null){ lastM=m; lastAt=o.createdAt||''; break; } }
+    const rowM=(lbl,val,sub)=>'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:4px 0;"><span style="color:var(--muted);font-size:13px;">'+lbl+'</span><span style="font-weight:800;font-size:15px;white-space:nowrap;">'+val+(sub?('<span style="color:var(--muted);font-weight:500;font-size:11px;margin-left:6px;">'+sub+'</span>'):'')+'</span></div>';
+    let inner='';
+    if(buyM!=null) inner+=rowM((isFin||bought)?'🛒 Al comprar':'📥 Primer registro', fmt(buyM));
+    if(lastM!=null){ const d=lastAt?new Date(lastAt).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):''; inner+=rowM('🔧 Último servicio', fmt(lastM), d); }
+    else inner+='<div style="color:var(--muted);font-size:12px;padding:3px 0;">Aún sin servicio registrado'+(buyM!=null?' — las millas base son las de compra.':'.')+'</div>';
+    if(buyM!=null && lastM!=null && lastM>=buyM) inner+='<div style="color:var(--muted);font-size:11px;margin-top:5px;border-top:1px dashed var(--border);padding-top:6px;">Recorrido desde la compra: <b style="color:var(--text);">'+Number(lastM-buyM).toLocaleString('en-US')+' mi</b></div>';
+    if(inner) h+=sec('📏 Odómetro', inner);
+  })();
   if(isFin){ h+=sec('💳 Historial de pagos', _c360PayHistory(c)); }
   h+=sec('🔧 Historial de servicio', c360SvcHistory(c, v));
   if(bought){ h+=sec('🗂️ Jacket del carro (documentos)', c360JacketHtml(c, v)); }   // solo carros COMPRADOS; los de servicio no llevan jacket
@@ -8232,6 +8248,6 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261113011142"></script>
+<script type="module" src="launcher.js?v=20261113011527"></script>
 </body>
 </html>
