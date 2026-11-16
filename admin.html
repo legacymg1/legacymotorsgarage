@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261116174020"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261116174020"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261116174546"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261116174546"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261116174020"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261116174020"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261116174546"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261116174546"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -7895,53 +7895,7 @@ window.repairDocs = function(){
   };
 };
 
-window.showPhoto = async function(url, title){
-  if(!url) return;
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:2147483600;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';   // 🔧 por ENCIMA del modal de la tarjeta del cliente (z 2147483050); si no, el visor se abría DETRÁS y "no hacía nada"
-  ov.innerHTML = '<div style="color:#fff;font-size:14px;margin-bottom:10px;font-weight:600;">'+(title||'Documento')+'</div>'
-    + '<div data-body style="color:#fff;font-size:13px;">Cargando…</div>'
-    + '<div style="margin-top:14px;display:flex;gap:10px;">'
-    + '<a data-open href="'+url+'" target="_blank" style="background:transparent;color:#f0c040;border:1px solid #f0c040;border-radius:8px;padding:8px 16px;text-decoration:none;font-size:13px;">Abrir en pestaña ↗</a>'
-    + '<button type="button" data-close style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">Cerrar ✕</button>'
-    + '</div>';
-  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
-  const onKey = (e) => { if(e.key === 'Escape') close(); };
-  ov.addEventListener('click', (e) => { if(e.target === ov) close(); });
-  ov.querySelector('[data-close]').onclick = close;
-  document.addEventListener('keydown', onKey);
-  document.body.appendChild(ov);
-  const body = ov.querySelector('[data-body]');
-  const openLink = ov.querySelector('[data-open]');
-  try{
-    const resp = await fetch(url);
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    let blob = await resp.blob();
-    let type = blob.type;
-    const sig = new Uint8Array(await blob.slice(0,12).arrayBuffer());
-    const isPdf = sig[0]===0x25 && sig[1]===0x50 && sig[2]===0x44 && sig[3]===0x46;
-    const isJpg = sig[0]===0xFF && sig[1]===0xD8;
-    const isPng = sig[0]===0x89 && sig[1]===0x50;
-    const isGif = sig[0]===0x47 && sig[1]===0x49;
-    const isFtyp = sig[4]===0x66 && sig[5]===0x74 && sig[6]===0x79 && sig[7]===0x70; // 'ftyp' (HEIC/HEIF/MP4)
-    // HTML (contratos): empieza con '<' o el tipo dice html
-    const isHtml = sig[0]===0x3C || (type && type.indexOf('html')>=0);
-    if(!type || type === 'application/octet-stream'){
-      type = isPdf?'application/pdf':isHtml?'text/html':isJpg?'image/jpeg':isPng?'image/png':isGif?'image/gif':isFtyp?'image/heic':'image/jpeg';
-      blob = new Blob([blob], {type});
-    }
-    const burl = URL.createObjectURL(blob);
-    if(openLink) openLink.href = burl; // abrir en pestaña = archivo ya tipado (previsualiza, no descarga)
-    if(type === 'application/pdf' || (type && type.indexOf('html')>=0) || isHtml){
-      body.innerHTML = '<iframe src="'+burl+'" style="width:92vw;height:80vh;border:none;border-radius:8px;background:#fff;"></iframe>';
-    } else {
-      body.innerHTML = '<img src="'+burl+'" style="max-width:96%;max-height:80vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.6);background:#fff;" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'[data-heic]\').style.display=\'block\';">'
-        + '<div data-heic style="display:none;color:#fff;max-width:440px;text-align:center;line-height:1.5;">Esta foto está en formato <strong>HEIC (iPhone)</strong> y esta computadora no puede mostrarla. Ábrela en el <strong>iPad</strong>, o corre <strong>🛠 Reparar fotos</strong> (en el iPad) para convertirla a imagen normal que se vea en todos lados.</div>';
-    }
-  }catch(err){
-    body.innerHTML = '<div style="color:#fff;text-align:center;max-width:420px;">No se pudo cargar la vista previa aquí. Usa <strong>Abrir en pestaña ↗</strong> abajo.</div>';
-  }
-};
+/* showPhoto → ahora COMPARTIDO en legacy-photo.js (un solo ecosistema). Ver <script src="legacy-photo.js?v=20261116174546">. */
 
 window.generateContract = function(clientId) {
   const c = clients.find(x => x.id === clientId);
@@ -8248,6 +8202,7 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261116174020"></script>
+<script type="module" src="launcher.js?v=20261116174546"></script>
+<script src="legacy-photo.js?v=20261116174546"></script>
 </body>
 </html>
