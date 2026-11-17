@@ -5763,11 +5763,12 @@ function buildListingDescription(p, vin){
   const d = p.ebayDraft || {};
   const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   // Sanitiza: si un borrador viejo guardó JSON crudo o ```json en la descripción, no lo mostramos.
-  let ov = (d.description || "").trim();
+  let ov = String(d.description == null ? "" : d.description).trim();
   if (/```|^\s*[{\[]|"\s*:\s*"|"title"\s*:/.test(ov)) ov = "";
-  const overview = ov || (p.name || "").trim();
-  const cond = (d.conditionNote || "").trim();
-  const fits = (d.fitsVehicles || "").trim();
+  const overview = ov || String(p.name == null ? "" : p.name).trim();
+  const cond = String(d.conditionNote == null ? "" : d.conditionNote).trim();
+  // fitsVehicles puede venir como ARREGLO (la IA devuelve "list of vehicles") o como texto → normalizar a string.
+  const fits = (Array.isArray(d.fitsVehicles) ? d.fitsVehicles.filter(Boolean).join(", ") : String(d.fitsVehicles == null ? "" : d.fitsVehicles)).trim();
   const nums = [...(d.partNumbers || []), d.suggestedPartNumber].filter(Boolean);
   const inter = (d.interchange || []).filter(Boolean);
   const veh = [p.vYear, p.vMake, p.vModel, p.vTrim].filter(Boolean).join(" ");
