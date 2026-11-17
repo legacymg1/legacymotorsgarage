@@ -5933,6 +5933,34 @@ async function buildInventoryItem(p){
   return { sku, invItem, title, desc, catId, catAck, photos: pics.length, aspects: Object.keys(aspects).length };
 }
 
+// 🚛 ID de la Product Compliance policy del DISCLOSURE personalizado ("Shipping & Delivery Disclosure").
+//    En eBay el "Additional disclosures" de un listing = una Product Compliance policy; se engancha a la oferta
+//    por listingPolicies.productCompliancePolicyIds. Se cachea en config/ebay.disclosurePolicyId.
+//    Para fijarlo a mano: pon config/ebay.disclosurePolicyId con el ID exacto (gana sobre la autodetección).
+async function ebayDisclosurePolicyId(token){
+  try{
+    const ref = admin.firestore().collection("config").doc("ebay");
+    const snap = await ref.get(); const cfg = snap.exists ? snap.data() : {};
+    if (cfg.disclosurePolicyId) return cfg.disclosurePolicyId;
+    const pick = (resp)=>{
+      const arr = (resp && resp.json && resp.json.customPolicies) || [];
+      if (!arr.length) return null;
+      const score = (p)=>{ const t = ((p.name||"")+" "+(p.label||"")+" "+(p.description||"")).toLowerCase();
+        return (/ship|deliver|freight|terminal|flete|env[ií]o/.test(t)?2:0) + (/disclos/.test(t)?1:0); };
+      const sorted = arr.slice().sort((a,b)=>score(b)-score(a));
+      if (score(sorted[0])>0) return sorted[0];
+      if (arr.length===1) return arr[0];   // si solo hay una política de cumplimiento, es esa
+      return null;
+    };
+    // Las políticas de cuenta se piden en EBAY_US (igual que fulfillment/payment/return); respaldo en EBAY_MOTORS.
+    let r = await ebayRest("GET", "/sell/account/v1/custom_policy/?policy_types=PRODUCT_COMPLIANCE", token, undefined, "EBAY_US");
+    let p = pick(r);
+    if (!p){ r = await ebayRest("GET", "/sell/account/v1/custom_policy/?policy_types=PRODUCT_COMPLIANCE", token, undefined, EBAY_MP); p = pick(r); }
+    if (p && p.customPolicyId){ try{ await ref.set({ disclosurePolicyId: p.customPolicyId, disclosurePolicyName: p.name || p.label || "" }, { merge: true }); }catch(e){} return p.customPolicyId; }
+  }catch(e){}
+  return "";
+}
+
 // 📝 Crear BORRADOR en eBay (Inventory API: inventory item + oferta SIN publicar). No sale en vivo.
 exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAUTH_REFRESH], timeoutSeconds: 240, memory: "1GiB" }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
@@ -5984,9 +6012,22 @@ exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
       pricingSummary: { price: { value: price, currency: "USD" } },
       merchantLocationKey: cfg.locationKey,
     };
-    let offer;
-    if (offerId) offer = await ebayRest("PUT", "/sell/inventory/v1/offer/" + offerId, a.token, offerBody, EBAY_MP);
-    else offer = await ebayRest("POST", "/sell/inventory/v1/offer", a.token, offerBody, EBAY_MP);
+    // 🚛 MOTOR/TRANSMISIÓN (flete) → engancha el disclosure "Shipping & Delivery" (Product Compliance policy),
+    //    así sale prendido en "Additional disclosures" sin tocarlo a mano. Solo para flete.
+    let disclosureId = "";
+    if (isFreightPart(p)) {
+      disclosureId = await ebayDisclosurePolicyId(a.token);
+      if (disclosureId) offerBody.listingPolicies.productCompliancePolicyIds = [disclosureId];
+    }
+    const doOffer = (bodyUse) => offerId
+      ? ebayRest("PUT", "/sell/inventory/v1/offer/" + offerId, a.token, bodyUse, EBAY_MP)
+      : ebayRest("POST", "/sell/inventory/v1/offer", a.token, bodyUse, EBAY_MP);
+    let offer = await doOffer(offerBody);
+    // Si el disclosure hiciera fallar la oferta (ID/marketplace), reintenta SIN él para no bloquear el borrador.
+    if (!offer.ok && offerBody.listingPolicies.productCompliancePolicyIds) {
+      const b2 = JSON.parse(JSON.stringify(offerBody)); delete b2.listingPolicies.productCompliancePolicyIds;
+      const o2 = await doOffer(b2); if (o2.ok) { offer = o2; disclosureId = ""; }
+    }
     if (!offer.ok) return { ok: false, step: "offer", status: offer.status, errors: ebayRestErrors(offer) };
     if (!offerId) offerId = offer.json && offer.json.offerId;
 
@@ -5994,7 +6035,7 @@ exports.ebayCreateDraft = onCall({ secrets: [EBAY_APP_ID, EBAY_CERT_ID, EBAY_OAU
     if (priceUsd) upd.priceCents = Math.round(Number(priceUsd) * 100);
     await admin.firestore().collection("parts").doc(p.id).update(upd);
 
-    return { ok: true, offerId, categoryId: b.catId, categoryAck: b.catAck, title: b.title, price, photos: b.photos, aspects: b.aspects };
+    return { ok: true, offerId, categoryId: b.catId, categoryAck: b.catAck, title: b.title, price, photos: b.photos, aspects: b.aspects, freight: isFreightPart(p), disclosureApplied: !!disclosureId };
   } catch (e) {
     return { ok: false, step: "exception", errors: ["Error interno: " + (e && e.message ? e.message : String(e))] };
   }
