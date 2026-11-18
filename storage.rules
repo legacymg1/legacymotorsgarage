@@ -52,6 +52,12 @@ service firebase.storage {
       allow read:  if isSignedIn();
       allow write: if isSignedIn() && request.resource.size < 25 * 1024 * 1024;
     }
+    // 🔢 Foto del ODÓMETRO (venta de cliente, cotización, actualización de millas del inventario).
+    // Pública en lectura (se muestra en el anuncio/ficha del carro); escribe cualquiera firmado (dueños por correo).
+    match /odometer/{allPaths=**} {
+      allow read:  if true;
+      allow write: if isSignedIn() && request.resource.size < 25 * 1024 * 1024;
+    }
     match /parts/{allPaths=**} {
       allow read: if true;
       allow write: if (isYard() || isYardPhone()) && request.resource.size < 25 * 1024 * 1024;
