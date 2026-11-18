@@ -46,17 +46,21 @@
     if(!url) return;
     var ov=document.createElement('div');
     // z casi máximo: SIEMPRE encima de cualquier modal (la tarjeta del cliente usa ~2147483050)
-    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:2147483600;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-    ov.innerHTML='<div style="color:#fff;font-size:14px;margin-bottom:10px;font-weight:600;">'+(title||'Documento')+'</div>'
+    // overflow:auto + justify-content:flex-start → si el documento es alto (contrato), se puede hacer scroll y los botones de abajo SIEMPRE se alcanzan.
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:2147483600;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:56px 16px 24px;overflow:auto;-webkit-overflow-scrolling:touch;';
+    ov.innerHTML=
+      // ✕ FIJA arriba-derecha: siempre alcanzable (iPhone), nunca se empuja fuera de pantalla ni se confunde con un botón del documento.
+      '<button type="button" data-close aria-label="Cerrar" style="position:fixed;top:calc(10px + env(safe-area-inset-top));right:14px;z-index:5;background:#f0c040;color:#000;border:none;border-radius:50%;width:44px;height:44px;font-size:22px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.6);">✕</button>'
+      +'<div style="color:#fff;font-size:14px;margin-bottom:10px;font-weight:600;max-width:90%;text-align:center;">'+(title||'Documento')+'</div>'
       +'<div data-body style="color:#fff;font-size:13px;">Cargando…</div>'
-      +'<div style="margin-top:14px;display:flex;gap:10px;">'
+      +'<div style="margin-top:14px;display:flex;gap:10px;flex:0 0 auto;">'
       +'<a data-open href="'+url+'" target="_blank" style="background:transparent;color:#f0c040;border:1px solid #f0c040;border-radius:8px;padding:8px 16px;text-decoration:none;font-size:13px;">Abrir en pestaña ↗</a>'
       +'<button type="button" data-close style="background:#f0c040;color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;">Cerrar ✕</button>'
       +'</div>';
     var close=function(){ try{ov.remove();}catch(e){} document.removeEventListener('keydown',onKey); };
     var onKey=function(e){ if(e.key==='Escape') close(); };
     ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
-    ov.querySelector('[data-close]').onclick=close;
+    try{ ov.querySelectorAll('[data-close]').forEach(function(b){ b.onclick=close; }); }catch(e){ var _c=ov.querySelector('[data-close]'); if(_c) _c.onclick=close; }
     document.addEventListener('keydown',onKey);
     document.body.appendChild(ov);
     var body=ov.querySelector('[data-body]'), openLink=ov.querySelector('[data-open]');

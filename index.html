@@ -1376,7 +1376,7 @@ async function toJpeg(file){
 }
 
 // 🖼️ Visor interno (igual que en admin): abre fotos/PDF AQUÍ, no en pestaña. Convierte HEIC.
-/* showPhoto → ahora COMPARTIDO en legacy-photo.js (un solo ecosistema). Ver <script src="legacy-photo.js?v=20261116174546">. */
+/* showPhoto → ahora COMPARTIDO en legacy-photo.js (un solo ecosistema). Ver <script src="legacy-photo.js?v=20261118225409">. */
 
 // 📸 Lee los bytes de la foto AL ELEGIRLA (igual que el ID en admin): evita que la Mac
 // pierda el acceso al archivo entre elegir y guardar (iCloud / stale reference).
@@ -1697,7 +1697,7 @@ window.sendMessage = function(){
 document.querySelectorAll('.modal-overlay').forEach(el=>{el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');});});
 renderCars();
 </script>
-<script src="legacy-carficha.js?v=20261116174546"></script><!-- 🗂️ ficha del carro compartida (misma que Pit Crew) -->
+<script src="legacy-carficha.js?v=20261118225409"></script><!-- 🗂️ ficha del carro compartida (misma que Pit Crew) -->
 <script type="module" src="chat-widget.js"></script>
 <script src="site-bot.js?v=6"></script>
 <!-- 🤖 Conversaciones del bot (en el logo de Inventario — solo dueños) -->
@@ -1764,9 +1764,9 @@ window.openBotConvo=async function(id){
 };
 window.LEGACY_ACTIONS = [ { label:'Conversaciones del bot', ico:'🤖', fn:'openBotInv' } ];
 </script>
-<script type="module" src="launcher.js?v=20261116174546"></script>
+<script type="module" src="launcher.js?v=20261118225409"></script>
 <link rel="prefetch" href="finanzas.html"><link rel="prefetch" href="admin.html"><link rel="prefetch" href="warehouse.html">
-<script src="legacy-photo.js?v=20261116174546"></script>
+<script src="legacy-photo.js?v=20261118225409"></script>
 </body>
 </html>
 </html>
