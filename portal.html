@@ -136,8 +136,8 @@
 </style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261109181200"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261109181200"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261120200746"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261120200746"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 
 <!-- PRIMER INGRESO: bloquea el portal hasta que conteste -->
 <div id="consent-modal" style="display:none;position:fixed;inset:0;background:rgba(6,9,15,0.94);z-index:9999;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
@@ -1579,12 +1579,21 @@ window.portalSignAddon=function(addonId){
   });
   window.location.href='contracts_addon.html?'+p.toString()+'&_cb='+Date.now();
 };
+// ✍️ Abre el contrato de COMPRA (el dealer ya lo generó y lo marcó "por firmar") para que el cliente lo firme desde su app.
+window.portalSignPurchase=function(){
+  const c=currentClient||{}; const cr=c.contractReady||{};
+  if(!cr.file || !cr.params){ alert(L==='en'?'Your contract is not ready yet. Please contact us.':'Tu contrato aún no está listo. Contáctanos.'); return; }
+  window.location.href = cr.file + '?' + cr.params + '&_cb=' + Date.now();
+};
 // 📄 SECCIÓN "MIS CONTRATOS" — muestra los contratos firmados (compra + cargos) Y los cargos POR FIRMAR.
 function contractsSectionHTML(c){
   const items = [];
   const sc = c.signedContract;
   if(sc && sc.url && (sc.status==='active' || !sc.status)){
     items.push({label:(L==='en'?'Purchase contract':'Contrato de compra'), num:sc.contractNumber, date:sc.signedAt, url:sc.url, signed:true});
+  } else if(c.contractReady && c.contractReady.file){
+    // El dealer ya generó el contrato de compra y lo envió a firmar → el cliente lo firma desde su app.
+    items.push({label:(L==='en'?'Purchase contract':'Contrato de compra'), num:(c.contractReady.contractNum||''), signed:false, kind:'purchase'});
   }
   (c.addons||[]).forEach(function(a){
     if(!a) return;
@@ -1615,7 +1624,7 @@ function contractsSectionHTML(c){
         <div style="font-weight:600;font-size:14px;color:var(--white);">${it.label}${it.concept?(' <span style="color:var(--muted);font-weight:400;">· '+String(it.concept)+'</span>'):''}</div>
         <div style="font-size:12px;color:#f0c040;margin-top:2px;font-weight:700;">⚠️ ${L==='en'?'Pending your signature':'Pendiente de tu firma'}</div>
       </div>
-      <button onclick="portalSignAddon('${it.addonId}')" style="flex:none;background:#f0c040;color:var(--navy3);border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">✍️ ${L==='en'?'Sign now':'Firmar ahora'}</button>
+      <button onclick="${it.kind==='purchase'?'portalSignPurchase()':("portalSignAddon('"+it.addonId+"')")}" style="flex:none;background:#f0c040;color:var(--navy3);border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">✍️ ${L==='en'?'Sign now':'Firmar ahora'}</button>
     </div>`;
   }).join('');
   const anyPending = items.some(it=>!it.signed);

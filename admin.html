@@ -246,8 +246,8 @@
 <style id="tabcss">#staff-tabbar{display:none;}body.admin-on #staff-tabbar{display:flex;}body.admin-on{padding-bottom:calc(74px + env(safe-area-inset-bottom));}/* El boton flotante vive encima de la barra, no debajo */body.admin-on .fab{bottom:calc(86px + env(safe-area-inset-bottom));}</style>
 </head>
 <body>
-<script src="legacy-splash.js?v=20261118225409"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
-<script src="legacy-version.js?v=20261118225409"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
+<script src="legacy-splash.js?v=20261120200746"></script><!-- ⏳ splash compartido anti-parpadeo (one-ecosystem) -->
+<script src="legacy-version.js?v=20261120200746"></script><!-- 🔖 aviso de nueva versión (anti-caché viejo) -->
 <nav id="staff-tabbar" style="position:fixed;bottom:0;left:0;right:0;z-index:6000;background:rgba(11,14,20,0.94);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom);"><a href="index.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🚗</div>Inventario</a><a href="admin.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#f0c040;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">👥</div>Clientes</a><a href="finanzas.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">💰</div>Finanzas</a><a href="warehouse.html" style="flex:1;text-align:center;padding:8px 4px 9px;text-decoration:none;color:#8b93a3;font-size:10.5px;font-weight:600;letter-spacing:0.2px;"><div style="font-size:21px;line-height:1.15;margin-bottom:1px;">🏭</div>Warehouse</a></nav>
 
 <!-- AUDITORIA DE SALDOS (temporal) -->
@@ -1008,8 +1008,8 @@
   ];
 </script>
 
-<script src="legacy-svc.js?v=20261118225409"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
-<script src="legacy-clientficha.js?v=20261118225409"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
+<script src="legacy-svc.js?v=20261120200746"></script><!-- 🔗 componente compartido del ecosistema (badge/estatus/divisor) -->
+<script src="legacy-clientficha.js?v=20261120200746"></script><!-- 👤 ficha del cliente compartida (Cliente 360) -->
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -7776,9 +7776,33 @@ window._showContractLinks = function(enUrl, esUrl){
     + '<div style="font-size:13px;color:var(--muted,#9aa3b4);margin-bottom:16px;">Toca para abrir el contrato y firmarlo.'+(esClient?' Firma primero uno; para el otro idioma, vuelve a generar.':'')+'</div>'
     + '<a href="'+enUrl+'" style="display:block;background:var(--gold,#f0c040);color:#0b0e14;text-decoration:none;border-radius:12px;padding:15px;font-size:16px;font-weight:800;margin-bottom:10px;">📄 Contrato (inglés) — firmar</a>';
   if(esUrl) html += '<a href="'+esUrl+'" style="display:block;background:transparent;color:var(--gold,#f0c040);border:2px solid var(--gold,#f0c040);text-decoration:none;border-radius:12px;padding:15px;font-size:16px;font-weight:800;margin-bottom:10px;">📄 Traducción (español) — firmar</a>';
+  // 📲 Enviar al cliente para que firme desde SU app (portal → 📄 Mis contratos). Solo contrato de compra (no cargo).
+  html += '<div style="border-top:1px solid var(--border,#2a3141);margin:10px 0 12px;"></div>'
+    + '<button id="cl-send" style="display:block;width:100%;background:linear-gradient(135deg,#1f6feb,#4d9bff);color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:6px;">📲 Enviar al cliente para firmar en su app</button>'
+    + '<div style="font-size:11px;color:var(--muted,#9aa3b4);margin-bottom:12px;line-height:1.4;">El cliente lo firma desde su teléfono (portal → 📄 Mis contratos). Tú ya generaste el contrato; él solo firma.</div>';
   html += '<button onclick="this.closest(\'[data-clov]\').remove()" style="background:transparent;color:var(--muted,#9aa3b4);border:1px solid var(--border,#2a3141);border-radius:10px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-top:4px;">Cerrar</button>';
   box.innerHTML = html;
   ov.appendChild(box); document.body.appendChild(ov);
+  try{ const _sb=box.querySelector('#cl-send'); if(_sb) _sb.onclick=function(){ window._sendContractToClient(enUrl, _sb); }; }catch(e){}
+};
+// 📲 Marca el contrato como "por firmar" en el expediente del cliente (contractReady) → aparece en su app.
+window._sendContractToClient = async function(url, btn){
+  try{
+    const qs = (url.split('?')[1]||'');
+    const p = new URLSearchParams(qs);
+    const cid = p.get('clientId');
+    if(!cid){ alert('No hay cliente ligado al contrato. Genera el contrato desde la tarjeta del cliente.'); return; }
+    p.delete('_cb');
+    const file = url.split('?')[0];
+    const ready = { file:file, params:p.toString(), contractNum:(p.get('contractNum')||''), at:new Date().toISOString(), by:((auth.currentUser&&auth.currentUser.email)||'') };
+    if(btn){ btn.disabled=true; btn.textContent='Enviando…'; }
+    await updateDoc(doc(db,'clients',cid), { contractReady: ready });
+    alert('✅ Listo. El cliente ya puede firmar su contrato desde su app, en 📄 Mis contratos.');
+    const _ov=document.querySelector('[data-clov]'); if(_ov) _ov.remove();
+  }catch(e){
+    alert('No se pudo enviar: '+(e.message||e));
+    if(btn){ btn.disabled=false; btn.textContent='📲 Enviar al cliente para firmar en su app'; }
+  }
 };
 
 async function _loadPdfjs(){
@@ -7895,7 +7919,7 @@ window.repairDocs = function(){
   };
 };
 
-/* showPhoto → ahora COMPARTIDO en legacy-photo.js (un solo ecosistema). Ver <script src="legacy-photo.js?v=20261118225409">. */
+/* showPhoto → ahora COMPARTIDO en legacy-photo.js (un solo ecosistema). Ver <script src="legacy-photo.js?v=20261120200746">. */
 
 window.generateContract = function(clientId) {
   const c = clients.find(x => x.id === clientId);
@@ -8202,7 +8226,7 @@ document.addEventListener('pointerup', delegatedClientAction, false);
   #print-receipt *{ color:#000 !important; }
 }
 </style>
-<script type="module" src="launcher.js?v=20261118225409"></script>
-<script src="legacy-photo.js?v=20261118225409"></script>
+<script type="module" src="launcher.js?v=20261120200746"></script>
+<script src="legacy-photo.js?v=20261120200746"></script>
 </body>
 </html>

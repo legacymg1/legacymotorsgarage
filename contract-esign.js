@@ -106,31 +106,47 @@ window.signAndSave = async function(){
       if(ib && chk && chk.textContent.indexOf('✓')>=0){ ib.innerHTML='<img src="'+iniData+'" alt="initials" style="height:24px;display:block;margin:1px auto;">'; }
     });
   }
-  // ✍️ FIRMA DEL VENDEDOR: guardada UNA vez en config/sellerSignature (desde el admin) → se estampa
-  // SOLA en la(s) línea(s) del vendedor. Así el contrato queda firmado por AMBOS.
-  try{
-    var _SFS=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-    var _SAP=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
-    var _sapp=_SAP.getApps().length?_SAP.getApps()[0]:_SAP.initializeApp(__FBCFG);
-    var _sdb=_SFS.getFirestore(_sapp);
-    var _ss=await _SFS.getDoc(_SFS.doc(_sdb,'config','sellerSignature'));
-    var sellerImg=(_ss.exists()&&_ss.data().dataUrl)||'';
-    if(sellerImg){
-      var sellerLines=Array.prototype.slice.call(document.querySelectorAll('.sign-line')).filter(function(el){
-        var tx=(el.textContent||'');
-        return /(seller|vendedor|representative|representante)/i.test(tx) && !/(buyer|comprador)/i.test(tx);
-      });
-      sellerLines.forEach(function(line){
-        var label=line.innerHTML;
-        line.innerHTML='<img src="'+sellerImg+'" alt="seller signature" style="height:52px;display:block;margin:0 auto 2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:7pt;color:#888;">Firmado electr&oacute;nicamente / e-signed</span></div>';
-        var srow=line.parentNode;
-        if(srow && srow.querySelectorAll){
-          var ss2=srow.querySelectorAll('.sign-line');
-          for(var k=0;k<ss2.length;k++){ var slk=ss2[k]; var dk=(slk.textContent||'').replace(/\s/g,'').toLowerCase(); if(slk!==line && dk && dk.length<=12 && (dk.indexOf('date')>=0 || dk.indexOf('fecha')>=0)){ slk.innerHTML=stampNice+'<br><span style="font-size:8pt;color:#555;">Date / Fecha</span>'; } }
-        }
-      });
+  // ✍️ FIRMA DEL VENDEDOR en la(s) línea(s) del vendedor, para que el contrato quede firmado por AMBOS.
+  //   • STAFF (correo): lee config/sellerSignature (solo dueños pueden) y la estampa aquí mismo.
+  //   • CLIENTE (teléfono): NO puede leer config → deja el marcador <!--SELLER_SIGN--> y el backend
+  //     (contractSign / addonSign) inyecta la firma del vendedor del lado del servidor.
+  var _isPhoneClient = !(__user && __user.email);
+  function _stampSellerDate(line){
+    var srow=line.parentNode;
+    if(srow && srow.querySelectorAll){
+      var ss2=srow.querySelectorAll('.sign-line');
+      for(var k=0;k<ss2.length;k++){ var slk=ss2[k]; var dk=(slk.textContent||'').replace(/\s/g,'').toLowerCase(); if(slk!==line && dk && dk.length<=12 && (dk.indexOf('date')>=0 || dk.indexOf('fecha')>=0)){ slk.innerHTML=stampNice+'<br><span style="font-size:8pt;color:#555;">Date / Fecha</span>'; } }
     }
-  }catch(sellerErr){ /* si no hay firma de vendedor guardada, el contrato se guarda igual (solo faltaría tu firma) */ }
+  }
+  function _sellerLines(){
+    return Array.prototype.slice.call(document.querySelectorAll('.sign-line')).filter(function(el){
+      var tx=(el.textContent||'');
+      return /(seller|vendedor|representative|representante)/i.test(tx) && !/(buyer|comprador)/i.test(tx);
+    });
+  }
+  if(_isPhoneClient){
+    _sellerLines().forEach(function(line){
+      var label=line.innerHTML;
+      line.innerHTML='<!--SELLER_SIGN--><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:7pt;color:#888;">Firmado electr&oacute;nicamente / e-signed</span></div>';
+      _stampSellerDate(line);
+    });
+  } else {
+    try{
+      var _SFS=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+      var _SAP=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+      var _sapp=_SAP.getApps().length?_SAP.getApps()[0]:_SAP.initializeApp(__FBCFG);
+      var _sdb=_SFS.getFirestore(_sapp);
+      var _ss=await _SFS.getDoc(_SFS.doc(_sdb,'config','sellerSignature'));
+      var sellerImg=(_ss.exists()&&_ss.data().dataUrl)||'';
+      if(sellerImg){
+        _sellerLines().forEach(function(line){
+          var label=line.innerHTML;
+          line.innerHTML='<img src="'+sellerImg+'" alt="seller signature" style="height:52px;display:block;margin:0 auto 2px;"><div style="border-top:1px solid #000;padding-top:2px;">'+label+'<br><span style="font-size:7pt;color:#888;">Firmado electr&oacute;nicamente / e-signed</span></div>';
+          _stampSellerDate(line);
+        });
+      }
+    }catch(sellerErr){ /* si no hay firma de vendedor guardada, el contrato se guarda igual (solo faltaría tu firma) */ }
+  }
 
   document.querySelectorAll('.esign-wrap, .action-bar, .lmg-banner').forEach(function(el){el.remove();});
   document.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); el.style.cursor=''; });
@@ -155,6 +171,19 @@ window.signAndSave = async function(){
       await FN.httpsCallable(fns,'addonSign')({ clientId:clientId, addonId:addonId, contractNum:cnum, snapshotHTML:snapshotHTML, hash:hashHex });
       alert('¡Contrato del cargo firmado y guardado! Numero: '+cnum+'.');
       var _u3A=new URL(window.location.href); _u3A.searchParams.set('_cb', String(Date.now())); window.location.href=_u3A.toString();
+      return;
+    }
+    // 🚗 CONTRATO DE COMPRA firmado por el CLIENTE (teléfono, sin email) → Cloud Function (admin SDK):
+    //    sube + versiona + inyecta la firma del vendedor en el marcador. El cliente no puede leer/escribir su doc.
+    if(!addonId && !(__user && __user.email)){
+      var FN2=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js');
+      var fns2=FN2.getFunctions(app);
+      var reasonC=null; try{ reasonC=sessionStorage.getItem('correctionReason'); }catch(e){}
+      var rC=await FN2.httpsCallable(fns2,'contractSign')({ clientId:clientId, contractNum:cnum, snapshotHTML:snapshotHTML, hash:hashHex, correctionReason:(reasonC||'') });
+      try{ sessionStorage.removeItem('correctionReason'); }catch(e){}
+      var rdC=(rC&&rC.data)||{};
+      alert('¡Contrato firmado y guardado! Numero: '+(rdC.contractNumber||cnum)+(rdC.version?(' (version '+rdC.version+')'):'')+'.');
+      var _u3C=new URL(window.location.href); _u3C.searchParams.delete('__correct'); _u3C.searchParams.set('_cb', String(Date.now())); window.location.href=_u3C.toString();
       return;
     }
     var snap=await FS.getDoc(FS.doc(db,'clients',clientId));

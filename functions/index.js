@@ -2147,6 +2147,71 @@ exports.addonSign = onCall({ timeoutSeconds: 60 }, async (request) => {
   await ref.set({ addons: updated }, { merge: true });
   return { ok: true, url };
 });
+
+// ✍️ FIRMA DEL CONTRATO DE COMPRA (carro) — la puede guardar el STAFF (email) o el PROPIO cliente (teléfono).
+// Igual que addonSign PERO escribe signedContract + signedContractVersions (versionado inmutable) del CARRO.
+// Además inyecta la firma del VENDEDOR del lado del servidor (el cliente no puede leer config/sellerSignature),
+// reemplazando el marcador <!--SELLER_SIGN--> que la página deja en la(s) línea(s) del vendedor.
+exports.contractSign = onCall({ timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
+  const tok = request.auth.token || {};
+  const email = String(tok.email || "").toLowerCase();
+  const phone = String(tok.phone_number || "");
+  const d = request.data || {};
+  const clientId = String(d.clientId || "");
+  let html = String(d.snapshotHTML || "");
+  const contractNum = String(d.contractNum || ("LMG-" + new Date().getFullYear() + "-" + String(Date.now()).slice(-5)));
+  const hash = String(d.hash || "");
+  const correctionReason = d.correctionReason ? String(d.correctionReason) : "";
+  if (!clientId || !html) throw new HttpsError("invalid-argument", "Faltan datos del contrato.");
+  if (html.length > 6000000) throw new HttpsError("invalid-argument", "Documento demasiado grande.");
+  const db = admin.firestore();
+  const ref = db.collection("clients").doc(clientId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Cliente no encontrado.");
+  const c = snap.data() || {};
+  // Autorización: staff (cualquier email autenticado) o el PROPIO cliente (su teléfono coincide con el del expediente).
+  const isStaff = !!email;
+  let isSelf = false;
+  if (phone) {
+    const digits = phone.replace(/\D/g, "");
+    const cand = [c.phoneE164, c.phone].map((x) => String(x || "").replace(/\D/g, "")).filter(Boolean);
+    isSelf = cand.some((x) => x === digits || x.slice(-10) === digits.slice(-10));
+  }
+  if (!isStaff && !isSelf) throw new HttpsError("permission-denied", "No autorizado para firmar este contrato.");
+  // Anti sobre-escritura: si YA hay un contrato activo y NO es corrección, no dejar re-firmar.
+  const existingVersions = Array.isArray(c.signedContractVersions) ? c.signedContractVersions.slice() : [];
+  const activeNow = (c.signedContract && c.signedContract.status === "active") ? c.signedContract : null;
+  if (activeNow && !correctionReason) throw new HttpsError("failed-precondition", "Este contrato ya está firmado.");
+  // Inyectar la firma del VENDEDOR (config/sellerSignature) en el marcador — el cliente nunca recibe la imagen cruda.
+  try {
+    const ss = await db.collection("config").doc("sellerSignature").get();
+    const sellerImg = (ss.exists && ss.data() && ss.data().dataUrl) ? ss.data().dataUrl : "";
+    if (sellerImg) {
+      const imgTag = '<img src="' + sellerImg + '" alt="seller signature" style="height:52px;display:block;margin:0 auto 2px;">';
+      html = html.split("<!--SELLER_SIGN-->").join(imgTag);
+    }
+  } catch (e) { /* si no hay firma del vendedor guardada, se guarda igual */ }
+  // Subir la copia firmada a Storage con token de descarga (URL que el cliente puede abrir).
+  const bucket = admin.storage().bucket();
+  const newVer = existingVersions.length + 1;
+  const key = "contracts/" + clientId + "/" + contractNum + "-v" + newVer + ".html";
+  let token; try { token = require("crypto").randomUUID(); } catch (e) { token = Date.now() + "-" + Math.random().toString(36).slice(2); }
+  await bucket.file(key).save(Buffer.from(html, "utf8"), { contentType: "text/html; charset=utf-8", resumable: false, metadata: { cacheControl: "public,max-age=31536000", metadata: { firebaseStorageDownloadTokens: token } } });
+  const url = wmTokenUrl(bucket.name, key, token);
+  const nowISO = new Date().toISOString();
+  // Versionado inmutable: anula la versión activa anterior (solo en corrección), agrega la nueva.
+  const versions = existingVersions.map((v) => {
+    if (v && v.status === "active") return Object.assign({}, v, { status: "voided", voidedAt: nowISO, voidReason: correctionReason || "Corrección" });
+    return v;
+  });
+  const entry = { version: newVer, url, contractNumber: contractNum, signedAt: nowISO, method: "esign", status: "active", hash, signedBy: (email || phone || "cliente") };
+  if (correctionReason) entry.correctionReason = correctionReason;
+  versions.push(entry);
+  // Al firmar, limpiamos la bandera "por firmar" (contractReady) para que no reaparezca.
+  await ref.set({ signedContractVersions: versions, signedContract: entry, contractReady: admin.firestore.FieldValue.delete() }, { merge: true });
+  return { ok: true, url, version: newVer, contractNumber: contractNum };
+});
 // La app del empleado llama esto al iniciar sesión → sabe su nombre y qué roles mostrarle.
 exports.empMe = onCall({ timeoutSeconds: 20 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Inicia sesión.");
